@@ -8,12 +8,14 @@
   },
   "packageManager": "pnpm@12.6.0",
   "scripts": {
+    "gen:types": "node scripts/gen-types.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
     "ajv": "^8.20.0",
+    "json-schema-to-typescript": "^16.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }

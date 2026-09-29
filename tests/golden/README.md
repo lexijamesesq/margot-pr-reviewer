@@ -4,6 +4,11 @@ These 70 contract/1 fixtures were copied from lexijamesesq/margot at
 45f12bb406260cc93455dc684e0c0cc78e261565. The schema in
 schema/contract-1.schema.json is the language-neutral source of truth.
 
+Contract types are generated from the schema with cross-field constraint-only
+branches stripped before generation; those rules are enforced by Ajv against
+the full, unmodified schema when a case is loaded, not by the type system. Run
+`pnpm gen:types` to regenerate the committed types.
+
 Margot keeps its own copy until cutover. Any live fix that re-records a fixture
 must be paired with a re-copy into this engine repository. After cutover,
 Margot's copy is deleted and this repository becomes the only copy.

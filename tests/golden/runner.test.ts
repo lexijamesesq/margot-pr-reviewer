@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { canonicalize } from "../../src/contract/canonical.js";
 import { compareGolden, findGitHubRead } from "../../src/contract/compare.js";
-import type { GoldenExpected, Seam } from "../../src/contract/types.js";
+import type { Expected, Seam } from "../../src/contract/types.js";
 import { readGoldenCase, readGoldenExpected } from "../../src/contract/validate.js";
 
 const PORTED: ReadonlySet<Seam> = new Set();
@@ -43,21 +43,39 @@ describe("runner self-tests", () => {
     expect(canonicalize(input)).toBe('{"risk":{"R":1,"safe":true,"tail":0.3},"z":[1]}');
   });
 
+  test("canonicalization sorts object keys by code point", () => {
+    expect(canonicalize({ a: 1, B: 2 })).toBe('{"B":2,"a":1}');
+  });
+
   test("the comparator catches a byte-exact rendered-string mismatch", () => {
-    const expected: GoldenExpected = {
+    const expected: Expected = {
       schema: "contract/1",
       id: "self-test",
       github: {
         writes: [{ method: "POST", path: "checks", body: { text: "line\n" }, token: "WRITE" }],
       },
     };
-    const actual: GoldenExpected = {
+    const actual: Expected = {
       ...expected,
       github: {
         writes: [{ method: "POST", path: "checks", body: { text: "line" }, token: "WRITE" }],
       },
     };
     expect(compareGolden(actual, expected)).toContain("github.writes");
+  });
+
+  test("the comparator does not round outcome triage numbers", () => {
+    const expected: Expected = {
+      schema: "contract/1",
+      id: "self-test",
+      github: { writes: [] },
+      outcome: { status: "reviewed", triage: { p: 0.3 } },
+    };
+    const actual: Expected = {
+      ...expected,
+      outcome: { status: "reviewed", triage: { p: 0.1 + 0.2 } },
+    };
+    expect(compareGolden(actual, expected)).toContain("outcome");
   });
 
   test("GitHub reads are an order-free store and missing data fails", () => {
