@@ -1,0 +1,32 @@
+{
+  "schema": "contract/1",
+  "id": "poster-check-create-no-id",
+  "model_requests": [],
+  "jev_requests": [],
+  "github": {
+    "writes": [
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/incubator/check-runs",
+        "body": {
+          "name": "review / margot",
+          "head_sha": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+          "status": "in_progress",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/36355686534",
+          "output": {
+            "title": "Margot: council is reviewing the changes",
+            "summary": "Review in progress; no clearance issued."
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "poster": {
+    "raised": "SystemExit",
+    "exit": {
+      "code": 1,
+      "uncaught": false
+    }
+  }
+}

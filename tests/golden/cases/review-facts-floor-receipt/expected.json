@@ -1,0 +1,42 @@
+{
+  "schema": "contract/1",
+  "id": "review-facts-floor-receipt",
+  "github": {
+    "writes": []
+  },
+  "outcome": {
+    "status": "reviewed",
+    "facts": {
+      "changed_files": [
+        "src/upload.py",
+        "tests/test_upload.py"
+      ],
+      "floor_receipt": [
+        {
+          "name": "ci / checks",
+          "conclusion": "neutral",
+          "url": "https://github.com/example-org/widgets/runs/100",
+          "app": "github-actions"
+        },
+        {
+          "name": "margot-anything",
+          "conclusion": "neutral",
+          "url": "https://github.com/example-org/widgets/runs/103",
+          "app": "github-actions"
+        },
+        {
+          "name": "ci / lint",
+          "conclusion": "neutral",
+          "url": "https://github.com/example-org/widgets/runs/100",
+          "app": "github-actions"
+        },
+        {
+          "name": "trusted-scan / trusted-scan",
+          "conclusion": "success",
+          "url": "https://github.com/example-org/widgets/runs/104",
+          "app": "github-actions"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "schema": "contract/1",
+  "id": "poster-check-create-no-id",
+  "description": "MARGOT_CHECK_ID is absent and creating the check returns no id: exit 1, nothing posted.",
+  "branch_class": "poster: check creation failing (no id)",
+  "provenance": "constructed",
+  "source": {
+    "constructed": true
+  },
+  "scrub": {
+    "ticket_ids": 0,
+    "roster_names": 0,
+    "vault_paths": 0
+  },
+  "pr": {
+    "repo": {
+      "value": "lexijamesesq/incubator",
+      "provenance": "recorded"
+    },
+    "number": {
+      "value": "93",
+      "provenance": "recorded"
+    },
+    "head_sha": {
+      "value": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+      "provenance": "recorded"
+    },
+    "base_sha": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "author": {
+      "value": "claude-the-enduring[bot]",
+      "provenance": "recorded"
+    },
+    "title": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "body": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "changed_files": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "triage": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "self_instrument_match": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "floor_receipt": {
+      "value": null,
+      "provenance": "constructed"
+    }
+  },
+  "github": {
+    "reads": [],
+    "write_responses": [
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/incubator/check-runs",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": {
+          "name": "review / margot",
+          "head_sha": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+          "status": "in_progress",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/36355686534",
+          "output": {
+            "title": "Margot: council is reviewing the changes",
+            "summary": "Review in progress; no clearance issued."
+          }
+        },
+        "response": "{}",
+        "provenance": "constructed"
+      }
+    ]
+  },
+  "models": {},
+  "jev": {},
+  "seams": [
+    "poster"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "contract/1",
+  "id": "review-admission-merge-conflict",
+  "github": {
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "repos/example-org/widgets/check-runs/4242",
+        "body": {
+          "status": "completed",
+          "conclusion": "failure",
+          "output[title]": "not reviewed: merge conflict (resolve before review)",
+          "output[summary]": "Margot does not review merge conflict (resolve before review) PRs."
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "outcome": {
+    "status": "refused:merge-conflict"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "driver": false,
+  "poster": true,
+  "owned_tier": null,
+  "poster_env": {
+    "REPO": {
+      "value": "lexijamesesq/incubator",
+      "provenance": "recorded"
+    },
+    "PR_NUMBER": {
+      "value": "93",
+      "provenance": "recorded"
+    },
+    "HEAD_SHA": {
+      "value": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+      "provenance": "recorded"
+    },
+    "PR_AUTHOR": {
+      "value": "claude-the-enduring[bot]",
+      "provenance": "recorded"
+    },
+    "RUN_URL": {
+      "value": "https://github.com/example-org/margot-instance/actions/runs/36355686534",
+      "provenance": "recorded"
+    },
+    "MARGOT_CALIBRATING": {
+      "value": "false",
+      "provenance": "constructed"
+    },
+    "PR_TICKET": {
+      "value": "T-1",
+      "provenance": "constructed"
+    },
+    "MARGOT_RUNTIME_S": {
+      "value": "391",
+      "provenance": "constructed"
+    },
+    "VERDICT_JSON": {
+      "value": "",
+      "provenance": "constructed"
+    },
+    "MARGOT_COST_USD": {
+      "value": "0.6998886000000001",
+      "provenance": "reconstructed"
+    },
+    "MARGOT_CHECK_ID": {
+      "value": "4242",
+      "provenance": "constructed"
+    }
+  }
+}

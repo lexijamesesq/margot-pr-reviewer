@@ -1,0 +1,150 @@
+{
+  "schema": "contract/1",
+  "id": "triage-fallback-says-mechanical",
+  "description": "Counterfactual (the hosted triage runner has no `claude`): Jev fails five times and a fallback answers 0.97. A fallback is never a clearance: not mechanical, `decision_source: fallback`.",
+  "branch_class": "triage: fallback-sourced answer (counterfactual)",
+  "provenance": "constructed",
+  "source": {
+    "constructed": true
+  },
+  "scrub": {
+    "ticket_ids": 0,
+    "roster_names": 0,
+    "vault_paths": 0
+  },
+  "pr": {
+    "repo": {
+      "value": "example-org/widgets",
+      "provenance": "constructed"
+    },
+    "number": {
+      "value": "7",
+      "provenance": "constructed"
+    },
+    "head_sha": {
+      "value": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "provenance": "constructed"
+    },
+    "base_sha": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "author": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "title": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "body": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "changed_files": {
+      "value": [],
+      "provenance": "constructed"
+    },
+    "triage": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "self_instrument_match": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "floor_receipt": {
+      "value": null,
+      "provenance": "constructed"
+    }
+  },
+  "github": {
+    "reads": [
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/pulls/7",
+        "params": {},
+        "body": null,
+        "response": "{\"head\": {\"sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\", \"repo\": {\"full_name\": \"example-org/widgets\"}}, \"base\": {\"sha\": \"0123456789abcdef0123456789abcdef01234567\"}, \"user\": {\"login\": \"renovate[bot]\"}, \"title\": \"Update dependency requests to v2.32.4\", \"body\": \"This PR updates requests.\"}",
+        "provenance": "constructed"
+      },
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/compare/0123456789abcdef0123456789abcdef01234567...a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "params": {
+          "Accept": "application/vnd.github.diff"
+        },
+        "body": null,
+        "response": "diff --git a/requirements.txt b/requirements.txt\nindex 1111111..2222222 100644\n--- a/requirements.txt\n+++ b/requirements.txt\n@@ -1,2 +1,2 @@\n-requests==2.32.3\n+requests==2.32.4\n",
+        "provenance": "constructed"
+      }
+    ],
+    "write_responses": [
+      {
+        "method": "POST",
+        "path": "repos/example-org/widgets/check-runs",
+        "params": {},
+        "body": {
+          "name": "review / triage",
+          "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+          "status": "completed",
+          "conclusion": "success",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/1001",
+          "output[title]": "Margot triage: not mechanical",
+          "output[summary]": "p=0.97 source=fallback. Mechanical: a dependency bump or formatter output with no functional change — the light floor runs and it merges; otherwise the full floor runs and the council reviews. This check is information for CI, never a gate.",
+          "output[text]": "{\"mechanical\": false, \"p\": 0.97, \"decision_source\": \"fallback\", \"reason\": \"\", \"owned_tier\": \"none\", \"head_sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\"}"
+        },
+        "response": "{\"id\":1}",
+        "provenance": "constructed"
+      }
+    ]
+  },
+  "models": {
+    "{\"card\":null,\"json_schema\":{\"additionalProperties\":false,\"properties\":{\"mechanical\":{\"additionalProperties\":false,\"properties\":{\"noul\":{\"maximum\":1,\"minimum\":0,\"type\":\"number\"}},\"required\":[\"noul\"],\"type\":\"object\"}},\"required\":[\"mechanical\"],\"type\":\"object\"},\"model\":\"claude-haiku-4-5\",\"prompt\":\"You are Margot's FALLBACK decision engine. The usual decision model (Jev) is unavailable, so you stand in for it on this one change. Judge ONLY from the change description below — do not ask for or assume anything not stated. Answer every question in the schema. Two question types:\\n  - noul: a calibrated probability in [0,1] that the named review lens is NEEDED for this change (higher = more likely needed).\\n  - score: an integer 0-3 against the given anchors (0 = lowest, 3 = highest).\\nYou are a DEGRADED stand-in and your verdict cannot auto-merge anything, so when genuinely uncertain, fail toward review: prefer summoning a lens (higher noul) and the higher score. Return ONLY the JSON the schema requires.\\n\\n=== CHANGE DESCRIPTION (state) ===\\n\\nPull request #7 in example-org/widgets.\\nChanged files (1): requirements.txt\\nCODEOWNERS ownership tier: none\\nDiff:\\ndiff --git a/requirements.txt b/requirements.txt\\nindex 1111111..2222222 100644\\n--- a/requirements.txt\\n+++ b/requirements.txt\\n@@ -1,2 +1,2 @@\\n-requests==2.32.3\\n+requests==2.32.4\\n\\n\\n\\n=== QUESTIONS ===\\n\\n- mechanical (noul): Probability this change is PURELY MECHANICAL: a tool-generated, deterministic change with NO functional or behavioral effect. Mechanical cases: a dependency version bump (manifest and/or lockfile, including a pinned action SHA/digest); linter/formatter output that changes only style (whitespace, indentation, import order, quotes, trailing commas, reflow). NOT mechanical if any hunk changes logic, values, configuration values, control flow, or behavior. Docs/comment edits, generated code whose source input changed, renames/moves, and test changes are NOT mechanical. When unsure, it is not mechanical.\",\"role\":\"fallback\",\"settings\":{\"disableAllHooks\":true},\"tool_permissions\":{\"allowed\":[],\"disallowed\":[],\"tools\":[]}}": {
+      "outcome": "success",
+      "response": "{\"type\": \"result\", \"subtype\": \"success\", \"is_error\": false, \"result\": \"{\\\"mechanical\\\": {\\\"noul\\\": 0.97}}\", \"total_cost_usd\": 0.003}",
+      "provenance": "constructed"
+    }
+  },
+  "jev": {
+    "{\"model\":\"jev-1.13.0\",\"questions\":{\"mechanical\":{\"instructions\":\"Probability this change is PURELY MECHANICAL: a tool-generated, deterministic change with NO functional or behavioral effect. Mechanical cases: a dependency version bump (manifest and/or lockfile, including a pinned action SHA/digest); linter/formatter output that changes only style (whitespace, indentation, import order, quotes, trailing commas, reflow). NOT mechanical if any hunk changes logic, values, configuration values, control flow, or behavior. Docs/comment edits, generated code whose source input changed, renames/moves, and test changes are NOT mechanical. When unsure, it is not mechanical.\",\"type\":\"noul\"}},\"state\":\"Pull request #7 in example-org/widgets.\\nChanged files (1): requirements.txt\\nCODEOWNERS ownership tier: none\\nDiff:\\ndiff --git a/requirements.txt b/requirements.txt\\nindex 1111111..2222222 100644\\n--- a/requirements.txt\\n+++ b/requirements.txt\\n@@ -1,2 +1,2 @@\\n-requests==2.32.3\\n+requests==2.32.4\\n\"}": {
+      "outcome": "persistent_failure",
+      "failure": {
+        "code": 503,
+        "reason": "Service Unavailable",
+        "body": "{\"error\":\"capacity\"}"
+      },
+      "provenance": "constructed"
+    }
+  },
+  "ruleset": {
+    "value": {
+      "codeowners_required_owned": [
+        "/.github/workflows/"
+      ],
+      "repos": {
+        "example-org/widgets": {
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/src/"
+          ]
+        }
+      },
+      "self_instrument": {
+        "global": [
+          "/.github/workflows/self-instrument-alert.yml"
+        ],
+        "repos": {
+          "example-org/widgets": [
+            "/gate/"
+          ]
+        }
+      }
+    },
+    "provenance": "constructed"
+  },
+  "seams": [
+    "triage",
+    "workflow-steps"
+  ]
+}

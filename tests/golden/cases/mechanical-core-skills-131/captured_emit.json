@@ -1,0 +1,71 @@
+{
+  "pr": {
+    "repo": "lexijamesesq/core-skills",
+    "number": "131",
+    "head_sha": "582f517acbd978e08621197517a66ed830b8448f",
+    "author": "ollie-the-intern[bot]"
+  },
+  "owned_path": {
+    "tier": "required_owned",
+    "owned_files": []
+  },
+  "n_files": 1,
+  "route": null,
+  "council": {
+    "summoned": [],
+    "prose": "",
+    "status": "mechanical",
+    "cost_usd": null,
+    "no_council": true
+  },
+  "risk": {
+    "vector": {
+      "blast_radius": 0.0,
+      "reversibility": 0.0,
+      "data_security": 0.0,
+      "operations": 0.0,
+      "verification_gap": 0.0
+    },
+    "levels": {
+      "blast_radius": 0,
+      "reversibility": 0,
+      "data_security": 0,
+      "operations": 0,
+      "verification_gap": 0
+    },
+    "R": 0,
+    "r_continuous": 0.0,
+    "band": "LOW",
+    "confidence": {
+      "blast_radius": 1.0,
+      "reversibility": 1.0,
+      "data_security": 1.0,
+      "operations": 1.0,
+      "verification_gap": 1.0
+    },
+    "distribution": {},
+    "decision_source": "jev"
+  },
+  "cards": [],
+  "decision_source": "jev",
+  "status": "ok",
+  "pipeline_ok": true,
+  "outcome": "APPROVED",
+  "band": "LOW",
+  "risk_classification": "mechanical change — no functional change",
+  "summary": "A mechanical change (dependency bump, or linter/formatter output) with no functional change — no review was required.",
+  "established": [],
+  "dismissed": [],
+  "unresolved_issue_ids": [],
+  "mechanical_p": 0.78,
+  "verdict_source": "mechanical",
+  "adherence": {
+    "status": "checked",
+    "risk_classification_ok": true,
+    "cards_restating": [],
+    "ok": true,
+    "nouls": {
+      "risk_is_classification": 0.89
+    }
+  }
+}

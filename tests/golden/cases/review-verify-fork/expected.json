@@ -1,0 +1,10 @@
+{
+  "schema": "contract/1",
+  "id": "review-verify-fork",
+  "github": {
+    "writes": []
+  },
+  "outcome": {
+    "status": "refused:fork"
+  }
+}

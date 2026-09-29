@@ -1,0 +1,10 @@
+{
+  "schema": "contract/1",
+  "id": "triage-fork-refusal",
+  "github": {
+    "writes": []
+  },
+  "outcome": {
+    "status": "refused:fork"
+  }
+}

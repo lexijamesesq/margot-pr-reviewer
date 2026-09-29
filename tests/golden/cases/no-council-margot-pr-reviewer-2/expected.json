@@ -1,0 +1,320 @@
+{
+  "schema": "contract/1",
+  "id": "no-council-margot-pr-reviewer-2",
+  "model_requests": [],
+  "jev_requests": [
+    {
+      "model": "jev-1.13.0",
+      "state": "Pull request #2 in lexijamesesq/margot-pr-reviewer by claude-the-enduring[bot].\nTitle: docs: clarify the README\nBody: A one-line README-only documentation change.\nChanged files (1): README.md\nCODEOWNERS ownership tier: none",
+      "questions": {
+        "exposure": {
+          "type": "score",
+          "instructions": "Score this change's overall security/operational exposure.",
+          "criteria": [
+            "none",
+            "an existing boundary preserved",
+            "a consequential data or privilege change",
+            "credential exposure, trust-boundary failure, or an authorization-control change"
+          ]
+        },
+        "safety": {
+          "type": "noul",
+          "instructions": "Does this change need the 'safety' review lens? It does when: a changed file can run, be sourced, grant access, or carry a credential shape."
+        },
+        "works-and-proven": {
+          "type": "noul",
+          "instructions": "Does this change need the 'works-and-proven' review lens? It does when: the change claims a behavior, a fix, or a result that evidence could establish."
+        },
+        "principal-engineer": {
+          "type": "noul",
+          "instructions": "Does this change need the 'principal-engineer' review lens? It does when: blast radius, reversibility, or operations is 1 or more."
+        },
+        "achieves-the-objective": {
+          "type": "noul",
+          "instructions": "Does this change need the 'achieves-the-objective' review lens? It does when: intent or scope alignment is unresolved after reading the body and diff."
+        },
+        "maintainable-no-slop": {
+          "type": "noul",
+          "instructions": "Does this change need the 'maintainable-no-slop' review lens? It does when: a material maintainability/slop question remains after the mechanical checks."
+        },
+        "house-style": {
+          "type": "noul",
+          "instructions": "Does this change need the 'house-style' review lens? It does when: a material convention question remains after the mechanical checks."
+        }
+      }
+    },
+    {
+      "model": "jev-1.13.0",
+      "state": "Pull request #2 in lexijamesesq/margot-pr-reviewer by claude-the-enduring[bot].\nTitle: docs: clarify the README\nBody: A one-line README-only documentation change.\nChanged files (1): README.md\nCODEOWNERS ownership tier: none\nCouncil findings:\n(no council: no_council)",
+      "questions": {
+        "blast_radius": {
+          "type": "score",
+          "instructions": "Score the change's blast radius against the anchors.",
+          "criteria": [
+            "non-behavioral",
+            "one bounded behavior",
+            "a shared contract or several consumers",
+            "changes estate control"
+          ]
+        },
+        "reversibility": {
+          "type": "score",
+          "instructions": "Score the change's reversibility against the anchors.",
+          "criteria": [
+            "no state effect",
+            "a revert restores it",
+            "recovery needs a demonstrated extra procedure",
+            "irreversible, or no effective recovery"
+          ]
+        },
+        "data_security": {
+          "type": "score",
+          "instructions": "Score the change's data security against the anchors.",
+          "criteria": [
+            "none",
+            "an existing boundary preserved",
+            "a consequential data or privilege change",
+            "credential exposure, trust-boundary failure, or an authorization-control change"
+          ]
+        },
+        "operations": {
+          "type": "score",
+          "instructions": "Score the change's operations against the anchors.",
+          "criteria": [
+            "none",
+            "a local, observable failure",
+            "a shared automation or service disruption",
+            "loss of recovery or control, or critical machine or house behavior"
+          ]
+        },
+        "verification_gap": {
+          "type": "score",
+          "instructions": "Score the change's verification gap against the anchors.",
+          "criteria": [
+            "proportionate evidence complete",
+            "minor uncertainty that cannot change clearance",
+            "material, author-resolvable proof missing",
+            "cannot be established by any test, static proof, or execution evidence"
+          ]
+        }
+      }
+    },
+    {
+      "model": "jev-1.13.0",
+      "state": "Risk line: low exposure — verification gap\nSummary: No review lens was required for this change.\n\nCouncil findings (card: finding):",
+      "questions": {
+        "risk_is_classification": {
+          "type": "noul",
+          "instructions": "Is the risk line a SHORT CLASSIFICATION — a few-word noun phrase naming the KIND of exposure (e.g. 'workflow-injection risk' or 'dependency bump, non-behavioral') — rather than a full explanatory sentence? True = a classification; False = a sentence."
+        }
+      }
+    }
+  ],
+  "github": {
+    "writes": [
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/margot-pr-reviewer/pulls/2/reviews",
+        "body": {
+          "commit_id": "4fad52cd3652586829113741dfea318af36d0fe0",
+          "event": "APPROVE",
+          "body": "### ✅ APPROVED\n🟢 **Risk: LOW** — low exposure — verification gap\n> No review lens was required for this change.\n\n---\nCouncil reviewed 1 file • 0 of 6 cards • 0 findings • $— • 1m\n* ❓ `safety` — skipped\n* ❓ `works-and-proven` — skipped\n* ❓ `principal-engineer` — skipped\n* ❓ `achieves-the-objective` — skipped\n* ❓ `maintainable-no-slop` — skipped\n* ❓ `house-style` — skipped\n\nReview 1 · 0 open · 0 fixed · 0 new\n\n---\n**Author:** [claude-the-enduring[bot]](https://github.com/apps/claude-the-enduring)\n**Ticket:** none\n**Commit:** [4fad52c](https://github.com/lexijamesesq/margot-pr-reviewer/commit/4fad52cd3652586829113741dfea318af36d0fe0)\n**Run:** [36591199819](https://github.com/example-org/margot-instance/actions/runs/36591199819)\n\n<!-- margot:v1 -->\n<!-- margot-ledger:v1 eyJlbnRyaWVzIjpbXSwiaGVhZCI6IjRmYWQ1MmNkMzY1MjU4NjgyOTExMzc0MWRmZWEzMThhZjM2ZDBmZTAiLCJyb3VuZCI6MSwidiI6MX0= -->"
+        },
+        "token": "WRITE"
+      },
+      {
+        "method": "PATCH",
+        "path": "repos/lexijamesesq/margot-pr-reviewer/check-runs/4242",
+        "body": {
+          "status": "completed",
+          "conclusion": "success",
+          "output": {
+            "title": "Margot: approved",
+            "summary": "APPROVED, LOW: low exposure — verification gap.",
+            "text": "verdict_source: fast_path\npipeline_ok: True\noutcome: APPROVED | band: LOW\nvector: {\"blast_radius\": 0.0, \"reversibility\": 0.61, \"data_security\": 0.11, \"operations\": 0.01, \"verification_gap\": 0.9}\nowned tier: none\nsummoned: none\nsummoned by ledger: none\nconvergence: {\"round\": 1, \"standing\": 0, \"fixed\": 0, \"new\": 0, \"late\": 0, \"unconfirmed\": 0}\ndecision_source: jev\ncan auto-merge: True\nadherence: clean"
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "driver": {
+    "raised": null
+  },
+  "emit": {
+    "pr": {
+      "repo": "lexijamesesq/margot-pr-reviewer",
+      "number": "2",
+      "head_sha": "4fad52cd3652586829113741dfea318af36d0fe0",
+      "author": "claude-the-enduring[bot]"
+    },
+    "owned_path": {
+      "tier": "none",
+      "owned_files": []
+    },
+    "n_files": 1,
+    "route": {
+      "exposure": {
+        "type": "score",
+        "score": 0.01,
+        "confidence": 0.99,
+        "legend": {
+          "0": "none",
+          "1": "an existing boundary preserved",
+          "2": "a consequential data or privilege change",
+          "3": "credential exposure, trust-boundary failure, or an authorization-control change"
+        },
+        "probabilities": {
+          "0": 1.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        }
+      },
+      "cards": {
+        "safety": {
+          "noul": 0.05,
+          "summon": false
+        },
+        "works-and-proven": {
+          "noul": 0.32,
+          "summon": false
+        },
+        "principal-engineer": {
+          "noul": 0.12,
+          "summon": false
+        },
+        "achieves-the-objective": {
+          "noul": 0.22,
+          "summon": false
+        },
+        "maintainable-no-slop": {
+          "noul": 0.15,
+          "summon": false
+        },
+        "house-style": {
+          "noul": 0.27,
+          "summon": false
+        }
+      },
+      "summoned": [],
+      "decision_source": "jev"
+    },
+    "council": {
+      "summoned": [],
+      "prose": "",
+      "reviews": [],
+      "status": "no_council",
+      "cost_usd": null,
+      "no_council": true
+    },
+    "round": 1,
+    "summoned_by_ledger": [],
+    "risk": {
+      "vector": {
+        "blast_radius": 0.0,
+        "reversibility": 0.61,
+        "data_security": 0.11,
+        "operations": 0.01,
+        "verification_gap": 0.9
+      },
+      "levels": {
+        "blast_radius": 0,
+        "reversibility": 1,
+        "data_security": 0,
+        "operations": 0,
+        "verification_gap": 2
+      },
+      "R": 1,
+      "r_continuous": 0.9,
+      "band": "LOW",
+      "confidence": {
+        "blast_radius": 1.0,
+        "reversibility": 0.61,
+        "data_security": 0.89,
+        "operations": 0.99,
+        "verification_gap": 0.1
+      },
+      "distribution": {
+        "blast_radius": {
+          "0": 1.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "reversibility": {
+          "0": 0.39,
+          "1": 0.61,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "data_security": {
+          "0": 0.89,
+          "1": 0.11,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "operations": {
+          "0": 1.0,
+          "1": 0.0,
+          "2": 0.0,
+          "3": 0.0
+        },
+        "verification_gap": {
+          "0": 0.55,
+          "1": 0.11,
+          "2": 0.23,
+          "3": 0.11
+        }
+      },
+      "decision_source": "jev",
+      "band_basis": "confident-dims",
+      "ignored_dimensions": [
+        "verification_gap"
+      ]
+    },
+    "council_valid": true,
+    "cards": [],
+    "decision_source": "jev",
+    "status": "ok",
+    "pipeline_ok": true,
+    "outcome": "APPROVED",
+    "band": "LOW",
+    "risk_classification": "low exposure — verification gap",
+    "summary": "No review lens was required for this change.",
+    "established": [],
+    "dismissed": [],
+    "unresolved_issue_ids": [],
+    "verdict_source": "fast_path",
+    "ledger": {
+      "v": 1,
+      "round": 1,
+      "head": "4fad52cd3652586829113741dfea318af36d0fe0",
+      "entries": []
+    },
+    "convergence": {
+      "round": 1,
+      "standing": 0,
+      "fixed": 0,
+      "new": 0,
+      "late": 0,
+      "unconfirmed": 0
+    },
+    "adherence": {
+      "status": "checked",
+      "risk_classification_ok": true,
+      "cards_restating": [],
+      "ok": true,
+      "nouls": {
+        "risk_is_classification": 0.91
+      }
+    }
+  },
+  "poster": {
+    "raised": null,
+    "exit": {
+      "code": 0,
+      "uncaught": false
+    }
+  }
+}

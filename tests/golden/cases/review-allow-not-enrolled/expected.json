@@ -1,0 +1,10 @@
+{
+  "schema": "contract/1",
+  "id": "review-allow-not-enrolled",
+  "github": {
+    "writes": []
+  },
+  "outcome": {
+    "status": "refused:not-enrolled"
+  }
+}

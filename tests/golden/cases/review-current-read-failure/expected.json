@@ -1,0 +1,10 @@
+{
+  "schema": "contract/1",
+  "id": "review-current-read-failure",
+  "github": {
+    "writes": []
+  },
+  "outcome": {
+    "status": "refused:read-failure"
+  }
+}

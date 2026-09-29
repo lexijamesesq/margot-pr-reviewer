@@ -1,0 +1,133 @@
+{
+  "schema": "contract/1",
+  "id": "poster-no-check-id",
+  "description": "MARGOT_CHECK_ID is absent: the poster creates the in-progress check first, then completes that check.",
+  "branch_class": "poster: MARGOT_CHECK_ID absent (POST check-run)",
+  "provenance": "constructed",
+  "source": {
+    "constructed": true
+  },
+  "scrub": {
+    "ticket_ids": 0,
+    "roster_names": 0,
+    "vault_paths": 0
+  },
+  "pr": {
+    "repo": {
+      "value": "lexijamesesq/incubator",
+      "provenance": "recorded"
+    },
+    "number": {
+      "value": "93",
+      "provenance": "recorded"
+    },
+    "head_sha": {
+      "value": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+      "provenance": "recorded"
+    },
+    "base_sha": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "author": {
+      "value": "claude-the-enduring[bot]",
+      "provenance": "recorded"
+    },
+    "title": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "body": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "changed_files": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "triage": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "self_instrument_match": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "floor_receipt": {
+      "value": null,
+      "provenance": "constructed"
+    }
+  },
+  "github": {
+    "reads": [
+      {
+        "method": "GET",
+        "path": "repos/lexijamesesq/incubator/pulls/93",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": null,
+        "response": "{\"head\": {\"sha\": \"26033f1ad63e510f4938ef8ee91bc6c124f8915b\"}}",
+        "provenance": "constructed"
+      }
+    ],
+    "write_responses": [
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/incubator/check-runs",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": {
+          "name": "review / margot",
+          "head_sha": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+          "status": "in_progress",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/36355686534",
+          "output": {
+            "title": "Margot: council is reviewing the changes",
+            "summary": "Review in progress; no clearance issued."
+          }
+        },
+        "response": "{\"id\":777}",
+        "provenance": "constructed"
+      },
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/incubator/pulls/93/reviews",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": {
+          "commit_id": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+          "event": "APPROVE",
+          "body": "### ✅ APPROVED\n🟢 **Risk: LOW** — low exposure — blast radius\n> Reviewed against the summoned lenses; no blocking findings.\n\n---\nCouncil reviewed 1 file • 4 of 6 cards • 0 findings • $0.70 • 6m 31s\n* ✅ `safety` — clear\n* ✅ `works-and-proven` — clear\n* ✅ `principal-engineer` — clear\n* ❓ `achieves-the-objective` — skipped\n* ✅ `maintainable-no-slop` — clear\n* ❓ `house-style` — skipped\n\nReview 1 · 0 open · 0 fixed · 0 new\n\n---\n**Author:** [claude-the-enduring[bot]](https://github.com/apps/claude-the-enduring)\n**Ticket:** [T-1](https://linear.app/lexijamesesq/issue/T-1)\n**Commit:** [26033f1](https://github.com/lexijamesesq/incubator/commit/26033f1ad63e510f4938ef8ee91bc6c124f8915b)\n**Run:** [36355686534](https://github.com/example-org/margot-instance/actions/runs/36355686534)\n\n<!-- margot:v1 -->\n<!-- margot-ledger:v1 eyJlbnRyaWVzIjpbXSwiaGVhZCI6IjI2MDMzZjFhZDYzZTUxMGY0OTM4ZWY4ZWU5MWJjNmMxMjRmODkxNWIiLCJyb3VuZCI6MSwidiI6MX0= -->"
+        },
+        "response": "{\"id\":101}",
+        "provenance": "constructed"
+      },
+      {
+        "method": "PATCH",
+        "path": "repos/lexijamesesq/incubator/check-runs/777",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": {
+          "status": "completed",
+          "conclusion": "success",
+          "output": {
+            "title": "Margot: approved",
+            "summary": "APPROVED, LOW: low exposure — blast radius.",
+            "text": "verdict_source: fast_path\npipeline_ok: True\noutcome: APPROVED | band: LOW\nvector: {\"blast_radius\": 0.93, \"reversibility\": 0.91, \"data_security\": 0.7, \"operations\": 0.65, \"verification_gap\": 0.84}\nowned tier: required_owned\nsummoned: safety, works-and-proven, principal-engineer, maintainable-no-slop\nsummoned by ledger: none\nconvergence: {\"round\": 1, \"standing\": 0, \"fixed\": 0, \"new\": 0, \"late\": 0, \"unconfirmed\": 0}\ndecision_source: jev\ncan auto-merge: True\nadherence: clean"
+          }
+        },
+        "response": "{\"id\": 777}",
+        "provenance": "constructed"
+      }
+    ]
+  },
+  "models": {},
+  "jev": {},
+  "seams": [
+    "poster"
+  ]
+}

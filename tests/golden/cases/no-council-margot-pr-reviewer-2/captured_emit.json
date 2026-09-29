@@ -1,0 +1,175 @@
+{
+  "pr": {
+    "repo": "lexijamesesq/margot-pr-reviewer",
+    "number": "2",
+    "head_sha": "4fad52cd3652586829113741dfea318af36d0fe0",
+    "author": "claude-the-enduring[bot]"
+  },
+  "owned_path": {
+    "tier": "none",
+    "owned_files": []
+  },
+  "n_files": 1,
+  "route": {
+    "exposure": {
+      "type": "score",
+      "score": 0.01,
+      "confidence": 0.99,
+      "legend": {
+        "0": "none",
+        "1": "an existing boundary preserved",
+        "2": "a consequential data or privilege change",
+        "3": "credential exposure, trust-boundary failure, or an authorization-control change"
+      },
+      "probabilities": {
+        "0": 1.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0
+      }
+    },
+    "cards": {
+      "safety": {
+        "noul": 0.05,
+        "summon": false
+      },
+      "works-and-proven": {
+        "noul": 0.32,
+        "summon": false
+      },
+      "principal-engineer": {
+        "noul": 0.12,
+        "summon": false
+      },
+      "achieves-the-objective": {
+        "noul": 0.22,
+        "summon": false
+      },
+      "maintainable-no-slop": {
+        "noul": 0.15,
+        "summon": false
+      },
+      "house-style": {
+        "noul": 0.27,
+        "summon": false
+      }
+    },
+    "summoned": [],
+    "decision_source": "jev"
+  },
+  "council": {
+    "summoned": [],
+    "prose": "",
+    "reviews": [],
+    "status": "no_council",
+    "cost_usd": null,
+    "no_council": true
+  },
+  "round": 1,
+  "summoned_by_ledger": [],
+  "risk": {
+    "vector": {
+      "blast_radius": 0.0,
+      "reversibility": 0.61,
+      "data_security": 0.11,
+      "operations": 0.01,
+      "verification_gap": 0.9
+    },
+    "levels": {
+      "blast_radius": 0,
+      "reversibility": 1,
+      "data_security": 0,
+      "operations": 0,
+      "verification_gap": 2
+    },
+    "R": 2,
+    "r_continuous": 0.9,
+    "band": "MEDIUM",
+    "confidence": {
+      "blast_radius": 1.0,
+      "reversibility": 0.61,
+      "data_security": 0.89,
+      "operations": 0.99,
+      "verification_gap": 0.1
+    },
+    "distribution": {
+      "blast_radius": {
+        "0": 1.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "reversibility": {
+        "0": 0.39,
+        "1": 0.61,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "data_security": {
+        "0": 0.89,
+        "1": 0.11,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "operations": {
+        "0": 1.0,
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "verification_gap": {
+        "0": 0.55,
+        "1": 0.11,
+        "2": 0.23,
+        "3": 0.11
+      }
+    },
+    "decision_source": "jev"
+  },
+  "council_valid": true,
+  "cards": [],
+  "decision_source": "jev",
+  "status": "ok",
+  "verdict_voice": {
+    "status": "ok",
+    "cost_usd": 0.0320068,
+    "num_turns": 1,
+    "duration_ms": 9541,
+    "prose": "outcome: ERROR\nband: MEDIUM\nband_reason: I confirmed the suggested MEDIUM. The verification-gap dimension is high (0.9), but the model's confidence in that score is very low (0.1), so there is no basis for moving the band either way. Reversibility (0.61) also sits above LOW. The main problem is that the council section of the mandate is empty: no reviewer prose, no card completion states, no Checked blocks. The findings list says there are no mandatory findings, but I can't tell whether the council found nothing or never reported. So I can't treat this as a clean review.\nrisk: unproven review coverage\nsummary: I couldn't finish reviewing this change because the reviewers' reports never reached me. I got a note saying they found no problems, but none of their actual reports or confirmations that they finished, so I can't tell whether they looked and found nothing or never ran. This is a fault in the review pipeline, not in the author's work. Re-running the review so the reviewers' reports come through should settle it.\nfinding: Pipeline failure: the \"Council findings (verbatim)\" section for PR #2 at head 4fad52cd3652586829113741dfea318af36d0fe0 is empty. No card prose, completion states or Checked blocks were handed over, so the \"no mandatory [issue] findings\" result can't be confirmed as a clean council outcome. Re-run the council and pass along its output.\nestablished:\ndismissed:"
+  },
+  "pipeline_ok": true,
+  "outcome": "ERROR",
+  "band": "MEDIUM",
+  "band_reason": "I confirmed the suggested MEDIUM. The verification-gap dimension is high (0.9), but the model's confidence in that score is very low (0.1), so there is no basis for moving the band either way. Reversibility (0.61) also sits above LOW. The main problem is that the council section of the mandate is empty: no reviewer prose, no card completion states, no Checked blocks. The findings list says there are no mandatory findings, but I can't tell whether the council found nothing or never reported. So I can't treat this as a clean review.",
+  "summary": "I couldn't finish reviewing this change because the reviewers' reports never reached me. I got a note saying they found no problems, but none of their actual reports or confirmations that they finished, so I can't tell whether they looked and found nothing or never ran. This is a fault in the review pipeline, not in the author's work. Re-running the review so the reviewers' reports come through should settle it.",
+  "risk_classification": "unproven review coverage",
+  "finding": "Pipeline failure: the \"Council findings (verbatim)\" section for PR #2 at head 4fad52cd3652586829113741dfea318af36d0fe0 is empty. No card prose, completion states or Checked blocks were handed over, so the \"no mandatory [issue] findings\" result can't be confirmed as a clean council outcome. Re-run the council and pass along its output.",
+  "clarification": null,
+  "established": [],
+  "dismissed": [],
+  "unresolved_issue_ids": [],
+  "verdict_source": "verdict_voice",
+  "ledger": {
+    "v": 1,
+    "round": 1,
+    "head": "4fad52cd3652586829113741dfea318af36d0fe0",
+    "entries": []
+  },
+  "convergence": {
+    "round": 1,
+    "standing": 0,
+    "fixed": 0,
+    "new": 0,
+    "late": 0,
+    "unconfirmed": 0
+  },
+  "adherence": {
+    "status": "checked",
+    "risk_classification_ok": true,
+    "cards_restating": [],
+    "ok": true,
+    "nouls": {
+      "risk_is_classification": 0.91
+    }
+  }
+}

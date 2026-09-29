@@ -1,0 +1,34 @@
+{
+  "schema": "contract/1",
+  "id": "triage-jev-outage",
+  "github": {
+    "writes": [
+      {
+        "method": "POST",
+        "path": "repos/example-org/widgets/check-runs",
+        "body": {
+          "name": "review / triage",
+          "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+          "status": "completed",
+          "conclusion": "success",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/1001",
+          "output[title]": "Margot triage: not mechanical",
+          "output[summary]": "Haiku fallback failed to spawn: FileNotFoundError: [Errno 2] No such file or directory: 'claude'. Mechanical: a dependency bump or formatter output with no functional change — the light floor runs and it merges; otherwise the full floor runs and the council reviews. This check is information for CI, never a gate.",
+          "output[text]": "{\"mechanical\": false, \"p\": null, \"decision_source\": \"jev_unreachable\", \"reason\": \"Haiku fallback failed to spawn: FileNotFoundError: [Errno 2] No such file or directory: 'claude'\", \"owned_tier\": \"none\", \"head_sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\"}"
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "outcome": {
+    "status": "reviewed",
+    "triage": {
+      "mechanical": false,
+      "p": null,
+      "decision_source": "jev_unreachable",
+      "reason": "Haiku fallback failed to spawn: FileNotFoundError: [Errno 2] No such file or directory: 'claude'",
+      "owned_tier": "none",
+      "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    }
+  }
+}

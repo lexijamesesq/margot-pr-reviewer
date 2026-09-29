@@ -1,0 +1,10 @@
+{
+  "schema": "contract/1",
+  "id": "review-verify-current",
+  "github": {
+    "writes": []
+  },
+  "outcome": {
+    "status": "reviewed"
+  }
+}

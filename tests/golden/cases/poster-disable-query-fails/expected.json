@@ -1,0 +1,54 @@
+{
+  "schema": "contract/1",
+  "id": "poster-disable-query-fails",
+  "model_requests": [],
+  "jev_requests": [],
+  "github": {
+    "writes": [
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/metrics/pulls/86/reviews",
+        "body": {
+          "commit_id": "e5ee16d1687af3dec120e679a012176377405eca",
+          "event": "COMMENT",
+          "body": "### ❌ CHANGES_REQUESTED\n🟡 **Risk: MEDIUM** — outdated guidance\n> This change removes a summary check from the project's automated pipeline. Reviewers confirmed it was not actually protecting anything, so the pipeline itself is safe. The one problem is that the project's guide still says the main branch is protected through the removed check, which could mislead someone into adding a new check that nothing enforces. Updating that one line of the guide in this change would resolve it.\n\n---\nCouncil reviewed 1 file • 4 of 6 cards • 2 findings • $0.76 • 6m 31s\n* ✅ `safety` — clear\n* ✅ `works-and-proven` — clear\n* ⚠️ `principal-engineer` — The repo's own guide still says the merge gate runs through the job this PR deletes, so anyone reading it gets the wrong picture of what protects the main branch.\n* ❓ `achieves-the-objective` — skipped\n* ⚠️ `maintainable-no-slop` — The repo's guide still says the protected branch is gated by the summary check this change deletes, so it now describes a setup that no longer exists.\n* ❓ `house-style` — skipped\n\nReview 1 · 2 open · 0 fixed · 2 new\n\n---\n**Author:** [claude-the-enduring[bot]](https://github.com/apps/claude-the-enduring)\n**Ticket:** [T-1](https://linear.app/lexijamesesq/issue/T-1)\n**Commit:** [e5ee16d](https://github.com/lexijamesesq/metrics/commit/e5ee16d1687af3dec120e679a012176377405eca)\n**Run:** [36355650821](https://github.com/example-org/margot-instance/actions/runs/36355650821)\n\n<!-- margot:v1 -->\n<!-- margot-ledger:v1 eyJlbnRyaWVzIjpbeyJjYXJkIjoicHJpbmNpcGFsLWVuZ2luZWVyIiwia2V5IjoiUjEtRjEiLCJsb2NhdGlvbiI6IkNMQVVERS5tZDo0MCIsInJvdW5kX3JhaXNlZCI6MSwic2V2ZXJpdHkiOiJNSU5PUiIsInN0YXR1cyI6InN0YW5kaW5nIiwid2hhdCI6IlRoZSByZXBvJ3Mgb3duIGd1aWRlIHN0aWxsIHNheXMgdGhlIG1lcmdlIGdhdGUgcnVucyB0aHJvdWdoIHRoZSBqb2IgdGhpcyBQUiBkZWxldGVzLCBzbyBhbnlvbmUgcmVhZGluZyBpdCBnZXRzIHRoZSB3cm9uZyBwaWN0dXJlIG9mIHdoYXQgcHJvdGVjdHMgdGhlIG1haW4gYnJhbmNoLiJ9LHsiY2FyZCI6Im1haW50YWluYWJsZS1uby1zbG9wIiwia2V5IjoiUjEtRjIiLCJsb2NhdGlvbiI6IkNMQVVERS5tZDo0MCIsInJvdW5kX3JhaXNlZCI6MSwic2V2ZXJpdHkiOiJNSU5PUiIsInN0YXR1cyI6InN0YW5kaW5nIiwid2hhdCI6IlRoZSByZXBvJ3MgZ3VpZGUgc3RpbGwgc2F5cyB0aGUgcHJvdGVjdGVkIGJyYW5jaCBpcyBnYXRlZCBieSB0aGUgc3VtbWFyeSBjaGVjayB0aGlzIGNoYW5nZSBkZWxldGVzLCBzbyBpdCBub3cgZGVzY3JpYmVzIGEgc2V0dXAgdGhhdCBubyBsb25nZXIgZXhpc3RzLiJ9XSwiaGVhZCI6ImU1ZWUxNmQxNjg3YWYzZGVjMTIwZTY3OWEwMTIxNzYzNzc0MDVlY2EiLCJyb3VuZCI6MSwidiI6MX0= -->"
+        },
+        "token": "WRITE"
+      },
+      {
+        "method": "POST",
+        "path": "graphql",
+        "body": {
+          "query": "query($o:String!,$n:String!,$p:Int!){repository(owner:$o,name:$n){pullRequest(number:$p){id autoMergeRequest{enabledAt}}}}",
+          "variables": {
+            "o": "lexijamesesq",
+            "n": "metrics",
+            "p": 86
+          }
+        },
+        "token": "WRITE"
+      },
+      {
+        "method": "PATCH",
+        "path": "repos/lexijamesesq/metrics/check-runs/4242",
+        "body": {
+          "status": "completed",
+          "conclusion": "action_required",
+          "output": {
+            "title": "held: auto-merge could not be disabled — blocked for the operator",
+            "summary": "CHANGES_REQUESTED, MEDIUM: outdated guidance.",
+            "text": "verdict_source: verdict_voice\npipeline_ok: True\noutcome: CHANGES_REQUESTED | band: MEDIUM\nvector: {\"blast_radius\": 1.13, \"reversibility\": 0.84, \"data_security\": 0.65, \"operations\": 0.91, \"verification_gap\": 0.64}\nowned tier: required_owned\nsummoned: safety, works-and-proven, principal-engineer, maintainable-no-slop\nsummoned by ledger: none\nconvergence: {\"round\": 1, \"standing\": 2, \"fixed\": 0, \"new\": 2, \"late\": 0, \"unconfirmed\": 0}\ndecision_source: jev\ncan auto-merge: False\nadherence: flags\n  cards restating a shared finding: principal-engineer, maintainable-no-slop\nband_reason: I'm keeping the suggested MEDIUM. The change removes a check aggregator from the CI gate wiring. The safety, works-and-proven and principal-engineer cards each read the live ruleset and confirmed `ci / all-passed` was not a required check, so no enforcement is lost. That brings data_security and blast_radius down. But the operations score has very low confidence (0.09), and changes to the merge gate are exactly what the operator should see. Nothing justifies moving to LOW, and nothing adds up to HIGH.\nsetting finding: principal-engineer · CLAUDE.md:40 · MINOR · HIGH — \"The repo's own guide still says the merge gate runs through the job this PR deletes\". CLAUDE.md:40 says ci.yml is \"required via the 'Protect main' ruleset through `all-checks-passed`\", but that job no longer exists after merge. Fix: in this PR, change CLAUDE.md:40 to say the ruleset requires `ci / checks`, `ci / ruff` and `ci / shellcheck` (plus `trusted-scan / trusted-scan`) directly, and that any new job must have its check added to the ruleset. It's fixed when `grep -rn 'all-checks-passed\\|all-passed'` over the head tree returns nothing.\nestablished:\n  - F1 · CLAUDE.md:40 · The guide still says main is gated through `all-checks-passed`, which this PR deletes, so a maintainer could add a new CI job without adding its check to the ruleset, and nothing would enforce it (reviewer was sure; stands on its word).\n  - F2 · CLAUDE.md:40 · The guide's description of the merge gate points to the deleted summary check, so it no longer matches the CI setup and later edits based on it could depend on a check that doesn't exist (reviewer was sure; stands on its word).\nfinding locations:\n  principal-engineer: issue @ CLAUDE.md:40\n  maintainable-no-slop: issue @ CLAUDE.md:40"
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "poster": {
+    "raised": null,
+    "exit": {
+      "code": 0,
+      "uncaught": false
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "contract/1",
+  "id": "poster-calibrating",
+  "model_requests": [],
+  "jev_requests": [],
+  "github": {
+    "writes": [
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/incubator/pulls/93/reviews",
+        "body": {
+          "commit_id": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+          "event": "COMMENT",
+          "body": "### ✅ APPROVED\n🟢 **Risk: LOW** — low exposure — blast radius\n> Reviewed against the summoned lenses; no blocking findings.\n\n---\nCouncil reviewed 1 file • 4 of 6 cards • 0 findings • $0.70 • 6m 31s\n* ✅ `safety` — clear\n* ✅ `works-and-proven` — clear\n* ✅ `principal-engineer` — clear\n* ❓ `achieves-the-objective` — skipped\n* ✅ `maintainable-no-slop` — clear\n* ❓ `house-style` — skipped\n\nReview 1 · 0 open · 0 fixed · 0 new\n\n---\n**Author:** [claude-the-enduring[bot]](https://github.com/apps/claude-the-enduring)\n**Ticket:** [T-1](https://linear.app/lexijamesesq/issue/T-1)\n**Commit:** [26033f1](https://github.com/lexijamesesq/incubator/commit/26033f1ad63e510f4938ef8ee91bc6c124f8915b)\n**Run:** [36355686534](https://github.com/example-org/margot-instance/actions/runs/36355686534)\n\n<!-- margot:v1 -->\n<!-- margot-ledger:v1 eyJlbnRyaWVzIjpbXSwiaGVhZCI6IjI2MDMzZjFhZDYzZTUxMGY0OTM4ZWY4ZWU5MWJjNmMxMjRmODkxNWIiLCJyb3VuZCI6MSwidiI6MX0= -->"
+        },
+        "token": "WRITE"
+      },
+      {
+        "method": "POST",
+        "path": "graphql",
+        "body": {
+          "query": "query($o:String!,$n:String!,$p:Int!){repository(owner:$o,name:$n){pullRequest(number:$p){id autoMergeRequest{enabledAt}}}}",
+          "variables": {
+            "o": "lexijamesesq",
+            "n": "incubator",
+            "p": 93
+          }
+        },
+        "token": "WRITE"
+      },
+      {
+        "method": "PATCH",
+        "path": "repos/lexijamesesq/incubator/check-runs/4242",
+        "body": {
+          "status": "completed",
+          "conclusion": "action_required",
+          "output": {
+            "title": "calibrating",
+            "summary": "APPROVED, LOW: low exposure — blast radius.",
+            "text": "verdict_source: fast_path\npipeline_ok: True\noutcome: APPROVED | band: LOW\nvector: {\"blast_radius\": 0.93, \"reversibility\": 0.91, \"data_security\": 0.7, \"operations\": 0.65, \"verification_gap\": 0.84}\nowned tier: required_owned\nsummoned: safety, works-and-proven, principal-engineer, maintainable-no-slop\nsummoned by ledger: none\nconvergence: {\"round\": 1, \"standing\": 0, \"fixed\": 0, \"new\": 0, \"late\": 0, \"unconfirmed\": 0}\ndecision_source: jev\ncan auto-merge: True\nadherence: clean"
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "poster": {
+    "raised": null,
+    "exit": {
+      "code": 0,
+      "uncaught": false
+    }
+  }
+}

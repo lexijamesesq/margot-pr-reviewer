@@ -1,0 +1,330 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/lexijamesesq/margot-pr-reviewer/schema/contract-1.schema.json",
+  "title": "Margot golden contract/1",
+  "oneOf": [
+    { "$ref": "#/definitions/case" },
+    { "$ref": "#/definitions/expected" }
+  ],
+  "definitions": {
+    "json": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/definitions/json" } },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/json" }
+        }
+      ]
+    },
+    "nullableString": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }]
+    },
+    "provenance": {
+      "enum": ["recorded", "reconstructed", "constructed"]
+    },
+    "provenanced": {
+      "type": "object",
+      "required": ["value", "provenance"],
+      "properties": {
+        "value": { "$ref": "#/definitions/json" },
+        "provenance": { "$ref": "#/definitions/provenance" }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "code": { "anyOf": [{ "type": "number" }, { "type": "string" }] },
+        "reason": { "type": "string" },
+        "body": { "type": "string" },
+        "fault": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "read": {
+      "type": "object",
+      "required": ["method", "path", "params", "provenance"],
+      "properties": {
+        "method": { "type": "string" },
+        "path": { "type": "string" },
+        "params": { "type": "object", "additionalProperties": { "$ref": "#/definitions/json" } },
+        "body": { "$ref": "#/definitions/json" },
+        "response": { "type": "string" },
+        "status": { "$ref": "#/definitions/status" },
+        "provenance": { "$ref": "#/definitions/provenance" }
+      },
+      "oneOf": [
+        { "required": ["response"], "not": { "required": ["status"] } },
+        { "required": ["status"], "not": { "required": ["response"] } }
+      ],
+      "additionalProperties": false
+    },
+    "writeResponse": {
+      "type": "object",
+      "required": ["method", "path", "params", "body", "provenance"],
+      "properties": {
+        "method": { "type": "string" },
+        "path": { "type": "string" },
+        "params": { "type": "object", "additionalProperties": { "$ref": "#/definitions/json" } },
+        "body": { "$ref": "#/definitions/json" },
+        "response": { "type": "string" },
+        "status": { "$ref": "#/definitions/status" },
+        "provenance": { "$ref": "#/definitions/provenance" }
+      },
+      "oneOf": [
+        { "required": ["response"], "not": { "required": ["status"] } },
+        { "required": ["status"], "not": { "required": ["response"] } }
+      ],
+      "additionalProperties": false
+    },
+    "storedResponse": {
+      "type": "object",
+      "required": ["outcome", "provenance"],
+      "properties": {
+        "outcome": {
+          "enum": ["success", "transient_then_success", "persistent_failure"]
+        },
+        "response": { "type": "string" },
+        "failure": { "$ref": "#/definitions/json" },
+        "provenance": { "$ref": "#/definitions/provenance" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "const": "success" } } },
+          "then": { "required": ["response"], "not": { "required": ["failure"] } }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "transient_then_success" } } },
+          "then": { "required": ["response", "failure"] }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "persistent_failure" } } },
+          "then": { "required": ["failure"], "not": { "required": ["response"] } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "required": [
+        "schema", "id", "description", "branch_class", "provenance", "source",
+        "scrub", "pr", "github", "models", "jev", "seams"
+      ],
+      "properties": {
+        "schema": { "const": "contract/1" },
+        "id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "branch_class": { "type": "string" },
+        "provenance": { "$ref": "#/definitions/provenance" },
+        "source": {
+          "anyOf": [
+            { "type": "null" },
+            { "type": "object",
+          "properties": {
+            "constructed": { "const": true },
+            "repo": { "type": "string" },
+            "repo_visibility": { "const": "public" },
+            "pr": { "type": "number" },
+            "run_id": { "type": "string" },
+            "check_run_id": { "anyOf": [{ "type": "number" }, { "type": "string" }] },
+            "dotty_sha": { "type": "string" },
+            "workflow_sha": { "type": "string" },
+            "run_started_at": { "type": "string" }
+          },
+          "oneOf": [
+            { "properties": { "constructed": {} }, "required": ["constructed"] },
+            { "properties": { "repo": {}, "repo_visibility": {} }, "required": ["repo", "repo_visibility"] }
+          ],
+          "additionalProperties": false
+            }
+          ]
+        },
+        "scrub": {
+          "type": "object",
+          "required": ["ticket_ids", "roster_names", "vault_paths"],
+          "properties": {
+            "ticket_ids": { "type": "integer", "minimum": 0 },
+            "roster_names": { "type": "integer", "minimum": 0 },
+            "vault_paths": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "pr": {
+          "type": "object",
+          "required": [
+            "repo", "number", "head_sha", "base_sha", "author", "title", "body",
+            "changed_files", "triage", "self_instrument_match", "floor_receipt"
+          ],
+          "properties": {
+            "repo": { "$ref": "#/definitions/provenanced" },
+            "number": { "$ref": "#/definitions/provenanced" },
+            "head_sha": { "$ref": "#/definitions/provenanced" },
+            "base_sha": { "$ref": "#/definitions/provenanced" },
+            "author": { "$ref": "#/definitions/provenanced" },
+            "title": { "$ref": "#/definitions/provenanced" },
+            "body": { "$ref": "#/definitions/provenanced" },
+            "changed_files": { "$ref": "#/definitions/provenanced" },
+            "triage": { "$ref": "#/definitions/provenanced" },
+            "self_instrument_match": { "$ref": "#/definitions/provenanced" },
+            "floor_receipt": { "$ref": "#/definitions/provenanced" }
+          },
+          "additionalProperties": false
+        },
+        "github": {
+          "type": "object",
+          "required": ["reads", "write_responses"],
+          "properties": {
+            "reads": { "type": "array", "items": { "$ref": "#/definitions/read" } },
+            "write_responses": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/writeResponse" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "models": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/storedResponse" }
+        },
+        "jev": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/storedResponse" }
+        },
+        "linear": { "anyOf": [{ "type": "null" }, { "type": "object", "additionalProperties": { "$ref": "#/definitions/json" } }] },
+        "ruleset": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/provenanced" }] },
+        "fidelity": { "type": "object", "additionalProperties": { "$ref": "#/definitions/json" } },
+        "seams": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["poster", "council-parse", "ledger", "risk-verdict", "triage", "workflow-steps"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "modelRequest": {
+      "type": "object",
+      "required": ["role", "card", "prompt", "model", "tool_permissions", "json_schema", "settings"],
+      "properties": {
+        "role": { "type": "string" },
+        "card": { "$ref": "#/definitions/nullableString" },
+        "prompt": { "type": "string" },
+        "model": { "$ref": "#/definitions/nullableString" },
+        "tool_permissions": {
+          "type": "object",
+          "required": ["tools", "allowed", "disallowed"],
+          "properties": {
+            "tools": {
+              "anyOf": [
+                { "type": "null" },
+                { "type": "array", "items": { "type": "string" } }
+              ]
+            },
+            "allowed": { "type": "array", "items": { "type": "string" } },
+            "disallowed": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        "json_schema": { "$ref": "#/definitions/json" },
+        "settings": { "$ref": "#/definitions/json" }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": ["schema", "id", "github"],
+      "properties": {
+        "schema": { "const": "contract/1" },
+        "id": { "type": "string", "minLength": 1 },
+        "model_requests": { "type": "array", "items": { "$ref": "#/definitions/modelRequest" } },
+        "jev_requests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["model", "state", "questions"],
+            "properties": {
+              "model": { "type": "string" },
+              "state": { "type": "string" },
+              "questions": { "type": "object", "additionalProperties": { "$ref": "#/definitions/json" } }
+            },
+            "additionalProperties": false
+          }
+        },
+        "github": {
+          "type": "object",
+          "required": ["writes"],
+          "properties": {
+            "writes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["method", "path", "body", "token"],
+                "properties": {
+                  "method": { "type": "string" },
+                  "path": { "type": "string" },
+                  "body": { "$ref": "#/definitions/json" },
+                  "token": { "enum": ["READ", "WRITE"] }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "emit": { "$ref": "#/definitions/json" },
+        "driver": {
+          "type": "object",
+          "required": ["raised"],
+          "properties": { "raised": { "$ref": "#/definitions/nullableString" } },
+          "additionalProperties": false
+        },
+        "poster": {
+          "type": "object",
+          "required": ["raised", "exit"],
+          "properties": {
+            "raised": { "$ref": "#/definitions/nullableString" },
+            "exit": {
+              "type": "object",
+              "required": ["code", "uncaught"],
+              "properties": {
+                "code": { "type": "integer" },
+                "uncaught": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "outcome": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "enum": [
+                "reviewed", "skipped", "skipped:superseded", "refused:not-enrolled",
+                "refused:fork", "refused:draft", "refused:merge-conflict",
+                "refused:empty-pr", "refused:read-failure", "refused:step-failed"
+              ]
+            },
+            "triage": { "$ref": "#/definitions/json" },
+            "facts": { "$ref": "#/definitions/json" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "anyOf": [
+        { "required": ["driver", "emit", "model_requests", "jev_requests"] },
+        { "required": ["poster", "model_requests", "jev_requests"] },
+        { "required": ["outcome"] }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

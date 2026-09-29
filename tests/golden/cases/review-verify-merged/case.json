@@ -1,0 +1,145 @@
+{
+  "schema": "contract/1",
+  "id": "review-verify-merged",
+  "description": "The PR merged before a runner picked it up: stale (`merged`, close_mode `stale`); its check closes `skipped`.",
+  "branch_class": "review step: verify merged + stale dispatch",
+  "provenance": "constructed",
+  "source": {
+    "constructed": true
+  },
+  "scrub": {
+    "ticket_ids": 0,
+    "roster_names": 0,
+    "vault_paths": 0
+  },
+  "pr": {
+    "repo": {
+      "value": "example-org/widgets",
+      "provenance": "constructed"
+    },
+    "number": {
+      "value": "7",
+      "provenance": "constructed"
+    },
+    "head_sha": {
+      "value": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "provenance": "constructed"
+    },
+    "base_sha": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "author": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "title": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "body": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "changed_files": {
+      "value": [],
+      "provenance": "constructed"
+    },
+    "triage": {
+      "value": "not-mechanical",
+      "provenance": "constructed"
+    },
+    "self_instrument_match": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "floor_receipt": {
+      "value": null,
+      "provenance": "constructed"
+    }
+  },
+  "github": {
+    "reads": [
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/pulls/7",
+        "params": {},
+        "body": null,
+        "response": "{\"state\": \"closed\", \"merged\": true, \"draft\": false, \"mergeable\": true, \"changed_files\": 2, \"head\": {\"sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\", \"repo\": {\"full_name\": \"example-org/widgets\"}}, \"base\": {\"sha\": \"0123456789abcdef0123456789abcdef01234567\"}, \"user\": {\"login\": \"example-author\"}, \"body\": \"Wraps the upload call in a bounded retry.\\n\\nTicket: T-1\"}",
+        "provenance": "constructed"
+      },
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/commits/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678/pulls",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": null,
+        "response": "[{\"number\": 7, \"state\": \"closed\", \"head\": {\"sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\"}}]",
+        "provenance": "constructed"
+      },
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/commits/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678/check-runs",
+        "params": {
+          "Accept": "application/vnd.github+json",
+          "app_id": "4862659",
+          "check_name": "review / margot"
+        },
+        "body": null,
+        "response": "{\"check_runs\": [{\"id\": 5150, \"status\": \"queued\", \"details_url\": \"https://github.com/example-org/widgets/actions/runs/77\"}]}",
+        "provenance": "constructed"
+      }
+    ],
+    "write_responses": [
+      {
+        "method": "PATCH",
+        "path": "repos/example-org/widgets/check-runs/5150",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": {
+          "status": "completed",
+          "conclusion": "skipped",
+          "output": {
+            "title": "Margot: not reviewed — the PR was merged first",
+            "summary": "The PR was merged before a review runner picked it up, so Margot skipped the review."
+          }
+        },
+        "response": "{\"id\":5150}",
+        "provenance": "constructed"
+      }
+    ]
+  },
+  "models": {},
+  "jev": {},
+  "ruleset": {
+    "value": {
+      "codeowners_required_owned": [
+        "/.github/workflows/"
+      ],
+      "repos": {
+        "example-org/widgets": {
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/src/"
+          ]
+        }
+      },
+      "self_instrument": {
+        "global": [
+          "/.github/workflows/self-instrument-alert.yml"
+        ],
+        "repos": {
+          "example-org/widgets": [
+            "/gate/"
+          ]
+        }
+      }
+    },
+    "provenance": "constructed"
+  },
+  "seams": [
+    "workflow-steps"
+  ]
+}

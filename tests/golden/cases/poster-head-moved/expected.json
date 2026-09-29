@@ -1,0 +1,16 @@
+{
+  "schema": "contract/1",
+  "id": "poster-head-moved",
+  "model_requests": [],
+  "jev_requests": [],
+  "github": {
+    "writes": []
+  },
+  "poster": {
+    "raised": null,
+    "exit": {
+      "code": 0,
+      "uncaught": false
+    }
+  }
+}

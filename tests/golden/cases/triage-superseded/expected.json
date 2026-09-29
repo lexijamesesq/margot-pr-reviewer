@@ -1,0 +1,10 @@
+{
+  "schema": "contract/1",
+  "id": "triage-superseded",
+  "github": {
+    "writes": []
+  },
+  "outcome": {
+    "status": "skipped:superseded"
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "schema": "contract/1",
+  "id": "review-current-read-failure",
+  "description": "An open PR is current at verification, then a later PR-files read fails; the refusal is read-failure, never superseded merely because verify emitted that default why value.",
+  "branch_class": "review step: current open PR, later read failure",
+  "source": {
+    "constructed": true
+  },
+  "provenance": "constructed",
+  "scrub": {
+    "ticket_ids": 0,
+    "roster_names": 0,
+    "vault_paths": 0
+  },
+  "pr": {
+    "repo": {
+      "value": "example-org/widgets",
+      "provenance": "constructed"
+    },
+    "number": {
+      "value": "7",
+      "provenance": "constructed"
+    },
+    "head_sha": {
+      "value": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "provenance": "constructed"
+    },
+    "base_sha": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "author": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "title": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "body": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "changed_files": {
+      "value": [],
+      "provenance": "constructed"
+    },
+    "triage": {
+      "value": "not-mechanical",
+      "provenance": "constructed"
+    },
+    "self_instrument_match": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "floor_receipt": {
+      "value": null,
+      "provenance": "constructed"
+    }
+  },
+  "github": {
+    "reads": [
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/pulls/7",
+        "params": {},
+        "body": null,
+        "response": "{\"state\": \"open\", \"merged\": false, \"draft\": false, \"mergeable\": true, \"changed_files\": 2, \"head\": {\"sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\", \"repo\": {\"full_name\": \"example-org/widgets\"}}, \"base\": {\"sha\": \"0123456789abcdef0123456789abcdef01234567\"}, \"user\": {\"login\": \"example-author\"}, \"body\": \"A current open PR.\"}",
+        "provenance": "constructed"
+      },
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/pulls/7/files",
+        "params": {},
+        "body": null,
+        "status": {
+          "code": 500,
+          "reason": "constructed read failure",
+          "body": "server error"
+        },
+        "provenance": "constructed"
+      }
+    ],
+    "write_responses": []
+  },
+  "models": {},
+  "jev": {},
+  "seams": [
+    "workflow-steps"
+  ]
+}

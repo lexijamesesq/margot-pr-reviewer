@@ -1,0 +1,50 @@
+{
+  "driver": true,
+  "poster": true,
+  "owned_tier": "none",
+  "poster_env": {
+    "REPO": {
+      "value": "lexijamesesq/margot-pr-reviewer",
+      "provenance": "recorded"
+    },
+    "PR_NUMBER": {
+      "value": "2",
+      "provenance": "recorded"
+    },
+    "HEAD_SHA": {
+      "value": "4fad52cd3652586829113741dfea318af36d0fe0",
+      "provenance": "recorded"
+    },
+    "PR_AUTHOR": {
+      "value": "claude-the-enduring[bot]",
+      "provenance": "recorded"
+    },
+    "RUN_URL": {
+      "value": "https://github.com/example-org/margot-instance/actions/runs/36591199819",
+      "provenance": "recorded"
+    },
+    "MARGOT_CALIBRATING": {
+      "value": "false",
+      "provenance": "reconstructed"
+    },
+    "PR_TICKET": {
+      "value": "",
+      "provenance": "reconstructed"
+    },
+    "MARGOT_RUNTIME_S": {
+      "value": "60",
+      "provenance": "reconstructed"
+    },
+    "VERDICT_JSON": {
+      "from": "driver.stdout"
+    },
+    "MARGOT_COST_USD": {
+      "value": "",
+      "provenance": "reconstructed"
+    },
+    "MARGOT_CHECK_ID": {
+      "value": "4242",
+      "provenance": "reconstructed"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schema": "contract/1",
+  "id": "poster-unparseable-emit",
+  "model_requests": [],
+  "jev_requests": [],
+  "github": {
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "repos/lexijamesesq/incubator/check-runs/4242",
+        "body": {
+          "status": "completed",
+          "conclusion": "action_required",
+          "output": {
+            "title": "not reviewed: poster error",
+            "summary": "emit parse failed: Expecting value: line 1 column 33 (char 32)"
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "poster": {
+    "raised": "SystemExit",
+    "exit": {
+      "code": 1,
+      "uncaught": false
+    }
+  }
+}

@@ -1,0 +1,550 @@
+{
+  "schema": "contract/1",
+  "id": "triage-not-mechanical-incubator-93",
+  "description": "A one-file CI change: Jev answers 0.03 — not mechanical.",
+  "branch_class": "triage: not mechanical",
+  "provenance": "constructed",
+  "source": {
+    "repo": "lexijamesesq/incubator",
+    "repo_visibility": "public",
+    "pr": 93,
+    "run_id": "36355670506",
+    "check_run_id": 108722822633,
+    "dotty_sha": "3c7d0ddcb491d9c7741acf8107b2a68643e039ed",
+    "run_started_at": "2026-09-27T22:33:14Z"
+  },
+  "scrub": {
+    "ticket_ids": 0,
+    "roster_names": 0,
+    "vault_paths": 0
+  },
+  "pr": {
+    "repo": {
+      "value": "lexijamesesq/incubator",
+      "provenance": "recorded"
+    },
+    "number": {
+      "value": "93",
+      "provenance": "recorded"
+    },
+    "head_sha": {
+      "value": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+      "provenance": "recorded"
+    },
+    "base_sha": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "author": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "title": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "body": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "changed_files": {
+      "value": [],
+      "provenance": "constructed"
+    },
+    "triage": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "self_instrument_match": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "floor_receipt": {
+      "value": null,
+      "provenance": "constructed"
+    }
+  },
+  "github": {
+    "reads": [
+      {
+        "method": "GET",
+        "path": "repos/lexijamesesq/incubator/pulls/93",
+        "params": {},
+        "body": null,
+        "response": "{\"head\": {\"sha\": \"26033f1ad63e510f4938ef8ee91bc6c124f8915b\", \"repo\": {\"full_name\": \"lexijamesesq/incubator\"}}, \"base\": {\"sha\": \"46d2b58062a5d15240787840a0ae7177141bad83\"}, \"user\": {\"login\": \"claude-the-enduring[bot]\"}, \"title\": \"ci: drop the aggregator job; the required checks name the jobs directly\", \"body\": \"<!-- pr-body:v1 -->\\n<!-- markdownlint-disable MD041 -->\\n## Intent\\n\\nOne CI shape in every repo. The operator's ruling (2026-09-27): \\\"we retain a unified universal CI, no meaningless public vs private fragmentation.\\\"\\n\\nThis repo's ruleset now requires `ci / checks` and each of its own `ci / <job>` checks directly. That's lexijamesesq/dotty#379, merged and converged. So the `ci / all-passed` aggregator gates nothing, and it costs a runner start on every PR.\\n\\n## What changed\\n\\n`.github/workflows/ci.yml`: the `all-checks-passed` job and the comment block directly above it are removed.\\n\\n## Verification\\n\\n- The live ruleset on the default branch requires: `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck`, `ci / release-check`. `ci / all-passed` is not among them.\\n- Every one of those checks reports from this workflow or from trusted-scan.\\n- The estate tool (`ci-caller-merge.py`) is idempotent on the result, so a future caller rollout won't change it.\\n- actionlint is clean.\\n\\n## Risk and blast radius\\n\\nThis repo's CI only. A job the floor skips on a mechanical PR reports \\\"skipped\\\", which satisfies a required check. A failed floor fails `ci / checks`.\\n\\n## Rollback\\n\\nRevert this PR.\\n\\n## Ticket\\n\\nNone. This is an operator ruling from the session.\\n\\n## Dependencies\\n\\nlexijamesesq/dotty#379 (merged, converged).\\n\\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\\n\\nhttps://claude.ai/code/session_01SsneLEHEy8BU2PkkUMPLzK\\n\"}",
+        "provenance": "recorded"
+      },
+      {
+        "method": "GET",
+        "path": "repos/lexijamesesq/incubator/compare/46d2b58062a5d15240787840a0ae7177141bad83...26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+        "params": {
+          "Accept": "application/vnd.github.diff"
+        },
+        "body": null,
+        "response": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex e77e045..49c7fa7 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -34,34 +34,6 @@ jobs:\n       dotty_ref: v1\n       check_name: checks\n \n-  all-checks-passed:\n-    name: ci / all-passed\n-    needs: [floor, ruff, shellcheck, release-check]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Require every dependency to have succeeded (a job skipped on a mechanical PR is satisfied)\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-          MECHANICAL: ${{ needs.floor.outputs.mechanical }}\n-          EVENT: ${{ github.event_name }}\n-        run: |\n-          set -euo pipefail\n-          # A skipped job is satisfied on a mechanical PR (the floor skipped\n-          # it) and on any non-PR event (a push to the default branch, where\n-          # any job skipped by its own `if:` is not a PR's failure); on a\n-          # functional PR a skipped job is a failure.\n-          bad=\"$(jq -r --arg mech \"$MECHANICAL\" --arg event \"$EVENT\" '\n-            to_entries[]\n-            | select(.value.result == \"failure\" or .value.result == \"cancelled\"\n-                     or (.value.result == \"skipped\" and $mech != \"true\" and $event == \"pull_request\"))\n-            | .key' <<<\"$RESULTS\")\"\n-          if [[ -n \"$bad\" ]]; then\n-            echo \"required job(s) not satisfied: $bad\"\n-            exit 1\n-          fi\n-          echo \"all checks passed (event=${EVENT} mechanical=${MECHANICAL:-false})\"\n-\n   ruff:\n     name: ci / ruff\n     needs: [floor]\n",
+        "provenance": "recorded"
+      }
+    ],
+    "write_responses": [
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/incubator/check-runs",
+        "params": {},
+        "body": {
+          "name": "review / triage",
+          "head_sha": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+          "status": "completed",
+          "conclusion": "success",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/36355670506",
+          "output[title]": "Margot triage: not mechanical",
+          "output[summary]": "p=0.03 source=jev. Mechanical: a dependency bump or formatter output with no functional change — the light floor runs and it merges; otherwise the full floor runs and the council reviews. This check is information for CI, never a gate.",
+          "output[text]": "{\"mechanical\": false, \"p\": 0.03, \"decision_source\": \"jev\", \"reason\": \"\", \"owned_tier\": \"required_owned\", \"head_sha\": \"26033f1ad63e510f4938ef8ee91bc6c124f8915b\"}"
+        },
+        "response": "{\"id\":1}",
+        "provenance": "constructed"
+      }
+    ]
+  },
+  "models": {},
+  "jev": {
+    "{\"model\":\"jev-1.13.0\",\"questions\":{\"mechanical\":{\"instructions\":\"Probability this change is PURELY MECHANICAL: a tool-generated, deterministic change with NO functional or behavioral effect. Mechanical cases: a dependency version bump (manifest and/or lockfile, including a pinned action SHA/digest); linter/formatter output that changes only style (whitespace, indentation, import order, quotes, trailing commas, reflow). NOT mechanical if any hunk changes logic, values, configuration values, control flow, or behavior. Docs/comment edits, generated code whose source input changed, renames/moves, and test changes are NOT mechanical. When unsure, it is not mechanical.\",\"type\":\"noul\"}},\"state\":\"Pull request #93 in lexijamesesq/incubator.\\nChanged files (1): .github/workflows/ci.yml\\nCODEOWNERS ownership tier: required_owned\\nDiff:\\ndiff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\\nindex e77e045..49c7fa7 100644\\n--- a/.github/workflows/ci.yml\\n+++ b/.github/workflows/ci.yml\\n@@ -34,34 +34,6 @@ jobs:\\n       dotty_ref: v1\\n       check_name: checks\\n \\n-  all-checks-passed:\\n-    name: ci / all-passed\\n-    needs: [floor, ruff, shellcheck, release-check]\\n-    if: always()\\n-    runs-on: ubuntu-latest\\n-    steps:\\n-      - name: Require every dependency to have succeeded (a job skipped on a mechanical PR is satisfied)\\n-        env:\\n-          RESULTS: ${{ toJSON(needs) }}\\n-          MECHANICAL: ${{ needs.floor.outputs.mechanical }}\\n-          EVENT: ${{ github.event_name }}\\n-        run: |\\n-          set -euo pipefail\\n-          # A skipped job is satisfied on a mechanical PR (the floor skipped\\n-          # it) and on any non-PR event (a push to the default branch, where\\n-          # any job skipped by its own `if:` is not a PR's failure); on a\\n-          # functional PR a skipped job is a failure.\\n-          bad=\\\"$(jq -r --arg mech \\\"$MECHANICAL\\\" --arg event \\\"$EVENT\\\" '\\n-            to_entries[]\\n-            | select(.value.result == \\\"failure\\\" or .value.result == \\\"cancelled\\\"\\n-                     or (.value.result == \\\"skipped\\\" and $mech != \\\"true\\\" and $event == \\\"pull_request\\\"))\\n-            | .key' <<<\\\"$RESULTS\\\")\\\"\\n-          if [[ -n \\\"$bad\\\" ]]; then\\n-            echo \\\"required job(s) not satisfied: $bad\\\"\\n-            exit 1\\n-          fi\\n-          echo \\\"all checks passed (event=${EVENT} mechanical=${MECHANICAL:-false})\\\"\\n-\\n   ruff:\\n     name: ci / ruff\\n     needs: [floor]\\n\"}": {
+      "outcome": "success",
+      "response": "{\"answers\": {\"mechanical\": {\"noul\": 0.03}}}",
+      "provenance": "reconstructed"
+    }
+  },
+  "ruleset": {
+    "value": {
+      "pull_request": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false,
+        "require_extra_approval_for_unattributed_changes": false
+      },
+      "required_status_checks": {
+        "strict_required_status_checks_policy": false
+      },
+      "dependency_bot_authors": [
+        "dependabot[bot]",
+        "ollie-the-intern[bot]",
+        "renovate[bot]"
+      ],
+      "tag_ruleset": {
+        "name": "Tag immutability",
+        "rules": [
+          "update",
+          "deletion"
+        ]
+      },
+      "repos": {
+        "lexijamesesq/dotty-private": {
+          "private_repo": true,
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / eval-suite"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "*"
+          ],
+          "codeowners_full_owned": true
+        },
+        "lexijamesesq/susuwatari-config": {
+          "private_repo": true,
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / ci"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.house-code.json",
+            "/.claude/settings.json",
+            "/.github/CODEOWNERS",
+            "/pi-cc/hooks/",
+            "/pi-cc/apply-fix-plan.sh",
+            "/pi-cc/canary-permission-wall.sh",
+            "/pi-cc/canary-plugin-version.sh",
+            "/pi-cc/op-sa-container.sh",
+            "/pi-cc/transpile-disallowed-tools.sh",
+            "/pi-cc/test-transpile-disallowed-tools.sh",
+            "/pi-cc/extract-allowed-tools.sh",
+            "/pi-cc/validate-extraction-report.sh",
+            "/pi-cc/journal-sign.sh",
+            "/pi-cc/linear-gql.sh",
+            "/pi-cc/entrypoint.sh",
+            "/pi-cc/*-egress-setup.sh",
+            "/pi-cc/CLAUDE.md",
+            "/pi-cc/settings/settings.json",
+            "/pi-cc/rubrics/",
+            "/pi-cc/Dockerfile",
+            "/n8n/dispatch/",
+            "/n8n/scripts/export-workflows*.sh",
+            "/scripts/deploy-to-pi.sh",
+            "/scripts/verify-consumer-paths.sh",
+            "/scripts/canary-export-lane.sh",
+            "/scripts/setup-test-vault.sh",
+            "/scripts/reset-test-vault.sh",
+            "/scripts/v2-oneshot-remote.sh",
+            "/monitoring/*-check.sh"
+          ]
+        },
+        "lexijamesesq/margot": {
+          "private_repo": true,
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "review / self-instrument",
+            "ci / margot-tests"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "*"
+          ],
+          "codeowners_full_owned": true
+        },
+        "lexijamesesq/agent-ops": {
+          "private_repo": true,
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.house-code.json",
+            "/.github/CODEOWNERS"
+          ]
+        },
+        "lexijamesesq/core-skills": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / release-check",
+            "ci / validate-and-test",
+            "ci / drift-check",
+            "ci / standalone-check"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.github/scripts/",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.shellcheckrc",
+            "/.house-code.json",
+            "/.claude/settings.json",
+            "/.github/CODEOWNERS",
+            "/.claude-plugin/marketplace.json",
+            "/plugins/core/.claude-plugin/plugin.json",
+            "/plugins/estate-hooks/",
+            "/plugins/core/skills/linear/scripts/",
+            "/plugins/core/skills/traffic-cone/scripts/",
+            "/plugins/core/agents/attack-kitty.md",
+            "/plugins/core/skills/attack-kitty/"
+          ]
+        },
+        "lexijamesesq/metrics": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / ruff",
+            "ci / shellcheck"
+          ],
+          "margot_enrolled": true
+        },
+        "lexijamesesq/dotty": {
+          "tag_ruleset_exclude": [
+            "refs/tags/v1"
+          ],
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / eval-suite",
+            "review / self-instrument"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.github/actions/",
+            "/.github/scripts/",
+            "/.github/zizmor.yml",
+            "/.github/dependabot.yml",
+            "/.pre-commit-config.yaml",
+            "/.pre-commit-hooks.yaml",
+            "/git-hooks/",
+            "/drift-check-report.sh",
+            "/.gitleaks.toml",
+            "/.vale.ini",
+            "/styles/Estate/",
+            "/.shellcheckrc",
+            "/.claude/eval/",
+            "/.github/pull_request_template.md",
+            "/.claude/rules/",
+            "/.claude/settings.json",
+            "/rulesets/",
+            "/.github/CODEOWNERS",
+            "/setup-claude-profiles.sh",
+            "/setup-terminal.sh",
+            "/provision-public-repo.sh",
+            "/repo-claude-template.md",
+            "/CLAUDE.sample.md"
+          ]
+        },
+        "lexijamesesq/home-assistant-tools": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / shellcheck"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.github/dependabot.yml",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.gitleaks-ci.toml",
+            "/.claude/settings.json",
+            "/.github/CODEOWNERS"
+          ]
+        },
+        "lexijamesesq/incubator": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / ruff",
+            "ci / shellcheck",
+            "ci / release-check"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.github/dependabot.yml",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.gitleaks-ci.toml",
+            "/.house-code.json",
+            "/.house-qa.json",
+            "/.claude/settings.json",
+            "/.github/CODEOWNERS",
+            "/.claude-plugin/marketplace.json",
+            "/plugins/incubator/.claude-plugin/plugin.json",
+            "/pyproject.toml",
+            "/.claude/competitive-landscape-settings.json",
+            "/scripts/research-db.py"
+          ]
+        },
+        "lexijamesesq/publish-skills": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / release-check",
+            "ci / validate-and-test",
+            "review / self-instrument"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.github/scripts/",
+            "/.github/dependabot.yml",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.shellcheckrc",
+            "/.github/CODEOWNERS",
+            "/.claude-plugin/marketplace.json",
+            "/.claude-plugin/plugin.json",
+            "/agents/margot.md",
+            "/agents/pr-reviewer.md",
+            "/skills/pr-council/"
+          ]
+        },
+        "lexijamesesq/wiki": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / gate",
+            "ci / release-check"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.github/dependabot.yml",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.gitleaks.ci.toml",
+            "/.house-code.json",
+            "/.claude/settings.json",
+            "/.github/CODEOWNERS",
+            "/.claude-plugin/marketplace.json",
+            "/.claude-plugin/plugin.json",
+            "/.track-list-guard.sh",
+            "/.claude/skills/lint-knowledge/lint.py",
+            "/.claude/skills/lint-knowledge/tests/",
+            "/.claude/skills/gatekeeper/",
+            "/spec/knowledge-contract.md",
+            "/spec/calibration-surface.md",
+            "/spec/integration-modes.md"
+          ]
+        },
+        "lexijamesesq/personal-skills": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / release-check",
+            "ci / validate-and-test"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.github/scripts/",
+            "/.github/dependabot.yml",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.shellcheckrc",
+            "/.github/CODEOWNERS",
+            "/.claude-plugin/marketplace.json",
+            "/.claude-plugin/plugin.json"
+          ]
+        },
+        "lexijamesesq/system-skills": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / release-check",
+            "ci / validate-and-test"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.github/scripts/",
+            "/.github/dependabot.yml",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.shellcheckrc",
+            "/.github/CODEOWNERS",
+            "/.claude-plugin/marketplace.json",
+            "/.claude-plugin/plugin.json",
+            "/skills/update-mbp/scripts/",
+            "/skills/update-mbp/SKILL.md"
+          ]
+        },
+        "lexijamesesq/home-assistant": {
+          "required_contexts": [
+            "ci / checks",
+            "trusted-scan / trusted-scan",
+            "ci / home-assistant-config"
+          ],
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/.github/workflows/",
+            "/.pre-commit-config.yaml",
+            "/.gitleaks.toml",
+            "/.github/CODEOWNERS",
+            "/shell_command.yaml",
+            "/rest_command.yaml",
+            "/configuration.yaml",
+            "/pyscript/"
+          ]
+        }
+      },
+      "release_tag_authors": [
+        "claude-the-enduring[bot]",
+        "github-actions[bot]"
+      ],
+      "codeowners_owner": "@lexijamesesq",
+      "codeowners_required_owned": [
+        "/.github/workflows/",
+        "/.pre-commit-config.yaml",
+        "/.gitleaks.toml"
+      ],
+      "self_instrument": {
+        "global": [
+          "/.github/workflows/self-instrument-alert.yml"
+        ],
+        "repos": {
+          "lexijamesesq/dotty": [
+            "/rulesets/",
+            "/.github/workflows/estate-self-instrument-alert.yml",
+            "/.github/workflows/estate-ci.yml",
+            "/.github/workflows/estate-gate.yml"
+          ],
+          "lexijamesesq/margot": [
+            "/.github/margot-poster.py",
+            "/.github/margot-runtime/",
+            "/.github/workflows/margot-review.yml",
+            "/.github/workflows/margot-benchmark.yml"
+          ],
+          "lexijamesesq/publish-skills": [
+            "/agents/margot.md",
+            "/agents/pr-reviewer.md",
+            "/skills/pr-council/"
+          ]
+        }
+      },
+      "branch_rulesets": [
+        {
+          "name": "Protect main — review",
+          "description": "One required approving review on main (required_approving_review_count: 1, dismiss_stale_reviews_on_push). Margot's native APPROVE clears LOW/mechanical; the operator's Approve clears MED/HIGH. Every non-approve verdict is a COMMENT that informs but never blocks, so the operator's approval always satisfies the gate with nothing to dismiss. Bypass = the admin RepositoryRole (5) ONLY — Ollie is deliberately NOT a bypass here, so Ollie's merge is subject to the review and can only land an APPROVED PR. require_code_owner_review is retired: CODEOWNERS is no longer the merge authority, Margot's ranking is (backed by the mechanical floor).",
+          "rules": [
+            "pull_request"
+          ],
+          "bypass_actors": [
+            {
+              "actor_type": "RepositoryRole",
+              "actor_id": 5,
+              "bypass_mode": "pull_request"
+            }
+          ]
+        },
+        {
+          "name": "Protect main — updates",
+          "description": "The wall: only a designated merger may UPDATE main. Bypass = Ollie (4984137), the sole merger App, and the admin RepositoryRole (5) — both at pull_request mode (merge via PR, no standing direct-push bypass, per the estate's no-'always'-bypass invariant; a genuine emergency uses GitHub's admin override, not a persistent hole). Every other identity — the agent App, Renovate, any collaborator — cannot update main, so an approved PR merges only through Ollie. This is what makes reviewer-can't-merge and agent-can't-merge structural (the wall), not a matter of scope: Margot holds contents:write so its approval counts, and is kept from merging by being absent from THIS ruleset's bypass.",
+          "rules": [
+            "update"
+          ],
+          "bypass_actors": [
+            {
+              "actor_type": "Integration",
+              "actor_id": 4984137,
+              "bypass_mode": "pull_request"
+            },
+            {
+              "actor_type": "RepositoryRole",
+              "actor_id": 5,
+              "bypass_mode": "pull_request"
+            }
+          ]
+        },
+        {
+          "name": "Protect main — checks",
+          "description": "The mechanical floor: required status checks and the two rules that stop history being rewritten (non_fast_forward, deletion). ADMIN ONLY may bypass — Ollie never bypasses the floor, so every Ollie merge inherits a green CI. strict_required_status_checks_policy (up-to-date-before-merge) is OFF: an approved PR merges without a forced rebase, so a rebase-push can't dismiss the approval that just cleared the gate; the required checks themselves still gate every merge. Kept separate from the review ruleset so a bypass actor on review stays fully subject to the floor.",
+          "rules": [
+            "required_status_checks",
+            "non_fast_forward",
+            "deletion"
+          ],
+          "bypass_actors": [
+            {
+              "actor_type": "RepositoryRole",
+              "actor_id": 5,
+              "bypass_mode": "pull_request"
+            }
+          ]
+        }
+      ]
+    },
+    "provenance": "recorded"
+  },
+  "seams": [
+    "triage",
+    "workflow-steps"
+  ]
+}

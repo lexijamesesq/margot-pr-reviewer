@@ -1,0 +1,51 @@
+{
+  "driver": false,
+  "poster": false,
+  "owned_tier": null,
+  "poster_env": {},
+  "workflow": {
+    "file": "margot-review.yml",
+    "job": "review",
+    "run": [
+      "Validate target repo against the enrolled allow-list",
+      "Mint Margot READ token",
+      "Mint Margot check-write token (preflight)",
+      "Re-derive fork status + drift check",
+      "Stale dispatch — skip cleanly (superseded by a newer push, or the PR merged/closed)",
+      "Post or take over the `review / margot` check (preflight)",
+      "Self-instrument preflight (hard-block the gate's own config surface)"
+    ],
+    "inputs": {
+      "repo": {
+        "value": "example-org/widgets",
+        "provenance": "constructed"
+      },
+      "pr": {
+        "value": "7",
+        "provenance": "constructed"
+      },
+      "sha": {
+        "value": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "provenance": "constructed"
+      },
+      "owned_tier": {
+        "value": "none",
+        "provenance": "constructed"
+      },
+      "triage": {
+        "value": "not-mechanical",
+        "provenance": "constructed"
+      }
+    },
+    "github": {
+      "run_id": {
+        "value": "2002",
+        "provenance": "constructed"
+      }
+    },
+    "uuid4": [
+      "00112233445566778899aabbccddeeff"
+    ],
+    "claude": false
+  }
+}

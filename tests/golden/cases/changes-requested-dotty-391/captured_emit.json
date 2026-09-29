@@ -1,0 +1,254 @@
+{
+  "pr": {
+    "repo": "lexijamesesq/dotty",
+    "number": "391",
+    "head_sha": "c966c5db37321044b89a3d9be729c52f1019d2fd",
+    "author": "claude-the-enduring[bot]"
+  },
+  "owned_path": {
+    "tier": "none",
+    "owned_files": []
+  },
+  "n_files": 1,
+  "route": {
+    "exposure": {
+      "type": "score",
+      "score": 0.47,
+      "confidence": 0.53,
+      "legend": {
+        "0": "none",
+        "1": "an existing boundary preserved",
+        "2": "a consequential data or privilege change",
+        "3": "credential exposure, trust-boundary failure, or an authorization-control change"
+      },
+      "probabilities": {
+        "0": 0.53,
+        "1": 0.47,
+        "2": 0.0,
+        "3": 0.0
+      }
+    },
+    "cards": {
+      "safety": {
+        "noul": 0.12,
+        "summon": false
+      },
+      "works-and-proven": {
+        "noul": 0.92,
+        "summon": true
+      },
+      "principal-engineer": {
+        "noul": 0.51,
+        "summon": true
+      },
+      "achieves-the-objective": {
+        "noul": 0.24,
+        "summon": false
+      },
+      "maintainable-no-slop": {
+        "noul": 0.45,
+        "summon": true
+      },
+      "house-style": {
+        "noul": 0.38,
+        "summon": true
+      }
+    },
+    "summoned": [
+      "works-and-proven",
+      "principal-engineer",
+      "maintainable-no-slop",
+      "house-style"
+    ],
+    "decision_source": "jev"
+  },
+  "council": {
+    "summoned": [
+      "works-and-proven",
+      "principal-engineer",
+      "maintainable-no-slop",
+      "house-style"
+    ],
+    "prose": "===CARD: works-and-proven===\ncard: works-and-proven\ncompletion: completed\n\nChecked:\n- Mapped the one changed behavior, the new `files.includes` in `biome.json` (lines 4\u201316), against every eval that reads `biome.json`: `.claude/eval/web-lint-configs.test.sh`, `new-repo.test.sh` and `provision-public-repo.test.sh:4540-4545`. The goal was to find the assertion that would fail if the `dist`/`build`/`coverage` skip or the JSON/`.vue`/`.svelte`/`.astro` skip stopped working. None of them asserts it. `web-lint-configs.test.sh` only runs `biome lint`/`check`/`format` on files named explicitly (`bad.ts`, `good.ts`, `ugly.ts`). The provisioner eval only diffs the written bytes against dotty's copy, and those bytes change together with the file. This probe would have caught a changed behavior with no automated pin; it found one (see finding).\n- Checked that the lint gate still works under the new includes, which would catch an exclusion that accidentally makes Biome skip real source files. `web-lint-configs.test.sh:40-51` copies the shipped `biome.json` and requires `biome lint bad.ts` to exit non-zero with `noUnusedVariables`, `noDebugger` and `noUnusedImports`. With `\"**\"` still first (`biome.json:6`), a broken negation that dropped `.ts` files would fail those assertions. This backs the PR body's claim that a real lint error still fails, and that claim is already pinned by an existing test.\n- Checked the diff for deleted or loosened tests, which would catch \"made green by weakening the eval\". The PR changes one file, `biome.json`. No test file is touched, and no assertion is removed or relaxed.\n- Checked the body's verification claims against the eval-suite log for run 36510410426 on c966c5d, which would catch a claimed run that CI does not show. The log shows `>>> web-lint-configs \u2026 All 18 tests passed.` and `>>> new-repo \u2026 All 203 tests passed.`. 18 matches the unchanged assertion count in `web-lint-configs.test.sh`. `provision-public-repo` ran, but I did not read its count line (532 is unconfirmed; the check-run succeeded).\n\nNot covered:\n- Mock-only or implementation-mirroring tests: no test is added or changed, so there is nothing to probe.\n- The body's manual claims (the eve-plus run at a8f9b3a, the scratch repro, the no-git/no-`.gitignore` run): these ran outside CI and left nothing I can fetch. They are unverified claims, not findings, and not contradicted by anything I could read.\n\nFindings:\n- [issue] biome.json:4 \u00b7 severity=MINOR \u00b7 confidence=MEDIUM\n    what: The new rule that tells the code checker to skip build output and config files was checked by hand once, but no automated test would notice if it stopped working.\n    consequence: A future edit to `files.includes`, or a Biome version with different glob rules, could quietly bring back both failures this PR fixes: a bare `biome check .` failing on `dist/` output, and Biome reformatting provisioner-written `renovate.json` against the hook. `default.json:17-28,40-46` has Renovate bump the `@biomejs/biome` pin with `automerge: true`, and on that path `ci / eval-suite` runs `web-lint-configs.test.sh`, which never exercises the exclusions. `biome.json` is copied whole to every repo in the estate, so a regression would reach all of them. The PR's own \"matching the hook's `exclude:`\" invariant (hook regex `.pre-commit-config.yaml:180` vs `biome.json:10-14`) also has no check, so the two lists can drift apart again.\n    action: Add a section to `.claude/eval/web-lint-configs.test.sh`. In the copied-config dir, create a lint-failing `dist/bad.js` (and `build/`, `coverage/`) plus a short-array `renovate.json`, run the hook-pinned `biome check .`, and assert exit 0 with no rewrite of the JSON. Add a control with `\"!**/dist\"` removed that must exit non-zero, so the test proves the exclusion rather than an empty run. Optionally assert that the extension set in `biome.json` negations equals the hook's `exclude:` regex. It is fixed when the suite's count rises above 18 and the control fails against the base `biome.json`.\n\n===CARD: principal-engineer===\nI've read the diff and traced how the config is used. Writing up the findings now.\n\ncard: principal-engineer\ncompletion: completed\n\nChecked:\n- Fetched `biome.json` at head sha c966c5d and compared its new `files.includes` (lines 4\u201316) with the hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` in `.pre-commit-config.yaml:180` and `.github/scripts/pre-commit-suite-merge.py:171`. This would have caught a context bug where the config and the hook disagree about which extensions are in scope. They agree: json, jsonc, vue, svelte and astro are excluded in both places. The list also starts with `\"**\"`, so the negations have something to subtract from, and all other files stay in scope.\n- Traced every caller of `biome.json` in the checkout: `provision-public-repo.sh:2698-2711,2800,2966` (`intended_biome_json` writes the file whole), `new-repo.sh:220,259`, `.claude/eval/web-lint-configs.test.sh:40-81`, `.claude/eval/provision-public-repo.test.sh:4540-4565`, `.claude/eval/new-repo.test.sh:416-511` and `rulesets/default-branch.json:391`. This would have caught a stale caller relying on keys the diff removed or changed. The diff only adds a `files` key. Every caller either copies the file byte for byte or reads keys that did not change (`formatter.lineWidth`, `linter.rules\u2026noUnusedImports`, `$schema`). The eval fixtures (`bad.ts`, `good.ts`, `ugly.ts`) sit outside every new exclusion, so the lint and format assertions still see their files.\n- Reasoned through a second provisioner run on a consumer repo. This would have caught a non-idempotent write. `intended_biome_json` is a `cat` of the single source file and the drift comparison is against those exact bytes. The first run after merge rewrites each consumer's `biome.json` once, and a second run finds no drift and changes nothing.\n- Checked the no-`.gitignore` edge case the body relies on. This would have caught Biome refusing to run in repos with no ignore file. `vcs.enabled` stays `false` at `biome.json:3`, so no ignore file is read or required, and `files.includes` is plain path matching that works with or without git.\n\nNot covered:\n- None. All four `insists on` clauses were probed above: edge case, rerun/idempotency, interface/contract with callers, and context bug. There is no shell or automation logic in the diff, so there was no mid-run error path to reason through beyond the provisioner rerun.\n\nFindings:\n- [info] biome.json:7 \u00b7 severity=MINOR \u00b7 confidence=MEDIUM\n    what: The new rule that skips build output matches any folder called \"dist\", \"build\" or \"coverage\" at any depth, so real source code kept in a folder with one of those names would quietly stop being checked in every repo.\n    consequence: `!**/dist`, `!**/build` and `!**/coverage` (lines 7\u20139) are name matches at any depth, not root-anchored build-artifact paths. `biome.json` is provisioner-owned whole, so this reaches every estate repo. If a repo tracks source in, say, `scripts/build/` or `src/coverage/`, those files drop out of `biome check .`. The pre-commit hook passes those files explicitly, but Biome treats them as ignored, so a lint or format error there no longer blocks a commit. Nothing in the dotty checkout is affected (no such directories exist). I could not check other estate repos from this checkout, which is why confidence is MEDIUM.\n    note: Consider anchoring the patterns to where build output actually lands (for example the root and `packages/*/dist`), or confirm across the estate that no tracked source lives under a directory with these names. A way to confirm the effect: a lint error in a tracked `build/x.ts` fixture should still fail `biome check`.\n\n===CARD: maintainable-no-slop===\ncard: maintainable-no-slop\ncompletion: completed\n\nChecked:\n- Fetched the diff at c966c5d. The whole PR is one hunk: `biome.json:4-16` adds a `files.includes` block. I read it for comments, code paths or dependencies. That would have caught comment drift, an error-swallowing path or a new package name. There are none: the file is pure JSON config with no comments, no logic and no dependency.\n- Nonexistent config option: resolved `files.includes` and the `!**/dir` negation form against the repo's declared Biome version. `biome.json:2` points `$schema` at 2.5.14, and `.pre-commit-config.yaml:179` pins `@biomejs/biome@2.5.14`. Next, `.claude/eval/web-lint-configs.test.sh:36-49` copies the shipped `biome.json` and runs the pinned 2.5.14 binary against it. It passes only if the recommended rules fire, so a config key the tool rejects would fail that suite. This would have caught an invented config key. It does not prove the key is valid: nothing in the checkout contains Biome's schema, so I rely on that eval run, which the PR body reports as 18/18. `ci / checks` does not prove it either: that pre-commit run is scoped to the change, and the hook's `exclude` regex (`.pre-commit-config.yaml:180`) skips `biome.json` itself.\n- Duplicated pattern: grepped the checkout for `biome`, `\"includes\"`, `files.includes` and `!**/dist`. This would have caught an existing shared exclusion source this config should have reused. There is none. The JSON/`.vue`/`.svelte`/`.astro` exclusion already exists twice as the hook's `exclude:` regex (`.pre-commit-config.yaml:180` and `.github/scripts/pre-commit-suite-merge.py:171`). That regex only filters which files pre-commit passes to Biome, so a bare `biome check .` or an editor can't use it. The new list in `biome.json` is a copy the file has to carry, not a reimplementation of something reachable. Nothing in the checkout tests that the three lists match, so a later change to the hook exclusion has to update `biome.json` by hand.\n- Unnecessary abstraction: the change is a flat include/exclude list with no indirection layer. This would have caught a single-caller layer, and there is none.\n\nNot covered:\n- Error-swallowing clause: doesn't apply. The diff has no executable code, only JSON config, so there is no try/except or default-returning path to probe.\n- External-AI-chat-link half of the comment clause: doesn't apply. The diff adds no comments or links.\n- Dependency wrong-name (slopsquatting) half of the nonexistent-package clause: doesn't apply. No manifest, lockfile or `additional_dependencies` pin changed.\n\nFindings:\n\n===CARD: house-style===\ncard: house-style\ncompletion: completed\n\nChecked:\n- Held the new `files.includes` block in `biome.json` (lines 4\u201316 at c966c5d) against the biome-check hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` (`.pre-commit-config.yaml:180`). I also compared it with the suite generator's copy of that exclude (`.github/scripts/pre-commit-suite-merge.py:171`) and the eval's copy (`.claude/eval/provision-public-repo.test.sh:4173`). This would have caught a file-type exclusion list that differs from the estate's one existing statement of what Biome must skip (for example, `.jsonc` or one of the three framework extensions missing, or an extra type). The five types match exactly.\n- Checked whether the change gets past the checks that guard `biome.json`. `.claude/eval/provision-public-repo.test.sh:4544` requires the provisioned copy to be byte-identical to dotty's own file. `.claude/eval/web-lint-configs.test.sh:33-34` requires the `$schema` version to match the hook's pinned tool version. This would have caught a config shape those guards cannot see, such as a schema or pin drift, or a second per-repo copy. The only change is new keys inside the one owned-whole file, and the `$schema` stays 2.5.14, matching `@biomejs/biome@2.5.14`. Nothing gets past these checks.\n- Compared the change with the sibling configs that are provisioned whole alongside it (`ruff.toml`, `.yamllint.yaml`, `.prettierrc`, listed together at `new-repo.sh:220`). This would have caught a clash with a consistent sibling pattern for how estate configs express exclusions or file scope. No sibling carries an exclusion list, so there is no pattern to contradict. The build-output ignores (`dist`/`build`/`coverage`) have no sibling precedent, but that is one tool's standard ignore set, not an unusual choice.\n\nNot covered:\n- None. Both \"insists on\" clauses (a check the change gets past, and a contradiction of a same-operation pattern) were probed against the single changed behaviour, the new `files.includes` scope in `biome.json`.\n\nFindings:",
+    "reviews": [
+      {
+        "card": "works-and-proven",
+        "raw": "card: works-and-proven\ncompletion: completed\n\nChecked:\n- Mapped the one changed behavior, the new `files.includes` in `biome.json` (lines 4\u201316), against every eval that reads `biome.json`: `.claude/eval/web-lint-configs.test.sh`, `new-repo.test.sh` and `provision-public-repo.test.sh:4540-4545`. The goal was to find the assertion that would fail if the `dist`/`build`/`coverage` skip or the JSON/`.vue`/`.svelte`/`.astro` skip stopped working. None of them asserts it. `web-lint-configs.test.sh` only runs `biome lint`/`check`/`format` on files named explicitly (`bad.ts`, `good.ts`, `ugly.ts`). The provisioner eval only diffs the written bytes against dotty's copy, and those bytes change together with the file. This probe would have caught a changed behavior with no automated pin; it found one (see finding).\n- Checked that the lint gate still works under the new includes, which would catch an exclusion that accidentally makes Biome skip real source files. `web-lint-configs.test.sh:40-51` copies the shipped `biome.json` and requires `biome lint bad.ts` to exit non-zero with `noUnusedVariables`, `noDebugger` and `noUnusedImports`. With `\"**\"` still first (`biome.json:6`), a broken negation that dropped `.ts` files would fail those assertions. This backs the PR body's claim that a real lint error still fails, and that claim is already pinned by an existing test.\n- Checked the diff for deleted or loosened tests, which would catch \"made green by weakening the eval\". The PR changes one file, `biome.json`. No test file is touched, and no assertion is removed or relaxed.\n- Checked the body's verification claims against the eval-suite log for run 36510410426 on c966c5d, which would catch a claimed run that CI does not show. The log shows `>>> web-lint-configs \u2026 All 18 tests passed.` and `>>> new-repo \u2026 All 203 tests passed.`. 18 matches the unchanged assertion count in `web-lint-configs.test.sh`. `provision-public-repo` ran, but I did not read its count line (532 is unconfirmed; the check-run succeeded).\n\nNot covered:\n- Mock-only or implementation-mirroring tests: no test is added or changed, so there is nothing to probe.\n- The body's manual claims (the eve-plus run at a8f9b3a, the scratch repro, the no-git/no-`.gitignore` run): these ran outside CI and left nothing I can fetch. They are unverified claims, not findings, and not contradicted by anything I could read.\n\nFindings:\n- [issue] biome.json:4 \u00b7 severity=MINOR \u00b7 confidence=MEDIUM\n    what: The new rule that tells the code checker to skip build output and config files was checked by hand once, but no automated test would notice if it stopped working.\n    consequence: A future edit to `files.includes`, or a Biome version with different glob rules, could quietly bring back both failures this PR fixes: a bare `biome check .` failing on `dist/` output, and Biome reformatting provisioner-written `renovate.json` against the hook. `default.json:17-28,40-46` has Renovate bump the `@biomejs/biome` pin with `automerge: true`, and on that path `ci / eval-suite` runs `web-lint-configs.test.sh`, which never exercises the exclusions. `biome.json` is copied whole to every repo in the estate, so a regression would reach all of them. The PR's own \"matching the hook's `exclude:`\" invariant (hook regex `.pre-commit-config.yaml:180` vs `biome.json:10-14`) also has no check, so the two lists can drift apart again.\n    action: Add a section to `.claude/eval/web-lint-configs.test.sh`. In the copied-config dir, create a lint-failing `dist/bad.js` (and `build/`, `coverage/`) plus a short-array `renovate.json`, run the hook-pinned `biome check .`, and assert exit 0 with no rewrite of the JSON. Add a control with `\"!**/dist\"` removed that must exit non-zero, so the test proves the exclusion rather than an empty run. Optionally assert that the extension set in `biome.json` negations equals the hook's `exclude:` regex. It is fixed when the suite's count rises above 18 and the control fails against the base `biome.json`.",
+        "status": "ok",
+        "cost_usd": 0.32142519999999997,
+        "duration_ms": 52631,
+        "num_turns": 10,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "principal-engineer",
+        "raw": "I've read the diff and traced how the config is used. Writing up the findings now.\n\ncard: principal-engineer\ncompletion: completed\n\nChecked:\n- Fetched `biome.json` at head sha c966c5d and compared its new `files.includes` (lines 4\u201316) with the hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` in `.pre-commit-config.yaml:180` and `.github/scripts/pre-commit-suite-merge.py:171`. This would have caught a context bug where the config and the hook disagree about which extensions are in scope. They agree: json, jsonc, vue, svelte and astro are excluded in both places. The list also starts with `\"**\"`, so the negations have something to subtract from, and all other files stay in scope.\n- Traced every caller of `biome.json` in the checkout: `provision-public-repo.sh:2698-2711,2800,2966` (`intended_biome_json` writes the file whole), `new-repo.sh:220,259`, `.claude/eval/web-lint-configs.test.sh:40-81`, `.claude/eval/provision-public-repo.test.sh:4540-4565`, `.claude/eval/new-repo.test.sh:416-511` and `rulesets/default-branch.json:391`. This would have caught a stale caller relying on keys the diff removed or changed. The diff only adds a `files` key. Every caller either copies the file byte for byte or reads keys that did not change (`formatter.lineWidth`, `linter.rules\u2026noUnusedImports`, `$schema`). The eval fixtures (`bad.ts`, `good.ts`, `ugly.ts`) sit outside every new exclusion, so the lint and format assertions still see their files.\n- Reasoned through a second provisioner run on a consumer repo. This would have caught a non-idempotent write. `intended_biome_json` is a `cat` of the single source file and the drift comparison is against those exact bytes. The first run after merge rewrites each consumer's `biome.json` once, and a second run finds no drift and changes nothing.\n- Checked the no-`.gitignore` edge case the body relies on. This would have caught Biome refusing to run in repos with no ignore file. `vcs.enabled` stays `false` at `biome.json:3`, so no ignore file is read or required, and `files.includes` is plain path matching that works with or without git.\n\nNot covered:\n- None. All four `insists on` clauses were probed above: edge case, rerun/idempotency, interface/contract with callers, and context bug. There is no shell or automation logic in the diff, so there was no mid-run error path to reason through beyond the provisioner rerun.\n\nFindings:\n- [info] biome.json:7 \u00b7 severity=MINOR \u00b7 confidence=MEDIUM\n    what: The new rule that skips build output matches any folder called \"dist\", \"build\" or \"coverage\" at any depth, so real source code kept in a folder with one of those names would quietly stop being checked in every repo.\n    consequence: `!**/dist`, `!**/build` and `!**/coverage` (lines 7\u20139) are name matches at any depth, not root-anchored build-artifact paths. `biome.json` is provisioner-owned whole, so this reaches every estate repo. If a repo tracks source in, say, `scripts/build/` or `src/coverage/`, those files drop out of `biome check .`. The pre-commit hook passes those files explicitly, but Biome treats them as ignored, so a lint or format error there no longer blocks a commit. Nothing in the dotty checkout is affected (no such directories exist). I could not check other estate repos from this checkout, which is why confidence is MEDIUM.\n    note: Consider anchoring the patterns to where build output actually lands (for example the root and `packages/*/dist`), or confirm across the estate that no tracked source lives under a directory with these names. A way to confirm the effect: a lint error in a tracked `build/x.ts` fixture should still fail `biome check`.",
+        "status": "ok",
+        "cost_usd": 0.256923,
+        "duration_ms": 38149,
+        "num_turns": 11,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "maintainable-no-slop",
+        "raw": "card: maintainable-no-slop\ncompletion: completed\n\nChecked:\n- Fetched the diff at c966c5d. The whole PR is one hunk: `biome.json:4-16` adds a `files.includes` block. I read it for comments, code paths or dependencies. That would have caught comment drift, an error-swallowing path or a new package name. There are none: the file is pure JSON config with no comments, no logic and no dependency.\n- Nonexistent config option: resolved `files.includes` and the `!**/dir` negation form against the repo's declared Biome version. `biome.json:2` points `$schema` at 2.5.14, and `.pre-commit-config.yaml:179` pins `@biomejs/biome@2.5.14`. Next, `.claude/eval/web-lint-configs.test.sh:36-49` copies the shipped `biome.json` and runs the pinned 2.5.14 binary against it. It passes only if the recommended rules fire, so a config key the tool rejects would fail that suite. This would have caught an invented config key. It does not prove the key is valid: nothing in the checkout contains Biome's schema, so I rely on that eval run, which the PR body reports as 18/18. `ci / checks` does not prove it either: that pre-commit run is scoped to the change, and the hook's `exclude` regex (`.pre-commit-config.yaml:180`) skips `biome.json` itself.\n- Duplicated pattern: grepped the checkout for `biome`, `\"includes\"`, `files.includes` and `!**/dist`. This would have caught an existing shared exclusion source this config should have reused. There is none. The JSON/`.vue`/`.svelte`/`.astro` exclusion already exists twice as the hook's `exclude:` regex (`.pre-commit-config.yaml:180` and `.github/scripts/pre-commit-suite-merge.py:171`). That regex only filters which files pre-commit passes to Biome, so a bare `biome check .` or an editor can't use it. The new list in `biome.json` is a copy the file has to carry, not a reimplementation of something reachable. Nothing in the checkout tests that the three lists match, so a later change to the hook exclusion has to update `biome.json` by hand.\n- Unnecessary abstraction: the change is a flat include/exclude list with no indirection layer. This would have caught a single-caller layer, and there is none.\n\nNot covered:\n- Error-swallowing clause: doesn't apply. The diff has no executable code, only JSON config, so there is no try/except or default-returning path to probe.\n- External-AI-chat-link half of the comment clause: doesn't apply. The diff adds no comments or links.\n- Dependency wrong-name (slopsquatting) half of the nonexistent-package clause: doesn't apply. No manifest, lockfile or `additional_dependencies` pin changed.\n\nFindings:",
+        "status": "ok",
+        "cost_usd": 0.29612540000000004,
+        "duration_ms": 48039,
+        "num_turns": 14,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "house-style",
+        "raw": "card: house-style\ncompletion: completed\n\nChecked:\n- Held the new `files.includes` block in `biome.json` (lines 4\u201316 at c966c5d) against the biome-check hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` (`.pre-commit-config.yaml:180`). I also compared it with the suite generator's copy of that exclude (`.github/scripts/pre-commit-suite-merge.py:171`) and the eval's copy (`.claude/eval/provision-public-repo.test.sh:4173`). This would have caught a file-type exclusion list that differs from the estate's one existing statement of what Biome must skip (for example, `.jsonc` or one of the three framework extensions missing, or an extra type). The five types match exactly.\n- Checked whether the change gets past the checks that guard `biome.json`. `.claude/eval/provision-public-repo.test.sh:4544` requires the provisioned copy to be byte-identical to dotty's own file. `.claude/eval/web-lint-configs.test.sh:33-34` requires the `$schema` version to match the hook's pinned tool version. This would have caught a config shape those guards cannot see, such as a schema or pin drift, or a second per-repo copy. The only change is new keys inside the one owned-whole file, and the `$schema` stays 2.5.14, matching `@biomejs/biome@2.5.14`. Nothing gets past these checks.\n- Compared the change with the sibling configs that are provisioned whole alongside it (`ruff.toml`, `.yamllint.yaml`, `.prettierrc`, listed together at `new-repo.sh:220`). This would have caught a clash with a consistent sibling pattern for how estate configs express exclusions or file scope. No sibling carries an exclusion list, so there is no pattern to contradict. The build-output ignores (`dist`/`build`/`coverage`) have no sibling precedent, but that is one tool's standard ignore set, not an unusual choice.\n\nNot covered:\n- None. Both \"insists on\" clauses (a check the change gets past, and a contradiction of a same-operation pattern) were probed against the single changed behaviour, the new `files.includes` scope in `biome.json`.\n\nFindings:",
+        "status": "ok",
+        "cost_usd": 0.2530796,
+        "duration_ms": 32731,
+        "num_turns": 12,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      }
+    ],
+    "status": "ok",
+    "cost_usd": 1.1275532,
+    "no_council": false
+  },
+  "round": 1,
+  "summoned_by_ledger": [],
+  "risk": {
+    "vector": {
+      "blast_radius": 2.8,
+      "reversibility": 0.83,
+      "data_security": 0.48,
+      "operations": 1.28,
+      "verification_gap": 1.89
+    },
+    "levels": {
+      "blast_radius": 3,
+      "reversibility": 1,
+      "data_security": 1,
+      "operations": 2,
+      "verification_gap": 2
+    },
+    "R": 3,
+    "r_continuous": 2.8,
+    "band": "HIGH",
+    "confidence": {
+      "blast_radius": 0.8,
+      "reversibility": 0.79,
+      "data_security": 0.52,
+      "operations": 0.54,
+      "verification_gap": 0.88
+    },
+    "distribution": {
+      "blast_radius": {
+        "0": 0.0,
+        "1": 0.03,
+        "2": 0.14,
+        "3": 0.83
+      },
+      "reversibility": {
+        "0": 0.19,
+        "1": 0.79,
+        "2": 0.02,
+        "3": 0.0
+      },
+      "data_security": {
+        "0": 0.53,
+        "1": 0.47,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "operations": {
+        "0": 0.09,
+        "1": 0.55,
+        "2": 0.35,
+        "3": 0.01
+      },
+      "verification_gap": {
+        "0": 0.01,
+        "1": 0.09,
+        "2": 0.9,
+        "3": 0.0
+      }
+    },
+    "decision_source": "jev"
+  },
+  "council_valid": true,
+  "cards": [
+    {
+      "name": "works-and-proven",
+      "completion": "completed",
+      "findings": [
+        {
+          "card": "works-and-proven",
+          "tag": "issue",
+          "location": "biome.json:4",
+          "severity": "MINOR",
+          "confidence": "MEDIUM",
+          "what": "The new rule that tells the code checker to skip build output and config files was checked by hand once, but no automated test would notice if it stopped working.",
+          "id": "F1"
+        }
+      ]
+    },
+    {
+      "name": "principal-engineer",
+      "completion": "completed",
+      "findings": [
+        {
+          "card": "principal-engineer",
+          "tag": "info",
+          "location": "biome.json:7",
+          "severity": "MINOR",
+          "confidence": "MEDIUM",
+          "what": "The new rule that skips build output matches any folder called \"dist\", \"build\" or \"coverage\" at any depth, so real source code kept in a folder with one of those names would quietly stop being checked in every repo."
+        }
+      ]
+    },
+    {
+      "name": "maintainable-no-slop",
+      "completion": "completed",
+      "findings": []
+    },
+    {
+      "name": "house-style",
+      "completion": "completed",
+      "findings": []
+    }
+  ],
+  "decision_source": "jev",
+  "status": "ok",
+  "verdict_voice": {
+    "status": "ok",
+    "cost_usd": 0.09175919999999999,
+    "num_turns": 2,
+    "duration_ms": 18019,
+    "prose": "outcome: CHANGES_REQUESTED\nband: HIGH\nband_reason: Confirming the model's HIGH band (R=3). Its highest dimension is blast_radius at 2.8. `biome.json` is copied whole to every repo in the estate by `provision-public-repo.sh` (`intended_biome_json`), and Renovate auto-merges `@biomejs/biome` pin bumps. A change in how the config picks files would reach every repo with nothing to catch it. The verification gap (1.89) adds to this; it doesn't offset it.\nrisk: estate-wide untested config\nsummary: This change tells the code checker to skip build output and some file types, which fixes two real problems where the checker failed or rewrote files it shouldn't touch. The fix was checked by hand, but no automated test would notice if it stopped working. This file is copied to every repository, so a future tool upgrade or edit could quietly bring both problems back everywhere. Adding a small test that proves build folders and config files are skipped, plus a control case showing the test can fail, would clear this.\nfinding: F1 \u00b7 works-and-proven \u00b7 biome.json:4. The new `files.includes` exclusions (`!**/dist`, `!**/build`, `!**/coverage`, `!**/*.json`, `!**/*.jsonc`, `!**/*.vue`, `!**/*.svelte`, `!**/*.astro`) have no automated pin. `.claude/eval/web-lint-configs.test.sh` at the head sha never mentions dist, build, coverage, renovate or a bare `biome check .`; it only lints files it names explicitly. A Biome bump auto-merged by Renovate, or an edit to the list, could silently bring back the `dist/` failure and the reformatting of `renovate.json`, and the list can drift from the hook's `exclude:` regex (`.pre-commit-config.yaml:180`). Fix: add a section to `web-lint-configs.test.sh` that creates a failing `dist/bad.js` (plus `build/` and `coverage/`) and a short-array `renovate.json`, runs the pinned `biome check .`, and asserts exit 0 with the JSON unchanged. Add a control with `!**/dist` removed that must exit non-zero.\nestablished:\n- F1 \u00b7 biome.json:4 \u00b7 The new `files.includes` exclusions change behavior in every estate repo, but no eval pins them: `web-lint-configs.test.sh` never exercises dist/build/coverage or the JSON exclusion, so a regression would pass CI.\ndismissed:\n\n---\n\n- **What I checked:** F1's reviewer was only MEDIUM-sure, so I fetched `biome.json` and `web-lint-configs.test.sh` at the head sha. The exclusions are there, and the test file doesn't mention any of them.\n- **Round:** I was given no round-two marks, so I ruled on F1 as mandatory even though it is MINOR.\n- **Advisory note, not blocking:** the principal-engineer `[info]` note (biome.json:7) says `!**/build`-style patterns match a folder with that name at any depth. That means real source kept in, say, `scripts/build/` would stop being checked. It's worth the author's attention."
+  },
+  "pipeline_ok": false,
+  "outcome": "ERROR",
+  "band": "HIGH",
+  "verdict_source": "verdict_voice_incomplete",
+  "verdict_incomplete_reason": "unaccounted mandatory finding(s) ['F1']",
+  "established": [
+    "F1 \u00b7 biome.json:4 \u00b7 The new `files.includes` exclusions change behavior in every estate repo, but no eval pins them: `web-lint-configs.test.sh` never exercises dist/build/coverage or the JSON exclusion, so a regression would pass CI."
+  ],
+  "dismissed": [
+    "**What I checked:** F1's reviewer was only MEDIUM-sure, so I fetched `biome.json` and `web-lint-configs.test.sh` at the head sha. The exclusions are there, and the test file doesn't mention any of them.",
+    "**Round:** I was given no round-two marks, so I ruled on F1 as mandatory even though it is MINOR."
+  ],
+  "unresolved_issue_ids": [
+    "F1"
+  ],
+  "risk_classification": "estate-wide untested config",
+  "adherence": {
+    "status": "skipped"
+  }
+}

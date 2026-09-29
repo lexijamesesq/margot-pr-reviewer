@@ -1,0 +1,241 @@
+{
+  "pr": {
+    "repo": "lexijamesesq/incubator",
+    "number": "93",
+    "head_sha": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+    "author": "claude-the-enduring[bot]"
+  },
+  "owned_path": {
+    "tier": "required_owned",
+    "owned_files": []
+  },
+  "n_files": 1,
+  "route": {
+    "exposure": {
+      "type": "score",
+      "score": 0.53,
+      "confidence": 0.52,
+      "legend": {
+        "0": "none",
+        "1": "an existing boundary preserved",
+        "2": "a consequential data or privilege change",
+        "3": "credential exposure, trust-boundary failure, or an authorization-control change"
+      },
+      "probabilities": {
+        "0": 0.47,
+        "1": 0.53,
+        "2": 0.0,
+        "3": 0.0
+      }
+    },
+    "cards": {
+      "safety": {
+        "noul": 0.53,
+        "summon": true
+      },
+      "works-and-proven": {
+        "noul": 0.79,
+        "summon": true
+      },
+      "principal-engineer": {
+        "noul": 0.57,
+        "summon": true
+      },
+      "achieves-the-objective": {
+        "noul": 0.24,
+        "summon": false
+      },
+      "maintainable-no-slop": {
+        "noul": 0.35,
+        "summon": true
+      },
+      "house-style": {
+        "noul": 0.28,
+        "summon": false
+      }
+    },
+    "summoned": [
+      "safety",
+      "works-and-proven",
+      "principal-engineer",
+      "maintainable-no-slop"
+    ],
+    "decision_source": "jev"
+  },
+  "council": {
+    "summoned": [
+      "safety",
+      "works-and-proven",
+      "principal-engineer",
+      "maintainable-no-slop"
+    ],
+    "prose": "===CARD: safety===\ncard: safety\ncompletion: completed\n\nChecked:\n- Weakened-guard probe. The only change is that `.github/workflows/ci.yml` at the head sha removes the `all-checks-passed` job (`ci / all-passed`) and its comment block. I fetched the live branch rules for `main` (`gh api repos/lexijamesesq/incubator/rules/branches/main`). Ruleset 23658235 requires `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck` and `ci / release-check`. It does not require `ci / all-passed`. So the removed check was not gating merges, and its protection was already off. That is not a finding under the card. Its extra rule (a skipped job counts as a failure on a non-mechanical PR) was not enforced by the ruleset either. The required checks still hold: if the floor fails, the required `ci / checks` fails; `ruff` and `shellcheck` still depend on `floor` (lines 39–40, 52–53); `release-check` still always runs (lines 63–84). This probe would have caught a required check or aggregator removed while the ruleset still enforced it, which would let a red PR merge.\n- Harmful-command skim of the one changed file. The diff only deletes lines (0 additions, 28 deletions). No `run:` step, command or permission is added or changed. Workflow permissions stay `contents: read` (line 17) and the floor's read-only scopes (lines 28–31). This would have caught a new destructive or exposing command, or wider token scopes.\n- `pull_request_target` probe. The head triggers are `pull_request` (opened, synchronize) and `push` to `main` (lines 2–6). There is no `pull_request_target` and no privileged checkout of PR-head code. This would have caught PR code running with repository secrets or a write token.\n- Secret coverage. The receipt shows `trusted-scan / trusted-scan` passed on 26033f1, and the card states gitleaks ran on this head. The diff adds no content, so no changed line was left unscanned. This would have caught a key or token added in the diff.\n\nNot covered:\n- Action pinned to a mutable tag (third-party template) — the PR ships no workflow for another repository. It only touches this repo's own `.github/`, where zizmor's passing result on the receipt stands.\n- Untrusted PR input interpolated into `run:` (template outside `.github/`) — no template outside this repo's `.github/` is touched, and no `run:` step is added. The in-repo file is covered by zizmor per the receipt.\n- Mandatory safety rule enforced only client-side — no hook or pre-commit file is changed.\n\nFindings:\n\n===CARD: works-and-proven===\ncard: works-and-proven\ncompletion: completed\n\nChecked:\n- Compared the gating logic that was removed with what the ruleset now requires. At `.github/workflows/ci.yml` (head, lines 37–84), `ruff` and `shellcheck` are skipped only when the floor sets `mechanical=true` (lines 40, 53), which is the same condition under which the old aggregator let a skip through. `release-check` always runs. If the floor fails, the dependent jobs are skipped, but `ci / checks` itself fails and still blocks the merge. This would have caught a gap the aggregator used to close, where a skipped job on a functional PR passes a required check. There is no such path.\n- Fetched the live branch rules with `gh api repos/lexijamesesq/incubator/rules/branches/main`. The required checks are exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck` and `ci / release-check`, and `ci / all-passed` is absent. This would have caught a body claim the live ruleset doesn't support. The claim holds, and each required check name matches a job `name:` at head or a floor receipt entry.\n- Searched the base checkout for `all-passed` and `all-checks-passed`. The only hits are the removed lines at `.github/workflows/ci.yml:37-38`. This would have caught a leftover consumer (a doc, script or `needs:`) that still depends on the removed job. There is none.\n- Checked the head workflow for structural damage from the deletion. No remaining job has `needs: [all-checks-passed]`, and the `jobs:` mapping is intact, with `ruff` following `floor` directly. This would have caught a workflow that no longer loads, which would drop every required check.\n\nNot covered:\n- A mock-only or implementation-mirroring test: no test files changed, and CI config has no unit-test surface.\n- A deleted or loosened failing test: the diff removes only a CI aggregator job and no test or assertion. The removed job's skip logic is covered by the first Checked item.\n- The body's claims that \"actionlint is clean\" and that \"`ci-caller-merge.py` is idempotent\": no actionlint check appears in the floor receipt, and `ci-caller-merge.py` lives in another repo (dotty) outside this checkout, so neither claim could be confirmed from the evidence I'm allowed to use. Neither is contradicted, and the workflow's structure is sound at head.\n\nFindings:\n\n===CARD: principal-engineer===\ncard: principal-engineer\ncompletion: completed\n\nChecked:\n- Compared what the removed `ci / all-passed` job enforced against what the remaining required checks enforce (`.github/workflows/ci.yml` at head 26033f1). This would have caught a gap in the merge gate after the aggregator is gone. The aggregator failed in three cases: (a) a `failure` or `cancelled` dependency; (b) a `skipped` `ruff`/`shellcheck` on a non-mechanical PR; (c) floor failure, which leaves its dependents skipped. Case (a) is still covered because each job is now its own required check. Case (b) can only happen when `needs.floor.outputs.mechanical == 'true'` (ci.yml:40, :53). The aggregator also passed in that case (`$mech != \"true\"` guard), so nothing changes. Case (c) is covered because the floor's only job-level check-run on this head is `ci / checks` (check-runs list at 26033f1). A floor failure therefore surfaces as a failing required `ci / checks`, not as a skip.\n- Checked the removed check against the live ruleset (`gh api repos/lexijamesesq/incubator/rules/branches/main`). This would have caught a stale contract: a ruleset that still requires `ci / all-passed` would block every PR forever, because nothing would report that check. The ruleset requires `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck` and `ci / release-check`. It does not require `ci / all-passed`, and each of the five reported on this head.\n- Searched the base checkout (`/work`) for `all-passed`, `all-checks-passed` and required-check references outside the file this PR changes. This would have caught a stale caller, such as another workflow, an automerge gate or a ruleset-as-code file that depends on the removed job or its name. There are no matches outside `.github/workflows/ci.yml`.\n- Reasoned through a rerun and a push-to-main run. This would have caught a non-idempotent effect or a lost push-event guard. The change only deletes a job and has no side effects. On push to main, the aggregator's `event != pull_request` tolerance for skipped jobs no longer applies, and no required check is evaluated on pushes. Rollback is a plain revert.\n\nNot covered:\n- The internals of `lexijamesesq/dotty/.github/workflows/estate-ci.yml@v1`. It is a separate repo outside the checkout and outside this PR's evidence. The one remaining assumption is that its single `checks` job has no `if:` that could make it skip rather than fail. The head's check-runs show a single floor job reporting `success`, which fits the PR's claim that \"a failed floor fails `ci / checks`\". I did not read the called workflow's source.\n- Non-idempotent side effect clause: not applicable. The diff only deletes a job, and nothing in it creates, appends or writes anything.\n\nFindings:\n\n===CARD: maintainable-no-slop===\ncard: maintainable-no-slop\ncompletion: completed\n\nChecked:\n- Read the diff at head 26033f1 and the whole `.github/workflows/ci.yml` at the head sha. The change only deletes the `all-checks-passed` job (base lines 37–63), with no line added or changed. This would have caught any new API, package, helper, abstraction layer or error-handling path. The diff has none.\n- Searched the base checkout at /work for `all-passed|all-checks-passed|aggregat` (case-insensitive). The only code hits are the deleted job itself (base `.github/workflows/ci.yml:37-38`). The other hits are unrelated text in `plugins/incubator/skills/thesis-test/SKILL.md` and `.claude/instance.sample.md`. This would have caught a leftover `needs:` or other reference to the removed job, and a comment elsewhere that still describes the aggregator.\n- Checked every comment left in `.github/workflows/ci.yml` at the head sha against what the code does: lines 8–11 (concurrency), 21–22 (the `ci / checks` naming), 24–27 (floor permissions) and 65–67 (`release-check` always runs, with no `needs: [floor]` or `if:`). This would have caught a comment that no longer matches the code after the removal, such as one saying one job gates the others. Each comment still matches the code.\n- Checked the deleted job's own error handling (a jq filter plus `exit 1`). Error swallowing that this PR adds or leaves behind would have shown up here. The logic is removed, not moved somewhere else, so no replacement path hides a failure.\n\nNot covered:\n- Nonexistent API or package: nothing to check. No dependency, action pin, manifest or lockfile changed; the diff only deletes lines.\n- Duplicated helper: nothing to check. The PR adds no helper or logic that could copy existing code.\n- Unnecessary abstraction layer: nothing to check. The PR adds no indirection; it removes a fan-in job.\n- External-AI-chat link carrying load-bearing reasoning: not probed in code, since the diff adds no comment or link. The `claude.ai/code/session_…` link is in the PR body, not the repo. The body states its own reasoning (the ruleset contents and the dotty#379 dependency), so the link carries nothing the PR relies on.\n\nFindings:",
+    "reviews": [
+      {
+        "card": "safety",
+        "raw": "card: safety\ncompletion: completed\n\nChecked:\n- Weakened-guard probe. The only change is that `.github/workflows/ci.yml` at the head sha removes the `all-checks-passed` job (`ci / all-passed`) and its comment block. I fetched the live branch rules for `main` (`gh api repos/lexijamesesq/incubator/rules/branches/main`). Ruleset 23658235 requires `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck` and `ci / release-check`. It does not require `ci / all-passed`. So the removed check was not gating merges, and its protection was already off. That is not a finding under the card. Its extra rule (a skipped job counts as a failure on a non-mechanical PR) was not enforced by the ruleset either. The required checks still hold: if the floor fails, the required `ci / checks` fails; `ruff` and `shellcheck` still depend on `floor` (lines 39–40, 52–53); `release-check` still always runs (lines 63–84). This probe would have caught a required check or aggregator removed while the ruleset still enforced it, which would let a red PR merge.\n- Harmful-command skim of the one changed file. The diff only deletes lines (0 additions, 28 deletions). No `run:` step, command or permission is added or changed. Workflow permissions stay `contents: read` (line 17) and the floor's read-only scopes (lines 28–31). This would have caught a new destructive or exposing command, or wider token scopes.\n- `pull_request_target` probe. The head triggers are `pull_request` (opened, synchronize) and `push` to `main` (lines 2–6). There is no `pull_request_target` and no privileged checkout of PR-head code. This would have caught PR code running with repository secrets or a write token.\n- Secret coverage. The receipt shows `trusted-scan / trusted-scan` passed on 26033f1, and the card states gitleaks ran on this head. The diff adds no content, so no changed line was left unscanned. This would have caught a key or token added in the diff.\n\nNot covered:\n- Action pinned to a mutable tag (third-party template) — the PR ships no workflow for another repository. It only touches this repo's own `.github/`, where zizmor's passing result on the receipt stands.\n- Untrusted PR input interpolated into `run:` (template outside `.github/`) — no template outside this repo's `.github/` is touched, and no `run:` step is added. The in-repo file is covered by zizmor per the receipt.\n- Mandatory safety rule enforced only client-side — no hook or pre-commit file is changed.\n\nFindings:",
+        "status": "ok",
+        "cost_usd": 0.1555702,
+        "duration_ms": 25083,
+        "num_turns": 5,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "works-and-proven",
+        "raw": "card: works-and-proven\ncompletion: completed\n\nChecked:\n- Compared the gating logic that was removed with what the ruleset now requires. At `.github/workflows/ci.yml` (head, lines 37–84), `ruff` and `shellcheck` are skipped only when the floor sets `mechanical=true` (lines 40, 53), which is the same condition under which the old aggregator let a skip through. `release-check` always runs. If the floor fails, the dependent jobs are skipped, but `ci / checks` itself fails and still blocks the merge. This would have caught a gap the aggregator used to close, where a skipped job on a functional PR passes a required check. There is no such path.\n- Fetched the live branch rules with `gh api repos/lexijamesesq/incubator/rules/branches/main`. The required checks are exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck` and `ci / release-check`, and `ci / all-passed` is absent. This would have caught a body claim the live ruleset doesn't support. The claim holds, and each required check name matches a job `name:` at head or a floor receipt entry.\n- Searched the base checkout for `all-passed` and `all-checks-passed`. The only hits are the removed lines at `.github/workflows/ci.yml:37-38`. This would have caught a leftover consumer (a doc, script or `needs:`) that still depends on the removed job. There is none.\n- Checked the head workflow for structural damage from the deletion. No remaining job has `needs: [all-checks-passed]`, and the `jobs:` mapping is intact, with `ruff` following `floor` directly. This would have caught a workflow that no longer loads, which would drop every required check.\n\nNot covered:\n- A mock-only or implementation-mirroring test: no test files changed, and CI config has no unit-test surface.\n- A deleted or loosened failing test: the diff removes only a CI aggregator job and no test or assertion. The removed job's skip logic is covered by the first Checked item.\n- The body's claims that \"actionlint is clean\" and that \"`ci-caller-merge.py` is idempotent\": no actionlint check appears in the floor receipt, and `ci-caller-merge.py` lives in another repo (dotty) outside this checkout, so neither claim could be confirmed from the evidence I'm allowed to use. Neither is contradicted, and the workflow's structure is sound at head.\n\nFindings:",
+        "status": "ok",
+        "cost_usd": 0.16408920000000002,
+        "duration_ms": 28987,
+        "num_turns": 6,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "principal-engineer",
+        "raw": "card: principal-engineer\ncompletion: completed\n\nChecked:\n- Compared what the removed `ci / all-passed` job enforced against what the remaining required checks enforce (`.github/workflows/ci.yml` at head 26033f1). This would have caught a gap in the merge gate after the aggregator is gone. The aggregator failed in three cases: (a) a `failure` or `cancelled` dependency; (b) a `skipped` `ruff`/`shellcheck` on a non-mechanical PR; (c) floor failure, which leaves its dependents skipped. Case (a) is still covered because each job is now its own required check. Case (b) can only happen when `needs.floor.outputs.mechanical == 'true'` (ci.yml:40, :53). The aggregator also passed in that case (`$mech != \"true\"` guard), so nothing changes. Case (c) is covered because the floor's only job-level check-run on this head is `ci / checks` (check-runs list at 26033f1). A floor failure therefore surfaces as a failing required `ci / checks`, not as a skip.\n- Checked the removed check against the live ruleset (`gh api repos/lexijamesesq/incubator/rules/branches/main`). This would have caught a stale contract: a ruleset that still requires `ci / all-passed` would block every PR forever, because nothing would report that check. The ruleset requires `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck` and `ci / release-check`. It does not require `ci / all-passed`, and each of the five reported on this head.\n- Searched the base checkout (`/work`) for `all-passed`, `all-checks-passed` and required-check references outside the file this PR changes. This would have caught a stale caller, such as another workflow, an automerge gate or a ruleset-as-code file that depends on the removed job or its name. There are no matches outside `.github/workflows/ci.yml`.\n- Reasoned through a rerun and a push-to-main run. This would have caught a non-idempotent effect or a lost push-event guard. The change only deletes a job and has no side effects. On push to main, the aggregator's `event != pull_request` tolerance for skipped jobs no longer applies, and no required check is evaluated on pushes. Rollback is a plain revert.\n\nNot covered:\n- The internals of `lexijamesesq/dotty/.github/workflows/estate-ci.yml@v1`. It is a separate repo outside the checkout and outside this PR's evidence. The one remaining assumption is that its single `checks` job has no `if:` that could make it skip rather than fail. The head's check-runs show a single floor job reporting `success`, which fits the PR's claim that \"a failed floor fails `ci / checks`\". I did not read the called workflow's source.\n- Non-idempotent side effect clause: not applicable. The diff only deletes a job, and nothing in it creates, appends or writes anything.\n\nFindings:",
+        "status": "ok",
+        "cost_usd": 0.2256656,
+        "duration_ms": 42883,
+        "num_turns": 9,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "maintainable-no-slop",
+        "raw": "card: maintainable-no-slop\ncompletion: completed\n\nChecked:\n- Read the diff at head 26033f1 and the whole `.github/workflows/ci.yml` at the head sha. The change only deletes the `all-checks-passed` job (base lines 37–63), with no line added or changed. This would have caught any new API, package, helper, abstraction layer or error-handling path. The diff has none.\n- Searched the base checkout at /work for `all-passed|all-checks-passed|aggregat` (case-insensitive). The only code hits are the deleted job itself (base `.github/workflows/ci.yml:37-38`). The other hits are unrelated text in `plugins/incubator/skills/thesis-test/SKILL.md` and `.claude/instance.sample.md`. This would have caught a leftover `needs:` or other reference to the removed job, and a comment elsewhere that still describes the aggregator.\n- Checked every comment left in `.github/workflows/ci.yml` at the head sha against what the code does: lines 8–11 (concurrency), 21–22 (the `ci / checks` naming), 24–27 (floor permissions) and 65–67 (`release-check` always runs, with no `needs: [floor]` or `if:`). This would have caught a comment that no longer matches the code after the removal, such as one saying one job gates the others. Each comment still matches the code.\n- Checked the deleted job's own error handling (a jq filter plus `exit 1`). Error swallowing that this PR adds or leaves behind would have shown up here. The logic is removed, not moved somewhere else, so no replacement path hides a failure.\n\nNot covered:\n- Nonexistent API or package: nothing to check. No dependency, action pin, manifest or lockfile changed; the diff only deletes lines.\n- Duplicated helper: nothing to check. The PR adds no helper or logic that could copy existing code.\n- Unnecessary abstraction layer: nothing to check. The PR adds no indirection; it removes a fan-in job.\n- External-AI-chat link carrying load-bearing reasoning: not probed in code, since the diff adds no comment or link. The `claude.ai/code/session_…` link is in the PR body, not the repo. The body states its own reasoning (the ruleset contents and the dotty#379 dependency), so the link carries nothing the PR relies on.\n\nFindings:",
+        "status": "ok",
+        "cost_usd": 0.15456360000000002,
+        "duration_ms": 21338,
+        "num_turns": 7,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      }
+    ],
+    "status": "ok",
+    "cost_usd": 0.6998886000000001,
+    "no_council": false
+  },
+  "round": 1,
+  "summoned_by_ledger": [],
+  "risk": {
+    "vector": {
+      "blast_radius": 0.93,
+      "reversibility": 0.91,
+      "data_security": 0.7,
+      "operations": 0.65,
+      "verification_gap": 0.84
+    },
+    "levels": {
+      "blast_radius": 1,
+      "reversibility": 1,
+      "data_security": 1,
+      "operations": 1,
+      "verification_gap": 1
+    },
+    "R": 1,
+    "r_continuous": 0.93,
+    "band": "LOW",
+    "confidence": {
+      "blast_radius": 0.66,
+      "reversibility": 0.9,
+      "data_security": 0.7,
+      "operations": 0.35,
+      "verification_gap": 0.73
+    },
+    "distribution": {
+      "blast_radius": {
+        "0": 0.21,
+        "1": 0.7,
+        "2": 0.05,
+        "3": 0.04
+      },
+      "reversibility": {
+        "0": 0.09,
+        "1": 0.91,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "data_security": {
+        "0": 0.3,
+        "1": 0.7,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "operations": {
+        "0": 0.64,
+        "1": 0.09,
+        "2": 0.27,
+        "3": 0.0
+      },
+      "verification_gap": {
+        "0": 0.21,
+        "1": 0.74,
+        "2": 0.05,
+        "3": 0.0
+      }
+    },
+    "decision_source": "jev"
+  },
+  "council_valid": true,
+  "cards": [
+    {
+      "name": "safety",
+      "completion": "completed",
+      "findings": []
+    },
+    {
+      "name": "works-and-proven",
+      "completion": "completed",
+      "findings": []
+    },
+    {
+      "name": "principal-engineer",
+      "completion": "completed",
+      "findings": []
+    },
+    {
+      "name": "maintainable-no-slop",
+      "completion": "completed",
+      "findings": []
+    }
+  ],
+  "decision_source": "jev",
+  "status": "ok",
+  "pipeline_ok": true,
+  "outcome": "APPROVED",
+  "band": "LOW",
+  "risk_classification": "low exposure — blast radius",
+  "summary": "Reviewed against the summoned lenses; no blocking findings.",
+  "established": [],
+  "dismissed": [],
+  "unresolved_issue_ids": [],
+  "verdict_source": "fast_path",
+  "ledger": {
+    "v": 1,
+    "round": 1,
+    "head": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+    "entries": []
+  },
+  "convergence": {
+    "round": 1,
+    "standing": 0,
+    "fixed": 0,
+    "new": 0,
+    "late": 0,
+    "unconfirmed": 0
+  },
+  "adherence": {
+    "status": "checked",
+    "risk_classification_ok": true,
+    "cards_restating": [],
+    "ok": true,
+    "nouls": {
+      "risk_is_classification": 0.87
+    }
+  }
+}

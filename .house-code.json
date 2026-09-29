@@ -1,3 +1,9 @@
 {
-  "exemptions": []
+  "exemptions": [
+    {
+      "path": "settings\\.json",
+      "rule": "sample-shape",
+      "reason": "Recorded golden fixtures carry dotty's public ruleset, whose codeowners_owned lists other repos' paths such as /.claude/settings.json. That is inert test data describing another repository's ownership, not an operator-config reference in this repo, so it has no sample counterpart to find."
+    }
+  ]
 }

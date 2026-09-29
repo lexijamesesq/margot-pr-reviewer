@@ -1,0 +1,50 @@
+{
+  "driver": true,
+  "poster": true,
+  "owned_tier": "none",
+  "poster_env": {
+    "REPO": {
+      "value": "example-org/widgets",
+      "provenance": "constructed"
+    },
+    "PR_NUMBER": {
+      "value": "7",
+      "provenance": "constructed"
+    },
+    "HEAD_SHA": {
+      "value": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "provenance": "constructed"
+    },
+    "PR_AUTHOR": {
+      "value": "example-author",
+      "provenance": "constructed"
+    },
+    "RUN_URL": {
+      "value": "https://github.com/example-org/margot-instance/actions/runs/1001",
+      "provenance": "constructed"
+    },
+    "MARGOT_CALIBRATING": {
+      "value": "false",
+      "provenance": "constructed"
+    },
+    "PR_TICKET": {
+      "value": "T-1",
+      "provenance": "constructed"
+    },
+    "MARGOT_RUNTIME_S": {
+      "value": "391",
+      "provenance": "constructed"
+    },
+    "VERDICT_JSON": {
+      "from": "driver.stdout"
+    },
+    "MARGOT_COST_USD": {
+      "value": "0.174",
+      "provenance": "constructed"
+    },
+    "MARGOT_CHECK_ID": {
+      "value": "4242",
+      "provenance": "constructed"
+    }
+  }
+}

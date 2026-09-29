@@ -1,0 +1,24 @@
+{
+  "schema": "contract/1",
+  "id": "review-verify-closed-unmerged",
+  "github": {
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "repos/example-org/widgets/check-runs/5150",
+        "body": {
+          "status": "completed",
+          "conclusion": "cancelled",
+          "output": {
+            "title": "Margot: not reviewed — the PR was closed first",
+            "summary": "The PR was closed before a review runner picked it up, so Margot skipped the review."
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "outcome": {
+    "status": "skipped"
+  }
+}

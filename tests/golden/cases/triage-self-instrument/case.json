@@ -1,0 +1,134 @@
+{
+  "schema": "contract/1",
+  "id": "triage-self-instrument",
+  "description": "The change touches a self-instrument path (`/gate/`): never mechanical, and Jev is never asked.",
+  "branch_class": "triage: self-instrument path",
+  "provenance": "constructed",
+  "source": {
+    "constructed": true
+  },
+  "scrub": {
+    "ticket_ids": 0,
+    "roster_names": 0,
+    "vault_paths": 0
+  },
+  "pr": {
+    "repo": {
+      "value": "example-org/widgets",
+      "provenance": "constructed"
+    },
+    "number": {
+      "value": "7",
+      "provenance": "constructed"
+    },
+    "head_sha": {
+      "value": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "provenance": "constructed"
+    },
+    "base_sha": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "author": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "title": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "body": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "changed_files": {
+      "value": [],
+      "provenance": "constructed"
+    },
+    "triage": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "self_instrument_match": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "floor_receipt": {
+      "value": null,
+      "provenance": "constructed"
+    }
+  },
+  "github": {
+    "reads": [
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/pulls/7",
+        "params": {},
+        "body": null,
+        "response": "{\"head\": {\"sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\", \"repo\": {\"full_name\": \"example-org/widgets\"}}, \"base\": {\"sha\": \"0123456789abcdef0123456789abcdef01234567\"}, \"user\": {\"login\": \"renovate[bot]\"}, \"title\": \"Update dependency requests to v2.32.4\", \"body\": \"This PR updates requests.\"}",
+        "provenance": "constructed"
+      },
+      {
+        "method": "GET",
+        "path": "repos/example-org/widgets/compare/0123456789abcdef0123456789abcdef01234567...a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        "params": {
+          "Accept": "application/vnd.github.diff"
+        },
+        "body": null,
+        "response": "diff --git a/gate/rules.txt b/gate/rules.txt\nindex 1111111..2222222 100644\n--- a/gate/rules.txt\n+++ b/gate/rules.txt\n@@ -1,2 +1,2 @@\n-strict\n+lenient\n",
+        "provenance": "constructed"
+      }
+    ],
+    "write_responses": [
+      {
+        "method": "POST",
+        "path": "repos/example-org/widgets/check-runs",
+        "params": {},
+        "body": {
+          "name": "review / triage",
+          "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+          "status": "completed",
+          "conclusion": "success",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/1001",
+          "output[title]": "Margot triage: not mechanical",
+          "output[summary]": "touches Margot's own instrument: gate/rules.txt. Mechanical: a dependency bump or formatter output with no functional change — the light floor runs and it merges; otherwise the full floor runs and the council reviews. This check is information for CI, never a gate.",
+          "output[text]": "{\"mechanical\": false, \"p\": null, \"decision_source\": \"self_instrument\", \"reason\": \"touches Margot's own instrument: gate/rules.txt\", \"owned_tier\": \"none\", \"head_sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\"}"
+        },
+        "response": "{\"id\":1}",
+        "provenance": "constructed"
+      }
+    ]
+  },
+  "models": {},
+  "jev": {},
+  "ruleset": {
+    "value": {
+      "codeowners_required_owned": [
+        "/.github/workflows/"
+      ],
+      "repos": {
+        "example-org/widgets": {
+          "margot_enrolled": true,
+          "codeowners_owned": [
+            "/src/"
+          ]
+        }
+      },
+      "self_instrument": {
+        "global": [
+          "/.github/workflows/self-instrument-alert.yml"
+        ],
+        "repos": {
+          "example-org/widgets": [
+            "/gate/"
+          ]
+        }
+      }
+    },
+    "provenance": "constructed"
+  },
+  "seams": [
+    "triage",
+    "workflow-steps"
+  ]
+}

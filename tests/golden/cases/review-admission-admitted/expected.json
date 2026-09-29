@@ -1,0 +1,10 @@
+{
+  "schema": "contract/1",
+  "id": "review-admission-admitted",
+  "github": {
+    "writes": []
+  },
+  "outcome": {
+    "status": "reviewed"
+  }
+}

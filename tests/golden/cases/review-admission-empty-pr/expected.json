@@ -1,0 +1,22 @@
+{
+  "schema": "contract/1",
+  "id": "review-admission-empty-pr",
+  "github": {
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "repos/example-org/widgets/check-runs/4242",
+        "body": {
+          "status": "completed",
+          "conclusion": "failure",
+          "output[title]": "not reviewed: empty (no changed files)",
+          "output[summary]": "Margot does not review empty (no changed files) PRs."
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "outcome": {
+    "status": "refused:empty-pr"
+  }
+}

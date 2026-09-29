@@ -1,0 +1,37 @@
+{
+  "schema": "contract/1",
+  "id": "review-self-instrument-clear",
+  "github": {
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "repos/example-org/widgets/check-runs/4242",
+        "body": {
+          "status": "in_progress",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/2002",
+          "output[title]": "Margot: preflight — mechanical checks",
+          "output[summary]": "A review runner has the job. Confirming the required mechanical checks are green before the review starts. Run: https://github.com/example-org/margot-instance/actions/runs/2002"
+        },
+        "token": "WRITE"
+      },
+      {
+        "method": "POST",
+        "path": "repos/example-org/widgets/check-runs",
+        "body": {
+          "name": "review / self-instrument",
+          "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+          "status": "completed",
+          "conclusion": "success",
+          "output": {
+            "title": "self-instrument: clear",
+            "summary": "No change to Margot's own config, the ownership map, or a gate workflow."
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "outcome": {
+    "status": "reviewed"
+  }
+}

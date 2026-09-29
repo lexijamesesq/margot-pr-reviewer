@@ -1,0 +1,30 @@
+{
+  "schema": "contract/1",
+  "id": "poster-empty-emit",
+  "model_requests": [],
+  "jev_requests": [],
+  "github": {
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "repos/lexijamesesq/incubator/check-runs/4242",
+        "body": {
+          "status": "completed",
+          "conclusion": "action_required",
+          "output": {
+            "title": "not reviewed: poster error",
+            "summary": "no verdict (the driver produced no emit)"
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "poster": {
+    "raised": "SystemExit",
+    "exit": {
+      "code": 1,
+      "uncaught": false
+    }
+  }
+}

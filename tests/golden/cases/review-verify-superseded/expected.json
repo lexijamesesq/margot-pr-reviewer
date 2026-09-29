@@ -1,0 +1,24 @@
+{
+  "schema": "contract/1",
+  "id": "review-verify-superseded",
+  "github": {
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "repos/example-org/widgets/check-runs/5150",
+        "body": {
+          "status": "completed",
+          "conclusion": "skipped",
+          "output": {
+            "title": "Margot: superseded by a newer push (a1b2c3d)",
+            "summary": "A newer push re-dispatched Margot; that run owns this PR's verdict."
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "outcome": {
+    "status": "skipped:superseded"
+  }
+}

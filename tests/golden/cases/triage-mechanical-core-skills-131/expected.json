@@ -1,0 +1,34 @@
+{
+  "schema": "contract/1",
+  "id": "triage-mechanical-core-skills-131",
+  "github": {
+    "writes": [
+      {
+        "method": "POST",
+        "path": "repos/lexijamesesq/core-skills/check-runs",
+        "body": {
+          "name": "review / triage",
+          "head_sha": "582f517acbd978e08621197517a66ed830b8448f",
+          "status": "completed",
+          "conclusion": "success",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/36354211391",
+          "output[title]": "Margot triage: mechanical",
+          "output[summary]": "p=0.78 source=jev. Mechanical: a dependency bump or formatter output with no functional change — the light floor runs and it merges; otherwise the full floor runs and the council reviews. This check is information for CI, never a gate.",
+          "output[text]": "{\"mechanical\": true, \"p\": 0.78, \"decision_source\": \"jev\", \"reason\": \"\", \"owned_tier\": \"required_owned\", \"head_sha\": \"582f517acbd978e08621197517a66ed830b8448f\"}"
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "outcome": {
+    "status": "reviewed",
+    "triage": {
+      "mechanical": true,
+      "p": 0.78,
+      "decision_source": "jev",
+      "reason": "",
+      "owned_tier": "required_owned",
+      "head_sha": "582f517acbd978e08621197517a66ed830b8448f"
+    }
+  }
+}

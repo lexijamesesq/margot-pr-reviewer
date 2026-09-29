@@ -1,0 +1,34 @@
+{
+  "schema": "contract/1",
+  "id": "triage-diff-cap-2001",
+  "github": {
+    "writes": [
+      {
+        "method": "POST",
+        "path": "repos/example-org/widgets/check-runs",
+        "body": {
+          "name": "review / triage",
+          "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+          "status": "completed",
+          "conclusion": "success",
+          "details_url": "https://github.com/example-org/margot-instance/actions/runs/1001",
+          "output[title]": "Margot triage: not mechanical",
+          "output[summary]": "diff exceeds 2000 lines. Mechanical: a dependency bump or formatter output with no functional change — the light floor runs and it merges; otherwise the full floor runs and the council reviews. This check is information for CI, never a gate.",
+          "output[text]": "{\"mechanical\": false, \"p\": null, \"decision_source\": \"diff_too_large\", \"reason\": \"diff exceeds 2000 lines\", \"owned_tier\": \"owned\", \"head_sha\": \"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678\"}"
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "outcome": {
+    "status": "reviewed",
+    "triage": {
+      "mechanical": false,
+      "p": null,
+      "decision_source": "diff_too_large",
+      "reason": "diff exceeds 2000 lines",
+      "owned_tier": "owned",
+      "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    }
+  }
+}

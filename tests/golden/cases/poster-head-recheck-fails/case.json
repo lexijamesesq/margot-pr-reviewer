@@ -1,0 +1,103 @@
+{
+  "schema": "contract/1",
+  "id": "poster-head-recheck-fails",
+  "description": "The head re-check fails: the check is completed action_required, exit 1.",
+  "branch_class": "poster: head re-check failing",
+  "provenance": "constructed",
+  "source": {
+    "constructed": true
+  },
+  "scrub": {
+    "ticket_ids": 0,
+    "roster_names": 0,
+    "vault_paths": 0
+  },
+  "pr": {
+    "repo": {
+      "value": "lexijamesesq/incubator",
+      "provenance": "recorded"
+    },
+    "number": {
+      "value": "93",
+      "provenance": "recorded"
+    },
+    "head_sha": {
+      "value": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+      "provenance": "recorded"
+    },
+    "base_sha": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "author": {
+      "value": "claude-the-enduring[bot]",
+      "provenance": "recorded"
+    },
+    "title": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "body": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "changed_files": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "triage": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "self_instrument_match": {
+      "value": null,
+      "provenance": "constructed"
+    },
+    "floor_receipt": {
+      "value": null,
+      "provenance": "constructed"
+    }
+  },
+  "github": {
+    "reads": [
+      {
+        "method": "GET",
+        "path": "repos/lexijamesesq/incubator/pulls/93",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": null,
+        "status": {
+          "code": 500,
+          "reason": "Internal Server Error",
+          "body": "{\"message\":\"Server Error\"}"
+        },
+        "provenance": "constructed"
+      }
+    ],
+    "write_responses": [
+      {
+        "method": "PATCH",
+        "path": "repos/lexijamesesq/incubator/check-runs/4242",
+        "params": {
+          "Accept": "application/vnd.github+json"
+        },
+        "body": {
+          "status": "completed",
+          "conclusion": "action_required",
+          "output": {
+            "title": "not reviewed: poster error",
+            "summary": "could not verify the current PR head"
+          }
+        },
+        "response": "{\"id\": 4242}",
+        "provenance": "constructed"
+      }
+    ]
+  },
+  "models": {},
+  "jev": {},
+  "seams": [
+    "poster"
+  ]
+}

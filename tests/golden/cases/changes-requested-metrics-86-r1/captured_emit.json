@@ -1,0 +1,298 @@
+{
+  "pr": {
+    "repo": "lexijamesesq/metrics",
+    "number": "86",
+    "head_sha": "e5ee16d1687af3dec120e679a012176377405eca",
+    "author": "claude-the-enduring[bot]"
+  },
+  "owned_path": {
+    "tier": "required_owned",
+    "owned_files": []
+  },
+  "n_files": 1,
+  "route": {
+    "exposure": {
+      "type": "score",
+      "score": 0.53,
+      "confidence": 0.51,
+      "legend": {
+        "0": "none",
+        "1": "an existing boundary preserved",
+        "2": "a consequential data or privilege change",
+        "3": "credential exposure, trust-boundary failure, or an authorization-control change"
+      },
+      "probabilities": {
+        "0": 0.48,
+        "1": 0.52,
+        "2": 0.0,
+        "3": 0.0
+      }
+    },
+    "cards": {
+      "safety": {
+        "noul": 0.57,
+        "summon": true
+      },
+      "works-and-proven": {
+        "noul": 0.77,
+        "summon": true
+      },
+      "principal-engineer": {
+        "noul": 0.59,
+        "summon": true
+      },
+      "achieves-the-objective": {
+        "noul": 0.25,
+        "summon": false
+      },
+      "maintainable-no-slop": {
+        "noul": 0.36,
+        "summon": true
+      },
+      "house-style": {
+        "noul": 0.31,
+        "summon": false
+      }
+    },
+    "summoned": [
+      "safety",
+      "works-and-proven",
+      "principal-engineer",
+      "maintainable-no-slop"
+    ],
+    "decision_source": "jev"
+  },
+  "council": {
+    "summoned": [
+      "safety",
+      "works-and-proven",
+      "principal-engineer",
+      "maintainable-no-slop"
+    ],
+    "prose": "===CARD: safety===\ncard: safety\ncompletion: completed\n\nChecked:\n- Weakened-guard clause. I checked whether removing the `ci / all-passed` job (`.github/workflows/ci.yml`, formerly lines 33–59 on base) takes away a live protection. I read the live branch rules with `gh api repos/lexijamesesq/metrics/rules/branches/main` (ruleset 23658240). The required checks are exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff` and `ci / shellcheck`, and `ci / all-passed` is not one of them. The aggregator was not enforcing anything, so the protection was already off before this PR, and the PR body's claim checks out. I also compared what the aggregator did with what the required checks still enforce, using the head workflow at lines 16–57:\n  - If the floor fails or is cancelled, `ci / checks` itself fails and blocks the merge. The ruff and shellcheck jobs are then skipped, and a skipped check counts as passing, but that no longer matters because `ci / checks` has already blocked.\n  - On a PR the floor does not mark mechanical, `if: needs.floor.outputs.mechanical != 'true'` makes `ci / ruff` and `ci / shellcheck` actually run. A failure in either blocks directly.\n  - On a mechanical PR the aggregator already treated skipped jobs as passing, so nothing is lost there.\n  - This probe would have caught a live required check, or a skipped-job loophole, lost with the aggregator. Neither exists.\n- Harmful-command skim. I read the only changed file, `.github/workflows/ci.yml`, in full at head e5ee16d. The diff only deletes lines (28 lines removed, none added). The deleted `run:` step fed `toJSON(needs)`, `needs.floor.outputs.mechanical` and `github.event_name` into the shell through `env:` and ran `jq`. Nothing is added that is destructive or exposes data. This would have caught a newly added or changed command with a destructive or exposure effect.\n- Secret scan. The receipt shows `trusted-scan / trusted-scan` succeeded on this head. The only changed file is covered, and the diff adds no content, so there was nothing new to scan by hand. This would have caught a token that gitleaks does not cover being introduced in the diff.\n\nNot covered:\n- Mutable action tag and script injection in a workflow shipped for another repository: they don't apply. The diff changes only this repo's own `.github/` and adds no `uses:` or `run:` lines, and zizmor's receipt result covers this repo's own `.github/`.\n- `pull_request_target` running untrusted PR-head code: it doesn't apply. The workflow's triggers (`pull_request` and `push` to main, lines 2–6) are unchanged, and the diff adds no checkout.\n- Client-side-only mandatory rule: it doesn't apply. No hook or pre-commit file changed.\n- Agent tool-grant widening, and loosened skill/rule/agent \"Never\" clauses: they don't apply. No agent, skill or rule file changed.\n- New dependency: it doesn't apply. No manifest or lockfile changed and no action ref was added.\n\nFindings:\n\n===CARD: works-and-proven===\ncard: works-and-proven\ncompletion: completed\n\nChecked:\n- Compared the removed aggregator (`.github/workflows/ci.yml`, removed `all-checks-passed`) with the jobs left at head (`ci.yml:33-57`). The aggregator did one thing the direct checks might not: it failed when a job was skipped on a functional PR. At head, `ruff` (`ci.yml:36`) and `shellcheck` (`ci.yml:49`) only skip when `needs.floor.outputs.mechanical == 'true'`, or when `floor` did not succeed. A failed or cancelled `floor` makes `ci / checks` fail or cancel, and that check is still required, so the merge stays blocked. The mechanical output is the same one the aggregator already trusted, so no gating is lost. This would have caught a regression where a functional PR merges with its lint jobs skipped and no required check failing.\n- Checked the body's verification claim against the live rules (`gh api repos/lexijamesesq/metrics/rules/branches/main`). The main branch requires exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff` and `ci / shellcheck`. `ci / all-passed` is not among them. The floor receipt on e5ee16d shows all four reported and succeeded. This would have caught a false claim that the aggregator gates nothing, which would leave a required check that can never report and block every PR.\n- Checked the diff for deleted or loosened tests. The only change is removing a CI job and its comment block. No test file or assertion changed. This would have caught a test weakened to get CI green.\n- Checked whether this change needs its own test. It changes CI wiring, not product code. Its proof is the live ruleset plus the green run on this head, where every required check reported without the aggregator, so no test is missing. This would have caught a real regression risk with nothing proving it.\n\nNot covered:\n- The mock-only or implementation-mirroring test clause did not apply: the diff adds or changes no tests.\n- I could not check the body's claim that `ci-caller-merge.py` is idempotent. The script is not in this repository (`/work` has no match); it lives in lexijamesesq/dotty, outside the checkout. It covers future rollouts, not what this PR does, so it does not affect this PR's correctness.\n\nFindings:\n\n===CARD: principal-engineer===\ncard: principal-engineer\ncompletion: completed\n\nChecked:\n- Traced what the removed `ci / all-passed` job used to catch against what the live ruleset now requires (`gh api repos/lexijamesesq/metrics/rules/branches/main`: `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck`) — would have caught the aggregator's one extra rule being lost: it failed a functional PR when a dependent job was skipped. I followed the only ways `ruff` or `shellcheck` can be skipped (.github/workflows/ci.yml:35 and :48, `needs: [floor]` plus `if: mechanical != 'true'`). (a) The floor fails, times out or is cancelled. The dependent jobs are then skipped, but `ci / checks` is itself required and not green, so the merge stays blocked. (b) The floor says the PR is mechanical, which is the intended skip and works the same as before. (c) The called workflow never starts, so `ci / checks` is never posted and the required check stays pending. That also fails closed. No path lets a functional PR merge with nothing run.\n- Read the called floor, `lexijamesesq/dotty/.github/workflows/estate-ci.yml@v1`, fetched read-only. It is a single job (`floor`, named by `check_name`) — would have caught a multi-job reusable workflow where an early job fails, the `checks` job reports \"skipped\", and a skipped required check then satisfies the gate. It has one job and no `needs:` chain, so a floor failure shows up as a `ci / checks` failure, never a skip.\n- Grepped the base checkout for `all-passed` / `all-checks-passed` — would have caught anything that still depends on the removed job's name or behaviour. Hits: the removed lines themselves and CLAUDE.md:40 (finding below). No other workflow, script or config uses it.\n- Reasoned through a rerun, and through a cancel-in-progress mid-run (`concurrency` block, ci.yml:8-10) — would have caught a non-idempotent side effect or a cancelled run satisfying the gate. The change deletes a read-only job with no side effects. A cancelled floor posts `cancelled` on `ci / checks`, which is not success.\n\nNot covered:\n- Non-idempotent side effect — probed as above, and nothing applies: the diff only deletes a stateless job and adds no create, append or write.\n\nFindings:\n- [issue] CLAUDE.md:40 · severity=MINOR · confidence=HIGH\n    what: The repo's own guide still says the merge gate runs through the job this PR deletes, so anyone reading it gets the wrong picture of what protects the main branch.\n    consequence: CLAUDE.md:40 says ci.yml is \"required via the 'Protect main' ruleset through `all-checks-passed`\". After merge that job no longer exists, and the live ruleset requires `ci / checks`, `ci / ruff` and `ci / shellcheck` directly. An agent or maintainer following this file may assume one aggregator covers every job. They could then add a new job, not add its `ci / <job>` check to the ruleset, and nothing would enforce it. That is the exact gap the new design depends on each job's own check to close.\n    action: In the same PR, update CLAUDE.md:40 to say the ruleset requires `ci / checks` and each of this repo's `ci / <job>` checks directly (currently `ci / ruff` and `ci / shellcheck`), and that a new job must have its check added to the ruleset. It's fixed when `grep -rn 'all-checks-passed\\|all-passed'` over the head tree returns nothing.\n\n===CARD: maintainable-no-slop===\ncard: maintainable-no-slop\ncompletion: completed\n\nChecked:\n- Read the full diff at head e5ee16d for `.github/workflows/ci.yml`. It is a pure deletion of the `all-checks-passed` job and its inline comment, with no added lines. This would have caught any new helper, abstraction layer, API call, or error-swallowing construct the change introduced.\n- Grepped the base checkout for `all-passed|all-checks-passed|aggregator` (case-insensitive), then re-read the hit at the head sha. This would have caught prose or comments elsewhere in the repo that still describe the removed job. It found `CLAUDE.md:40` (see the finding below).\n- Re-read the remaining comments in `.github/workflows/ci.yml` at lines 17-18 and 20-23, which cover the `ci / checks` naming and the floor's permission scopes. This would have caught a comment in the edited file that now contradicts the workflow after the removal. They still match the code.\n\nNot covered:\n- Nonexistent API or package: nothing was added. The diff only deletes lines, and no manifest or lockfile changed.\n- Duplicated helper: the diff adds no helper or logic.\n- Unnecessary abstraction layer: the diff adds no layer. It removes one.\n- Error-swallowing: the diff adds no try/except or fallback. The removed `run:` step failed loudly (`set -euo pipefail`, `exit 1`).\n\nFindings:\n- [issue] CLAUDE.md:40 · severity=MINOR · confidence=HIGH\n    what: The repo's guide still says the protected branch is gated by the summary check this change deletes, so it now describes a setup that no longer exists.\n    consequence: At the head sha, CLAUDE.md:40 says the workflow is \"required via the \"Protect main\" ruleset through `all-checks-passed`\". That job is gone from `.github/workflows/ci.yml`, and per the PR's own claim the ruleset now requires `ci / checks`, `ci / ruff`, `ci / shellcheck` and `trusted-scan / trusted-scan` directly. CLAUDE.md is the file agents and maintainers read for how CI gates `main`, so this is comment drift left behind by the change. A later edit made from this text could bring back or depend on a check that no longer exists.\n    action: Change CLAUDE.md:40 to say the ruleset requires `ci / checks`, `ci / ruff` and `ci / shellcheck` directly, plus `trusted-scan / trusted-scan`, and drop the `all-checks-passed` reference. It is fixed when a grep for `all-checks-passed|all-passed` over the head tree returns nothing.",
+    "reviews": [
+      {
+        "card": "safety",
+        "raw": "card: safety\ncompletion: completed\n\nChecked:\n- Weakened-guard clause. I checked whether removing the `ci / all-passed` job (`.github/workflows/ci.yml`, formerly lines 33–59 on base) takes away a live protection. I read the live branch rules with `gh api repos/lexijamesesq/metrics/rules/branches/main` (ruleset 23658240). The required checks are exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff` and `ci / shellcheck`, and `ci / all-passed` is not one of them. The aggregator was not enforcing anything, so the protection was already off before this PR, and the PR body's claim checks out. I also compared what the aggregator did with what the required checks still enforce, using the head workflow at lines 16–57:\n  - If the floor fails or is cancelled, `ci / checks` itself fails and blocks the merge. The ruff and shellcheck jobs are then skipped, and a skipped check counts as passing, but that no longer matters because `ci / checks` has already blocked.\n  - On a PR the floor does not mark mechanical, `if: needs.floor.outputs.mechanical != 'true'` makes `ci / ruff` and `ci / shellcheck` actually run. A failure in either blocks directly.\n  - On a mechanical PR the aggregator already treated skipped jobs as passing, so nothing is lost there.\n  - This probe would have caught a live required check, or a skipped-job loophole, lost with the aggregator. Neither exists.\n- Harmful-command skim. I read the only changed file, `.github/workflows/ci.yml`, in full at head e5ee16d. The diff only deletes lines (28 lines removed, none added). The deleted `run:` step fed `toJSON(needs)`, `needs.floor.outputs.mechanical` and `github.event_name` into the shell through `env:` and ran `jq`. Nothing is added that is destructive or exposes data. This would have caught a newly added or changed command with a destructive or exposure effect.\n- Secret scan. The receipt shows `trusted-scan / trusted-scan` succeeded on this head. The only changed file is covered, and the diff adds no content, so there was nothing new to scan by hand. This would have caught a token that gitleaks does not cover being introduced in the diff.\n\nNot covered:\n- Mutable action tag and script injection in a workflow shipped for another repository: they don't apply. The diff changes only this repo's own `.github/` and adds no `uses:` or `run:` lines, and zizmor's receipt result covers this repo's own `.github/`.\n- `pull_request_target` running untrusted PR-head code: it doesn't apply. The workflow's triggers (`pull_request` and `push` to main, lines 2–6) are unchanged, and the diff adds no checkout.\n- Client-side-only mandatory rule: it doesn't apply. No hook or pre-commit file changed.\n- Agent tool-grant widening, and loosened skill/rule/agent \"Never\" clauses: they don't apply. No agent, skill or rule file changed.\n- New dependency: it doesn't apply. No manifest or lockfile changed and no action ref was added.\n\nFindings:",
+        "status": "ok",
+        "cost_usd": 0.1533524,
+        "duration_ms": 24959,
+        "num_turns": 5,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "works-and-proven",
+        "raw": "card: works-and-proven\ncompletion: completed\n\nChecked:\n- Compared the removed aggregator (`.github/workflows/ci.yml`, removed `all-checks-passed`) with the jobs left at head (`ci.yml:33-57`). The aggregator did one thing the direct checks might not: it failed when a job was skipped on a functional PR. At head, `ruff` (`ci.yml:36`) and `shellcheck` (`ci.yml:49`) only skip when `needs.floor.outputs.mechanical == 'true'`, or when `floor` did not succeed. A failed or cancelled `floor` makes `ci / checks` fail or cancel, and that check is still required, so the merge stays blocked. The mechanical output is the same one the aggregator already trusted, so no gating is lost. This would have caught a regression where a functional PR merges with its lint jobs skipped and no required check failing.\n- Checked the body's verification claim against the live rules (`gh api repos/lexijamesesq/metrics/rules/branches/main`). The main branch requires exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff` and `ci / shellcheck`. `ci / all-passed` is not among them. The floor receipt on e5ee16d shows all four reported and succeeded. This would have caught a false claim that the aggregator gates nothing, which would leave a required check that can never report and block every PR.\n- Checked the diff for deleted or loosened tests. The only change is removing a CI job and its comment block. No test file or assertion changed. This would have caught a test weakened to get CI green.\n- Checked whether this change needs its own test. It changes CI wiring, not product code. Its proof is the live ruleset plus the green run on this head, where every required check reported without the aggregator, so no test is missing. This would have caught a real regression risk with nothing proving it.\n\nNot covered:\n- The mock-only or implementation-mirroring test clause did not apply: the diff adds or changes no tests.\n- I could not check the body's claim that `ci-caller-merge.py` is idempotent. The script is not in this repository (`/work` has no match); it lives in lexijamesesq/dotty, outside the checkout. It covers future rollouts, not what this PR does, so it does not affect this PR's correctness.\n\nFindings:",
+        "status": "ok",
+        "cost_usd": 0.1555296,
+        "duration_ms": 25821,
+        "num_turns": 6,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "principal-engineer",
+        "raw": "card: principal-engineer\ncompletion: completed\n\nChecked:\n- Traced what the removed `ci / all-passed` job used to catch against what the live ruleset now requires (`gh api repos/lexijamesesq/metrics/rules/branches/main`: `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck`) — would have caught the aggregator's one extra rule being lost: it failed a functional PR when a dependent job was skipped. I followed the only ways `ruff` or `shellcheck` can be skipped (.github/workflows/ci.yml:35 and :48, `needs: [floor]` plus `if: mechanical != 'true'`). (a) The floor fails, times out or is cancelled. The dependent jobs are then skipped, but `ci / checks` is itself required and not green, so the merge stays blocked. (b) The floor says the PR is mechanical, which is the intended skip and works the same as before. (c) The called workflow never starts, so `ci / checks` is never posted and the required check stays pending. That also fails closed. No path lets a functional PR merge with nothing run.\n- Read the called floor, `lexijamesesq/dotty/.github/workflows/estate-ci.yml@v1`, fetched read-only. It is a single job (`floor`, named by `check_name`) — would have caught a multi-job reusable workflow where an early job fails, the `checks` job reports \"skipped\", and a skipped required check then satisfies the gate. It has one job and no `needs:` chain, so a floor failure shows up as a `ci / checks` failure, never a skip.\n- Grepped the base checkout for `all-passed` / `all-checks-passed` — would have caught anything that still depends on the removed job's name or behaviour. Hits: the removed lines themselves and CLAUDE.md:40 (finding below). No other workflow, script or config uses it.\n- Reasoned through a rerun, and through a cancel-in-progress mid-run (`concurrency` block, ci.yml:8-10) — would have caught a non-idempotent side effect or a cancelled run satisfying the gate. The change deletes a read-only job with no side effects. A cancelled floor posts `cancelled` on `ci / checks`, which is not success.\n\nNot covered:\n- Non-idempotent side effect — probed as above, and nothing applies: the diff only deletes a stateless job and adds no create, append or write.\n\nFindings:\n- [issue] CLAUDE.md:40 · severity=MINOR · confidence=HIGH\n    what: The repo's own guide still says the merge gate runs through the job this PR deletes, so anyone reading it gets the wrong picture of what protects the main branch.\n    consequence: CLAUDE.md:40 says ci.yml is \"required via the 'Protect main' ruleset through `all-checks-passed`\". After merge that job no longer exists, and the live ruleset requires `ci / checks`, `ci / ruff` and `ci / shellcheck` directly. An agent or maintainer following this file may assume one aggregator covers every job. They could then add a new job, not add its `ci / <job>` check to the ruleset, and nothing would enforce it. That is the exact gap the new design depends on each job's own check to close.\n    action: In the same PR, update CLAUDE.md:40 to say the ruleset requires `ci / checks` and each of this repo's `ci / <job>` checks directly (currently `ci / ruff` and `ci / shellcheck`), and that a new job must have its check added to the ruleset. It's fixed when `grep -rn 'all-checks-passed\\|all-passed'` over the head tree returns nothing.",
+        "status": "ok",
+        "cost_usd": 0.2271106,
+        "duration_ms": 40468,
+        "num_turns": 7,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      },
+      {
+        "card": "maintainable-no-slop",
+        "raw": "card: maintainable-no-slop\ncompletion: completed\n\nChecked:\n- Read the full diff at head e5ee16d for `.github/workflows/ci.yml`. It is a pure deletion of the `all-checks-passed` job and its inline comment, with no added lines. This would have caught any new helper, abstraction layer, API call, or error-swallowing construct the change introduced.\n- Grepped the base checkout for `all-passed|all-checks-passed|aggregator` (case-insensitive), then re-read the hit at the head sha. This would have caught prose or comments elsewhere in the repo that still describe the removed job. It found `CLAUDE.md:40` (see the finding below).\n- Re-read the remaining comments in `.github/workflows/ci.yml` at lines 17-18 and 20-23, which cover the `ci / checks` naming and the floor's permission scopes. This would have caught a comment in the edited file that now contradicts the workflow after the removal. They still match the code.\n\nNot covered:\n- Nonexistent API or package: nothing was added. The diff only deletes lines, and no manifest or lockfile changed.\n- Duplicated helper: the diff adds no helper or logic.\n- Unnecessary abstraction layer: the diff adds no layer. It removes one.\n- Error-swallowing: the diff adds no try/except or fallback. The removed `run:` step failed loudly (`set -euo pipefail`, `exit 1`).\n\nFindings:\n- [issue] CLAUDE.md:40 · severity=MINOR · confidence=HIGH\n    what: The repo's guide still says the protected branch is gated by the summary check this change deletes, so it now describes a setup that no longer exists.\n    consequence: At the head sha, CLAUDE.md:40 says the workflow is \"required via the \"Protect main\" ruleset through `all-checks-passed`\". That job is gone from `.github/workflows/ci.yml`, and per the PR's own claim the ruleset now requires `ci / checks`, `ci / ruff`, `ci / shellcheck` and `trusted-scan / trusted-scan` directly. CLAUDE.md is the file agents and maintainers read for how CI gates `main`, so this is comment drift left behind by the change. A later edit made from this text could bring back or depend on a check that no longer exists.\n    action: Change CLAUDE.md:40 to say the ruleset requires `ci / checks`, `ci / ruff` and `ci / shellcheck` directly, plus `trusted-scan / trusted-scan`, and drop the `all-checks-passed` reference. It is fixed when a grep for `all-checks-passed|all-passed` over the head tree returns nothing.",
+        "status": "ok",
+        "cost_usd": 0.1520766,
+        "duration_ms": 20996,
+        "num_turns": 7,
+        "models": [
+          "claude-opus-5-5"
+        ]
+      }
+    ],
+    "status": "ok",
+    "cost_usd": 0.6880691999999999,
+    "no_council": false
+  },
+  "round": 1,
+  "summoned_by_ledger": [],
+  "risk": {
+    "vector": {
+      "blast_radius": 1.13,
+      "reversibility": 0.84,
+      "data_security": 0.65,
+      "operations": 0.91,
+      "verification_gap": 0.64
+    },
+    "levels": {
+      "blast_radius": 1,
+      "reversibility": 1,
+      "data_security": 1,
+      "operations": 2,
+      "verification_gap": 1
+    },
+    "R": 2,
+    "r_continuous": 1.13,
+    "band": "MEDIUM",
+    "confidence": {
+      "blast_radius": 0.55,
+      "reversibility": 0.84,
+      "data_security": 0.64,
+      "operations": 0.09,
+      "verification_gap": 0.49
+    },
+    "distribution": {
+      "blast_radius": {
+        "0": 0.16,
+        "1": 0.66,
+        "2": 0.06,
+        "3": 0.12
+      },
+      "reversibility": {
+        "0": 0.16,
+        "1": 0.84,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "data_security": {
+        "0": 0.36,
+        "1": 0.64,
+        "2": 0.0,
+        "3": 0.0
+      },
+      "operations": {
+        "0": 0.48,
+        "1": 0.13,
+        "2": 0.39,
+        "3": 0.0
+      },
+      "verification_gap": {
+        "0": 0.43,
+        "1": 0.5,
+        "2": 0.07,
+        "3": 0.0
+      }
+    },
+    "decision_source": "jev"
+  },
+  "council_valid": true,
+  "cards": [
+    {
+      "name": "safety",
+      "completion": "completed",
+      "findings": []
+    },
+    {
+      "name": "works-and-proven",
+      "completion": "completed",
+      "findings": []
+    },
+    {
+      "name": "principal-engineer",
+      "completion": "completed",
+      "findings": [
+        {
+          "card": "principal-engineer",
+          "tag": "issue",
+          "location": "CLAUDE.md:40",
+          "severity": "MINOR",
+          "confidence": "HIGH",
+          "what": "The repo's own guide still says the merge gate runs through the job this PR deletes, so anyone reading it gets the wrong picture of what protects the main branch.",
+          "id": "F1"
+        }
+      ]
+    },
+    {
+      "name": "maintainable-no-slop",
+      "completion": "completed",
+      "findings": [
+        {
+          "card": "maintainable-no-slop",
+          "tag": "issue",
+          "location": "CLAUDE.md:40",
+          "severity": "MINOR",
+          "confidence": "HIGH",
+          "what": "The repo's guide still says the protected branch is gated by the summary check this change deletes, so it now describes a setup that no longer exists.",
+          "id": "F2"
+        }
+      ]
+    }
+  ],
+  "decision_source": "jev",
+  "status": "ok",
+  "verdict_voice": {
+    "status": "ok",
+    "cost_usd": 0.0678508,
+    "num_turns": 1,
+    "duration_ms": 9324,
+    "prose": "outcome: CHANGES_REQUESTED\nband: MEDIUM\nband_reason: I'm keeping the suggested MEDIUM. The change removes a check aggregator from the CI gate wiring. The safety, works-and-proven and principal-engineer cards each read the live ruleset and confirmed `ci / all-passed` was not a required check, so no enforcement is lost. That brings data_security and blast_radius down. But the operations score has very low confidence (0.09), and changes to the merge gate are exactly what the operator should see. Nothing justifies moving to LOW, and nothing adds up to HIGH.\nrisk: outdated guidance\nsummary: This change removes a summary check from the project's automated pipeline. Reviewers confirmed it was not actually protecting anything, so the pipeline itself is safe. The one problem is that the project's guide still says the main branch is protected through the removed check, which could mislead someone into adding a new check that nothing enforces. Updating that one line of the guide in this change would resolve it.\nfinding: principal-engineer · CLAUDE.md:40 · MINOR · HIGH — \"The repo's own guide still says the merge gate runs through the job this PR deletes\". CLAUDE.md:40 says ci.yml is \"required via the 'Protect main' ruleset through `all-checks-passed`\", but that job no longer exists after merge. Fix: in this PR, change CLAUDE.md:40 to say the ruleset requires `ci / checks`, `ci / ruff` and `ci / shellcheck` (plus `trusted-scan / trusted-scan`) directly, and that any new job must have its check added to the ruleset. It's fixed when `grep -rn 'all-checks-passed\\|all-passed'` over the head tree returns nothing.\nestablished:\n- F1 · CLAUDE.md:40 · The guide still says main is gated through `all-checks-passed`, which this PR deletes, so a maintainer could add a new CI job without adding its check to the ruleset, and nothing would enforce it (reviewer was sure; stands on its word).\n- F2 · CLAUDE.md:40 · The guide's description of the merge gate points to the deleted summary check, so it no longer matches the CI setup and later edits based on it could depend on a check that doesn't exist (reviewer was sure; stands on its word).\ndismissed:"
+  },
+  "pipeline_ok": true,
+  "outcome": "CHANGES_REQUESTED",
+  "band": "MEDIUM",
+  "band_reason": "I'm keeping the suggested MEDIUM. The change removes a check aggregator from the CI gate wiring. The safety, works-and-proven and principal-engineer cards each read the live ruleset and confirmed `ci / all-passed` was not a required check, so no enforcement is lost. That brings data_security and blast_radius down. But the operations score has very low confidence (0.09), and changes to the merge gate are exactly what the operator should see. Nothing justifies moving to LOW, and nothing adds up to HIGH.",
+  "summary": "This change removes a summary check from the project's automated pipeline. Reviewers confirmed it was not actually protecting anything, so the pipeline itself is safe. The one problem is that the project's guide still says the main branch is protected through the removed check, which could mislead someone into adding a new check that nothing enforces. Updating that one line of the guide in this change would resolve it.",
+  "risk_classification": "outdated guidance",
+  "finding": "principal-engineer · CLAUDE.md:40 · MINOR · HIGH — \"The repo's own guide still says the merge gate runs through the job this PR deletes\". CLAUDE.md:40 says ci.yml is \"required via the 'Protect main' ruleset through `all-checks-passed`\", but that job no longer exists after merge. Fix: in this PR, change CLAUDE.md:40 to say the ruleset requires `ci / checks`, `ci / ruff` and `ci / shellcheck` (plus `trusted-scan / trusted-scan`) directly, and that any new job must have its check added to the ruleset. It's fixed when `grep -rn 'all-checks-passed\\|all-passed'` over the head tree returns nothing.",
+  "clarification": null,
+  "established": [
+    "F1 · CLAUDE.md:40 · The guide still says main is gated through `all-checks-passed`, which this PR deletes, so a maintainer could add a new CI job without adding its check to the ruleset, and nothing would enforce it (reviewer was sure; stands on its word).",
+    "F2 · CLAUDE.md:40 · The guide's description of the merge gate points to the deleted summary check, so it no longer matches the CI setup and later edits based on it could depend on a check that doesn't exist (reviewer was sure; stands on its word)."
+  ],
+  "dismissed": [],
+  "unresolved_issue_ids": [],
+  "verdict_source": "verdict_voice",
+  "ledger": {
+    "v": 1,
+    "round": 1,
+    "head": "e5ee16d1687af3dec120e679a012176377405eca",
+    "entries": [
+      {
+        "key": "R1-F1",
+        "card": "principal-engineer",
+        "round_raised": 1,
+        "location": "CLAUDE.md:40",
+        "severity": "MINOR",
+        "what": "The repo's own guide still says the merge gate runs through the job this PR deletes, so anyone reading it gets the wrong picture of what protects the main branch.",
+        "status": "standing"
+      },
+      {
+        "key": "R1-F2",
+        "card": "maintainable-no-slop",
+        "round_raised": 1,
+        "location": "CLAUDE.md:40",
+        "severity": "MINOR",
+        "what": "The repo's guide still says the protected branch is gated by the summary check this change deletes, so it now describes a setup that no longer exists.",
+        "status": "standing"
+      }
+    ]
+  },
+  "convergence": {
+    "round": 1,
+    "standing": 2,
+    "fixed": 0,
+    "new": 2,
+    "late": 0,
+    "unconfirmed": 0
+  },
+  "adherence": {
+    "status": "checked",
+    "risk_classification_ok": true,
+    "cards_restating": [
+      "principal-engineer",
+      "maintainable-no-slop"
+    ],
+    "ok": false,
+    "nouls": {
+      "risk_is_classification": 0.9,
+      "distinct__principal-engineer": 0.39,
+      "distinct__maintainable-no-slop": 0.24
+    }
+  }
+}

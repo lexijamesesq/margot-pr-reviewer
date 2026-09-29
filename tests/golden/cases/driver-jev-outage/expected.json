@@ -1,0 +1,221 @@
+{
+  "schema": "contract/1",
+  "id": "driver-jev-outage",
+  "model_requests": [
+    {
+      "role": "fallback",
+      "card": null,
+      "prompt": "You are Margot's FALLBACK decision engine. The usual decision model (Jev) is unavailable, so you stand in for it on this one change. Judge ONLY from the change description below — do not ask for or assume anything not stated. Answer every question in the schema. Two question types:\n  - noul: a calibrated probability in [0,1] that the named review lens is NEEDED for this change (higher = more likely needed).\n  - score: an integer 0-3 against the given anchors (0 = lowest, 3 = highest).\nYou are a DEGRADED stand-in and your verdict cannot auto-merge anything, so when genuinely uncertain, fail toward review: prefer summoning a lens (higher noul) and the higher score. Return ONLY the JSON the schema requires.\n\n=== CHANGE DESCRIPTION (state) ===\n\nPull request #7 in example-org/widgets by example-author.\nTitle: widgets: retry the upload on a 503\nBody: Wraps the upload call in a bounded retry so a transient 503 from the storage service no longer fails the whole sync.\n\nTicket: T-1\nChanged files (2): src/upload.py, tests/test_upload.py\nCODEOWNERS ownership tier: none\n\n\n=== QUESTIONS ===\n\n- exposure (score): Score this change's overall security/operational exposure.\n    0 = none\n    1 = an existing boundary preserved\n    2 = a consequential data or privilege change\n    3 = credential exposure, trust-boundary failure, or an authorization-control change\n- safety (noul): Does this change need the 'safety' review lens? It does when: a changed file can run, be sourced, grant access, or carry a credential shape.\n- works-and-proven (noul): Does this change need the 'works-and-proven' review lens? It does when: the change claims a behavior, a fix, or a result that evidence could establish.\n- principal-engineer (noul): Does this change need the 'principal-engineer' review lens? It does when: blast radius, reversibility, or operations is 1 or more.\n- achieves-the-objective (noul): Does this change need the 'achieves-the-objective' review lens? It does when: intent or scope alignment is unresolved after reading the body and diff.\n- maintainable-no-slop (noul): Does this change need the 'maintainable-no-slop' review lens? It does when: a material maintainability/slop question remains after the mechanical checks.\n- house-style (noul): Does this change need the 'house-style' review lens? It does when: a material convention question remains after the mechanical checks.",
+      "model": "claude-haiku-4-5",
+      "tool_permissions": {
+        "tools": [],
+        "allowed": [],
+        "disallowed": []
+      },
+      "json_schema": {
+        "type": "object",
+        "properties": {
+          "exposure": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              }
+            },
+            "required": [
+              "score"
+            ],
+            "additionalProperties": false
+          },
+          "safety": {
+            "type": "object",
+            "properties": {
+              "noul": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "noul"
+            ],
+            "additionalProperties": false
+          },
+          "works-and-proven": {
+            "type": "object",
+            "properties": {
+              "noul": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "noul"
+            ],
+            "additionalProperties": false
+          },
+          "principal-engineer": {
+            "type": "object",
+            "properties": {
+              "noul": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "noul"
+            ],
+            "additionalProperties": false
+          },
+          "achieves-the-objective": {
+            "type": "object",
+            "properties": {
+              "noul": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "noul"
+            ],
+            "additionalProperties": false
+          },
+          "maintainable-no-slop": {
+            "type": "object",
+            "properties": {
+              "noul": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "noul"
+            ],
+            "additionalProperties": false
+          },
+          "house-style": {
+            "type": "object",
+            "properties": {
+              "noul": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "noul"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "exposure",
+          "safety",
+          "works-and-proven",
+          "principal-engineer",
+          "achieves-the-objective",
+          "maintainable-no-slop",
+          "house-style"
+        ],
+        "additionalProperties": false
+      },
+      "settings": {
+        "disableAllHooks": true
+      }
+    }
+  ],
+  "jev_requests": [
+    {
+      "model": "jev-1.13.0",
+      "state": "Pull request #7 in example-org/widgets by example-author.\nTitle: widgets: retry the upload on a 503\nBody: Wraps the upload call in a bounded retry so a transient 503 from the storage service no longer fails the whole sync.\n\nTicket: T-1\nChanged files (2): src/upload.py, tests/test_upload.py\nCODEOWNERS ownership tier: none",
+      "questions": {
+        "exposure": {
+          "type": "score",
+          "instructions": "Score this change's overall security/operational exposure.",
+          "criteria": [
+            "none",
+            "an existing boundary preserved",
+            "a consequential data or privilege change",
+            "credential exposure, trust-boundary failure, or an authorization-control change"
+          ]
+        },
+        "safety": {
+          "type": "noul",
+          "instructions": "Does this change need the 'safety' review lens? It does when: a changed file can run, be sourced, grant access, or carry a credential shape."
+        },
+        "works-and-proven": {
+          "type": "noul",
+          "instructions": "Does this change need the 'works-and-proven' review lens? It does when: the change claims a behavior, a fix, or a result that evidence could establish."
+        },
+        "principal-engineer": {
+          "type": "noul",
+          "instructions": "Does this change need the 'principal-engineer' review lens? It does when: blast radius, reversibility, or operations is 1 or more."
+        },
+        "achieves-the-objective": {
+          "type": "noul",
+          "instructions": "Does this change need the 'achieves-the-objective' review lens? It does when: intent or scope alignment is unresolved after reading the body and diff."
+        },
+        "maintainable-no-slop": {
+          "type": "noul",
+          "instructions": "Does this change need the 'maintainable-no-slop' review lens? It does when: a material maintainability/slop question remains after the mechanical checks."
+        },
+        "house-style": {
+          "type": "noul",
+          "instructions": "Does this change need the 'house-style' review lens? It does when: a material convention question remains after the mechanical checks."
+        }
+      }
+    }
+  ],
+  "github": {
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "repos/example-org/widgets/check-runs/4242",
+        "body": {
+          "status": "completed",
+          "conclusion": "action_required",
+          "output": {
+            "title": "not reviewed: poster error",
+            "summary": "driver produced no usable verdict (Haiku fallback exited rc=1: claude: upstream overloaded)"
+          }
+        },
+        "token": "WRITE"
+      }
+    ]
+  },
+  "driver": {
+    "raised": null
+  },
+  "emit": {
+    "pr": {
+      "repo": "example-org/widgets",
+      "number": "7",
+      "head_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+      "author": "example-author"
+    },
+    "owned_path": {
+      "tier": "none",
+      "owned_files": []
+    },
+    "n_files": 2,
+    "status": "jev_unreachable",
+    "stage": "route",
+    "error": "Haiku fallback exited rc=1: claude: upstream overloaded",
+    "adherence": {
+      "status": "skipped"
+    }
+  },
+  "poster": {
+    "raised": "SystemExit",
+    "exit": {
+      "code": 1,
+      "uncaught": false
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "driver": false,
+  "poster": false,
+  "owned_tier": null,
+  "poster_env": {},
+  "workflow": {
+    "file": "margot-triage.yml",
+    "job": "triage",
+    "run": [
+      "Validate target repo against the enrolled allow-list",
+      "Mint Margot READ token",
+      "Mint Margot check-write token",
+      "Resolve PR facts and the diff (read-only, at the head sha)",
+      "Triage (driver.triage_decision — ruleset, self-instrument, size, then Jev)",
+      "Post the review / triage check (information, never a gate)"
+    ],
+    "inputs": {
+      "repo": {
+        "value": "lexijamesesq/incubator",
+        "provenance": "recorded"
+      },
+      "pr": {
+        "value": "93",
+        "provenance": "recorded"
+      },
+      "sha": {
+        "value": "26033f1ad63e510f4938ef8ee91bc6c124f8915b",
+        "provenance": "recorded"
+      }
+    },
+    "github": {
+      "run_id": {
+        "value": "36355670506",
+        "provenance": "recorded"
+      }
+    },
+    "uuid4": [],
+    "claude": false
+  }
+}
