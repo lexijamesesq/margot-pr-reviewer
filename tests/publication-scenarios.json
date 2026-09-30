@@ -138,5 +138,10 @@
     "id": "pub-rollback-ledger",
     "name": "The posted ledger is readable by unchanged Python and retains the exact TypeScript receipt",
     "defect": "Replace the terminal legacy marker with an incompatible compressed marker"
+  },
+  {
+    "id": "tally-late-advisory",
+    "name": "Recalling a late advisory cannot silently turn it into a blocker",
+    "defect": "Change its earlier fate from advisory to standing"
   }
 ]

@@ -496,3 +496,48 @@ scenario(
   },
   { legacyReadable: true, restored: baseReview.ledger },
 );
+
+scenario(
+  "tally-late-advisory",
+  (b) => {
+    const scope: RoundScope = {
+      round: 3,
+      priorHead: r.head,
+      full: false,
+      diff: "delta",
+      files: [],
+      entries: [
+        {
+          key: "R2-F1",
+          card: "principal-engineer",
+          status: b ? "standing" : "advisory",
+          severity: "MAJOR",
+          round_raised: 2,
+          location: "a.ts:1",
+          what: "Earlier out-of-scope concern",
+          late: "missed: outside earlier delta",
+        },
+      ],
+    };
+    const card: Card = {
+      name: "principal-engineer",
+      completion: "completed",
+      checked: ["Rechecked the concern"],
+      notCovered: [],
+      findings: [
+        {
+          id: "F1",
+          ledger: "R2-F1",
+          tag: "issue",
+          severity: "MAJOR",
+          confidence: "HIGH",
+          location: "a.ts:1",
+          what: "Earlier out-of-scope concern",
+        },
+      ],
+    };
+    prepareFindings([card], scope);
+    return { advisory: card.findings[0]?.advisory };
+  },
+  { advisory: "late-non-blocking" },
+);

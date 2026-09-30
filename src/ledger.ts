@@ -160,9 +160,10 @@ export function prepareFindings(cards: Card[], scope: RoundScope): void {
       if (entry?.status === "dismissed" && !finding.reopens) finding.advisory = "carried-dismissal";
       else if (finding.severity === "MINOR") finding.advisory = "minor-after-round-1";
       else if (
-        !entry &&
-        !scope.full &&
-        finding.late?.startsWith("missed:") &&
+        ((!entry && !scope.full && finding.late?.startsWith("missed:")) ||
+          (entry?.status === "advisory" &&
+            entry.late?.startsWith("missed:") &&
+            !finding.late?.startsWith("reach:"))) &&
         finding.severity !== "BLOCKING" &&
         card.name !== "safety"
       )
@@ -261,7 +262,7 @@ export function nextLedger(
       if (f.unconfirmed) counts.unconfirmed++;
       if (f.advisory) {
         const old = f.ledger ? entries.get(f.ledger) : undefined;
-        if (!old || (old.status === "standing" && !upheld.has(f.ledger))) {
+        if (!old || (["standing", "advisory"].includes(old.status) && !upheld.has(f.ledger))) {
           const key = old?.key ?? `R${scope.round}-F${++index}`;
           entries.set(key, {
             key,
@@ -272,7 +273,7 @@ export function nextLedger(
             severity: f.severity,
             status: "advisory",
             advisory_round: scope.round,
-            ...(f.late ? { late: f.late } : {}),
+            ...(f.late ? { late: f.late } : old?.late ? { late: old.late } : {}),
           });
         }
         continue;
