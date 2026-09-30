@@ -65,6 +65,7 @@ for (const scenario of scenarios) {
     if (result.kind === "classified") observed.classification = result.classification;
     if (result.kind === "reviewed") {
       Object.assign(observed, {
+        convergence: result.convergence,
         classification: result.classification,
         outcome: result.decision.outcome,
         band: result.decision.rating.band,
@@ -87,6 +88,8 @@ for (const scenario of scenarios) {
                 voice: result.voice,
                 decision: result.decision,
                 provenance: result.provenance,
+                ledger: result.ledger,
+                convergence: result.convergence,
               },
               report: result.report,
             }),

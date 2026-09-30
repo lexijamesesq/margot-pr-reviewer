@@ -28,11 +28,23 @@ export function parseCard(raw: string, name: Card["name"]): Card {
   const chunks = findings.split(/(?=^\s*[-*] \[)/m).filter((s) => s.trim());
   const parsed = chunks.map((chunk, index) => {
     const match = chunk.match(
-      /^\s*[-*] \[(issue|info)\] (.+?) · severity=(MINOR|MAJOR|BLOCKING) · confidence=(LOW|MEDIUM|HIGH)\s*\n([\s\S]+)$/,
+      /^\s*[-*] \[(issue|info)\] (.+?) · severity=(MINOR|MAJOR|BLOCKING) · confidence=(LOW|MEDIUM|HIGH)([^\n]*)\s*\n([\s\S]+)$/,
     );
     if (!match) throw new Error("Unreadable finding");
-    const body = (match[5] ?? "").replace(/^\s+/gm, "");
+    const body = (match[6] ?? "").replace(/^\s+/gm, "");
+    const extras = Object.fromEntries(
+      (match[5] ?? "")
+        .split(" · ")
+        .filter((x) => x.trim())
+        .map((x) => {
+          const at = x.indexOf("=");
+          if (at < 1 || !["ledger", "late", "reopens"].includes(x.slice(0, at)))
+            throw new Error("Unreadable finding attribution");
+          return [x.slice(0, at), x.slice(at + 1).trim()];
+        }),
+    );
     return {
+      ...extras,
       id: `${name}-F${index + 1}`,
       tag: match[1],
       location: match[2],
@@ -50,6 +62,15 @@ export function parseCard(raw: string, name: Card["name"]): Card {
     checked: bullets(section(raw, "Checked")),
     notCovered: bullets(section(raw, "Not covered")),
     findings: parsed,
+    ...(/^Resolved:$/im.test(raw)
+      ? {
+          resolved: bullets(section(raw, "Resolved")).map((line) => {
+            const match = line.match(/^(R[1-9]\d*-F[1-9]\d*) · (.+)$/);
+            if (!match) throw new Error("Unreadable resolution");
+            return { key: match[1], reason: match[2] };
+          }),
+        }
+      : {}),
   });
 }
 export function parseVoice(raw: string) {

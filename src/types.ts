@@ -5,9 +5,14 @@ import type {
   cardSchema,
   classSchema,
   configSchema,
+  convergenceSchema,
+  decisionSchema,
   factsSchema,
+  ledgerSchema,
   publicationSchema,
+  ratingSchema,
   requestSchema,
+  reviewCoreSchema,
   riskSchema,
   voiceSchema,
 } from "./schemas.js";
@@ -21,26 +26,19 @@ export type Voice = z.infer<typeof voiceSchema>;
 export type RiskEvidence = z.infer<typeof riskSchema>;
 export type Bundle = z.infer<typeof bundleSchema>;
 export type Band = z.infer<typeof bandSchema>;
-export type Rating = {
-  band: Band;
-  rationale: string;
-  evidence: RiskEvidence | null;
-  ignoredDimensions: string[];
-  voiceOverride: Band | null;
-};
-export type Decision = {
-  outcome: Voice["outcome"];
-  rating: Rating;
-  mergeEligible: boolean;
-  holdReasons: string[];
-};
-export type Review = {
-  request: ReviewRequest;
-  classification: Classification;
-  cards: Card[];
-  voice: Voice | null;
-  decision: Decision;
-  provenance: { cardBundle: string; classification: "fresh-jev"; services: string };
+export type Rating = z.infer<typeof ratingSchema>;
+export type Decision = z.infer<typeof decisionSchema>;
+export type Ledger = z.infer<typeof ledgerSchema>;
+export type Convergence = z.infer<typeof convergenceSchema>;
+export type ReviewCore = z.infer<typeof reviewCoreSchema>;
+export type Review = ReviewCore & { ledger: Ledger; convergence: Convergence };
+export type RoundScope = {
+  round: number;
+  priorHead: string | null;
+  full: boolean;
+  diff: string;
+  files: Facts["files"];
+  entries: Ledger["entries"];
 };
 export type ReviewResult =
   | ({
@@ -54,6 +52,7 @@ export type CallContext = { signal: AbortSignal };
 export interface Services {
   readonly provenance: string;
   facts(request: ReviewRequest, context: CallContext): Promise<unknown>;
+  compare?(request: ReviewRequest, priorHead: string, context: CallContext): Promise<unknown>;
   classify(
     facts: Facts,
     questions: Readonly<Record<string, string>>,
@@ -79,6 +78,7 @@ export interface Services {
       classification: Classification;
       cardPath: string;
       agent: Bundle["reviewerAgent"];
+      round: RoundScope;
     },
     context: CallContext,
   ): Promise<unknown>;
@@ -89,6 +89,7 @@ export interface Services {
       cards: Card[];
       rating: Rating;
       agent: Bundle["voiceAgent"];
+      round: RoundScope;
     },
     context: CallContext,
   ): Promise<unknown>;

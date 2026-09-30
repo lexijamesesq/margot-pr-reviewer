@@ -1,0 +1,307 @@
+[
+  {
+    "id": "ledger-auth",
+    "name": "Forged author cannot supply ledger history",
+    "defect": "Repair the forged actor to the configured App login"
+  },
+  {
+    "id": "ledger-binding",
+    "name": "Ledger head must match GitHub review commit",
+    "defect": "Repair mismatched GitHub review commit to ledger head"
+  },
+  {
+    "id": "ledger-corrupt",
+    "name": "Corrupt trusted ledger fails closed",
+    "defect": "Replace corrupt block with readable ledger"
+  },
+  {
+    "id": "ledger-unreadable",
+    "name": "Unreadable review history fails closed",
+    "defect": "Change history completeness to true"
+  },
+  {
+    "id": "ledger-newest",
+    "name": "Newest submitted ledger wins",
+    "defect": "Move newer ledger timestamp before older ledger"
+  },
+  {
+    "id": "ledger-duplicate",
+    "name": "Duplicate ledger keys are rejected",
+    "defect": "Remove the duplicate ledger key"
+  },
+  {
+    "id": "ledger-terminal",
+    "name": "Quoted nonterminal ledger is skipped",
+    "defect": "Remove prose following the ledger block"
+  },
+  {
+    "id": "ledger-delta",
+    "name": "Delta excludes unrelated main changes",
+    "defect": "Replace the PR file delta with an unrelated path"
+  },
+  {
+    "id": "ledger-unreadable-compare",
+    "name": "Unreadable compare uses complete full PR",
+    "defect": "Supply a readable ahead comparison"
+  },
+  {
+    "id": "ledger-wrong-delta",
+    "name": "Wrong compare revision is rejected",
+    "defect": "Repair mismatched compare head"
+  },
+  {
+    "id": "ledger-300",
+    "name": "Delta inventory exceeds 300 files",
+    "defect": "Remove the 301st diff file"
+  },
+  {
+    "id": "ledger-round-one-minor",
+    "name": "Round one MINOR still blocks",
+    "defect": "Move MINOR finding to round two"
+  },
+  {
+    "id": "ledger-round-four",
+    "name": "Unfixed MAJOR remains blocking at round four",
+    "defect": "Lower standing round-four MAJOR to MINOR"
+  },
+  {
+    "id": "ledger-full-not-late",
+    "name": "Rebase full review has no late demotion",
+    "defect": "Change full rebase scope to delta scope"
+  },
+  {
+    "id": "ledger-dismissal",
+    "name": "Unchanged dismissal carries without another ruling",
+    "defect": "Supply an explicit delta reopening citation"
+  },
+  {
+    "id": "ledger-reopened",
+    "name": "Changed dismissed code can receive a new ruling",
+    "defect": "Remove the delta reopening citation"
+  },
+  {
+    "id": "ledger-foreign",
+    "name": "Card cannot attribute another ledger key",
+    "defect": "Repair the unknown ledger key"
+  },
+  {
+    "id": "ledger-attribution",
+    "name": "New delta findings require scope attribution",
+    "defect": "Restore omitted new-finding attribution"
+  },
+  {
+    "id": "ledger-engine-fields",
+    "name": "Card cannot forge engine advisory annotations",
+    "defect": "Remove forged engine-only advisory annotation"
+  },
+  {
+    "id": "ledger-unconfirmed",
+    "name": "Silent MAJOR returns to voice for confirmation",
+    "defect": "Remove prior standing MAJOR"
+  },
+  {
+    "id": "ledger-minor-fixed",
+    "name": "Silent MINOR counts as fixed",
+    "defect": "Make the prior finding MAJOR and uphold it"
+  },
+  {
+    "id": "ledger-major-fixed",
+    "name": "Voice-confirmed fix counts once",
+    "defect": "Establish the silent finding instead of confirming it fixed"
+  },
+  {
+    "id": "ledger-upheld-wins",
+    "name": "Standing wins conflicting rulings on one key",
+    "defect": "Dismiss both repeats instead of establishing one"
+  },
+  {
+    "id": "ledger-keys",
+    "name": "New findings receive current-round stable keys",
+    "defect": "Move the review from round two to three"
+  },
+  {
+    "id": "ledger-late-count",
+    "name": "Late advisory counted without becoming new mandatory finding",
+    "defect": "Mark the missed advisory as a new delta issue and establish it"
+  },
+  {
+    "id": "ledger-prune",
+    "name": "Old fixes retire and dismissals persist",
+    "defect": "Change old fixed entry to standing"
+  },
+  {
+    "id": "ledger-budget",
+    "name": "Oversize ledger fails rather than forgetting findings",
+    "defect": "Shorten the oversized ledger to fit the budget"
+  },
+  {
+    "id": "ledger-mechanical-recall",
+    "name": "Standing card defeats mechanical shortcut",
+    "defect": "Remove the standing finding"
+  },
+  {
+    "id": "ledger-editorial-recall",
+    "name": "Standing card defeats editorial shortcut",
+    "defect": "Remove the standing finding"
+  },
+  {
+    "id": "ledger-card-isolation",
+    "name": "Card receives only its own standing and dismissed history",
+    "defect": "Assign the dismissed entry to the called card"
+  },
+  {
+    "id": "ledger-retry",
+    "name": "Same head reuses identical result without paid calls",
+    "defect": "Change routing configuration after saving the result"
+  },
+  {
+    "id": "ledger-retry-checks",
+    "name": "Same-head retry revalidates required checks",
+    "defect": "Repair the failed required check"
+  },
+  {
+    "id": "ledger-retry-legacy",
+    "name": "Legacy same-head ledger cannot pretend to be a cached result",
+    "defect": "Move legacy history to a previous head"
+  },
+  {
+    "id": "ledger-prose",
+    "name": "Card prose preserves ledger marks and resolution citations",
+    "defect": "Change the parsed finding ledger key"
+  },
+  {
+    "id": "ledger-pagination",
+    "name": "Ledger on page two participates in selection",
+    "defect": "Remove the second-page Link header"
+  },
+  {
+    "id": "ledger-rebase",
+    "name": "Rebase keeps ledger and reviews full PR",
+    "defect": "Change diverged comparison to ahead"
+  },
+  {
+    "id": "ledger-incomplete-delta",
+    "name": "Incomplete compare uses complete full PR",
+    "defect": "Repair incomplete comparison"
+  },
+  {
+    "id": "ledger-bad-hunk",
+    "name": "Truncated delta hunk uses complete full PR",
+    "defect": "Restore missing hunk line"
+  },
+  {
+    "id": "ledger-minor",
+    "name": "Round two MINOR is advisory",
+    "defect": "Raise MINOR to BLOCKING"
+  },
+  {
+    "id": "ledger-major",
+    "name": "Round two MAJOR still blocks",
+    "defect": "Lower MAJOR to MINOR"
+  },
+  {
+    "id": "ledger-late-major",
+    "name": "Late non-safety MAJOR is advisory",
+    "defect": "Raise late MAJOR to BLOCKING"
+  },
+  {
+    "id": "ledger-late-blocking",
+    "name": "Late BLOCKING still blocks",
+    "defect": "Lower late BLOCKING to MINOR"
+  },
+  {
+    "id": "ledger-late-safety",
+    "name": "Late safety MAJOR still blocks",
+    "defect": "Lower late safety MAJOR to MINOR"
+  },
+  {
+    "id": "ledger-reach",
+    "name": "Delta-reach regression blocks at honest severity",
+    "defect": "Lower delta-reach MAJOR to MINOR"
+  },
+  {
+    "id": "ledger-info-cannot-close",
+    "name": "An info-tagged repeat cannot silently close a MAJOR",
+    "defect": "Change the repeat from info to an explicit issue"
+  },
+  {
+    "id": "ledger-retry-evidence",
+    "name": "Changed PR evidence invalidates saved approval",
+    "defect": "Leave PR body unchanged"
+  },
+  {
+    "id": "ledger-voice-advisory",
+    "name": "Voice cannot reestablish demoted advisory",
+    "defect": "Remove engine advisory annotation"
+  },
+  {
+    "id": "process-stdin",
+    "name": "Large CLI evidence arrives complete through stdin",
+    "defect": "Replace stdin with truncated evidence"
+  },
+  {
+    "id": "jev-batch-evidence",
+    "name": "Jev batching retains every evidence byte",
+    "defect": "Delete the final Jev evidence batch in the adapter source",
+    "sourceBreak": {
+      "file": "src/adapters/jev.ts",
+      "from": "const chunks = evidence.match(/[\\s\\S]{1,16000}/gu) ?? [evidence];",
+      "to": "const chunks = evidence.match(/[\\s\\S]{1,16000}/gu) ?? [evidence];\n    if (chunks.length > 1) chunks.pop();"
+    }
+  },
+  {
+    "id": "jev-batch-severity",
+    "name": "Jev batch risk takes conservative maximum tails",
+    "defect": "Remove HIGH answer from last evidence batch"
+  },
+  {
+    "id": "jev-batch-confidence",
+    "name": "Jev batches preserve lowest confidence",
+    "defect": "Raise last batch confidence"
+  },
+  {
+    "id": "evidence-diff-pages",
+    "name": "Paged model diff tool returns complete bound diff",
+    "defect": "Delete first evidence character"
+  },
+  {
+    "id": "reference-sha",
+    "name": "Reference reads stay bound to configured repository and SHA",
+    "defect": "Change the configured pin"
+  },
+  {
+    "id": "reference-unknown",
+    "name": "Unconfigured reference is refused without a GitHub read",
+    "defect": "Request the configured reference instead"
+  },
+  {
+    "id": "ledger-identical-compare",
+    "name": "Identical trees preserve ledger with empty delta",
+    "defect": "Change compare status to diverged"
+  },
+  {
+    "id": "ledger-retry-provenance",
+    "name": "Changed live service configuration invalidates retry",
+    "defect": "Keep service provenance unchanged"
+  },
+  {
+    "id": "jev-batch-classification",
+    "name": "Functional evidence in final batch survives aggregation",
+    "defect": "Remove functional classification from last batch"
+  },
+  {
+    "id": "ledger-render-injection",
+    "name": "Model ledger markers cannot become authenticated history",
+    "defect": "Remove the planted marker from model prose"
+  },
+  {
+    "id": "ledger-page-two-failure",
+    "name": "Unreadable second review page cannot forget history",
+    "defect": "Repair the failed second page response"
+  },
+  {
+    "id": "ledger-human-quote",
+    "name": "Newer human marker quote does not hide the trusted App ledger",
+    "defect": "Replace the harmless quote with an untrusted trailing ledger block"
+  }
+]

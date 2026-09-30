@@ -1,5 +1,5 @@
 {
-  "provenance": "Historical capture 6; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication. Second-round history is refused.",
+  "provenance": "Historical capture 6; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication. Prior MINOR ledger entries are normalized from the captured first round; actor and revision identifiers are neutral reconstructions. Delta is the guide hunk from the retrieved full comparison.",
   "request": {
     "repository": "example/project",
     "pr": 6,
@@ -28,7 +28,10 @@
     "noCouncilConfidenceFloor": 0.3,
     "timeoutMs": 1000,
     "publication": "record",
-    "calibration": false
+    "calibration": false,
+    "trustedLedgerActors": [
+      "reviewer[bot]"
+    ]
   },
   "facts": {
     "repository": "example/project",
@@ -59,7 +62,17 @@
     ],
     "history": {
       "complete": true,
-      "priorLedger": true
+      "priorLedger": true,
+      "reviews": [
+        {
+          "id": 1,
+          "actor": "reviewer[bot]",
+          "actorType": "Bot",
+          "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "submittedAt": "2026-09-01T00:00:00Z",
+          "body": "Recorded prior review\n<!-- margot-ledger:v1 eyJ2IjogMSwgInJvdW5kIjogMSwgImhlYWQiOiAiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsICJlbnRyaWVzIjogW3sia2V5IjogIlIxLUYxIiwgImNhcmQiOiAicHJpbmNpcGFsLWVuZ2luZWVyIiwgInJvdW5kX3JhaXNlZCI6IDEsICJsb2NhdGlvbiI6ICJHVUlERS5tZDo0MCIsICJzZXZlcml0eSI6ICJNSU5PUiIsICJ3aGF0IjogIlRoZSByZXBvJ3Mgb3duIGd1aWRlIHN0aWxsIHNheXMgdGhlIG1lcmdlIGdhdGUgcnVucyB0aHJvdWdoIHRoZSBqb2IgdGhpcyBQUiBkZWxldGVzLCBzbyBhbnlvbmUgcmVhZGluZyBpdCBnZXRzIHRoZSB3cm9uZyBwaWN0dXJlIG9mIHdoYXQgcHJvdGVjdHMgdGhlIG1haW4gYnJhbmNoLiIsICJzdGF0dXMiOiAic3RhbmRpbmcifSwgeyJrZXkiOiAiUjEtRjIiLCAiY2FyZCI6ICJtYWludGFpbmFibGUtbm8tc2xvcCIsICJyb3VuZF9yYWlzZWQiOiAxLCAibG9jYXRpb24iOiAiR1VJREUubWQ6NDAiLCAic2V2ZXJpdHkiOiAiTUlOT1IiLCAid2hhdCI6ICJUaGUgcmVwbydzIGd1aWRlIHN0aWxsIHNheXMgdGhlIHByb3RlY3RlZCBicmFuY2ggaXMgZ2F0ZWQgYnkgdGhlIHN1bW1hcnkgY2hlY2sgdGhpcyBjaGFuZ2UgZGVsZXRlcywgc28gaXQgbm93IGRlc2NyaWJlcyBhIHNldHVwIHRoYXQgbm8gbG9uZ2VyIGV4aXN0cy4iLCAic3RhdHVzIjogInN0YW5kaW5nIn1dfQ== -->"
+        }
+      ]
     },
     "triage": null,
     "autoMergeArmed": true
@@ -205,5 +218,12 @@
     "head": "0000000000000000000000000000000000000006",
     "recorded": true,
     "id": "recorded-6"
+  },
+  "comparison": {
+    "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "head": "0000000000000000000000000000000000000006",
+    "status": "ahead",
+    "complete": true,
+    "diff": "diff --git a/GUIDE.md b/GUIDE.md\nindex a597119..c1907e7 100644\n--- a/GUIDE.md\n+++ b/GUIDE.md\n@@ -37,7 +37,7 @@ pre-commit run --all-files  # gitleaks-staged + the standard hook set\n \n ## CI\n \n-`.github/workflows/ci.yml`, required via the \"Protect main\" ruleset through `all-checks-passed`: the organization's shared `floor` job, plus this repo's own `ruff` (Python lint) and `shellcheck` (`ludeeus/action-shellcheck`, no-op today \u2014 no `.sh` files yet, kept for when scripts are added). PR-time secret scanning is the trusted lane's `trusted-scan` (`gate.yml`), a separate required check.\n+`.github/workflows/ci.yml`, required via the \"Protect main\" ruleset: the organization's shared `floor` job (`ci / checks`), plus this repo's own `ruff` (`ci / ruff`, Python lint) and `shellcheck` (`ci / shellcheck`, `ludeeus/action-shellcheck`, no-op today \u2014 no `.sh` files yet, kept for when scripts are added). The ruleset requires each job's check directly; a new job needs its check added to the ruleset in project's `rulesets/default-branch.json`. PR-time secret scanning is the trusted lane's `trusted-scan` (`gate.yml`), a separate required check.\n \n ## Conventions\n \n"
   }
 }

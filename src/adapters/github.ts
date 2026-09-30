@@ -1,6 +1,7 @@
 import { Octokit } from "octokit";
 import parseDiff from "parse-diff";
 import { z } from "zod";
+import { diffIsComplete } from "../diff.js";
 import { factsSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
@@ -49,6 +50,23 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
   const pull = async (r: ReviewRequest, c: CallContext) =>
     (await client.rest.pulls.get(params(r, c))).data;
   return {
+    async compare(r: ReviewRequest, priorHead: string, c: CallContext) {
+      const p = { ...params(r, c), basehead: `${priorHead}...${r.head}` };
+      const [metadata, diff] = await Promise.all([
+        client.rest.repos.compareCommitsWithBasehead(p),
+        client.request("GET /repos/{owner}/{repo}/compare/{basehead}", {
+          ...p,
+          mediaType: { format: "diff" },
+        }),
+      ]);
+      return {
+        base: priorHead,
+        head: r.head,
+        status: metadata.data.status,
+        diff: diff.data,
+        complete: true,
+      };
+    },
     async head(r: ReviewRequest, c: CallContext) {
       const current = await pull(r, c);
       if (
@@ -95,13 +113,11 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
         throw new Error("Incomplete GitHub diff");
       // Metadata-only changes have no patch. Binary or missing content remains incomplete.
       if (
-        /^Binary files .* differ$|^GIT binary patch$/m.test(diffText) ||
         files.some((f) => typeof f.patch !== "string" && (f.additions !== 0 || f.deletions !== 0))
       )
         throw new Error("A changed file has no complete text patch");
-      const diffFiles = [...diffText.matchAll(/^diff --git /gm)].length;
-      if (diffFiles !== files.length) throw new Error("Diff and file inventory disagree");
       const parsed = parseDiff(diffText);
+      if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
       if (
         parsed.length !== files.length ||
         parsed.some((file, index) => {
@@ -109,14 +125,7 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
           return (
             !expected ||
             file.additions !== expected.additions ||
-            file.deletions !== expected.deletions ||
-            file.chunks.some(
-              (chunk) =>
-                chunk.changes.filter((c) => c.type !== "add" && !c.content.startsWith("\\"))
-                  .length !== chunk.oldLines ||
-                chunk.changes.filter((c) => c.type !== "del" && !c.content.startsWith("\\"))
-                  .length !== chunk.newLines,
-            )
+            file.deletions !== expected.deletions
           );
         })
       )
@@ -153,6 +162,20 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
           complete: true,
           priorLedger:
             !options.freshShadow && reviews.some((r) => r.body.includes("margot-ledger:")),
+          ...(!options.freshShadow
+            ? {
+                reviews: reviews
+                  .filter((r) => r.submitted_at)
+                  .map((r) => ({
+                    id: r.id,
+                    actor: r.user?.login ?? "unknown",
+                    actorType: r.user?.type ?? "unknown",
+                    head: r.commit_id,
+                    submittedAt: r.submitted_at,
+                    body: r.body,
+                  })),
+              }
+            : {}),
         },
         triage: null,
         autoMergeArmed: before.auto_merge !== null,

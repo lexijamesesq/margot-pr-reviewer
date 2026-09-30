@@ -103,7 +103,10 @@ export function mandatory(cards: Card[]): string[] {
     card.findings
       .filter(
         (f) =>
-          f.tag === "issue" || f.severity === "BLOCKING" || card.name === "achieves-the-objective",
+          !f.advisory &&
+          (f.tag === "issue" ||
+            f.severity === "BLOCKING" ||
+            card.name === "achieves-the-objective"),
       )
       .map((f) => f.id),
   );
@@ -126,6 +129,9 @@ export function needsVoice(
   );
 }
 export function validateVoice(cards: Card[], voice: Voice): void {
+  const advisory = cards.flatMap((c) => c.findings.filter((f) => f.advisory).map((f) => f.id));
+  if (voice.dispositions.some((d) => advisory.includes(d.id) && d.status !== "dismissed"))
+    throw new Error("Voice cannot reestablish advisory findings");
   const required = mandatory(cards);
   const all = cards.flatMap((c) => c.findings.map((f) => f.id));
   const ids = voice.dispositions.map((d) => d.id);

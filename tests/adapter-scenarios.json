@@ -182,12 +182,7 @@
   {
     "id": "truncated-hunk",
     "name": "A partial final hunk cannot claim complete facts",
-    "defect": "source mutation: remove hunk line-count validation",
-    "sourceBreak": {
-      "file": "src/adapters/github.ts",
-      "from": "file.chunks.some(\n              (chunk) =>\n                chunk.changes.filter((c) => c.type !== \"add\" && !c.content.startsWith(\"\\\\\"))\n                  .length !== chunk.oldLines ||\n                chunk.changes.filter((c) => c.type !== \"del\" && !c.content.startsWith(\"\\\\\"))\n                  .length !== chunk.newLines,\n            )",
-      "to": "false"
-    }
+    "defect": "Restore the truncated hunk line counts"
   },
   {
     "id": "evidence-range",
@@ -293,5 +288,15 @@
     "id": "binary-patch",
     "name": "GitHub refuses an encoded binary patch",
     "defect": "remove the encoded binary patch"
+  },
+  {
+    "id": "claude-stdin-delta",
+    "name": "Claude receives its complete prompt on stdin and only the round delta through read_diff",
+    "defect": "source mutation: put the runtime prompt back in argv",
+    "sourceBreak": {
+      "file": "src/adapters/claude.ts",
+      "from": "          \"-p\",",
+      "to": "          \"-p\",\n          prompt,"
+    }
   }
 ]

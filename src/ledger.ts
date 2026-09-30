@@ -1,0 +1,289 @@
+import { createHash } from "node:crypto";
+import { deflateSync, inflateSync } from "node:zlib";
+import parseDiff from "parse-diff";
+import { diffIsComplete } from "./diff.js";
+import { comparisonSchema, ledgerSchema } from "./schemas.js";
+import type {
+  Card,
+  Convergence,
+  Facts,
+  Ledger,
+  ReviewConfig,
+  ReviewCore,
+  RoundScope,
+  Voice,
+} from "./types.js";
+
+export const configHash = (config: ReviewConfig): string =>
+  createHash("sha256")
+    .update(`ledger-v2:${JSON.stringify(config)}`)
+    .digest("hex");
+
+export const evidenceHash = (facts: Facts): string =>
+  createHash("sha256")
+    .update(
+      JSON.stringify({
+        repository: facts.repository,
+        pr: facts.pr,
+        base: facts.base,
+        head: facts.head,
+        title: facts.title,
+        body: facts.body,
+        author: facts.author,
+        diff: facts.diff,
+        files: facts.files,
+        triage: facts.triage,
+      }),
+    )
+    .digest("hex");
+
+/** Only trailing blocks claim history; prose mentions cannot hide the App's ledger.
+ * Explicit untrusted claims and corrupt payloads fail closed.
+ */
+export function selectLedger(facts: Facts, config: ReviewConfig): Ledger | null {
+  if (!facts.history.complete) throw new Error("History unavailable");
+  if (facts.history.priorLedger && !facts.history.reviews)
+    throw new Error("Ledger history missing");
+  const reviews = [...(facts.history.reviews ?? [])].sort(
+    (a, b) => b.submittedAt.localeCompare(a.submittedAt) || b.id - a.id,
+  );
+  for (const review of reviews) {
+    const match = review.body.match(/(?:^|\n)<!-- margot-ledger:v([12]) ([A-Za-z0-9+/=]+) -->\s*$/);
+    if (!match) continue;
+    if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor))
+      throw new Error("Untrusted ledger author");
+    const ledger = ledgerSchema.parse(
+      JSON.parse(
+        (match[1] === "2"
+          ? inflateSync(Buffer.from(match[2] ?? "", "base64"), { maxOutputLength: 1048576 })
+          : Buffer.from(match[2] ?? "", "base64")
+        ).toString("utf8"),
+      ),
+    );
+    if (ledger.v !== Number(match[1]) || ledger.head !== review.head)
+      throw new Error("Ledger revision mismatch");
+    if (
+      ledger.receipt &&
+      (ledger.receipt.review.request.repository !== facts.repository ||
+        ledger.receipt.review.request.pr !== facts.pr)
+    )
+      throw new Error("Ledger belongs to another PR");
+    return ledger;
+  }
+  return null;
+}
+
+/** Unified diff is the inventory: the compare JSON file list is capped at 300. */
+export function roundScope(facts: Facts, prior: Ledger | null, comparison?: unknown): RoundScope {
+  const full: RoundScope = {
+    round: prior ? prior.round + 1 : 1,
+    priorHead: prior?.head ?? null,
+    full: true,
+    diff: facts.diff,
+    files: facts.files,
+    entries: prior?.entries ?? [],
+  };
+  if (!prior) return full;
+  const parsed = comparisonSchema.safeParse(comparison);
+  if (!parsed.success) return full;
+  const delta = parsed.data;
+  if (delta.base !== prior.head || delta.head !== facts.head)
+    throw new Error("Delta revision mismatch");
+  if (!delta.complete || !["ahead", "identical"].includes(delta.status)) return full;
+  const files = parseDiff(delta.diff);
+  if (!diffIsComplete(delta.diff, files)) return full;
+  const own = new Set(
+    facts.files.flatMap((f) => [f.path, ...(f.previousPath ? [f.previousPath] : [])]),
+  );
+  const chunks = delta.diff.split(/(?=^diff --git )/m).filter((s) => s.trim());
+  const selected = files.flatMap((f, i) =>
+    own.has(f.to ?? "") || own.has(f.from ?? "") ? [i] : [],
+  );
+  return {
+    ...full,
+    full: false,
+    diff: selected.map((i) => chunks[i]).join(""),
+    files: selected.map((i) => {
+      const f = files[i];
+      const path = f?.to === "/dev/null" ? f.from : f?.to;
+      if (!path) throw new Error("Unreadable delta path");
+      return {
+        path,
+        ...(f?.from && f.from !== path && f.from !== "/dev/null" ? { previousPath: f.from } : {}),
+      };
+    }),
+  };
+}
+export const standingCards = (scope: RoundScope): Card["name"][] => [
+  ...new Set(scope.entries.filter((e) => e.status === "standing").map((e) => e.card)),
+];
+
+/** Matching, reach and fix evidence are model judgments; severity and memory are code. */
+export function prepareFindings(cards: Card[], scope: RoundScope): void {
+  for (const card of cards) {
+    for (const finding of card.findings) {
+      // These are engine-owned annotations, never accepted from a card.
+      if (finding.unconfirmed !== undefined || finding.advisory !== undefined)
+        throw new Error("Card supplied engine annotations");
+      if (
+        finding.ledger &&
+        !scope.entries.some(
+          (e) =>
+            e.key === finding.ledger &&
+            e.card === card.name &&
+            ["standing", "dismissed"].includes(e.status),
+        )
+      )
+        throw new Error("Unknown or foreign ledger key");
+      if (finding.tag !== "issue" || scope.round < 2) continue;
+      const entry = scope.entries.find((e) => e.key === finding.ledger);
+      if (!entry && !scope.full && !finding.late)
+        throw new Error("New finding needs delta or late attribution");
+      if (entry?.status === "dismissed" && !finding.reopens) finding.advisory = "carried-dismissal";
+      else if (finding.severity === "MINOR") finding.advisory = "minor-after-round-1";
+      else if (
+        !entry &&
+        !scope.full &&
+        finding.late?.startsWith("missed:") &&
+        finding.severity !== "BLOCKING" &&
+        card.name !== "safety"
+      )
+        finding.advisory = "late-non-blocking";
+    }
+    for (const resolved of card.resolved ?? []) {
+      if (
+        !scope.entries.some(
+          (e) => e.key === resolved.key && e.card === card.name && e.status === "standing",
+        )
+      )
+        throw new Error("Unknown resolved ledger key");
+    }
+    for (const entry of scope.entries.filter(
+      (e) => e.card === card.name && e.status === "standing",
+    )) {
+      if (card.findings.some((f) => f.ledger === entry.key && f.tag === "issue")) continue;
+      if (scope.round >= 2 && entry.severity === "MINOR") continue;
+      card.findings.push({
+        id: `verify-${entry.key}`,
+        tag: "issue",
+        severity: entry.severity,
+        confidence: "LOW",
+        location: entry.location,
+        what: entry.what,
+        ledger: entry.key,
+        unconfirmed: true,
+      });
+    }
+  }
+  if (standingCards(scope).some((name) => !cards.some((c) => c.name === name)))
+    throw new Error("Standing card did not complete");
+}
+
+export function nextLedger(
+  scope: RoundScope,
+  cards: Card[],
+  voice: Voice | null,
+  core: ReviewCore,
+  config: ReviewConfig,
+  facts: Facts,
+): { ledger: Ledger; convergence: Convergence } {
+  const entries = new Map(
+    scope.entries
+      .filter((e) => e.status === "standing" || e.status === "dismissed")
+      .map((e) => [e.key, { ...e }]),
+  );
+  const counts: Convergence = {
+    round: scope.round,
+    standing: 0,
+    fixed: 0,
+    new: 0,
+    late: 0,
+    unconfirmed: 0,
+  };
+  const dispositions = new Map(voice?.dispositions.map((d) => [d.id, d]) ?? []);
+  let index = 0;
+  const upheld = new Set(
+    cards.flatMap((c) =>
+      c.findings
+        .filter((f) => !f.advisory && dispositions.get(f.id)?.status !== "dismissed")
+        .map((f) => f.ledger),
+    ),
+  );
+  for (const card of cards) {
+    for (const entry of scope.entries.filter(
+      (e) => e.card === card.name && e.status === "standing" && e.severity === "MINOR",
+    )) {
+      if (
+        scope.round >= 2 &&
+        !card.findings.some((f) => f.ledger === entry.key && f.tag === "issue")
+      ) {
+        entries.set(entry.key, {
+          ...entry,
+          status: "fixed",
+          fixed_round: scope.round,
+          reason:
+            card.resolved?.find((r) => r.key === entry.key)?.reason ??
+            "Card completed and no longer raised this MINOR finding",
+        });
+        counts.fixed++;
+      }
+    }
+    for (const f of card.findings) {
+      if (f.tag !== "issue") continue;
+      if (!f.ledger && !scope.full && f.late?.startsWith("missed:")) counts.late++;
+      if (f.unconfirmed) counts.unconfirmed++;
+      if (f.advisory) {
+        const old = f.ledger ? entries.get(f.ledger) : undefined;
+        if (old?.status === "standing" && !upheld.has(f.ledger))
+          entries.set(old.key, { ...old, status: "advisory", advisory_round: scope.round });
+        continue;
+      }
+      const ruling = dispositions.get(f.id);
+      if (!ruling) throw new Error("Ledger finding has no ruling");
+      const key = f.ledger ?? `R${scope.round}-F${++index}`;
+      const old = entries.get(key);
+      if (!f.ledger) counts.new++;
+      if (f.ledger && upheld.has(key) && ruling.status === "dismissed") continue;
+      const fixed = ruling.status === "dismissed" && f.unconfirmed === true;
+      const entry: Ledger["entries"][number] = {
+        key,
+        card: card.name,
+        round_raised: old?.round_raised ?? scope.round,
+        location: f.location,
+        what: f.what,
+        severity: f.severity,
+        status: fixed ? "fixed" : ruling.status === "dismissed" ? "dismissed" : "standing",
+        reason: ruling.reason,
+        ...(fixed ? { fixed_round: scope.round } : {}),
+      };
+      entries.set(key, entry);
+    }
+  }
+  counts.fixed += [...entries.values()].filter(
+    (e) => e.status === "fixed" && e.severity !== "MINOR",
+  ).length;
+  counts.standing = [...entries.values()].filter((e) => e.status === "standing").length;
+  if (counts.standing > 0 && core.decision.outcome === "APPROVED")
+    throw new Error("Approval contradicts standing ledger");
+  const ledger = ledgerSchema.parse({
+    v: 2,
+    head: core.request.head,
+    round: scope.round,
+    entries: [...entries.values()],
+    receipt: {
+      configHash: configHash(config),
+      evidenceHash: evidenceHash(facts),
+      review: core,
+      counts,
+    },
+  });
+  return { ledger, convergence: counts };
+}
+export function ledgerBlock(ledger: Ledger): string {
+  const raw = Buffer.from(JSON.stringify(ledger));
+  if (raw.length > 1048576) throw new Error("Ledger exceeds decoded budget");
+  const encoded = (ledger.v === 2 ? deflateSync(raw) : raw).toString("base64");
+  // Never discard an open finding or a dismissal to make a result fit.
+  if (encoded.length > 48000) throw new Error("Ledger exceeds review body budget");
+  return `<!-- margot-ledger:v${ledger.v} ${encoded} -->`;
+}

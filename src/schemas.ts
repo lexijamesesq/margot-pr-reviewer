@@ -35,6 +35,7 @@ export const configSchema = z
     protectedPaths: z.array(text),
     trustedCheckActors: z.array(text),
     trustedTriageActors: z.array(text),
+    trustedLedgerActors: z.array(text).default([]),
     requiredChecks: z.array(text),
     cardBundle: z.strictObject({ commit: shaSchema }),
     classificationThreshold: probability,
@@ -75,7 +76,22 @@ export const factsSchema = z.strictObject({
       conclusion: z.enum(["success", "failure", "pending", "skipped"]),
     }),
   ),
-  history: z.strictObject({ complete: z.boolean(), priorLedger: z.boolean() }),
+  history: z.strictObject({
+    complete: z.boolean(),
+    priorLedger: z.boolean(),
+    reviews: z
+      .array(
+        z.strictObject({
+          id: z.number().int().positive(),
+          actor: text,
+          actorType: text,
+          head: shaSchema,
+          submittedAt: z.iso.datetime(),
+          body: z.string(),
+        }),
+      )
+      .optional(),
+  }),
   triage: z
     .strictObject({ actor: text, base: shaSchema, head: shaSchema, classification: classSchema })
     .nullable(),
@@ -115,6 +131,17 @@ export const findingSchema = z.strictObject({
   confidence: z.enum(["LOW", "MEDIUM", "HIGH"]),
   location: text,
   what: text,
+  ledger: z
+    .string()
+    .regex(/^R[1-9]\d*-F[1-9]\d*$/)
+    .optional(),
+  late: z
+    .string()
+    .regex(/^(new(?:: .+)?|missed: .+|delta-reach: .+)$/)
+    .optional(),
+  reopens: text.optional(),
+  unconfirmed: z.boolean().optional(),
+  advisory: z.enum(["minor-after-round-1", "late-non-blocking", "carried-dismissal"]).optional(),
 });
 export const cardSchema = z.strictObject({
   name: cardNameSchema,
@@ -122,6 +149,9 @@ export const cardSchema = z.strictObject({
   checked: z.array(text).min(1),
   notCovered: z.array(text),
   findings: z.array(findingSchema),
+  resolved: z
+    .array(z.strictObject({ key: z.string().regex(/^R[1-9]\d*-F[1-9]\d*$/), reason: text }))
+    .optional(),
 });
 export const voiceSchema = z.strictObject({
   outcome: z.enum(["APPROVED", "CHANGES_REQUESTED", "CLARIFICATION_REQUESTED"]),
@@ -148,14 +178,114 @@ export const publicationSchema = z.strictObject({
   id: text,
 });
 
+export const referencesSchema = z.record(
+  z.string(),
+  z.strictObject({ repository: requestSchema.shape.repository, head: shaSchema }),
+);
 export const liveConfigSchema = z.strictObject({
   review: configSchema,
-  github: z.strictObject({ gh: z.string().optional(), freshShadow: z.literal(true) }),
+  github: z.strictObject({ gh: z.string().optional(), freshShadow: z.boolean().default(false) }),
   jev: z.strictObject({ model: z.string().min(1) }),
   claude: z.strictObject({
     executable: z.string().min(1),
     version: z.string().regex(/^\d+\.\d+\.\d+$/),
     pluginDirectory: z.string().min(1),
     reviewerModel: z.string().min(1),
+    references: referencesSchema.optional(),
   }),
+});
+
+export const ratingSchema = z.strictObject({
+  band: bandSchema,
+  rationale: text,
+  evidence: riskSchema.nullable(),
+  ignoredDimensions: z.array(text),
+  voiceOverride: bandSchema.nullable(),
+});
+export const decisionSchema = z.strictObject({
+  outcome: voiceSchema.shape.outcome,
+  rating: ratingSchema,
+  mergeEligible: z.boolean(),
+  holdReasons: z.array(text),
+});
+export const reviewCoreSchema = z.strictObject({
+  request: requestSchema,
+  classification: classSchema,
+  cards: z.array(cardSchema),
+  voice: voiceSchema.nullable(),
+  decision: decisionSchema,
+  provenance: z.strictObject({
+    cardBundle: shaSchema,
+    classification: z.literal("fresh-jev"),
+    services: text,
+  }),
+});
+export const convergenceSchema = z.strictObject({
+  round: z.number().int().positive(),
+  standing: z.number().int().nonnegative(),
+  fixed: z.number().int().nonnegative(),
+  new: z.number().int().nonnegative(),
+  late: z.number().int().nonnegative(),
+  unconfirmed: z.number().int().nonnegative(),
+});
+export const ledgerEntrySchema = z
+  .strictObject({
+    key: z.string().regex(/^R[1-9]\d*-F[1-9]\d*$/),
+    card: cardNameSchema,
+    location: text,
+    what: text,
+    severity: findingSchema.shape.severity,
+    status: z.enum(["standing", "fixed", "dismissed", "advisory"]),
+    round_raised: z.number().int().positive(),
+    reason: text.optional(),
+    fixed_round: z.number().int().positive().optional(),
+    advisory_round: z.number().int().positive().optional(),
+  })
+  .refine((e) => e.status !== "dismissed" || !!e.reason, "Dismissal requires a reason");
+export const ledgerSchema = z
+  .strictObject({
+    v: z.union([z.literal(1), z.literal(2)]),
+    round: z.number().int().positive(),
+    head: shaSchema,
+    entries: z.array(ledgerEntrySchema),
+    receipt: z
+      .strictObject({
+        configHash: text,
+        evidenceHash: text,
+        review: reviewCoreSchema,
+        counts: convergenceSchema,
+      })
+      .optional(),
+  })
+  .superRefine((l, ctx) => {
+    if (
+      new Set(l.entries.map((e) => e.key)).size !== l.entries.length ||
+      l.entries.some(
+        (e) =>
+          e.round_raised > l.round ||
+          Number(e.key.split("-")[0]?.slice(1)) !== e.round_raised ||
+          (e.fixed_round ?? 0) > l.round ||
+          (e.advisory_round ?? 0) > l.round,
+      ) ||
+      (l.v === 1 && l.receipt !== undefined) ||
+      (l.receipt &&
+        (l.receipt.counts.standing !== l.entries.filter((e) => e.status === "standing").length ||
+          (l.receipt.review.decision.outcome === "APPROVED" && l.receipt.counts.standing > 0) ||
+          (l.receipt.review.decision.mergeEligible &&
+            (l.receipt.review.decision.outcome !== "APPROVED" ||
+              l.receipt.review.decision.rating.band !== "LOW" ||
+              l.receipt.review.decision.holdReasons.length > 0)))) ||
+      (l.v === 2 &&
+        (!l.receipt ||
+          l.receipt.review.request.head !== l.head ||
+          l.receipt.counts.round !== l.round))
+    )
+      ctx.addIssue({ code: "custom", message: "Inconsistent ledger" });
+  });
+export const comparisonSchema = z.strictObject({
+  base: shaSchema,
+  head: shaSchema,
+  status: z.enum(["ahead", "identical", "diverged", "behind"]),
+  diff: z.string(),
+  complete: z.boolean(),
 });

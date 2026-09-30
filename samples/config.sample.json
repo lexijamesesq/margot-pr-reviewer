@@ -22,10 +22,13 @@
     "noCouncilConfidenceFloor": 0.3,
     "timeoutMs": 900000,
     "publication": "record",
-    "calibration": false
+    "calibration": false,
+    "trustedLedgerActors": [
+      "YOUR_REVIEW_APP[bot]"
+    ]
   },
   "github": {
-    "freshShadow": true
+    "freshShadow": false
   },
   "jev": {
     "model": "YOUR_JEV_VERSION"

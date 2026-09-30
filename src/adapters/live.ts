@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { z } from "zod";
 import { liveConfigSchema, requestSchema } from "../schemas.js";
 import type { Services } from "../types.js";
@@ -24,7 +25,7 @@ export function liveServices(
   );
   const actions: unknown[] = [];
   const services: Services = {
-    provenance: "live-read-only/fresh-first-round-shadow",
+    provenance: `live-read-only/shadow:${createHash("sha256").update(JSON.stringify(config)).digest("hex")}`,
     ...github,
     ...jevAdapter({ key: credentials.jevKey, model: config.jev.model }),
     ...claudeAdapter({
