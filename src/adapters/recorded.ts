@@ -7,6 +7,7 @@ export interface Recording {
   config: unknown;
   facts: unknown;
   classification: unknown;
+  comparison?: unknown;
   route: unknown;
   risk: unknown;
   bundle: unknown;
@@ -35,6 +36,7 @@ export function recordedServices(
     calls,
     publications,
     facts: (request) => read("facts", request, data.facts),
+    compare: (request, priorHead) => read("compare", { request, priorHead }, data.comparison),
     classify: (facts, questions) =>
       read("classification", { facts, questions }, data.classification),
     route: (facts, classification, questions) =>

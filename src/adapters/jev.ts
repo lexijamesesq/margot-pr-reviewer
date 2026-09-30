@@ -31,7 +31,7 @@ export function jevAdapter(options: {
   minTimeout?: number;
 }) {
   const transport = options.fetch ?? fetch;
-  async function decide(questions: object, state: unknown, c: CallContext) {
+  async function ask(questions: object, state: unknown, c: CallContext) {
     const raw = await pRetry(
       async () => {
         let response: Response;
@@ -68,6 +68,61 @@ export function jevAdapter(options: {
       .object({ model: z.literal(options.model), answers: z.record(z.string(), z.unknown()) })
       .parse(raw);
     return envelope.answers;
+  }
+  async function decide(questions: object, input: unknown, c: CallContext) {
+    // History belongs to the convergence reducer, not Jev. Keep every byte of the diff.
+    const state = structuredClone(input) as Record<string, unknown>;
+    const facts = (state.facts ?? state) as Record<string, unknown>;
+    delete facts.history;
+    const evidence = JSON.stringify(state);
+    const chunks = evidence.match(/[\s\S]{1,16000}/gu) ?? [evidence];
+    const answers: Record<string, unknown>[] = [];
+    for (const [index, chunk] of chunks.entries()) {
+      const batch =
+        chunks.length === 1
+          ? state
+          : {
+              repository: facts.repository,
+              pr: facts.pr,
+              head: facts.head,
+              base: facts.base,
+              evidencePart: index + 1,
+              totalParts: chunks.length,
+              evidence: chunk,
+              scope:
+                "Contiguous excerpt of complete JSON evidence, possibly continuing across boundaries. Assess the evidence visible in this excerpt; the engine combines every excerpt conservatively.",
+            };
+      answers.push(await ask(questions, batch, c));
+    }
+    if (answers.length === 1 && answers[0]) return answers[0];
+    return Object.fromEntries(
+      Object.keys(questions).map((name) => {
+        const values = answers.map((a) => a[name]);
+        if (noul.safeParse(values[0]).success)
+          return [name, { type: "noul", noul: Math.max(...values.map((v) => noul.parse(v).noul)) }];
+        const scores = values.map((v) => score.parse(v));
+        // Maximum tail at each level is a valid conservative distribution.
+        const tails = [0, 1, 2, 3].map((level) =>
+          Math.max(
+            ...scores.map((s) =>
+              Object.values(s.probabilities)
+                .slice(level)
+                .reduce((a, b) => a + b, 0),
+            ),
+          ),
+        );
+        return [
+          name,
+          {
+            type: "score",
+            confidence: Math.min(...scores.map((s) => s.confidence)),
+            probabilities: Object.fromEntries(
+              tails.map((tail, i) => [String(i), Math.max(0, tail - (tails[i + 1] ?? 0))]),
+            ),
+          },
+        ];
+      }),
+    );
   }
   const nouls = (questions: Readonly<Record<string, string>>) =>
     Object.fromEntries(

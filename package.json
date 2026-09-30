@@ -1,7 +1,7 @@
 {
   "name": "margot-pr-reviewer",
-  "version": "0.2.0-slice2",
-  "description": "Margot's read-only first-round PR review engine",
+  "version": "0.3.0-slice3",
+  "description": "Margot's read-only PR review engine with convergence",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -26,10 +26,11 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs",
+    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs && node scripts/ledger-breaks.mjs",
     "prepack": "npm run build",
     "audit:recordings": "node scripts/audit-recordings.mjs",
-    "test:adapter-breaks": "node scripts/adapter-breaks.mjs"
+    "test:adapter-breaks": "node scripts/adapter-breaks.mjs",
+    "test:ledger-breaks": "node scripts/ledger-breaks.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",

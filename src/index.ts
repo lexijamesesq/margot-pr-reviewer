@@ -6,13 +6,16 @@ export { review } from "./review.js";
 export type {
   Card,
   Classification,
+  Convergence,
   Decision,
   Facts,
+  Ledger,
   Rating,
   Review,
   ReviewConfig,
   ReviewRequest,
   ReviewResult,
+  RoundScope,
   Services,
   Voice,
 } from "./types.js";

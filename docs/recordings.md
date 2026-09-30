@@ -12,7 +12,7 @@ review-model calls were made to create these fixtures.
 | voice-hold | 1df054d31bf1bdd9dff22c11eeeb345abc196e69b2bfd8ba8289f625481d5ba2 | retrieved exact comparison |
 | invalid-accounting | 3c43e24a115758722ddc8b2d8f742ce7fa7523a92eb14a776837dc961f89e1ee | reconstructed; original base missing |
 | author-changes | ffa9ba0aa5e1d5c5867537eaa31b44f5a0a216174e4bbe9c231702d10184ff33 | retrieved exact comparison |
-| prior-ledger | 7d7bd42fcce385b18797494c8ea0718703926521ed313ba34972ba6c253bcee0 | retrieved exact comparison |
+| prior-ledger | e088b7a34071a6aa8cbfe08c5a9419f498d388e852f0352e1912a7af32fcfe66 | retrieved comparison and normalized previous ledger |
 | no-council-floor | 664530a11143327a4ce4877bd7be01845afc255490ccc0bb157ae0f3ac8617cd | reconstructed; original base missing |
 
 Five comparisons were retrieved read-only from public GitHub at the recorded exact
@@ -35,7 +35,7 @@ in-memory and reconstructed. No live GitHub review is created.
 Sanitization uses neutral file names and repository/author identifiers, pseudonymous
 SHAs, and removes URLs, original repo names, machine paths, session links and tokens.
 Source model envelopes, prompts and encoded ledgers are not distributed. The
-prior-ledger capture retains only the marker needed to refuse the review.
+prior-ledger capture includes its normalized first-round MINOR entries and the fixing guide delta. The actor and SHA identities remain neutral reconstructions.
 
 `npm run audit:recordings` scans every nested key/value against the denylist, rejects
 URLs and unexpected absolute paths, permits only the explicit virtual bundle paths,

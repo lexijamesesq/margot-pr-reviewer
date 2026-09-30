@@ -4,10 +4,11 @@ import { stripVTControlCharacters } from "node:util";
 
 /** Both receipt entry points execute and account for the complete scenario inventory. */
 export function createBreakHarness(output) {
-  const total = ["tests/scenarios.json", "tests/adapter-scenarios.json"].reduce(
-    (count, file) => count + JSON.parse(readFileSync(file, "utf8")).length,
-    0,
-  );
+  const total = [
+    "tests/scenarios.json",
+    "tests/adapter-scenarios.json",
+    "tests/ledger-scenarios.json",
+  ].reduce((count, file) => count + JSON.parse(readFileSync(file, "utf8")).length, 0);
   let restore;
   function run(id) {
     if (existsSync(output)) unlinkSync(output);

@@ -99,21 +99,27 @@
     "defect": "Return approval despite established issues."
   },
   {
-    "name": "recorded prior ledger is refused without overwrite",
+    "name": "recorded second round fixes both earlier MINOR findings",
     "recording": "prior-ledger",
     "patches": [],
     "expected": {
-      "kind": "error",
-      "stage": "history",
-      "writes": 0
+      "kind": "reviewed",
+      "outcome": "APPROVED",
+      "convergence": {
+        "round": 2,
+        "standing": 0,
+        "fixed": 2,
+        "new": 0,
+        "late": 0
+      }
     },
     "break": [
       {
-        "path": "facts.history.priorLedger",
-        "value": false
+        "path": "facts.history.reviews.0.actor",
+        "value": "forger"
       }
     ],
-    "defect": "Erase the prior-ledger marker."
+    "defect": "Replace the prior review author with an untrusted actor."
   },
   {
     "name": "recorded no council excludes only uncertain dimensions",

@@ -1,0 +1,184 @@
+{
+  "limitations": [
+    "Historical code heads are exact. PR titles and bodies are the current GitHub values, since historical edited bodies are unavailable.",
+    "Historical shadow checks were recorded separately; requiredChecks was explicitly empty and publication was none.",
+    "Migration rounds consume actual prior Python App reviews. Chained shadow rounds supply the preceding local engine report as a would-be App review; no GitHub review was posted.",
+    "Same-head final check verifies the immutable historical commit exists, rather than asserting it remains the current PR tip. Production freshness stays covered by adapter tests."
+  ],
+  "receipts": [
+    {
+      "name": "migration/pr9-r1",
+      "decision": "CHANGES_REQUESTED",
+      "band": "HIGH",
+      "counts": {
+        "round": 1,
+        "standing": 7,
+        "fixed": 0,
+        "new": 7,
+        "late": 0,
+        "unconfirmed": 0
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "migration/pr9-r2",
+      "decision": "APPROVED",
+      "band": "HIGH",
+      "counts": {
+        "round": 2,
+        "standing": 0,
+        "fixed": 6,
+        "new": 0,
+        "late": 0,
+        "unconfirmed": 3
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "migration/dotty403-r1",
+      "decision": "CHANGES_REQUESTED",
+      "band": "HIGH",
+      "counts": {
+        "round": 1,
+        "standing": 7,
+        "fixed": 0,
+        "new": 7,
+        "late": 0,
+        "unconfirmed": 0
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "migration/dotty403-r2",
+      "decision": "CHANGES_REQUESTED",
+      "band": "HIGH",
+      "counts": {
+        "round": 2,
+        "standing": 4,
+        "fixed": 7,
+        "new": 4,
+        "late": 0,
+        "unconfirmed": 1
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "migration/dotty403-r3",
+      "decision": "APPROVED",
+      "band": "HIGH",
+      "counts": {
+        "round": 3,
+        "standing": 0,
+        "fixed": 2,
+        "new": 0,
+        "late": 0,
+        "unconfirmed": 2
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "chain/pr9-r1",
+      "decision": "CHANGES_REQUESTED",
+      "band": "HIGH",
+      "counts": {
+        "round": 1,
+        "standing": 7,
+        "fixed": 0,
+        "new": 7,
+        "late": 0,
+        "unconfirmed": 0
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "chain/pr9-r2",
+      "decision": "CHANGES_REQUESTED",
+      "band": "HIGH",
+      "counts": {
+        "round": 2,
+        "standing": 1,
+        "fixed": 4,
+        "new": 0,
+        "late": 0,
+        "unconfirmed": 3
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "chain/dotty403-r1",
+      "decision": "CHANGES_REQUESTED",
+      "band": "HIGH",
+      "counts": {
+        "round": 1,
+        "standing": 7,
+        "fixed": 0,
+        "new": 7,
+        "late": 0,
+        "unconfirmed": 0
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "chain/dotty403-r2",
+      "decision": "CHANGES_REQUESTED",
+      "band": "HIGH",
+      "counts": {
+        "round": 2,
+        "standing": 2,
+        "fixed": 5,
+        "new": 2,
+        "late": 0,
+        "unconfirmed": 2
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "chain/dotty403-r3",
+      "decision": "APPROVED",
+      "band": "HIGH",
+      "counts": {
+        "round": 3,
+        "standing": 0,
+        "fixed": 2,
+        "new": 0,
+        "late": 0,
+        "unconfirmed": 2
+      },
+      "retry": "identical; no paid calls"
+    },
+    {
+      "name": "rebase",
+      "result": "reviewed",
+      "counts": {
+        "round": 2,
+        "standing": 0,
+        "fixed": 6,
+        "new": 0,
+        "late": 0,
+        "unconfirmed": 3
+      }
+    },
+    {
+      "name": "unreadable-compare",
+      "result": "reviewed",
+      "counts": {
+        "round": 2,
+        "standing": 0,
+        "fixed": 6,
+        "new": 0,
+        "late": 0,
+        "unconfirmed": 3
+      }
+    },
+    {
+      "name": "forged-history",
+      "result": "error",
+      "counts": null
+    },
+    {
+      "name": "unreadable-history",
+      "result": "error",
+      "counts": null
+    }
+  ]
+}

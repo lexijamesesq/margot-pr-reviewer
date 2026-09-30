@@ -1,4 +1,13 @@
 import {
+  configHash,
+  evidenceHash,
+  nextLedger,
+  prepareFindings,
+  roundScope,
+  selectLedger,
+  standingCards,
+} from "./ledger.js";
+import {
   classify,
   decide,
   needsVoice,
@@ -23,7 +32,7 @@ import {
   shaSchema,
   voiceSchema,
 } from "./schemas.js";
-import type { Bundle, Card, Review, ReviewResult, Services, Voice } from "./types.js";
+import type { Bundle, Card, Review, ReviewCore, ReviewResult, Services, Voice } from "./types.js";
 
 /** Validate all external data, including data returned by a typed adapter. */
 export async function review(
@@ -76,8 +85,17 @@ export async function review(
     )
       throw new Error("Facts do not match requested revision");
     stage = "history";
-    if (!facts.history.complete) throw new Error("History unavailable");
-    if (facts.history.priorLedger) throw new Error("Ledger reviews require slice 3");
+    const prior = selectLedger(facts, config);
+    const cached = prior?.head === request.head ? prior.receipt : undefined;
+    if (
+      prior?.head === request.head &&
+      (!cached ||
+        cached.configHash !== configHash(config) ||
+        cached.review.provenance.services !== services.provenance ||
+        cached.evidenceHash !== evidenceHash(facts) ||
+        cached.review.request.base !== request.base)
+    )
+      throw new Error("Same-head history has no compatible saved result");
     stage = "triage";
     if (
       facts.triage &&
@@ -86,13 +104,15 @@ export async function review(
         facts.triage.base !== request.base)
     )
       throw new Error("Untrusted triage receipt");
-    const classification = classify(
-      classificationSchema.parse(
-        await call("classification", (c) => services.classify(facts, classificationQuestions, c)),
-      ),
-      facts,
-      config,
-    );
+    const classification =
+      cached?.review.classification ??
+      classify(
+        classificationSchema.parse(
+          await call("classification", (c) => services.classify(facts, classificationQuestions, c)),
+        ),
+        facts,
+        config,
+      );
     if (request.phase === "triage") return { kind: "classified", request, classification };
     stage = "checks";
     for (const name of config.requiredChecks) {
@@ -108,89 +128,144 @@ export async function review(
       )
         throw new Error(`Required check not trusted and green: ${name}`);
     }
-    const cards: Card[] = [];
-    let rating = rate(null, false, config);
-    let voice: Voice | null = null;
-    let bundle: Bundle | undefined;
-    const loadBundle = async (): Promise<Bundle> => {
-      if (!bundle) {
-        const loaded = bundleSchema.parse(
-          await call("bundle", (c) => services.bundle(config.cardBundle.commit, c)),
+    let comparison: unknown;
+    const compare = services.compare;
+    if (prior && !cached && compare) {
+      try {
+        comparison = await call("compare", (c) => compare(request, prior.head, c));
+      } catch {
+        comparison = undefined;
+      } // Complete full-PR evidence above is the recovery path.
+    }
+    const scope = roundScope(facts, prior, comparison);
+    let result: Review;
+    if (cached && prior) {
+      result = { ...cached.review, ledger: prior, convergence: cached.counts };
+    } else {
+      const cards: Card[] = [];
+      let rating = rate(null, false, config);
+      let voice: Voice | null = null;
+      let bundle: Bundle | undefined;
+      const loadBundle = async (): Promise<Bundle> => {
+        if (!bundle) {
+          const loaded = bundleSchema.parse(
+            await call("bundle", (c) => services.bundle(config.cardBundle.commit, c)),
+          );
+          if (loaded.commit !== config.cardBundle.commit)
+            throw new Error("Card bundle pin mismatch");
+          bundle = loaded;
+        }
+        return bundle;
+      };
+      const recalled = standingCards(scope);
+      if (reviewPath(classification, null, config).routing || recalled.length > 0) {
+        const { documentationSubstantive: _documentationSubstantive, ...functionalRouteQuestions } =
+          routeQuestions;
+        const questions =
+          classification === "documentation" ? routeQuestions : functionalRouteQuestions;
+        const scopedFacts = {
+          ...facts,
+          diff: scope.diff || "No delta on this PR",
+          files: scope.files,
+          fileCount: scope.files.length,
+        };
+        const route = routeSchema.parse(
+          await call("route", (c) => services.route(scopedFacts, classification, questions, c)),
         );
-        if (loaded.commit !== config.cardBundle.commit) throw new Error("Card bundle pin mismatch");
-        bundle = loaded;
-      }
-      return bundle;
-    };
-    if (reviewPath(classification, null, config).routing) {
-      const { documentationSubstantive: _documentationSubstantive, ...functionalRouteQuestions } =
-        routeQuestions;
-      const questions =
-        classification === "documentation" ? routeQuestions : functionalRouteQuestions;
-      const route = routeSchema.parse(
-        await call("route", (c) => services.route(facts, classification, questions, c)),
-      );
-      const path = reviewPath(classification, route, config);
-      if (path.council) {
-        const selected = selectCards(route, classification, config);
-        if (selected.length > 0) {
-          const resolved = await loadBundle();
-          for (const name of selected) {
-            const card = cardSchema.parse(
-              await call(`card:${name}`, (c) =>
-                services.card(
+        const path = reviewPath(classification, route, config);
+        if (path.council || recalled.length > 0) {
+          const selected = [
+            ...new Set([
+              ...(path.council ? selectCards(route, classification, config) : []),
+              ...recalled,
+            ]),
+          ];
+          if (selected.length > 0) {
+            const resolved = await loadBundle();
+            const completed = await Promise.allSettled(
+              selected.map(async (name) => {
+                const card = cardSchema.parse(
+                  await call(`card:${name}`, (c) =>
+                    services.card(
+                      {
+                        facts: {
+                          ...scopedFacts,
+                          history: { complete: true, priorLedger: prior !== null },
+                        },
+                        name,
+                        classification,
+                        cardPath: resolved.cardPaths[name],
+                        agent: resolved.reviewerAgent,
+                        round: {
+                          ...scope,
+                          entries: scope.entries.filter(
+                            (e) => e.card === name && ["standing", "dismissed"].includes(e.status),
+                          ),
+                        },
+                      },
+                      c,
+                    ),
+                  ),
+                );
+                if (card.name !== name) throw new Error("Wrong card returned");
+                return card;
+              }),
+            );
+            for (const [index, completion] of completed.entries()) {
+              if (completion.status === "rejected") {
+                stage = `card:${selected[index]}`;
+                throw completion.reason;
+              }
+              cards.push(completion.value);
+            }
+            stage = "cards";
+            prepareFindings(cards, scope);
+            const ids = cards.flatMap((c) => c.findings.map((f) => f.id));
+            if (new Set(ids).size !== ids.length) throw new Error("Duplicate finding IDs");
+          }
+          if (path.risk)
+            rating = rate(
+              riskSchema.parse(
+                await call("risk", (c) => services.risk(facts, cards, riskQuestions, c)),
+              ),
+              cards.length === 0,
+              config,
+            );
+          if (needsVoice(cards, rating, route.confidence, config)) {
+            const resolved = await loadBundle();
+            voice = voiceSchema.parse(
+              await call("voice", (c) =>
+                services.voice(
                   {
-                    facts,
-                    name,
+                    facts: { ...facts, history: { complete: true, priorLedger: prior !== null } },
                     classification,
-                    cardPath: resolved.cardPaths[name],
-                    agent: resolved.reviewerAgent,
+                    cards,
+                    rating,
+                    agent: resolved.voiceAgent,
+                    round: scope,
                   },
                   c,
                 ),
               ),
             );
-            if (card.name !== name) throw new Error("Wrong card returned");
-            cards.push(card);
+            validateVoice(cards, voice);
           }
-          stage = "cards";
-          const ids = cards.flatMap((c) => c.findings.map((f) => f.id));
-          if (new Set(ids).size !== ids.length) throw new Error("Duplicate finding IDs");
-        }
-        if (path.risk)
-          rating = rate(
-            riskSchema.parse(
-              await call("risk", (c) => services.risk(facts, cards, riskQuestions, c)),
-            ),
-            cards.length === 0,
-            config,
-          );
-        if (needsVoice(cards, rating, route.confidence, config)) {
-          const resolved = await loadBundle();
-          voice = voiceSchema.parse(
-            await call("voice", (c) =>
-              services.voice(
-                { facts, classification, cards, rating, agent: resolved.voiceAgent },
-                c,
-              ),
-            ),
-          );
-          validateVoice(cards, voice);
         }
       }
+      const core: ReviewCore = {
+        request,
+        classification,
+        cards,
+        voice,
+        decision: decide(classification, facts, config, rating, voice),
+        provenance: {
+          cardBundle: config.cardBundle.commit,
+          classification: "fresh-jev",
+          services: services.provenance,
+        },
+      };
+      result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
-    const result: Review = {
-      request,
-      classification,
-      cards,
-      voice,
-      decision: decide(classification, facts, config, rating, voice),
-      provenance: {
-        cardBundle: config.cardBundle.commit,
-        classification: "fresh-jev",
-        services: services.provenance,
-      },
-    };
     const report = render(result);
     let publication = null;
     if (

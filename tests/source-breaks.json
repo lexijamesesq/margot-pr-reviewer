@@ -90,5 +90,32 @@
     "tests": [
       "Voice prose preserves finding IDs and dispositions"
     ]
+  },
+  {
+    "name": "disabled ledger author authentication",
+    "file": "src/ledger.ts",
+    "from": "if (review.actorType !== \"Bot\" || !config.trustedLedgerActors.includes(review.actor))",
+    "to": "if (false)",
+    "tests": [
+      "Forged author cannot supply ledger history"
+    ]
+  },
+  {
+    "name": "removed round-two MINOR demotion",
+    "file": "src/ledger.ts",
+    "from": "else if (finding.severity === \"MINOR\")",
+    "to": "else if (false)",
+    "tests": [
+      "Round two MINOR is advisory"
+    ]
+  },
+  {
+    "name": "silently dropped MAJOR verification",
+    "file": "src/ledger.ts",
+    "from": "if (scope.round >= 2 && entry.severity === \"MINOR\") continue;",
+    "to": "if (scope.round >= 2) continue;",
+    "tests": [
+      "Silent MAJOR returns to voice for confirmation"
+    ]
   }
 ]

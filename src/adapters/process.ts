@@ -4,13 +4,14 @@ import { execFile } from "node:child_process";
 export function execute(
   file: string,
   args: string[],
-  options: { signal?: AbortSignal; cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  options: { signal?: AbortSignal; cwd?: string; env?: NodeJS.ProcessEnv; input?: string } = {},
 ): Promise<string> {
+  const { input, ...spawnOptions } = options;
   return new Promise((resolve, reject) => {
     const child = execFile(
       file,
       args,
-      { ...options, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
+      { ...spawnOptions, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
       (error, stdout) => {
         if (error)
           reject(
@@ -19,6 +20,7 @@ export function execute(
         else resolve(stdout);
       },
     );
-    child.stdin?.end();
+    child.stdin?.on("error", () => {}); // Process exit is reported through the callback.
+    child.stdin?.end(input);
   });
 }

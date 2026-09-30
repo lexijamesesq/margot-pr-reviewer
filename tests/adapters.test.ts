@@ -497,6 +497,14 @@ async function fakeClaude(
         classification: "functional",
         cardPath: join(root, "skills/pr-council/playbooks/safety.md"),
         agent: "publish:pr-reviewer",
+        round: {
+          round: 1,
+          priorHead: null,
+          full: true,
+          diff: facts.diff,
+          files: facts.files,
+          entries: [],
+        },
       },
       context(),
     );

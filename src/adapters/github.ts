@@ -49,6 +49,23 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
   const pull = async (r: ReviewRequest, c: CallContext) =>
     (await client.rest.pulls.get(params(r, c))).data;
   return {
+    async compare(r: ReviewRequest, priorHead: string, c: CallContext) {
+      const p = { ...params(r, c), basehead: `${priorHead}...${r.head}` };
+      const [metadata, diff] = await Promise.all([
+        client.rest.repos.compareCommitsWithBasehead(p),
+        client.request("GET /repos/{owner}/{repo}/compare/{basehead}", {
+          ...p,
+          mediaType: { format: "diff" },
+        }),
+      ]);
+      return {
+        base: priorHead,
+        head: r.head,
+        status: metadata.data.status,
+        diff: diff.data,
+        complete: true,
+      };
+    },
     async head(r: ReviewRequest, c: CallContext) {
       const current = await pull(r, c);
       if (
@@ -153,6 +170,20 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
           complete: true,
           priorLedger:
             !options.freshShadow && reviews.some((r) => r.body.includes("margot-ledger:")),
+          ...(!options.freshShadow
+            ? {
+                reviews: reviews
+                  .filter((r) => r.submitted_at)
+                  .map((r) => ({
+                    id: r.id,
+                    actor: r.user?.login ?? "unknown",
+                    actorType: r.user?.type ?? "unknown",
+                    head: r.commit_id,
+                    submittedAt: r.submitted_at,
+                    body: r.body,
+                  })),
+              }
+            : {}),
         },
         triage: null,
         autoMergeArmed: before.auto_merge !== null,
