@@ -194,7 +194,7 @@ scenario(
     );
     return {
       kind: x.result.kind,
-      approveBeforeSuccess: approve >= 0 && success > approve,
+      successBeforeApprove: success >= 0 && approve > success,
       head: x.writes.find((w) => w.body.event === "APPROVE")?.body.commit_id,
       merged: x.writes.some(
         (w) =>
@@ -203,7 +203,7 @@ scenario(
       ),
     };
   },
-  { kind: "reviewed", approveBeforeSuccess: true, head: r.head, merged: false },
+  { kind: "reviewed", successBeforeApprove: true, head: r.head, merged: false },
 );
 scenario(
   "pub-hold",
@@ -259,7 +259,7 @@ for (const mode of ["head", "start-fail", "review-fail", "disarm-fail", "identit
     },
     { kind: "error", approved: false },
   );
-for (const mode of ["final-fail", "error", "receipt"])
+for (const mode of ["error", "receipt"])
   scenario(
     `pub-${mode}`,
     async (b) => {
@@ -540,4 +540,17 @@ scenario(
     return { advisory: card.findings[0]?.advisory };
   },
   { advisory: "late-non-blocking" },
+);
+
+scenario(
+  "pub-final-fail",
+  async (b) => {
+    const x = await wire("final-fail", b);
+    return {
+      kind: x.result.kind,
+      conclusion: x.final?.conclusion,
+      reviewWrites: x.writes.filter((w) => w.path.endsWith("/reviews")).length,
+    };
+  },
+  { kind: "error", conclusion: "action_required", reviewWrites: 0 },
 );

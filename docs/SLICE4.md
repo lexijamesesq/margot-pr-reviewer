@@ -26,8 +26,8 @@ The check names and App identity are supplied by the instance. The publisher tak
 over the caller's pending check by name, App and head, marks run ownership, and
 rejects a superseded writer. Earlier App approvals are withdrawn before evaluating
 again. The native review carries `commit_id`; every write rechecks head, base,
-fork, draft and open status. The required review check is the last affirmative
-write, after a confirmed native approval. Held decisions use COMMENT and neutral;
+fork, draft and open status. The native approval is the last publication
+write, after every check write is confirmed. Held decisions use COMMENT and neutral;
 errors use action_required. Self-instrument holds are neutral; triage JSON retains
 `decision_source`, `head_sha`, `classification` and `mechanical` for estate readers.
 

@@ -1,16 +1,16 @@
 # Publication and tally break receipts
 
-Generated 2026-09-30T19:44:01.981Z, Node v26.3.1. Baseline and restored suite: 237/237 passed. Each of 28 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-09-30T19:49:02.925Z, Node v26.3.1. Baseline and restored suite: 237/237 passed. Each of 28 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Publication uses the real Octokit client against a recorded HTTP transport. No live GitHub writes occur. The tally source mutation deliberately adds one to Closed; reconciliation must fail.
 
 Most breaks are controlled service/input counterexamples selected by MARGOT_ADAPTER_BREAK; error cases repair their bad input. They do not claim exhaustive source mutation coverage or independence. Declared source mutations are identified in the manifest. No live service or paid model call occurs in the harness.
 
-Manifest SHA-256: d178761d59389fc56f276334dc793c6fd5f8fcb281e0128e43263e85e0e72b93. Reproduce: npm run test:publication-breaks.
+Manifest SHA-256: bd42fe7b9340cfd4146e7a5ecc22e1d0b7bdfe67bf09d4de55dc9fcb530bd14d. Reproduce: npm run test:publication-breaks.
 
 | Test | Deliberate break | Observed |
 | --- | --- | --- |
-| Clearance writes an SHA-bound approval before the final success | Change the result to a held decision | 1 failed; 236 passed |
+| Clearance confirms all checks before the SHA-bound approval | Change the result to a held decision | 1 failed; 236 passed |
 | Held review disarms auto-merge and comments with neutral checks | Remove the hold | 1 failed; 236 passed |
 | Authority hold remains neutral on the self-instrument check | Remove the authority hold | 1 failed; 236 passed |
 | Calibration cannot satisfy the review check | Remove calibration hold | 1 failed; 236 passed |
@@ -22,7 +22,7 @@ Manifest SHA-256: d178761d59389fc56f276334dc793c6fd5f8fcb281e0128e43263e85e0e72b
 | Head movement before approval fails closed | Stop moving the head | 1 failed; 236 passed |
 | Failure to create the pending gate stops evaluation | Allow the initial check write | 1 failed; 236 passed |
 | Failed native review never completes a success check | Allow review write | 1 failed; 236 passed |
-| Failed final check dismisses the posted approval | Allow the final check write | 1 failed; 236 passed |
+| A failed final check cannot leave an approving review | Allow the final check write | 1 failed; 236 passed |
 | Unconfirmed auto-merge disable cannot publish a held verdict | Confirm the disable | 1 failed; 236 passed |
 | Evaluation error withdraws earlier approval and closes the gate | Return the clean review | 1 failed; 236 passed |
 | A wrong-App check receipt cannot approve | Return the configured App identity | 1 failed; 236 passed |

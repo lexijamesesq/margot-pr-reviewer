@@ -1,7 +1,7 @@
 [
   {
     "id": "pub-clear",
-    "name": "Clearance writes an SHA-bound approval before the final success",
+    "name": "Clearance confirms all checks before the SHA-bound approval",
     "defect": "Change the result to a held decision"
   },
   {
@@ -61,7 +61,7 @@
   },
   {
     "id": "pub-final-fail",
-    "name": "Failed final check dismisses the posted approval",
+    "name": "A failed final check cannot leave an approving review",
     "defect": "Allow the final check write"
   },
   {

@@ -9,7 +9,7 @@ old finding tally with New, Open, Closed that reconcile with the listed issues.
 
 Added an Octokit publisher that adopts the caller's pending check by App/name/head,
 fences superseded runs, withdraws earlier App approvals, confirms hold disarming,
-posts the SHA-bound native review and completes the required check last. Errors
+completes the check writes and posts the SHA-bound native approval last. Errors
 attempt independent cleanup and remain errors if cleanup fails. Held reviews use
 COMMENT plus neutral; only eligible results APPROVE plus success. No merge or
 enable-auto-merge path exists. Check names and App identity are caller configuration.

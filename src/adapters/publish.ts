@@ -75,6 +75,8 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     // Save a valid ID even if other response fields are wrong, for error cleanup.
     if (Number.isSafeInteger(data.id)) ids.set(name, data.id);
     if (
+      !Number.isSafeInteger(data.id) ||
+      data.id <= 0 ||
       data.head_sha !== r.head ||
       data.name !== name ||
       data.app?.id !== config.appId ||
@@ -149,22 +151,8 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       undefined,
       c,
     );
-    await guard(r, c);
-    const { data } = await client.rest.pulls.createReview({
-      ...params(r, c),
-      commit_id: r.head,
-      event: decision.mergeEligible ? "APPROVE" : "COMMENT",
-      body: report,
-    });
-    if (decision.mergeEligible && Number.isSafeInteger(data.id)) approvalId = data.id;
-    if (
-      data.commit_id !== r.head ||
-      data.user?.login !== config.actor ||
-      data.user.type !== "Bot" ||
-      data.state !== (decision.mergeEligible ? "APPROVED" : "COMMENTED")
-    )
-      throw new Error("Invalid native review receipt");
-    // The required check is the last affirmative write, after the native review exists.
+    // Complete all check writes before the approving review. The review-count rule
+    // must hold even when the review check is informational, not required.
     await check(
       r,
       config.checks.review,
@@ -178,6 +166,23 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       undefined,
       c,
     );
+    await guard(r, c);
+    const { data } = await client.rest.pulls.createReview({
+      ...params(r, c),
+      commit_id: r.head,
+      event: decision.mergeEligible ? "APPROVE" : "COMMENT",
+      body: report,
+    });
+    if (decision.mergeEligible && Number.isSafeInteger(data.id)) approvalId = data.id;
+    if (
+      !Number.isSafeInteger(data.id) ||
+      data.id <= 0 ||
+      data.commit_id !== r.head ||
+      data.user?.login !== config.actor ||
+      data.user.type !== "Bot" ||
+      data.state !== (decision.mergeEligible ? "APPROVED" : "COMMENTED")
+    )
+      throw new Error("Invalid native review receipt");
     await guard(r, c);
     return { recorded: false, head: r.head, id: String(data.id) };
   };

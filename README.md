@@ -240,7 +240,7 @@ The publisher adopts the caller's check by App, name and head, records run
 ownership and refuses to let a superseded invocation close the newer run's check.
 It withdraws earlier App approvals before reevaluation, keeps the required check
 pending, then publishes classification, authority status and the SHA-bound native
-review. The final review check succeeds only after an eligible approval is posted.
+review. Every check write must succeed before the eligible native approval is posted.
 Reviewed holds use COMMENT and neutral; errors use action_required. It never
 requests changes at GitHub's review gate, enables auto-merge, or merges.
 Every write rechecks head/base and admission. Partial failures attempt to disarm,
