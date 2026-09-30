@@ -1,46 +1,23 @@
----
-tags:
-  - type/claude-repo
-description: "{What this repo is and what it builds — one or two sentences.}"
-docs_home: "{workspace_root}/{path to the paired vault knowledge-home folder} — the {workspace_root} placeholder form, not a literal expanded path (a git-tracked file encoding the operator's real local vault path trips the operator-infra-path gitleaks rule, in any repo regardless of visibility). Omit only if this repo genuinely has no vault knowledge home."
----
+# Margot PR reviewer
 
-# {Repo Name}
+This package owns first-round review decisions. Slice 1 uses recorded services;
+GitHub, Jev, Claude and production deployment are not implemented here yet.
 
-{One paragraph: what this repo is, what it builds/ships, who/what consumes it. A session, engine, or CI runner with zero other context should understand the repo's purpose from this paragraph alone.}
+## Setup and checks
 
-## Setup
+Use Node 22 or later. Run `npm ci`, `npm run build`, `npm run typecheck` and
+`npm test`. Run `npm run test:breaks` to reproduce every deliberate-break receipt.
+The README explains package installation, API configuration and live prerequisites.
 
-{How to get from a fresh clone to a working local environment — install steps, dependencies, required tools. Copy any `*.sample.*`/`*.example.*` config files to their real names and fill in values (see Configuration below).}
+## Boundaries
 
-## Configuration
+- `src/review.ts` orchestrates validation, service deadlines and publication.
+- `src/policy.ts` owns classification, routing, rating and clearance decisions.
+- `src/questions.ts` owns Jev questions. Cards and voice stay in publish-skills.
+- `src/schemas.ts` is the source of runtime schemas and inferred data types.
+- `src/adapters/recorded.ts` records calls and publication without network access.
 
-{Config keys skills/code read at runtime, by key name — not hardcoded. Sensitive values referenced by path (1Password, env var), never inlined. Mirrors the `*.sample.*` files this repo ships for consumers.}
-
-```yaml
-# example
-some.config.key: "value or op://vault/item/field reference"
-```
-
-## Build / Test
-
-{Exact commands to build and run the test suite locally. If there's more than one (lint, unit, integration), name each and what it checks.}
-
-## CI
-
-{What runs on every PR, what's required to merge, where the workflow/ruleset config lives. Point at `.github/workflows/` rather than duplicating the YAML — this section names the shape (checks, required-status gate), not the implementation.}
-
-## Conventions
-
-{Code style, commit message shape, branch naming, anything a contributor or an autonomous session would get wrong by guessing. Only what's genuinely non-obvious — skip anything a linter already enforces.}
-
-## Workflow Cadence
-
-{Recurring operational rhythms, if this repo has any — e.g. "run `/skill-name` monthly," a deploy cadence, a scheduled job. Omit entirely if the repo has none (most don't).}
-
-## Key Files
-
-{Only files a session can't discover from the filesystem — non-obvious paths, entry points, generated files that shouldn't be hand-edited.}
-
-| File | Purpose |
-| ---- | ------- |
+Do not turn a missing or failed response into empty success. Never enable merging.
+Prior ledger history is refused until convergence is implemented. Treat recordings
+as external inputs, including those with reconstructed evidence. No live service
+calls belong in tests. Install hooks with `pre-commit install`; fix all findings.

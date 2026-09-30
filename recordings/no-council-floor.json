@@ -1,0 +1,161 @@
+{
+  "provenance": "Historical capture 7; normalized card/risk/voice outputs; reconstructed complete inputs and publication; synthetic functional adaptation",
+  "request": {
+    "repository": "example/project",
+    "pr": 7,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000007",
+    "phase": "review"
+  },
+  "config": {
+    "protectedPaths": [],
+    "trustedCheckActors": [
+      "checks-app"
+    ],
+    "trustedTriageActors": [
+      "triage-app"
+    ],
+    "requiredChecks": [
+      "ci"
+    ],
+    "cardBundle": {
+      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+    },
+    "classificationThreshold": 0.6,
+    "routeThreshold": 0.35,
+    "riskTailThreshold": 0.3,
+    "confidenceThreshold": 0.3,
+    "noCouncilConfidenceFloor": 0.3,
+    "timeoutMs": 1000,
+    "publication": "record",
+    "calibration": false
+  },
+  "facts": {
+    "repository": "example/project",
+    "pr": 7,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000007",
+    "title": "docs: clarify the README",
+    "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
+    "author": "contributor",
+    "diff": "Reconstructed evidence: Change a bounded runtime behavior (synthetic functional confidence-floor case).",
+    "complete": true,
+    "fileCount": 1,
+    "files": [
+      {
+        "path": "README.md"
+      }
+    ],
+    "checks": [
+      {
+        "name": "ci",
+        "actor": "checks-app",
+        "head": "0000000000000000000000000000000000000007",
+        "conclusion": "success"
+      }
+    ],
+    "history": {
+      "complete": true,
+      "priorLedger": false
+    },
+    "triage": null,
+    "autoMergeArmed": true
+  },
+  "classification": {
+    "source": "jev",
+    "functional": 1,
+    "documentation": 0,
+    "mechanical": 0
+  },
+  "route": {
+    "source": "jev",
+    "cards": {
+      "safety": 0.05,
+      "works-and-proven": 0.32,
+      "principal-engineer": 0.12,
+      "achieves-the-objective": 0.22,
+      "maintainable-no-slop": 0.15,
+      "house-style": 0.27
+    },
+    "confidence": 0.99,
+    "documentationSubstantive": null
+  },
+  "risk": {
+    "source": "jev",
+    "dimensions": {
+      "blast_radius": {
+        "probabilities": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "confidence": 1.0
+      },
+      "reversibility": {
+        "probabilities": [
+          0.39,
+          0.61,
+          0.0,
+          0.0
+        ],
+        "confidence": 0.61
+      },
+      "data_security": {
+        "probabilities": [
+          0.89,
+          0.11,
+          0.0,
+          0.0
+        ],
+        "confidence": 0.89
+      },
+      "operations": {
+        "probabilities": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "confidence": 0.99
+      },
+      "verification_gap": {
+        "probabilities": [
+          0.55,
+          0.11,
+          0.23,
+          0.11
+        ],
+        "confidence": 0.1
+      }
+    }
+  },
+  "bundle": {
+    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "reviewerAgent": "publish:pr-reviewer",
+    "voiceAgent": "publish:margot",
+    "cardPaths": {
+      "safety": "/recorded-bundle/skills/pr-council/playbooks/safety.md",
+      "works-and-proven": "/recorded-bundle/skills/pr-council/playbooks/works-and-proven.md",
+      "principal-engineer": "/recorded-bundle/skills/pr-council/playbooks/principal-engineer.md",
+      "achieves-the-objective": "/recorded-bundle/skills/pr-council/playbooks/achieves-the-objective.md",
+      "maintainable-no-slop": "/recorded-bundle/skills/pr-council/playbooks/maintainable-no-slop.md",
+      "house-style": "/recorded-bundle/skills/pr-council/playbooks/house-style.md"
+    }
+  },
+  "cards": {},
+  "voice": {
+    "outcome": "APPROVED",
+    "band": "LOW",
+    "rationale": "Synthetic unused voice",
+    "summary": "No voice expected.",
+    "dispositions": []
+  },
+  "head": "0000000000000000000000000000000000000007",
+  "disableAutoMerge": true,
+  "publication": {
+    "head": "0000000000000000000000000000000000000007",
+    "recorded": true,
+    "id": "recorded-7"
+  }
+}

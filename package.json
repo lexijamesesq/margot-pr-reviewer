@@ -1,0 +1,42 @@
+{
+  "name": "margot-pr-reviewer",
+  "version": "0.1.0-slice1",
+  "description": "Margot's first-round PR review engine with recorded services",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./recordings/*": "./recordings/*"
+  },
+  "files": [
+    "dist",
+    "recordings",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:breaks": "node scripts/breaks.mjs",
+    "prepack": "npm run build",
+    "audit:recordings": "node scripts/audit-recordings.mjs"
+  },
+  "dependencies": {
+    "picomatch": "4.0.7",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@types/node": "22.20.4",
+    "@types/picomatch": "4.0.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

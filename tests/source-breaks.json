@@ -1,0 +1,49 @@
+[
+  {
+    "name": "reversed classification precedence",
+    "file": "src/policy.ts",
+    "from": "classNames.find((name) => answer[name] >= config.classificationThreshold)",
+    "to": "[...classNames].reverse().find((name) => answer[name] >= config.classificationThreshold)",
+    "tests": [
+      "functional takes precedence over other confident classes",
+      "documentation takes precedence over mechanical"
+    ]
+  },
+  {
+    "name": "forced documentation band",
+    "file": "src/policy.ts",
+    "from": "band: classification === \"documentation\" ? \"LOW\" : voice.band,",
+    "to": "band: classification === \"documentation\" ? \"HIGH\" : voice.band,",
+    "tests": [
+      "documentation defects go to the author at LOW",
+      "documentation questions request clarification at LOW"
+    ]
+  },
+  {
+    "name": "always-true routing",
+    "file": "src/policy.ts",
+    "from": "routing: classification !== \"mechanical\",",
+    "to": "routing: true,",
+    "tests": [
+      "recorded mechanical bump spends no Claude"
+    ]
+  },
+  {
+    "name": "dropped old-path rename check",
+    "file": "src/policy.ts",
+    "from": "(protectedPath(f.path) || protectedPath(f.previousPath))",
+    "to": "protectedPath(f.path)",
+    "tests": [
+      "protected old rename path always holds"
+    ]
+  },
+  {
+    "name": "disabled LOW-band confidence escalation",
+    "file": "src/policy.ts",
+    "from": "rating.evidence !== null &&",
+    "to": "false &&",
+    "tests": [
+      "LOW council risk with uncertain dimension requires voice"
+    ]
+  }
+]

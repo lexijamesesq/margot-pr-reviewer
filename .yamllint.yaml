@@ -1,3 +1,4 @@
+---
 # Minimal relaxed config for the yamllint pre-commit hook (see
 # .pre-commit-config.yaml). Extends yamllint's own `default` rule set and
 # disables only the one rule that is noisy on long generated/data lines

@@ -1,0 +1,209 @@
+{
+  "provenance": "Historical capture 6; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication. Second-round history is refused.",
+  "request": {
+    "repository": "example/project",
+    "pr": 6,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000006",
+    "phase": "review"
+  },
+  "config": {
+    "protectedPaths": [],
+    "trustedCheckActors": [
+      "checks-app"
+    ],
+    "trustedTriageActors": [
+      "triage-app"
+    ],
+    "requiredChecks": [
+      "ci"
+    ],
+    "cardBundle": {
+      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+    },
+    "classificationThreshold": 0.6,
+    "routeThreshold": 0.35,
+    "riskTailThreshold": 0.3,
+    "confidenceThreshold": 0.3,
+    "noCouncilConfidenceFloor": 0.3,
+    "timeoutMs": 1000,
+    "publication": "record",
+    "calibration": false
+  },
+  "facts": {
+    "repository": "example/project",
+    "pr": 6,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000006",
+    "title": "ci: drop the aggregator job; the required checks name the jobs directly",
+    "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
+    "author": "contributor",
+    "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex b355f6a..b01089f 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -30,34 +30,6 @@ jobs:\n       project_ref: v1\n       check_name: checks\n \n-  all-checks-passed:\n-    name: ci / all-passed\n-    needs: [floor, ruff, shellcheck]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Require every dependency to have succeeded (a job skipped on a mechanical PR is satisfied)\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-          MECHANICAL: ${{ needs.floor.outputs.mechanical }}\n-          EVENT: ${{ github.event_name }}\n-        run: |\n-          set -euo pipefail\n-          # A skipped job is satisfied on a mechanical PR (the floor skipped\n-          # it) and on any non-PR event (a push to the default branch, where\n-          # any job skipped by its own `if:` is not a PR's failure); on a\n-          # functional PR a skipped job is a failure.\n-          bad=\"$(jq -r --arg mech \"$MECHANICAL\" --arg event \"$EVENT\" '\n-            to_entries[]\n-            | select(.value.result == \"failure\" or .value.result == \"cancelled\"\n-                     or (.value.result == \"skipped\" and $mech != \"true\" and $event == \"pull_request\"))\n-            | .key' <<<\"$RESULTS\")\"\n-          if [[ -n \"$bad\" ]]; then\n-            echo \"required job(s) not satisfied: $bad\"\n-            exit 1\n-          fi\n-          echo \"all checks passed (event=${EVENT} mechanical=${MECHANICAL:-false})\"\n-\n   ruff:\n     name: ci / ruff\n     needs: [floor]\ndiff --git a/GUIDE.md b/GUIDE.md\nindex a597119..c1907e7 100644\n--- a/GUIDE.md\n+++ b/GUIDE.md\n@@ -37,7 +37,7 @@ pre-commit run --all-files  # gitleaks-staged + the standard hook set\n \n ## CI\n \n-`.github/workflows/ci.yml`, required via the \"Protect main\" ruleset through `all-checks-passed`: the organization's shared `floor` job, plus this repo's own `ruff` (Python lint) and `shellcheck` (`ludeeus/action-shellcheck`, no-op today \u2014 no `.sh` files yet, kept for when scripts are added). PR-time secret scanning is the trusted lane's `trusted-scan` (`gate.yml`), a separate required check.\n+`.github/workflows/ci.yml`, required via the \"Protect main\" ruleset: the organization's shared `floor` job (`ci / checks`), plus this repo's own `ruff` (`ci / ruff`, Python lint) and `shellcheck` (`ci / shellcheck`, `ludeeus/action-shellcheck`, no-op today \u2014 no `.sh` files yet, kept for when scripts are added). The ruleset requires each job's check directly; a new job needs its check added to the ruleset in project's `rulesets/default-branch.json`. PR-time secret scanning is the trusted lane's `trusted-scan` (`gate.yml`), a separate required check.\n \n ## Conventions\n \n",
+    "complete": true,
+    "fileCount": 2,
+    "files": [
+      {
+        "path": ".github/workflows/ci.yml"
+      },
+      {
+        "path": "GUIDE.md"
+      }
+    ],
+    "checks": [
+      {
+        "name": "ci",
+        "actor": "checks-app",
+        "head": "0000000000000000000000000000000000000006",
+        "conclusion": "success"
+      }
+    ],
+    "history": {
+      "complete": true,
+      "priorLedger": true
+    },
+    "triage": null,
+    "autoMergeArmed": true
+  },
+  "classification": {
+    "source": "jev",
+    "functional": 1,
+    "documentation": 0,
+    "mechanical": 0
+  },
+  "route": {
+    "source": "jev",
+    "cards": {
+      "safety": 0.59,
+      "works-and-proven": 0.78,
+      "principal-engineer": 0.57,
+      "achieves-the-objective": 0.28,
+      "maintainable-no-slop": 0.37,
+      "house-style": 0.3
+    },
+    "confidence": 0.5,
+    "documentationSubstantive": null
+  },
+  "risk": {
+    "source": "jev",
+    "dimensions": {
+      "blast_radius": {
+        "probabilities": [
+          0.64,
+          0.25,
+          0.05,
+          0.06
+        ],
+        "confidence": 0.48
+      },
+      "reversibility": {
+        "probabilities": [
+          0.24,
+          0.76,
+          0.0,
+          0.0
+        ],
+        "confidence": 0.76
+      },
+      "data_security": {
+        "probabilities": [
+          0.24,
+          0.76,
+          0.0,
+          0.0
+        ],
+        "confidence": 0.76
+      },
+      "operations": {
+        "probabilities": [
+          0.75,
+          0.04,
+          0.21,
+          0.0
+        ],
+        "confidence": 0.52
+      },
+      "verification_gap": {
+        "probabilities": [
+          0.1,
+          0.7,
+          0.19,
+          0.01
+        ],
+        "confidence": 0.7
+      }
+    }
+  },
+  "bundle": {
+    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "reviewerAgent": "publish:pr-reviewer",
+    "voiceAgent": "publish:margot",
+    "cardPaths": {
+      "safety": "/recorded-bundle/skills/pr-council/playbooks/safety.md",
+      "works-and-proven": "/recorded-bundle/skills/pr-council/playbooks/works-and-proven.md",
+      "principal-engineer": "/recorded-bundle/skills/pr-council/playbooks/principal-engineer.md",
+      "achieves-the-objective": "/recorded-bundle/skills/pr-council/playbooks/achieves-the-objective.md",
+      "maintainable-no-slop": "/recorded-bundle/skills/pr-council/playbooks/maintainable-no-slop.md",
+      "house-style": "/recorded-bundle/skills/pr-council/playbooks/house-style.md"
+    }
+  },
+  "cards": {
+    "safety": {
+      "name": "safety",
+      "completion": "completed",
+      "checked": [
+        "Secret-scan coverage: the floor's receipt shows `trusted-scan / trusted-scan` succeeded on head 0682d5d, which runs gitleaks over the PR diff. The only file in the delta is `GUIDE.md`, and a skim of its one changed hunk (line 40) found no key-, token- or credential-shaped content. This would have caught a secret committed in the doc edit."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    },
+    "works-and-proven": {
+      "name": "works-and-proven",
+      "completion": "completed",
+      "checked": [
+        "Compared the documented check names in the delta (`GUIDE.md:40`) with the job `name:` values in `.github/workflows/ci.yml` at head 0682d5d. The docs list `ci / checks` (floor job `name: ci` + `check_name: checks`), `ci / ruff` and `ci / shellcheck`, and the workflow produces exactly those. This would have caught docs naming a check the workflow no longer reports, such as a leftover mention of `all-checks-passed` or `ci / all-passed`, or a wrong composite name for the floor job."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    },
+    "principal-engineer": {
+      "name": "principal-engineer",
+      "completion": "completed",
+      "checked": [
+        "Compared the reviewed head e5ee16d with head 0682d5d (only `GUIDE.md` changed) and read `GUIDE.md:40` at the head sha. This would have caught the R1-F1 stale reference to `all-checks-passed` still being there, or a new wrong description of the gate. The line no longer names the aggregator. It now describes the gate as each job's check, required directly."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    },
+    "maintainable-no-slop": {
+      "name": "maintainable-no-slop",
+      "completion": "completed",
+      "checked": [
+        "Compared the delta `e5ee16d...0682d5d` (GUIDE.md only) and read `GUIDE.md:40` at the head sha against `.github/workflows/ci.yml` at the head sha. Each check name the guide gives must match what the workflow reports: `floor` job `name: ci` plus `check_name: checks` gives `ci / checks`, and the other two jobs are `ci / ruff` and `ci / shellcheck`. This would have caught comment drift, where the rewritten guide names a check or job the workflow does not report."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    }
+  },
+  "voice": {
+    "outcome": "APPROVED",
+    "band": "LOW",
+    "rationale": "Recorded risk judgment",
+    "summary": "Reviewed against the summoned lenses; no blocking findings.",
+    "dispositions": []
+  },
+  "head": "0000000000000000000000000000000000000006",
+  "disableAutoMerge": true,
+  "publication": {
+    "head": "0000000000000000000000000000000000000006",
+    "recorded": true,
+    "id": "recorded-6"
+  }
+}
