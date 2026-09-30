@@ -4,8 +4,9 @@
 
 Run first-round Margot reviews on the operator's real PRs through live GitHub,
 Jev and Claude Code adapters, with all publication recorded locally. Python
-keeps production authority. Slice 2 acceptance is not yet complete: live
-functional risk and voice scoring still need the requested credential read.
+keeps production authority. The functional decision, completed held result and
+corrected routing confidence now have live proof. A separate APPROVED-but-held
+candidate failed closed on inaccessible cross-repository evidence.
 
 ## What changed
 
@@ -29,21 +30,38 @@ The installed tarball passes an independent consumer smoke; replacing its CLI
 with an empty executable fails the entrypoint assertion and restoration passes.
 See `docs/SLICE2.md` and the generated receipts for exact commands and limitations.
 
-A recent mechanical PR completed APPROVED/LOW without Claude. A README PR
-completed APPROVED/LOW after two live cards. Four functional cards confirmed
-Python's real rollout, missing-test and stale-comment findings, but the final
-live risk/voice result is still pending. Jev unreachable and a substituted moved
-head both returned errors without approval. Eleven paid Claude invocations ran;
-there were five Jev credential reads and no additional read without authorization.
+| Live PR / exact head | Python | TypeScript | Comparison |
+| --- | --- | --- | --- |
+| margot-pr-reviewer #7 / `439feb449780eb0190187667e8dbe68d8dc35a57` | APPROVED / LOW; eligible | APPROVED / LOW; eligible | Agreement; zero Claude calls |
+| margot-pr-reviewer #2 / `4fad52cd3652586829113741dfea318af36d0fe0` | APPROVED / LOW; eligible | APPROVED / LOW; eligible | Same decision; two documentation cards add scrutiny |
+| dotty #402 / `11777c29b8405076acb315027a466967534b89fb` | CHANGES_REQUESTED / MEDIUM; ineligible | CHANGES_REQUESTED / HIGH; held for protected-path authority, risk and author action | Same rollout, missing-test and stale-comment defects. Python lowered HIGH for limited actual rollout; the live voice retained HIGH for shared provisioner reach. This supplies both the functional and completed held proof. |
+| eve-plus #9 / `7198b9ead47ecc6f7fe08a6b61516d783e8eaad4` | APPROVED / LOW; operator hold | ERROR at works-and-proven; ineligible; no final risk/voice | External dotty implementation/eval unavailable to the repository-bound tools. Not counted as a completed held verdict. |
+
+Dotty's four saved live cards were reused only after validating current facts,
+revision, configuration and card inputs. Classification, route, risk, voice and
+final head checks ran live. Corrected raw exposure Score confidence and translated
+route confidence match: dotty **0.70**, eve-plus **0.71**. Python comparisons are
+existing checks on those exact heads; eve-plus's Python result is round two while
+this shadow is a fresh first round. Jev unreachable and a substituted moved head
+also returned errors in earlier safety proofs.
+
+Finish counts: **one vault read, five Jev HTTP requests (all 200, no retries),
+two Claude CLI invocations** (dotty voice, eve-plus incomplete card; $0.2808068).
+Whole-slice totals: **six vault reads and 13 paid Claude CLI invocations**.
+Historical Jev HTTP attempts were not fully metered; no aggregate is claimed.
+The credential stayed in memory for the whole process. No startup retry reread it.
+See `docs/live/finish-proof.json` for raw answers, final verdict, failure and counts.
+The unchanged implementation was rebuilt under Node 22; receipt assertions passed.
 
 ## Risk and blast radius
 
 The package is read-only shadow infrastructure. Python still posts. The model
 has only repository evidence tools; it cannot run a shell, execute PR code or
 write to GitHub. Recorded actions have no production authority. The final
-exposure-Score routing translation has offline coverage but needs a live rerun.
-Functional held-result proof, live voice proof, hosted Action execution and the
-whole-port independent review remain incomplete. No estate workflow changed.
+exposure-Score routing translation and dotty's held/voice result are proved live.
+A separate APPROVED-but-held result, cross-repository evidence access, hosted
+Action execution and the whole-port independent review remain unproved.
+No estate workflow changed.
 
 ## Rollback
 
