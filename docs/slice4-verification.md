@@ -20,11 +20,11 @@ node scripts/package-smoke.mjs ./margot-pr-reviewer-0.4.0.tgz
 
 All commands passed. Four suites, 239 named tests: 96 core, 55 adapter, 60 ledger,
 28 publication/tally. npm reported zero vulnerabilities; seven bundled recordings
-passed the identity/credential/host/path audit. The tarball is 54,260 bytes,
-235,607 bytes unpacked. SHA-256:
+passed the identity/credential/host/path audit. The tarball is 55,067 bytes,
+238,353 bytes unpacked. SHA-256:
 
 ```text
-dc0f15479c97f4f018187474f7e0d3bd21d13f5dd8bf89713f24ad22fb570011
+486b8a72863eb3b483676a5b29910d3a4b04a9e4f88b270244cc211bb64d0f81
 ```
 
 An empty external consumer installed that tarball and imported the public API.
