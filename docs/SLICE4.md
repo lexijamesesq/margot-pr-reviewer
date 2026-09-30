@@ -2,8 +2,9 @@
 
 The engine can publish the estate's existing check contract and a SHA-bound native
 review. Its tally is New, Open, Closed, derived from the findings listed below it.
-The instance adopts exact package 0.4.0 through a reversible shadow/authority
-switch. A separate local retirement branch removes Python only after the operator
+The instance adopts an exact 0.4.0 registry or GitHub release-tag pin through a
+reversible shadow/authority switch. A separate local retirement branch removes
+Python only after the operator
 passes the canary. Nothing was pushed, posted or dispatched. Release 0.4.0 and
 production adoption remain operator actions, not completed production proofs.
 

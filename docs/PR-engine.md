@@ -82,5 +82,6 @@ None.
 
 Existing Octokit, Zod and Node tooling; no npm dependency added. Consumer-provided
 check names, App credentials, runner, policy and pinned publish-skills bundle.
-Release 0.4.0 must be published before instance adoption. The instance hand-over
-contains the exact five-step canary procedure and pass criteria.
+Registry release 0.4.0 or an exact GitHub release tag must exist before instance
+adoption. The instance hand-over contains the exact five-step canary procedure
+and pass criteria.
