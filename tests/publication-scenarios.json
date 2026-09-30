@@ -2,7 +2,12 @@
   {
     "id": "pub-clear",
     "name": "Clearance confirms all checks before the SHA-bound approval",
-    "defect": "Change the result to a held decision"
+    "defect": "Remove the wait that makes the approval the last publication write",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "    await confirmReviewCheck(r, reviewConclusion, c);",
+      "to": ""
+    }
   },
   {
     "id": "pub-hold",
@@ -47,7 +52,12 @@
   {
     "id": "pub-head",
     "name": "Head movement before approval fails closed",
-    "defect": "Stop moving the head"
+    "defect": "Remove the final head recheck immediately before publication",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "    await guard(r, c);\n    const { data } = await client.rest.pulls.createReview({",
+      "to": "    const { data } = await client.rest.pulls.createReview({"
+    }
   },
   {
     "id": "pub-start-fail",
@@ -67,7 +77,12 @@
   {
     "id": "pub-disarm-fail",
     "name": "Unconfirmed auto-merge disable cannot publish a held verdict",
-    "defect": "Confirm the disable"
+    "defect": "Stop counting an unconfirmed cleanup disarm as a cleanup failure",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "            if (!ok) throw new Error(\"disable unconfirmed\");",
+      "to": ""
+    }
   },
   {
     "id": "pub-error",
@@ -82,7 +97,12 @@
   {
     "id": "pub-receipt",
     "name": "A mismatched native review receipt is compensated",
-    "defect": "Return the requested commit"
+    "defect": "Remove cleanup of an approval whose response is not yet list-visible",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": ", ...(approvalId ? [approvalId] : [])",
+      "to": ""
+    }
   },
   {
     "id": "pub-order",

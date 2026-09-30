@@ -106,6 +106,18 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     }
     approvalId = undefined;
   }
+  async function confirmReviewCheck(r: ReviewRequest, conclusion: string, c: CallContext) {
+    const id = ids.get(config.checks.review);
+    if (!id) throw new Error("Review check was not completed before approval");
+    const { data } = await client.rest.checks.get({ ...params(r, c), check_run_id: id });
+    if (
+      data.status !== "completed" ||
+      data.conclusion !== conclusion ||
+      data.head_sha !== r.head ||
+      data.app?.id !== config.appId
+    )
+      throw new Error("Review check was not confirmed before approval");
+  }
   const disableAutoMerge: Services["disableAutoMerge"] = async (r, c) => {
     const pr = await guard(r, c);
     if (!pr.auto_merge) return true;
@@ -153,19 +165,21 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     );
     // Complete all check writes before the approving review. The review-count rule
     // must hold even when the review check is informational, not required.
+    const reviewConclusion = decision.holdReasons.includes("calibration")
+      ? "action_required"
+      : decision.mergeEligible
+        ? "success"
+        : "neutral";
     await check(
       r,
       config.checks.review,
-      decision.holdReasons.includes("calibration")
-        ? "action_required"
-        : decision.mergeEligible
-          ? "success"
-          : "neutral",
+      reviewConclusion,
       decision.mergeEligible ? "Margot: approved" : `Margot: ${decision.outcome} — held`,
       `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
       undefined,
       c,
     );
+    await confirmReviewCheck(r, reviewConclusion, c);
     await guard(r, c);
     const { data } = await client.rest.pulls.createReview({
       ...params(r, c),

@@ -121,7 +121,11 @@ cases use the real Octokit client with recorded HTTP responses, never a live PR
 write. Deliberate failure cases cover admission, head/base movement, write errors,
 failed disarm, malformed receipts, prior approval withdrawal, check adoption and
 superseded writers. The tally source mutation adds one to displayed Closed; the
-reconciliation assertion must fail. Every new named test has a break receipt.
+reconciliation assertion must fail. Four publisher source-removal breaks cover
+approval-last ordering, failed-disarm accounting, the final head recheck and
+partial-approval cleanup. The other publication receipts are controlled
+service/input counterexamples; they are not represented as source-removal proof.
+Every new named test has a break receipt.
 
 The instance's adoption and authority branches retain Python. The reverse patch
 of the authority commit is applied locally, the original engine/runtime/poster

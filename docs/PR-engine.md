@@ -32,9 +32,12 @@ The release is 0.4.0, with a self-hosted sample and unchanged pinned skill loadi
 See `docs/slice4-verification.md` for final clean-clone, package, test and break
 receipts. Recorded Octokit transport tests cover approval, hold/disarm, every
 write-failure boundary, malformed receipts, stale admission, caller check adoption
-and superseded ownership. Every new test has a failing break receipt; deliberately
-adding one to Closed fails tally reconciliation. The slice-three corpus replays
-with the same decisions, new reconciled tallies and identical no-model retries.
+and superseded ownership. Four source removals independently prove approval-last
+ordering, failed-disarm accounting, the final head recheck and partial-approval
+cleanup; the other publication breaks are controlled service/input counterexamples.
+Every new test has a failing break receipt, and deliberately adding one to Closed
+fails tally reconciliation. The slice-three corpus replays with the same decisions,
+new reconciled tallies and identical no-model retries.
 
 Read-only live shadows cover all three engine classes and a HIGH hold at Python's
 exact heads. A README review completes where Python's first attempt lost card

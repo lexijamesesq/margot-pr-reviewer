@@ -1,8 +1,8 @@
 # Slice 4 verification
 
-Verified engine source commit: `619f16d`. Subsequent verification-document changes
-are excluded from the npm package. Nothing was pushed, posted, dispatched or
-published. All GitHub publication tests use recorded HTTP targets.
+Verified engine branch head is recorded in the workspace hand-over. Verification
+documents are excluded from the npm package. Nothing was pushed, posted,
+dispatched or published. All GitHub publication tests use recorded HTTP targets.
 
 ## Clean clone and installed package
 
@@ -18,7 +18,7 @@ npm pack --json
 node scripts/package-smoke.mjs ./margot-pr-reviewer-0.4.0.tgz
 ```
 
-All commands passed. Four suites, 237 named tests: 96 core, 53 adapter, 60 ledger,
+All commands passed. Four suites, 239 named tests: 96 core, 55 adapter, 60 ledger,
 28 publication/tally. npm reported zero vulnerabilities; seven bundled recordings
 passed the identity/credential/host/path audit. The tarball is 54,260 bytes,
 235,607 bytes unpacked. SHA-256:
@@ -39,11 +39,13 @@ does not establish ARM64 Linux installation on the Pi.
 
 There are 31 new Vitest tests: 28 publication/tally and three adapter cases.
 `publication-break-receipts.md` records all 28 isolated breaks against the final
-237-test suite: exactly one named assertion failed for each, 236 passed, then
-237 passed after restoration. The tally mutation adds one to displayed Closed;
-the reconciliation test detects the deliberate miscount. The publication proof
-covers all-checks-before-approval, hold/disarm, write failures, malformed receipts,
-SHA/admission guards, check adoption, ownership and no-write shadows.
+239-test suite: exactly one named assertion failed for each, 238 passed, then
+239 passed after restoration. Four publisher source removals cover approval-last
+ordering, failed-disarm accounting, the final head recheck and partial-approval
+cleanup. A fifth source mutation adds one to displayed Closed; the reconciliation
+test detects the deliberate miscount. The remaining 23 breaks are controlled
+service/input counterexamples covering hold/disarm, write failures, malformed
+receipts, admission, check adoption, ownership and no-write shadows.
 
 `adapter-break-receipts.md` records 53 isolated breaks at the 234-test stage,
 including all three new adapter tests: shadow history selection, refusal to

@@ -50,6 +50,7 @@ async function wire(mode = "clear", broken = false) {
       details_url: "https://github.com/example/caller/actions/runs/1",
     });
   const reviews: Record<string, unknown>[] = [];
+  const dismissedIds: number[] = [];
   let armed = mode === "hold" || mode === "disarm-fail";
   let evaluated = false;
   let moved = false;
@@ -88,7 +89,7 @@ async function wire(mode = "clear", broken = false) {
       writes.push({ method, path, body });
       if (
         (defect("start-fail") && body.status === "in_progress") ||
-        (defect("review-fail") && path.endsWith("/reviews")) ||
+        ((defect("review-fail") || defect("final-fail")) && path.endsWith("/reviews")) ||
         (defect("final-fail") &&
           body.name === options.checks.review &&
           body.conclusion === "success")
@@ -99,6 +100,7 @@ async function wire(mode = "clear", broken = false) {
         data = { data: { disablePullRequestAutoMerge: { pullRequest: { id: "PR_1" } } } };
       } else if (path.endsWith("/dismissals")) {
         const id = Number(path.split("/").at(-2));
+        dismissedIds.push(id);
         const item = reviews.find((v) => v.id === id);
         if (item) item.state = "DISMISSED";
         data = { state: "DISMISSED" };
@@ -109,7 +111,7 @@ async function wire(mode = "clear", broken = false) {
           user: { login: options.actor, type: "Bot" },
           state: body.event === "APPROVE" ? "APPROVED" : "COMMENTED",
         };
-        reviews.push(data as Record<string, unknown>);
+        if (!defect("receipt")) reviews.push(data as Record<string, unknown>);
       } else {
         const id = method === "POST" ? ++sequence : Number(path.split("/").at(-1));
         data = {
@@ -119,6 +121,13 @@ async function wire(mode = "clear", broken = false) {
           app: { id: defect("identity") ? 999 : options.appId },
         };
         stored.set(id, data as Record<string, unknown>);
+        if (
+          mode === "clear" &&
+          broken &&
+          body.name === options.checks.review &&
+          body.conclusion === "success"
+        )
+          stored.set(id, { ...(data as Record<string, unknown>), status: "in_progress" });
         if (defect("head") && body.name === options.checks.authority) moved = true;
       }
     }
@@ -162,10 +171,6 @@ async function wire(mode = "clear", broken = false) {
       ];
       value.decision.rating.band = "HIGH";
     }
-    if (mode === "clear" && broken) {
-      value.decision.mergeEligible = false;
-      value.decision.holdReasons = ["risk"];
-    }
     const report = render(value);
     const publication = await publisher.publish(
       { expectedHead: r.head, review: value, report },
@@ -182,7 +187,7 @@ async function wire(mode = "clear", broken = false) {
     (v) => v.name === (mode === "triage" ? options.checks.triage : options.checks.review),
   );
   const authority = [...stored.values()].find((v) => v.name === options.checks.authority);
-  return { result, writes, reviews, evaluated, armed, final, authority };
+  return { result, writes, reviews, dismissedIds, evaluated, armed, final, authority };
 }
 scenario(
   "pub-clear",
@@ -196,6 +201,7 @@ scenario(
       kind: x.result.kind,
       successBeforeApprove: success >= 0 && approve > success,
       head: x.writes.find((w) => w.body.event === "APPROVE")?.body.commit_id,
+      finalStatus: x.final?.status,
       merged: x.writes.some(
         (w) =>
           w.path.endsWith("/merge") ||
@@ -203,7 +209,13 @@ scenario(
       ),
     };
   },
-  { kind: "reviewed", successBeforeApprove: true, head: r.head, merged: false },
+  {
+    kind: "reviewed",
+    successBeforeApprove: true,
+    head: r.head,
+    finalStatus: "completed",
+    merged: false,
+  },
 );
 scenario(
   "pub-hold",
@@ -250,7 +262,7 @@ for (const mode of ["closed", "fork", "draft", "base"])
     },
     { kind: "error", evaluated: false, writes: 0 },
   );
-for (const mode of ["head", "start-fail", "review-fail", "disarm-fail", "identity"])
+for (const mode of ["head", "start-fail", "review-fail", "identity"])
   scenario(
     `pub-${mode}`,
     async (b) => {
@@ -259,20 +271,43 @@ for (const mode of ["head", "start-fail", "review-fail", "disarm-fail", "identit
     },
     { kind: "error", approved: false },
   );
-for (const mode of ["error", "receipt"])
-  scenario(
-    `pub-${mode}`,
-    async (b) => {
-      const x = await wire(mode, b);
-      return {
-        kind: x.result.kind,
-        conclusion: x.final?.conclusion,
-        dismissed: x.reviews.some((v) => v.state === "DISMISSED"),
-        approved: x.reviews.some((v) => v.state === "APPROVED"),
-      };
-    },
-    { kind: "error", conclusion: "action_required", dismissed: true, approved: false },
-  );
+scenario(
+  "pub-disarm-fail",
+  async () => {
+    const x = await wire("disarm-fail");
+    return {
+      kind: x.result.kind,
+      diagnostic: x.result.kind === "error" ? x.result.diagnostic : "",
+      approved: x.reviews.some((v) => v.state === "APPROVED"),
+    };
+  },
+  { kind: "error", diagnostic: expect.stringContaining("cleanup unconfirmed"), approved: false },
+);
+scenario(
+  "pub-error",
+  async (b) => {
+    const x = await wire("error", b);
+    return {
+      kind: x.result.kind,
+      conclusion: x.final?.conclusion,
+      dismissed: x.reviews.some((v) => v.state === "DISMISSED"),
+      approved: x.reviews.some((v) => v.state === "APPROVED"),
+    };
+  },
+  { kind: "error", conclusion: "action_required", dismissed: true, approved: false },
+);
+scenario(
+  "pub-receipt",
+  async (b) => {
+    const x = await wire("receipt", b);
+    return {
+      kind: x.result.kind,
+      conclusion: x.final?.conclusion,
+      dismissed: x.dismissedIds.length > 0,
+    };
+  },
+  { kind: "error", conclusion: "action_required", dismissed: true },
+);
 scenario(
   "pub-order",
   async (b) => {
