@@ -14,11 +14,13 @@ import {
   cardSchema,
   classificationSchema,
   configSchema,
+  disableAutoMergeSchema,
   factsSchema,
   publicationSchema,
   requestSchema,
   riskSchema,
   routeSchema,
+  shaSchema,
   voiceSchema,
 } from "./schemas.js";
 import type { Bundle, Card, Review, ReviewResult, Services, Voice } from "./types.js";
@@ -55,10 +57,11 @@ export async function review(
         clearTimeout(timer);
       }
     };
+    const disableAutoMerge = async (name: string): Promise<boolean> =>
+      disableAutoMergeSchema.parse(await call(name, (c) => services.disableAutoMerge(request, c)));
     const facts = factsSchema.parse(await call("facts", (c) => services.facts(request, c)));
     if (facts.autoMergeArmed)
-      emergencyDisable = () =>
-        call("disable-auto-merge-after-error", (c) => services.disableAutoMerge(request, c));
+      emergencyDisable = () => disableAutoMerge("disable-auto-merge-after-error");
     if (
       !facts.complete ||
       facts.files.length !== facts.fileCount ||
@@ -109,6 +112,16 @@ export async function review(
     let rating = rate(null, false, config);
     let voice: Voice | null = null;
     let bundle: Bundle | undefined;
+    const loadBundle = async (): Promise<Bundle> => {
+      if (!bundle) {
+        const loaded = bundleSchema.parse(
+          await call("bundle", (c) => services.bundle(config.cardBundle.commit, c)),
+        );
+        if (loaded.commit !== config.cardBundle.commit) throw new Error("Card bundle pin mismatch");
+        bundle = loaded;
+      }
+      return bundle;
+    };
     if (reviewPath(classification, null, config).routing) {
       const { documentationSubstantive: _documentationSubstantive, ...functionalRouteQuestions } =
         routeQuestions;
@@ -121,13 +134,8 @@ export async function review(
       if (path.council) {
         const selected = selectCards(route, classification, config);
         if (selected.length > 0) {
-          bundle = bundleSchema.parse(
-            await call("bundle", (c) => services.bundle(config.cardBundle.commit, c)),
-          );
-          if (bundle.commit !== config.cardBundle.commit)
-            throw new Error("Card bundle pin mismatch");
+          const resolved = await loadBundle();
           for (const name of selected) {
-            const resolved = bundle;
             const card = cardSchema.parse(
               await call(`card:${name}`, (c) =>
                 services.card(
@@ -158,14 +166,7 @@ export async function review(
             config,
           );
         if (needsVoice(cards, rating, route.confidence, config)) {
-          if (!bundle) {
-            bundle = bundleSchema.parse(
-              await call("bundle", (c) => services.bundle(config.cardBundle.commit, c)),
-            );
-            if (bundle.commit !== config.cardBundle.commit)
-              throw new Error("Card bundle pin mismatch");
-          }
-          const resolved = bundle;
+          const resolved = await loadBundle();
           voice = voiceSchema.parse(
             await call("voice", (c) =>
               services.voice(
@@ -193,12 +194,15 @@ export async function review(
     const report = render(result);
     let publication = null;
     if (config.publication === "record") {
-      if ((await call("publication-head", (c) => services.head(request, c))) !== request.head)
+      if (
+        shaSchema.parse(await call("publication-head", (c) => services.head(request, c))) !==
+        request.head
+      )
         throw new Error("Head moved before publication");
       if (
         !result.decision.mergeEligible &&
         facts.autoMergeArmed &&
-        !(await call("disable-auto-merge", (c) => services.disableAutoMerge(request, c)))
+        !(await disableAutoMerge("disable-auto-merge"))
       )
         throw new Error("Auto-merge disable was not confirmed");
       publication = publicationSchema.parse(

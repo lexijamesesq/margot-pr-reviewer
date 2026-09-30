@@ -12,8 +12,8 @@ export interface Recording {
   bundle: unknown;
   cards: Record<string, unknown>;
   voice: unknown;
-  head: string;
-  disableAutoMerge: boolean;
+  head: unknown;
+  disableAutoMerge: unknown;
   publication: unknown;
   failures?: Record<string, string>;
 }
@@ -43,9 +43,8 @@ export function recordedServices(
     bundle: (commit) => read("bundle", commit, data.bundle),
     card: (input) => read(`card:${input.name}`, input, data.cards[input.name]),
     voice: (input) => read("voice", input, data.voice),
-    head: async (request) => String(await read("head", request, data.head)),
-    disableAutoMerge: async (request) =>
-      (await read("disableAutoMerge", request, data.disableAutoMerge)) === true,
+    head: (request) => read("head", request, data.head),
+    disableAutoMerge: (request) => read("disableAutoMerge", request, data.disableAutoMerge),
     publish: async (input) => {
       const receipt = await read("publish", input, data.publication);
       if (input.expectedHead !== data.head) throw new Error("Publication head mismatch");

@@ -11,6 +11,7 @@ interface Scenario {
   recording: string;
   patches: Patch[];
   expected: Record<string, unknown>;
+  questionContract?: { key: string; rules: string[] };
   break: Patch[];
   defect: string;
 }
@@ -39,6 +40,15 @@ for (const scenario of scenarios) {
       calls: services.calls.map((c) => c.name),
       writes: services.publications.length,
     };
+    if (scenario.questionContract) {
+      const classification = services.calls.find((c) => c.name === "classification");
+      const questions = (classification?.input as { questions?: Record<string, unknown> })
+        ?.questions;
+      const question = questions?.[scenario.questionContract.key];
+      observed.questionContract = scenario.questionContract.rules.every(
+        (rule) => typeof question === "string" && question.includes(rule),
+      );
+    }
     const routing = services.calls.find((c) => c.name === "route");
     observed.askedMeaning =
       typeof (routing?.input as { questions?: Record<string, unknown> } | undefined)?.questions
@@ -47,6 +57,9 @@ for (const scenario of scenarios) {
       Object.assign(observed, {
         stage: result.stage,
         diagnostic: result.diagnostic,
+        invalidExternalData:
+          result.diagnostic.includes('"code": "invalid_type"') ||
+          result.diagnostic.includes('"code": "invalid_format"'),
         eligible: result.mergeEligible,
       });
     if (result.kind === "classified") observed.classification = result.classification;

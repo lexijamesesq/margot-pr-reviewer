@@ -2,7 +2,8 @@ import { z } from "zod";
 
 const text = z.string().min(1);
 const probability = z.number().min(0).max(1);
-const sha = z.string().regex(/^[a-f0-9]{40}$/);
+export const shaSchema = z.string().regex(/^[a-f0-9]{40}$/);
+export const disableAutoMergeSchema = z.boolean();
 export const cardNames = [
   "safety",
   "works-and-proven",
@@ -25,8 +26,8 @@ export const bandSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 export const requestSchema = z.strictObject({
   repository: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
   pr: z.number().int().positive(),
-  base: sha,
-  head: sha,
+  base: shaSchema,
+  head: shaSchema,
   phase: z.enum(["triage", "review"]),
 });
 export const configSchema = z
@@ -35,7 +36,7 @@ export const configSchema = z
     trustedCheckActors: z.array(text),
     trustedTriageActors: z.array(text),
     requiredChecks: z.array(text),
-    cardBundle: z.strictObject({ commit: sha }),
+    cardBundle: z.strictObject({ commit: shaSchema }),
     classificationThreshold: probability,
     routeThreshold: probability,
     riskTailThreshold: probability,
@@ -57,8 +58,8 @@ export const configSchema = z
 export const factsSchema = z.strictObject({
   repository: text,
   pr: z.number().int().positive(),
-  base: sha,
-  head: sha,
+  base: shaSchema,
+  head: shaSchema,
   title: text,
   body: z.string(),
   author: text,
@@ -70,13 +71,13 @@ export const factsSchema = z.strictObject({
     z.strictObject({
       name: text,
       actor: text,
-      head: sha,
+      head: shaSchema,
       conclusion: z.enum(["success", "failure", "pending", "skipped"]),
     }),
   ),
   history: z.strictObject({ complete: z.boolean(), priorLedger: z.boolean() }),
   triage: z
-    .strictObject({ actor: text, base: sha, head: sha, classification: classSchema })
+    .strictObject({ actor: text, base: shaSchema, head: shaSchema, classification: classSchema })
     .nullable(),
   autoMergeArmed: z.boolean(),
 });
@@ -136,9 +137,13 @@ export const voiceSchema = z.strictObject({
   ),
 });
 export const bundleSchema = z.strictObject({
-  commit: sha,
+  commit: shaSchema,
   reviewerAgent: z.literal("publish:pr-reviewer"),
   voiceAgent: z.literal("publish:margot"),
   cardPaths: z.record(cardNameSchema, z.string().regex(/^\//)),
 });
-export const publicationSchema = z.strictObject({ head: sha, recorded: z.literal(true), id: text });
+export const publicationSchema = z.strictObject({
+  head: shaSchema,
+  recorded: z.literal(true),
+  id: text,
+});

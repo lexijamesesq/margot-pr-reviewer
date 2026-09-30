@@ -1,10 +1,12 @@
 import type { z } from "zod";
 import type {
+  bandSchema,
   bundleSchema,
   cardSchema,
   classSchema,
   configSchema,
   factsSchema,
+  publicationSchema,
   requestSchema,
   riskSchema,
   voiceSchema,
@@ -18,7 +20,7 @@ export type Card = z.infer<typeof cardSchema>;
 export type Voice = z.infer<typeof voiceSchema>;
 export type RiskEvidence = z.infer<typeof riskSchema>;
 export type Bundle = z.infer<typeof bundleSchema>;
-export type Band = "LOW" | "MEDIUM" | "HIGH";
+export type Band = z.infer<typeof bandSchema>;
 export type Rating = {
   band: Band;
   rationale: string;
@@ -44,7 +46,7 @@ export type ReviewResult =
   | ({
       kind: "reviewed";
       report: string;
-      publication: { head: string; recorded: true; id: string } | null;
+      publication: z.infer<typeof publicationSchema> | null;
     } & Review)
   | { kind: "classified"; request: ReviewRequest; classification: Classification }
   | { kind: "error"; stage: string; diagnostic: string; mergeEligible: false };
@@ -90,8 +92,8 @@ export interface Services {
     },
     context: CallContext,
   ): Promise<unknown>;
-  head(request: ReviewRequest, context: CallContext): Promise<string>;
-  disableAutoMerge(request: ReviewRequest, context: CallContext): Promise<boolean>;
+  head(request: ReviewRequest, context: CallContext): Promise<unknown>;
+  disableAutoMerge(request: ReviewRequest, context: CallContext): Promise<unknown>;
   /** Must bind every write to expectedHead, abort on movement, and never enable merge. */
   publish(
     input: { expectedHead: string; review: Review; report: string },

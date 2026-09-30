@@ -304,7 +304,7 @@
     "defect": "Lower the earlier trusted profile."
   },
   {
-    "name": "a human formatting change is mechanical",
+    "name": "classification question tells Jev to judge human formatting by behavior",
     "recording": "mechanical-bump",
     "patches": [
       {
@@ -317,18 +317,25 @@
       }
     ],
     "expected": {
-      "classification": "mechanical"
+      "questionContract": true
     },
-    "break": [
-      {
-        "path": "classification.functional",
-        "value": 1
-      }
-    ],
-    "defect": "Misclassify a human formatting pass."
+    "break": [],
+    "defect": "Remove the relevant classification rule from the question sent to Jev.",
+    "questionContract": {
+      "key": "mechanical",
+      "rules": [
+        "Judge changed lines, never author, source, extension or size.",
+        "Version bumps and behavior-preserving formatting are mechanical."
+      ]
+    },
+    "sourceBreak": {
+      "file": "src/questions.ts",
+      "from": "Version bumps and behavior-preserving formatting are mechanical. ",
+      "to": ""
+    }
   },
   {
-    "name": "agent instructions in markdown are functional",
+    "name": "classification question tells Jev agent instructions are functional",
     "recording": "council-clear",
     "patches": [
       {
@@ -345,20 +352,21 @@
       }
     ],
     "expected": {
-      "classification": "functional"
+      "questionContract": true
     },
-    "break": [
-      {
-        "path": "classification",
-        "value": {
-          "source": "jev",
-          "functional": 0,
-          "documentation": 1,
-          "mechanical": 0
-        }
-      }
-    ],
-    "defect": "Classify agent behavior as ordinary documentation."
+    "break": [],
+    "defect": "Remove the relevant classification rule from the question sent to Jev.",
+    "questionContract": {
+      "key": "functional",
+      "rules": [
+        "Agent instructions, directives, tests, paths and executable settings are functional."
+      ]
+    },
+    "sourceBreak": {
+      "file": "src/questions.ts",
+      "from": "Agent instructions, directives, tests, paths and executable settings are functional. ",
+      "to": ""
+    }
   },
   {
     "name": "substantive documentation defaults to works-and-proven",
@@ -3462,5 +3470,349 @@
       "to": "classification !== \"mechanical\" ? routeQuestions : functionalRouteQuestions"
     },
     "defect": "Send the documentation-only question on the functional route."
+  },
+  {
+    "name": "LOW council risk with uncertain dimension requires voice",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "risk.dimensions.operations.confidence",
+        "value": 0.29
+      }
+    ],
+    "expected": {
+      "kind": "reviewed",
+      "band": "LOW",
+      "ignored": [],
+      "voice": true,
+      "cards": [
+        "safety",
+        "works-and-proven",
+        "principal-engineer",
+        "maintainable-no-slop"
+      ],
+      "calls": [
+        "facts",
+        "classification",
+        "route",
+        "bundle",
+        "card:safety",
+        "card:works-and-proven",
+        "card:principal-engineer",
+        "card:maintainable-no-slop",
+        "risk",
+        "voice",
+        "head",
+        "publish"
+      ]
+    },
+    "defect": "Raise the only uncertain dimension confidence to the 0.3 boundary.",
+    "break": [
+      {
+        "path": "risk.dimensions.operations.confidence",
+        "value": 0.3
+      }
+    ]
+  },
+  {
+    "name": "publication rejects malformed SHA",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "head",
+        "value": "not-a-sha"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "publication-head",
+      "invalidExternalData": true,
+      "eligible": false,
+      "writes": 0
+    },
+    "defect": "Repair the invalid external head response.",
+    "break": [
+      {
+        "path": "head",
+        "value": "0000000000000000000000000000000000000002"
+      }
+    ]
+  },
+  {
+    "name": "publication rejects non-string head",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "head",
+        "value": {
+          "sha": "0000000000000000000000000000000000000002"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "publication-head",
+      "invalidExternalData": true,
+      "eligible": false,
+      "writes": 0
+    },
+    "defect": "Repair the invalid external head response.",
+    "break": [
+      {
+        "path": "head",
+        "value": "0000000000000000000000000000000000000002"
+      }
+    ]
+  },
+  {
+    "name": "held review rejects truthy string disarm response",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "config.calibration",
+        "value": true
+      },
+      {
+        "path": "disableAutoMerge",
+        "value": "true"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "disable-auto-merge",
+      "invalidExternalData": true,
+      "eligible": false,
+      "writes": 0
+    },
+    "defect": "Replace the truthy non-boolean disarm response with true.",
+    "break": [
+      {
+        "path": "disableAutoMerge",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "error recovery rejects truthy string disarm response",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.history.complete",
+        "value": false
+      },
+      {
+        "path": "disableAutoMerge",
+        "value": "true"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "history",
+      "diagnostic": "History unavailable; auto-merge disable failed",
+      "eligible": false,
+      "writes": 0,
+      "calls": [
+        "facts",
+        "disableAutoMerge"
+      ]
+    },
+    "defect": "Confirm emergency disarm with the boolean true.",
+    "break": [
+      {
+        "path": "disableAutoMerge",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "held review rejects truthy number disarm response",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "config.calibration",
+        "value": true
+      },
+      {
+        "path": "disableAutoMerge",
+        "value": 1
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "disable-auto-merge",
+      "invalidExternalData": true,
+      "eligible": false,
+      "writes": 0
+    },
+    "defect": "Replace the truthy non-boolean disarm response with true.",
+    "break": [
+      {
+        "path": "disableAutoMerge",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "error recovery rejects truthy number disarm response",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.history.complete",
+        "value": false
+      },
+      {
+        "path": "disableAutoMerge",
+        "value": 1
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "history",
+      "diagnostic": "History unavailable; auto-merge disable failed",
+      "eligible": false,
+      "writes": 0,
+      "calls": [
+        "facts",
+        "disableAutoMerge"
+      ]
+    },
+    "defect": "Confirm emergency disarm with the boolean true.",
+    "break": [
+      {
+        "path": "disableAutoMerge",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "held review rejects truthy object disarm response",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "config.calibration",
+        "value": true
+      },
+      {
+        "path": "disableAutoMerge",
+        "value": {
+          "confirmed": true
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "disable-auto-merge",
+      "invalidExternalData": true,
+      "eligible": false,
+      "writes": 0
+    },
+    "defect": "Replace the truthy non-boolean disarm response with true.",
+    "break": [
+      {
+        "path": "disableAutoMerge",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "error recovery rejects truthy object disarm response",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.history.complete",
+        "value": false
+      },
+      {
+        "path": "disableAutoMerge",
+        "value": {
+          "confirmed": true
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "history",
+      "diagnostic": "History unavailable; auto-merge disable failed",
+      "eligible": false,
+      "writes": 0,
+      "calls": [
+        "facts",
+        "disableAutoMerge"
+      ]
+    },
+    "defect": "Confirm emergency disarm with the boolean true.",
+    "break": [
+      {
+        "path": "disableAutoMerge",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "error recovery reports unconfirmed boolean disarm",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.history.complete",
+        "value": false
+      },
+      {
+        "path": "disableAutoMerge",
+        "value": false
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "history",
+      "diagnostic": "History unavailable; auto-merge disable not confirmed",
+      "eligible": false,
+      "writes": 0
+    },
+    "defect": "Confirm emergency disarm instead of returning false.",
+    "break": [
+      {
+        "path": "disableAutoMerge",
+        "value": true
+      }
+    ]
+  },
+  {
+    "name": "voice without council validates the bundle pin",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.confidence",
+        "value": 0.29
+      },
+      {
+        "path": "bundle.commit",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "bundle",
+      "diagnostic": "Card bundle pin mismatch",
+      "eligible": false,
+      "writes": 0
+    },
+    "defect": "Restore the pinned bundle for a voice-only review.",
+    "break": [
+      {
+        "path": "bundle.commit",
+        "value": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+      }
+    ]
   }
 ]
