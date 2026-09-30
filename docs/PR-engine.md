@@ -29,15 +29,34 @@ The release is 0.4.0, with a self-hosted sample and unchanged pinned skill loadi
 
 ## Verification
 
-See `docs/slice4-verification.md` for final clean-clone, package, test and break
-receipts. Recorded Octokit transport tests cover approval, hold/disarm, every
+See `docs/slice4-verification.md` for current test and break receipts and the
+earlier clean-clone and package proof. Recorded Octokit transport tests cover approval, hold/disarm, every
 write-failure boundary, malformed receipts, stale admission, caller check adoption
-and superseded ownership. Four source removals independently prove approval-last
-ordering, failed-disarm accounting, the final head recheck and partial-approval
-cleanup; the other publication breaks are controlled service/input counterexamples.
-Every new test has a failing break receipt, and deliberately adding one to Closed
-fails tally reconciliation. The slice-three corpus replays with the same decisions,
-new reconciled tallies and identical no-model retries.
+and superseded ownership. The publication review fixes add transport cases for an
+in-progress check readback, a push after approval, an immediate auto-merge and
+three independent cleanup failures. The pre-approval head case now moves only
+after the completed review-check write and asserts that approval was never
+attempted, even if later cleanup would dismiss it.
+
+The earlier head and confirmation receipts combined source removal with a harness
+input flag; they did not establish the claimed independent source coverage.
+The corrected harness runs source mutations with no input scenario selected.
+All 32 publication/tally breaks now fail exactly their named assertion, with 242 passing;
+baseline and restored suites pass all 243 tests. Seven publisher source mutations
+cover check confirmation, the pre-approval head guard, dismissal after a push,
+merged success, cleanup diagnostics, failed-disarm accounting and partial-approval
+cleanup. One tally source mutation and 24 input/service counterexamples cover the
+remaining scenarios. Every new scenario has a break receipt.
+
+For this revision, `npm ci`, typecheck, `npm test`, build and
+`npm run test:publication-breaks` pass. Staged-file hooks and the operator overlay
+scan pass. No model or Jev calls were made; commits remain local, with no GitHub
+writes. The clean-clone and installed-package receipts in the verification file
+are historical and were not rerun for this revision.
+
+Deliberately adding one to Closed fails tally reconciliation. The slice-three
+corpus replays with the same decisions, new reconciled tallies and identical
+no-model retries.
 
 Read-only live shadows cover all three engine classes and a HIGH hold at Python's
 exact heads. A README review completes where Python's first attempt lost card
@@ -50,7 +69,7 @@ Slice 3; these requests were unpaged. 29 three-run ablations isolate the wording
 and release-note effects; full request reconstruction, provenance correction
 (#131 golden versus saved P1 #132), and scores are in the Mechanical regression
 section. Two new wire-contract tests have source-mutation break receipts; all
-239 tests, typecheck and build pass.
+239 tests, typecheck and build passed at that earlier stage.
 The held round-three result has Closed 11: nine fixes and two dismissals, all
 listed. Full comparisons and limitations are in `docs/SLICE4.md`.
 

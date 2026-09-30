@@ -2,12 +2,7 @@
   {
     "id": "pub-clear",
     "name": "Clearance confirms all checks before the SHA-bound approval",
-    "defect": "Remove the wait that makes the approval the last publication write",
-    "sourceBreak": {
-      "file": "src/adapters/publish.ts",
-      "from": "    await confirmReviewCheck(r, reviewConclusion, c);",
-      "to": ""
-    }
+    "defect": "Replace the completed review check with an in-progress readback"
   },
   {
     "id": "pub-hold",
@@ -80,7 +75,7 @@
     "defect": "Stop counting an unconfirmed cleanup disarm as a cleanup failure",
     "sourceBreak": {
       "file": "src/adapters/publish.ts",
-      "from": "            if (!ok) throw new Error(\"disable unconfirmed\");",
+      "from": "              if (!ok) throw new Error(\"disable unconfirmed\");",
       "to": ""
     }
   },
@@ -163,5 +158,45 @@
     "id": "tally-late-advisory",
     "name": "Recalling a late advisory cannot silently turn it into a blocker",
     "defect": "Change its earlier fate from advisory to standing"
+  },
+  {
+    "id": "pub-confirm",
+    "name": "An in-progress review check readback prevents approval",
+    "defect": "Remove the completed review check confirmation",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "    await confirmReviewCheck(r, reviewConclusion, c);",
+      "to": ""
+    }
+  },
+  {
+    "id": "pub-head-after-approval",
+    "name": "Head movement after approval still dismisses approval and disarms auto-merge",
+    "defect": "Restore the admission guard before dismissing approvals",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "      await assertCurrentRun(r, c);\n      const { data } = await client.rest.pulls.dismissReview",
+      "to": "      await guard(r, c);\n      const { data } = await client.rest.pulls.dismissReview"
+    }
+  },
+  {
+    "id": "pub-merged",
+    "name": "A confirmed approval followed by auto-merge succeeds",
+    "defect": "Require the PR to remain open after the confirmed approval",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "    await guard(r, c, decision.mergeEligible);",
+      "to": "    await guard(r, c);"
+    }
+  },
+  {
+    "id": "pub-cleanup-fail",
+    "name": "Cleanup diagnostics identify every failed operation and its cause",
+    "defect": "Discard cleanup labels and error messages",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "          failures.push(\n            `${label} cleanup unconfirmed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,\n          );",
+      "to": "          failures.push(\"cleanup unconfirmed\");"
+    }
   }
 ]

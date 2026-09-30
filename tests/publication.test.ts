@@ -51,7 +51,10 @@ async function wire(mode = "clear", broken = false) {
     });
   const reviews: Record<string, unknown>[] = [];
   const dismissedIds: number[] = [];
-  let armed = mode === "hold" || mode === "disarm-fail";
+  let armed = ["hold", "disarm-fail", "head-after-approval", "merged", "cleanup-fail"].includes(
+    mode,
+  );
+  let merged = false;
   let evaluated = false;
   let moved = false;
   let sequence = 0;
@@ -76,13 +79,14 @@ async function wire(mode = "clear", broken = false) {
       else
         data = {
           node_id: "PR_1",
-          state: defect("closed") ? "closed" : "open",
+          state: defect("closed") || merged ? "closed" : "open",
+          merged,
           draft: defect("draft"),
           head: {
             sha: moved ? "f".repeat(40) : r.head,
             repo: { full_name: defect("fork") ? "other/repo" : r.repository },
           },
-          base: { sha: defect("base") ? "f".repeat(40) : r.base },
+          base: { sha: defect("base") || merged ? "f".repeat(40) : r.base },
           auto_merge: armed ? {} : null,
         };
     } else {
@@ -95,6 +99,21 @@ async function wire(mode = "clear", broken = false) {
           body.conclusion === "success")
       )
         return new Response(JSON.stringify({ message: "Recorded write failure" }), { status: 422 });
+      if (mode === "cleanup-fail") {
+        const message =
+          path === "/graphql"
+            ? "Disarm denied"
+            : path.endsWith("/dismissals")
+              ? "Dismissal denied"
+              : body.conclusion === "action_required"
+                ? "Check denied"
+                : undefined;
+        if (message)
+          return new Response(JSON.stringify({ message }), {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          });
+      }
       if (path === "/graphql") {
         if (!defect("disarm-fail")) armed = false;
         data = { data: { disablePullRequestAutoMerge: { pullRequest: { id: "PR_1" } } } };
@@ -107,11 +126,16 @@ async function wire(mode = "clear", broken = false) {
       } else if (path.endsWith("/reviews")) {
         data = {
           id: ++sequence,
-          commit_id: defect("receipt") ? "f".repeat(40) : body.commit_id,
+          commit_id: defect("receipt") || mode === "cleanup-fail" ? "f".repeat(40) : body.commit_id,
           user: { login: options.actor, type: "Bot" },
           state: body.event === "APPROVE" ? "APPROVED" : "COMMENTED",
         };
         if (!defect("receipt")) reviews.push(data as Record<string, unknown>);
+        if (mode === "head-after-approval") moved = true;
+        if (mode === "merged") {
+          merged = true;
+          armed = false;
+        }
       } else {
         const id = method === "POST" ? ++sequence : Number(path.split("/").at(-1));
         data = {
@@ -122,13 +146,13 @@ async function wire(mode = "clear", broken = false) {
         };
         stored.set(id, data as Record<string, unknown>);
         if (
-          mode === "clear" &&
-          broken &&
+          (mode === "confirm" || (mode === "clear" && broken)) &&
           body.name === options.checks.review &&
           body.conclusion === "success"
         )
           stored.set(id, { ...(data as Record<string, unknown>), status: "in_progress" });
-        if (defect("head") && body.name === options.checks.authority) moved = true;
+        if (mode === "head" && body.name === options.checks.review && body.conclusion === "success")
+          moved = true;
       }
     }
     const response = new Response(JSON.stringify(data), {
@@ -262,7 +286,7 @@ for (const mode of ["closed", "fork", "draft", "base"])
     },
     { kind: "error", evaluated: false, writes: 0 },
   );
-for (const mode of ["head", "start-fail", "review-fail", "identity"])
+for (const mode of ["start-fail", "review-fail", "identity"])
   scenario(
     `pub-${mode}`,
     async (b) => {
@@ -271,6 +295,76 @@ for (const mode of ["head", "start-fail", "review-fail", "identity"])
     },
     { kind: "error", approved: false },
   );
+for (const mode of ["head", "confirm"])
+  scenario(
+    `pub-${mode}`,
+    async () => {
+      const x = await wire(mode);
+      return {
+        kind: x.result.kind,
+        completedWrite: x.writes.some(
+          (w) => w.body.name === options.checks.review && w.body.conclusion === "success",
+        ),
+        approvalAttempted: x.writes.some((w) => w.body.event === "APPROVE"),
+      };
+    },
+    { kind: "error", completedWrite: true, approvalAttempted: false },
+  );
+scenario(
+  "pub-head-after-approval",
+  async () => {
+    const x = await wire("head-after-approval");
+    return {
+      kind: x.result.kind,
+      approved: x.writes.some((w) => w.body.event === "APPROVE"),
+      dismissed: x.dismissedIds.length > 0,
+      disarmed: x.writes.some((w) => String(w.body.query).includes("disablePullRequestAutoMerge")),
+      armed: x.armed,
+      approvalRemains: x.reviews.some((v) => v.state === "APPROVED"),
+    };
+  },
+  {
+    kind: "error",
+    approved: true,
+    dismissed: true,
+    disarmed: true,
+    armed: false,
+    approvalRemains: false,
+  },
+);
+scenario(
+  "pub-merged",
+  async () => {
+    const x = await wire("merged");
+    return {
+      kind: x.result.kind,
+      publication: x.result.kind === "reviewed" ? x.result.publication : undefined,
+      dismissed: x.dismissedIds.length,
+      conclusion: x.final?.conclusion,
+    };
+  },
+  {
+    kind: "reviewed",
+    publication: { recorded: false, head: r.head },
+    dismissed: 0,
+    conclusion: "success",
+  },
+);
+scenario(
+  "pub-cleanup-fail",
+  async () => {
+    const x = await wire("cleanup-fail");
+    return {
+      kind: x.result.kind,
+      diagnostic: x.result.kind === "error" ? x.result.diagnostic : "",
+    };
+  },
+  {
+    kind: "error",
+    diagnostic:
+      "Invalid native review receipt; disable auto-merge cleanup unconfirmed: Disarm denied; dismiss approvals cleanup unconfirmed: Dismissal denied; write error check cleanup unconfirmed: Check denied",
+  },
+);
 scenario(
   "pub-disarm-fail",
   async () => {

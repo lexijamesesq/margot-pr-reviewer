@@ -14,16 +14,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     const [owner = "", repo = ""] = r.repository.split("/");
     return { owner, repo, pull_number: r.pr, request: { signal: c.signal } };
   };
-  async function guard(r: ReviewRequest, c: CallContext) {
-    const { data } = await client.rest.pulls.get(params(r, c));
-    if (
-      data.state !== "open" ||
-      data.draft ||
-      data.head.repo?.full_name !== r.repository ||
-      data.head.sha !== r.head ||
-      data.base.sha !== r.base
-    )
-      throw new Error("Publication refused: admission or revision changed");
+  async function assertCurrentRun(r: ReviewRequest, c: CallContext) {
     const primary = active?.phase === "triage" ? config.checks.triage : config.checks.review;
     const id = ids.get(primary);
     if (id) {
@@ -35,6 +26,18 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       )
         throw new Error("Publication superseded by another run");
     }
+  }
+  async function guard(r: ReviewRequest, c: CallContext, allowMerged = false) {
+    const { data } = await client.rest.pulls.get(params(r, c));
+    await assertCurrentRun(r, c);
+    const merged = allowMerged && data.merged;
+    if (
+      (!merged && (data.state !== "open" || data.base.sha !== r.base)) ||
+      data.draft ||
+      data.head.repo?.full_name !== r.repository ||
+      data.head.sha !== r.head
+    )
+      throw new Error("Publication refused: admission or revision changed");
     return data;
   }
   async function check(
@@ -96,7 +99,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     // An ambiguous approval response is also compensated when its ID was received.
     const reviewIds = new Set([...owned.map((v) => v.id), ...(approvalId ? [approvalId] : [])]);
     for (const review_id of reviewIds) {
-      await guard(r, c);
+      await assertCurrentRun(r, c);
       const { data } = await client.rest.pulls.dismissReview({
         ...params(r, c),
         review_id,
@@ -119,13 +122,15 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       throw new Error("Review check was not confirmed before approval");
   }
   const disableAutoMerge: Services["disableAutoMerge"] = async (r, c) => {
-    const pr = await guard(r, c);
+    const { data: pr } = await client.rest.pulls.get(params(r, c));
+    await assertCurrentRun(r, c);
     if (!pr.auto_merge) return true;
     await client.graphql(
       "mutation($id: ID!) { disablePullRequestAutoMerge(input: {pullRequestId: $id}) { pullRequest { id } } }",
       { id: pr.node_id, request: { signal: c.signal } },
     );
-    return (await guard(r, c)).auto_merge === null;
+    await assertCurrentRun(r, c);
+    return (await client.rest.pulls.get(params(r, c))).data.auto_merge === null;
   };
   async function triage(r: ReviewRequest, classification: string, c: CallContext) {
     await check(
@@ -197,7 +202,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       data.state !== (decision.mergeEligible ? "APPROVED" : "COMMENTED")
     )
       throw new Error("Invalid native review receipt");
-    await guard(r, c);
+    await guard(r, c, decision.mergeEligible);
     return { recorded: false, head: r.head, id: String(data.id) };
   };
   async function run(
@@ -227,27 +232,36 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     } catch (error) {
       const failures: string[] = [];
       // Each cleanup is independent; inability to write can never become a successful result.
-      for (const cleanup of [
-        () =>
-          disableAutoMerge(r, context()).then((ok) => {
-            if (!ok) throw new Error("disable unconfirmed");
-          }),
-        () => withdraw(r, context()),
-        () =>
-          check(
-            r,
-            r.phase === "triage" ? config.checks.triage : config.checks.review,
-            "action_required",
-            "Margot: not reviewed (error)",
-            "Publication or evaluation failed; no clearance.",
-            undefined,
-            context(),
-          ),
-      ]) {
+      const cleanups: [string, () => Promise<unknown>][] = [
+        [
+          "disable auto-merge",
+          () =>
+            disableAutoMerge(r, context()).then((ok) => {
+              if (!ok) throw new Error("disable unconfirmed");
+            }),
+        ],
+        ["dismiss approvals", () => withdraw(r, context())],
+        [
+          "write error check",
+          () =>
+            check(
+              r,
+              r.phase === "triage" ? config.checks.triage : config.checks.review,
+              "action_required",
+              "Margot: not reviewed (error)",
+              "Publication or evaluation failed; no clearance.",
+              undefined,
+              context(),
+            ),
+        ],
+      ];
+      for (const [label, cleanup] of cleanups) {
         try {
           await cleanup();
-        } catch {
-          failures.push("cleanup unconfirmed");
+        } catch (cleanupError) {
+          failures.push(
+            `${label} cleanup unconfirmed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          );
         }
       }
       return {

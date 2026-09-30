@@ -4,7 +4,20 @@ Verified engine branch head is recorded in the workspace hand-over. Verification
 documents are excluded from the npm package. Nothing was pushed, posted,
 dispatched or published. All GitHub publication tests use recorded HTTP targets.
 
-## Clean clone and installed package
+## Publication review revision
+
+The local revision passes `npm ci`, `npm run typecheck`, `npm test`,
+`npm run build` and `npm run test:publication-breaks` on Node 26.3.1.
+All 243 tests pass: 96 core, 55 adapter, 60 ledger and 32 publication/tally.
+The four additional scenarios exercise an in-progress check readback, cleanup
+after a post-approval push, immediate auto-merge and labeled cleanup errors.
+The head-movement case now moves only after the completed review-check write
+and rejects any approval attempt, including one later dismissed by cleanup.
+Staged-file hooks and the operator overlay scan pass. No model or Jev calls
+were made and no GitHub state changed. Package and clean-clone receipts below
+record the earlier 239-test revision; they were not rerun for these changes.
+
+## Earlier clean clone and installed package
 
 A new local clone without shared Git objects installed on Node 22.23.3 and ran:
 
@@ -37,15 +50,19 @@ does not establish ARM64 Linux installation on the Pi.
 
 ## Every new test has a break receipt
 
-There are 31 new Vitest tests: 28 publication/tally and three adapter cases.
-`publication-break-receipts.md` records all 28 isolated breaks against the final
-239-test suite: exactly one named assertion failed for each, 238 passed, then
-239 passed after restoration. Four publisher source removals cover approval-last
-ordering, failed-disarm accounting, the final head recheck and partial-approval
-cleanup. A fifth source mutation adds one to displayed Closed; the reconciliation
-test detects the deliberate miscount. The remaining 23 breaks are controlled
-service/input counterexamples covering hold/disarm, write failures, malformed
-receipts, admission, check adoption, ownership and no-write shadows.
+`publication-break-receipts.md` records 32 isolated breaks against the current
+243-test suite: exactly one named assertion failed for each, 242 passed, then
+243 passed after restoration. Seven publisher source mutations cover completed
+check confirmation, the pre-approval head guard, dismissal after a push, merged
+success, cleanup diagnostics, failed-disarm accounting and partial-approval
+cleanup. A tally source mutation adds one to displayed Closed; reconciliation
+detects the deliberate miscount. The remaining 24 breaks are controlled
+service/input counterexamples.
+
+Earlier head and confirmation receipts mixed a source removal with an input
+flag, so their source-coverage claims were not established. Source mutations
+now run with `MARGOT_ADAPTER_BREAK` empty; only the source change causes the
+failure. The transport cases and corrected receipts replace those claims.
 
 `adapter-break-receipts.md` records 53 isolated breaks at the 234-test stage,
 including all three new adapter tests: shadow history selection, refusal to
