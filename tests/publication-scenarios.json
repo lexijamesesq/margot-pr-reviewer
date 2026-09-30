@@ -1,0 +1,202 @@
+[
+  {
+    "id": "pub-clear",
+    "name": "Clearance confirms all checks before the SHA-bound approval",
+    "defect": "Replace the completed review check with an in-progress readback"
+  },
+  {
+    "id": "pub-hold",
+    "name": "Held review disarms auto-merge and comments with neutral checks",
+    "defect": "Remove the hold"
+  },
+  {
+    "id": "pub-authority",
+    "name": "Authority hold remains neutral on the self-instrument check",
+    "defect": "Remove the authority hold"
+  },
+  {
+    "id": "pub-calibration",
+    "name": "Calibration cannot satisfy the review check",
+    "defect": "Remove calibration hold"
+  },
+  {
+    "id": "pub-triage",
+    "name": "Triage exposes the estate classification JSON without approving",
+    "defect": "Change classification to functional"
+  },
+  {
+    "id": "pub-closed",
+    "name": "Closed PR cannot receive a publication",
+    "defect": "Reopen the PR"
+  },
+  {
+    "id": "pub-fork",
+    "name": "Fork PR cannot receive a publication",
+    "defect": "Restore same-repository head"
+  },
+  {
+    "id": "pub-draft",
+    "name": "Draft PR cannot receive a publication",
+    "defect": "Mark ready for review"
+  },
+  {
+    "id": "pub-base",
+    "name": "Base movement cannot receive a publication",
+    "defect": "Restore requested base"
+  },
+  {
+    "id": "pub-head",
+    "name": "Head movement before approval fails closed",
+    "defect": "Remove the final head recheck immediately before publication",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "    await guard(r, c);\n    const { data } = await client.rest.pulls.createReview({",
+      "to": "    const { data } = await client.rest.pulls.createReview({"
+    }
+  },
+  {
+    "id": "pub-start-fail",
+    "name": "Failure to create the pending gate stops evaluation",
+    "defect": "Allow the initial check write"
+  },
+  {
+    "id": "pub-review-fail",
+    "name": "Failed native review never completes a success check",
+    "defect": "Allow review write"
+  },
+  {
+    "id": "pub-final-fail",
+    "name": "A failed final check cannot leave an approving review",
+    "defect": "Allow the final check write"
+  },
+  {
+    "id": "pub-disarm-fail",
+    "name": "Unconfirmed auto-merge disable cannot publish a held verdict",
+    "defect": "Stop counting an unconfirmed cleanup disarm as a cleanup failure",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "              if (!ok) throw new Error(\"disable unconfirmed\");",
+      "to": ""
+    }
+  },
+  {
+    "id": "pub-error",
+    "name": "Evaluation error withdraws earlier approval and closes the gate",
+    "defect": "Return the clean review"
+  },
+  {
+    "id": "pub-identity",
+    "name": "A wrong-App check receipt cannot approve",
+    "defect": "Return the configured App identity"
+  },
+  {
+    "id": "pub-receipt",
+    "name": "A mismatched native review receipt is compensated",
+    "defect": "Remove cleanup of an approval whose response is not yet list-visible",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": ", ...(approvalId ? [approvalId] : [])",
+      "to": ""
+    }
+  },
+  {
+    "id": "pub-order",
+    "name": "A prior same-head approval is withdrawn before evaluating again",
+    "defect": "Remove prior approval"
+  },
+  {
+    "id": "pub-shadow",
+    "name": "Shadow services record publication without any write credential",
+    "defect": "Select none instead of recorded publication"
+  },
+  {
+    "id": "tally",
+    "name": "New Open Closed reconcile with every listed finding including dismissals and advisories",
+    "defect": "Increment the displayed Closed tally",
+    "sourceBreak": {
+      "file": "src/render.ts",
+      "from": "Closed: ${tally.closed}",
+      "to": "Closed: ${tally.closed + 1}"
+    }
+  },
+  {
+    "id": "tally-history",
+    "name": "Closed entries and late attribution survive later rounds",
+    "defect": "Discard an earlier closed entry"
+  },
+  {
+    "id": "pub-adopt",
+    "name": "The caller pending check is adopted without a stranded duplicate",
+    "defect": "Remove the dispatched check from the recorded target"
+  },
+  {
+    "id": "pub-superseded",
+    "name": "A superseded run cannot close the newer run check or approve",
+    "defect": "Keep the original check ownership"
+  },
+  {
+    "id": "pub-skip-policy",
+    "name": "Only explicitly configured skipped jobs satisfy required checks",
+    "defect": "Remove the skipped job from caller permission"
+  },
+  {
+    "id": "tally-advisory-fix",
+    "name": "An open advisory is recalled and can be closed with fix evidence",
+    "defect": "Omit the confirmed advisory resolution"
+  },
+  {
+    "id": "pub-run-url",
+    "name": "A new workflow run keeps same-head review compatibility but a policy change does not",
+    "defect": "Change the App identity along with the operational run URL"
+  },
+  {
+    "id": "pub-rollback-ledger",
+    "name": "The posted ledger is readable by unchanged Python and retains the exact TypeScript receipt",
+    "defect": "Replace the terminal legacy marker with an incompatible compressed marker"
+  },
+  {
+    "id": "tally-late-advisory",
+    "name": "Recalling a late advisory cannot silently turn it into a blocker",
+    "defect": "Change its earlier fate from advisory to standing"
+  },
+  {
+    "id": "pub-confirm",
+    "name": "An in-progress review check readback prevents approval",
+    "defect": "Remove the completed review check confirmation",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "    await confirmReviewCheck(r, reviewConclusion, c);",
+      "to": ""
+    }
+  },
+  {
+    "id": "pub-head-after-approval",
+    "name": "Head movement after approval still dismisses approval and disarms auto-merge",
+    "defect": "Restore the admission guard before dismissing approvals",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "      await assertCurrentRun(r, c);\n      const { data } = await client.rest.pulls.dismissReview",
+      "to": "      await guard(r, c);\n      const { data } = await client.rest.pulls.dismissReview"
+    }
+  },
+  {
+    "id": "pub-merged",
+    "name": "A confirmed approval followed by auto-merge succeeds",
+    "defect": "Require the PR to remain open after the confirmed approval",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "    await guard(r, c, decision.mergeEligible);",
+      "to": "    await guard(r, c);"
+    }
+  },
+  {
+    "id": "pub-cleanup-fail",
+    "name": "Cleanup diagnostics identify every failed operation and its cause",
+    "defect": "Discard cleanup labels and error messages",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "          failures.push(\n            `${label} cleanup unconfirmed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,\n          );",
+      "to": "          failures.push(\"cleanup unconfirmed\");"
+    }
+  }
+]

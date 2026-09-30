@@ -1,21 +1,41 @@
 import { createHash } from "node:crypto";
 import type { z } from "zod";
+import { review } from "../review.js";
 import { liveConfigSchema, requestSchema } from "../schemas.js";
-import type { Services } from "../types.js";
+import type { ReviewRequest, Services } from "../types.js";
 import { resolveBundle } from "./bundle.js";
 import { type ClaudeOptions, claudeAdapter } from "./claude.js";
 import { githubAdapter, githubClient } from "./github.js";
 import { jevAdapter } from "./jev.js";
+import { githubPublisher } from "./publish.js";
 
 export { liveConfigSchema } from "../schemas.js";
 export type LiveConfig = z.infer<typeof liveConfigSchema>;
-/** Live reads and model calls; every would-be GitHub mutation stays in memory. */
+/** Shadow by default; explicit GitHub mode owns publication through run(). */
 export function liveServices(
   configInput: LiveConfig,
-  credentials: { jevKey: string; githubToken?: string },
+  credentials: { jevKey: string; githubToken?: string; writeToken?: string },
   onResponse?: ClaudeOptions["onResponse"],
 ) {
   const config = liveConfigSchema.parse(configInput);
+  const authority = config.review.publication === "github";
+  if (
+    authority &&
+    (!config.publisher ||
+      !credentials.writeToken ||
+      config.github.freshShadow ||
+      config.github.shadowBeforeHead)
+  )
+    throw new Error(
+      "GitHub publication requires publisher configuration, a separate write token and complete history",
+    );
+  const publisher =
+    authority && config.publisher
+      ? githubPublisher(
+          githubClient(credentials.writeToken ? { token: credentials.writeToken, retries: 0 } : {}),
+          config.publisher,
+        )
+      : undefined;
   const github = githubAdapter(
     githubClient({
       ...(config.github.gh ? { gh: config.github.gh } : {}),
@@ -23,9 +43,12 @@ export function liveServices(
     }),
     config.github,
   );
+  const provenanceConfig = structuredClone(config);
+  // A workflow invocation owns checks, but does not change the review policy.
+  if (provenanceConfig.publisher) provenanceConfig.publisher.runUrl = "";
   const actions: unknown[] = [];
   const services: Services = {
-    provenance: `live-read-only/shadow:${createHash("sha256").update(JSON.stringify(config)).digest("hex")}`,
+    provenance: `live:${authority ? "github" : "shadow"}:${createHash("sha256").update(JSON.stringify(provenanceConfig)).digest("hex")}`,
     ...github,
     ...jevAdapter({ key: credentials.jevKey, model: config.jev.model }),
     ...claudeAdapter({
@@ -47,5 +70,16 @@ export function liveServices(
       return { recorded: true, head: input.expectedHead, id: `shadow-${actions.length}` };
     },
   };
-  return { services, actions };
+  if (publisher) {
+    services.publish = publisher.publish;
+    services.disableAutoMerge = publisher.disableAutoMerge;
+  }
+  return {
+    services,
+    actions,
+    run: (request: ReviewRequest) => {
+      const evaluate = () => review(request, config.review, services);
+      return publisher ? publisher.run(request, evaluate) : evaluate();
+    },
+  };
 }

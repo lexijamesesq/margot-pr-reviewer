@@ -1,9 +1,9 @@
 # Margot PR reviewer
 
 An ESM TypeScript engine for PR reviews and later-round verification, with live GitHub, Jev and
-Claude Code adapters. Slice 3 runs in shadow mode: it records proposed publication
-and auto-merge disarming locally and has no GitHub write implementation. Python
-remains authoritative. Later rounds read authenticated review ledgers without modifying GitHub history.
+Claude Code adapters. Live operation defaults to shadow mode: it records proposed publication
+and auto-merge disarming locally. Explicit GitHub mode posts checks and native
+reviews, and disarms holds. Later rounds read authenticated review ledgers.
 
 ## Install and run the recorded review
 
@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.3.0-slice3.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.4.0.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -59,7 +59,7 @@ The request identifies repository, PR number, exact base/head SHAs, and phase
 result. The service adapter is trusted infrastructure: it must authenticate actors,
 fetch complete evidence, bind facts to both SHAs, honor abort signals, and prevent
 writes if the head changes. Recorded services implement that boundary in memory.
-The live adapter and thin composite Action expose only shadow operation.
+The live adapter and thin composite Action support shadow and explicitly configured GitHub publication.
 
 Configuration has no implicit authority defaults. An explicitly empty protection
 list is allowed; missing configuration is rejected. The recordings show every key:
@@ -69,9 +69,13 @@ list is allowed; missing configuration is rejected. The recordings show every ke
   for a protected path; renames touching either protected endpoint always hold.
 - `requiredChecks`, `trustedCheckActors`, `trustedTriageActors`: caller-owned policy.
   Required checks need one trusted successful receipt on the reviewed head.
+  `allowedSkippedChecks` explicitly permits named skipped jobs; its default is empty.
 - `trustedLedgerActors`: logins of the GitHub Apps allowed to supply review history.
   The default empty list trusts nobody. `github.freshShadow: true` explicitly selects
   an independent first-round experiment; leave it false for convergence.
+  `github.shadowBeforeHead: true` instead omits only reviews on the requested head,
+  preserving earlier-round history for side-by-side shadows. Both options are
+  refused with GitHub publication.
 - `cardBundle.commit`: the exact publish-skills revision. The resolver supplies
   both agents and an absolute path to every card. Each reviewer receives its own
   explicit card path; it never guesses a skill/cache location.
@@ -79,7 +83,7 @@ list is allowed; missing configuration is rejected. The recordings show every ke
   `confidenceThreshold`, `noCouncilConfidenceFloor`: positive probabilities.
   The carried settings are 0.6, 0.35, 0.3, 0.3 and 0.3, respectively.
 - `timeoutMs`: deadline for each service call; a failed or timed-out call is an error.
-- `publication`: `record` or `none`. `calibration: true` always prevents clearance.
+- `publication`: `record`, `none`, or `github`. `calibration: true` always prevents clearance.
 
 The fresh Jev class selects the path; a trusted earlier triage can only raise the
 test profile. Functional outranks documentation, which outranks mechanical.
@@ -89,8 +93,8 @@ questions live in `src/questions.ts`. Playbooks and the voice stay in publish-sk
 The voice model belongs to the bundle's `agents/margot.md`, not ReviewConfig.
 
 The final rating drives both display and eligibility. Every mandatory finding must
-have exactly one disposition. A held review records a proposed auto-merge disable;
-it does not actually disarm anything. A moved head fails even with publication
+have exactly one disposition. Shadow records a proposed auto-merge disable;
+GitHub publication confirms the real disable on holds. A moved head fails even with publication
 set to `none`. A shadow result is not an authorization for an external publisher.
 
 ## Live shadow review on a self-hosted runner
@@ -104,7 +108,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.3.0-slice3.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.4.0.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
@@ -183,14 +187,16 @@ A reviewed result contains `ledger` and `convergence`. The rendered report ends
 with a versioned ledger block. GitHub review author, author type, submitted time
 and commit ID authenticate selection; a malformed or untrusted ledger stops the
 review. The adapter reads every review page. Python v1 ledgers are accepted as
-prior-round inputs. New v2 ledgers use base64-encoded, deflated JSON to keep the
-saved result within GitHub's body limit. Decoding has a one-MiB limit. Oversized
+prior-round inputs. The typed v2 ledger is posted in a v1-compatible JSON envelope with plain entries
+and a compressed `receipt_v2` extension. Unchanged Python reads the same entries;
+TypeScript restores the exact saved receipt. Earlier compressed v2 blocks remain
+readable. Decoding has a one-MiB limit. Oversized
 results fail rather than silently dropping open findings or dismissals.
 
 Cards review the complete unified delta, restricted to the PR's files, plus their
-own standing and dismissed entries. The compare JSON file list is not used as an
+own standing, advisory and dismissed entries. The compare JSON file list is not used as an
 inventory. A rebase, unreadable compare or incomplete diff keeps the ledger and
-uses the already validated full PR evidence. Every card with a standing finding
+uses the already validated full PR evidence. Every card with an open finding
 is recalled, including on mechanical and editorial paths. Matching, fix evidence,
 dismissal reopening and late attribution remain model judgments. The engine does
 not infer finding identity or fixes from line-number arithmetic.
@@ -201,7 +207,7 @@ Nothing escalates or relaxes after round three. A silent MINOR counts as fixed;
 a silent MAJOR or BLOCKING requires Margot's confirmation. Dismissals retain their
 reasons until the delta changes the cited code. A new delta finding must state
 whether it is new, missed, or caused through delta reach; missing attribution fails
-closed. Counts show standing, fixed, new, late and unconfirmed findings.
+closed. The displayed counts are New, Open, Closed, with each finding listed below.
 
 An exact-head retry reuses the authenticated v2 result and counts without model
 calls, after checking configuration, evidence, required checks and current head.
@@ -218,3 +224,38 @@ is a model-quality limitation; the live comparison records its observed effects.
 
 Run `npm run test:breaks` for all recorded, adapter and convergence break receipts.
 See [slice 3 proof](docs/SLICE3.md) for exact live heads, differences and limitations.
+
+## GitHub publication
+
+Set `review.publication` to `github`, leave `github.freshShadow` false and supply
+`publisher` with three check names (`triage`, `review`, `authority`), the App's
+`actor` login, numeric `appId`, and this invocation's unique `runUrl`. Supply a
+read-only `GH_TOKEN` and a separate `MARGOT_WRITE_TOKEN`. The latter needs checks
+and pull-request write access, plus the permission needed to disable auto-merge.
+It is never forwarded to the model environment or read-only evidence server.
+The CLI calls `liveServices(...).run(request)`; API consumers using publication
+must use that lifecycle too. Calling its publisher outside the lifecycle fails.
+
+The publisher adopts the caller's check by App, name and head, records run
+ownership and refuses to let a superseded invocation close the newer run's check.
+It withdraws earlier App approvals before reevaluation, keeps the required check
+pending, then publishes classification, authority status and the SHA-bound native
+review. Every check write must succeed before the eligible native approval is posted.
+Reviewed holds use COMMENT and neutral; errors use action_required. It never
+requests changes at GitHub's review gate, enables auto-merge, or merges.
+Every write rechecks head/base and admission. Partial failures attempt to disarm,
+withdraw approvals and close the gate. A failed cleanup remains an error; an API
+outage can leave the check pending. GitHub has no transaction spanning these
+writes, so same-head writers must share the caller's PR concurrency group.
+
+New counts issues first raised this round. Open counts standing and advisory
+issues. Closed counts retained fixed and dismissed issues. Every ledger issue
+appears exactly once below the tally, with its fate, first-round marker and late
+attribution. Closed history remains visible in later rounds; notes are separate
+and are not issues. These are the operator's three labels, not Python arithmetic.
+The saved receipt retains old diagnostic counters for compatibility; the
+visible tally is derived from the listed entries. Oversize history fails closed.
+
+The self-hosted sample workflow installs the exact release. No hosted-runner
+sample is supplied. Publication remains subject to a consumer's reversible live
+canary; see `docs/SLICE4.md` for the local proof and its limits.

@@ -8,6 +8,7 @@ export function createBreakHarness(output) {
     "tests/scenarios.json",
     "tests/adapter-scenarios.json",
     "tests/ledger-scenarios.json",
+    "tests/publication-scenarios.json",
   ].reduce((count, file) => count + JSON.parse(readFileSync(file, "utf8")).length, 0);
   let restore;
   function run(id) {

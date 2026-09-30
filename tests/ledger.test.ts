@@ -448,10 +448,10 @@ scenario(
         core([], b ? voice("established") : null),
         config,
         facts,
-      ).ledger.entries.map((e) => e.key),
+      ).ledger.entries.map((e) => `${e.key}:${e.status}`),
     };
   },
-  { entries: ["R1-F2"] },
+  { entries: ["R1-F1:fixed", "R1-F2:dismissed"] },
 );
 scenario("ledger-budget", (b) =>
   rejects(() => ledgerBlock(prior([{ ...entry(), what: "x".repeat(b ? 10 : 50000) }]))),

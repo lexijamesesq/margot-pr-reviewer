@@ -7,6 +7,7 @@ import { resolveBundle } from "../src/adapters/bundle.js";
 import { claudeAdapter, claudeEnvironment } from "../src/adapters/claude.js";
 import { ghFetch, githubAdapter } from "../src/adapters/github.js";
 import { jevAdapter } from "../src/adapters/jev.js";
+import { liveServices } from "../src/adapters/live.js";
 import { execute } from "../src/adapters/process.js";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
@@ -22,6 +23,7 @@ import {
   routeSchema,
 } from "../src/schemas.js";
 import cases from "./adapter-scenarios.json" with { type: "json" };
+import measuredP1 from "./p1-questions.json" with { type: "json" };
 
 const recording = JSON.parse(
   await readFile(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
@@ -54,6 +56,7 @@ function cardText() {
 function github(
   overrides: {
     pageTwo?: boolean;
+    shadowBeforeHead?: boolean;
     base?: string;
     count?: number;
     patch?: string | null;
@@ -107,7 +110,9 @@ function github(
     } else if (url.pathname.endsWith("/check-runs")) data = { total_count: 0, check_runs: [] };
     else if (url.pathname.endsWith("/reviews")) {
       if (overrides.historyFailure) throw new Error("History unavailable");
-      data = overrides.ledger ? [{ body: "<!-- margot-ledger:v1 unknown -->" }] : [];
+      data = overrides.ledger
+        ? [{ body: "<!-- margot-ledger:v1 unknown -->", commit_id: request.head }]
+        : [];
     } else {
       pulls++;
       pull.head.sha = overrides.moved && pulls > 1 ? "f".repeat(40) : request.head;
@@ -134,7 +139,10 @@ function github(
     retry: { enabled: false },
     throttle: { enabled: false },
   });
-  return { adapter: githubAdapter(client), calls };
+  return {
+    adapter: githubAdapter(client, { shadowBeforeHead: overrides.shadowBeforeHead ?? false }),
+    calls,
+  };
 }
 scenario("pagination", async (broken) => {
   const { adapter, calls } = github({ pageTwo: !broken, count: broken ? 1 : 2 });
@@ -218,6 +226,38 @@ scenario("jev-class", async (broken) => {
   const j = jev({ ...classes, mechanical: { type: "noul", noul: broken ? 0 : 1 } });
   const result = await j.adapter.classify(facts, classificationQuestions, context());
   return { ok: classificationSchema.parse(result).mechanical === 1 };
+});
+scenario("jev-measured-p1", async () => {
+  const j = jev(classes);
+  await j.adapter.classify(facts, classificationQuestions, context());
+  // Compare the actual wire request with the independently retained eval contract.
+  return {
+    ok:
+      JSON.stringify((j.calls[0] as { questions: unknown }).questions) ===
+      JSON.stringify(measuredP1),
+  };
+});
+scenario("jev-classification-code-only", async () => {
+  const j = jev(classes);
+  await j.adapter.classify(
+    {
+      ...facts,
+      title: "External release changes",
+      body: "New external behavior",
+      author: "release-bot",
+    },
+    classificationQuestions,
+    context(),
+  );
+  const sent = (j.calls[0] as { state: Record<string, unknown> }).state;
+  return {
+    ok:
+      j.calls.length === 1 &&
+      sent.diff === facts.diff &&
+      sent.head === facts.head &&
+      sent.base === facts.base &&
+      ["title", "body", "author", "history"].every((name) => !(name in sent)),
+  };
 });
 scenario("jev-invalid", (broken) =>
   rejects(() =>
@@ -491,6 +531,7 @@ async function fakeClaude(
       `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
+  if (process.env.MARGOT_WRITE_TOKEN) process.exit(19);
   console.log(${JSON.stringify(options.version ?? "0.0.1 test")});
 } else {
   console.log(JSON.stringify(${JSON.stringify({ type: "system", subtype: "init", tools: options.tools ?? [] })}));
@@ -790,5 +831,46 @@ scenario("bundle-dirty", async (broken) => {
     return await rejects(() => resolveBundle(root, sha, context()));
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+scenario(
+  "shadow-before-head",
+  async (b) => {
+    const facts = await github({ ledger: true, shadowBeforeHead: !b }).adapter.facts(
+      request,
+      context(),
+    );
+    return { priorLedger: facts.history.priorLedger };
+  },
+  { priorLedger: false },
+);
+scenario("shadow-cannot-publish", async (b) => {
+  const config = JSON.parse(
+    await readFile(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
+  );
+  config.review.publication = "github";
+  config.github.shadowBeforeHead = !b;
+  config.publisher = {
+    checks: { triage: "triage", review: "review", authority: "authority" },
+    actor: "example[bot]",
+    appId: 1,
+    runUrl: "https://example.invalid/run/1",
+  };
+  return rejects(async () => {
+    liveServices(config, { jevKey: "unused", writeToken: "unused" });
+  });
+});
+scenario("claude-probe-credential", async () => {
+  const previous = process.env.MARGOT_WRITE_TOKEN;
+  process.env.MARGOT_WRITE_TOKEN = "test-only-publication-credential";
+  try {
+    await fakeClaude();
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  } finally {
+    if (previous === undefined) delete process.env.MARGOT_WRITE_TOKEN;
+    else process.env.MARGOT_WRITE_TOKEN = previous;
   }
 });

@@ -1,5 +1,5 @@
-name: Margot shadow review
-description: Run the installed Margot package with live reads and recorded publication
+name: Margot review
+description: Run the installed Margot package with caller-configured publication
 inputs:
   request:
     description: Absolute path to the SHA-bound request JSON

@@ -1,0 +1,694 @@
+{
+  "model": "jev-1.13.0",
+  "provenance": "#131 P1 request newly reconstructed using the P1 harness; no saved #131 P1 trial exists. Saved P1 #132 is separate.",
+  "vaultReads": 2,
+  "jevHttpAttempts": 100,
+  "claudeCalls": 1,
+  "artifacts": {
+    "engine-request.json": "a5d408ef271dd20dd6b35b5ce9dbf3c86efd4a655715406a435d406d1154d346",
+    "p1-reconstructed-request.json": "e8213dcb8832624e59e7dd8cd7b01f03f5e6f4f83eeac62ffefc18db64caca14",
+    "variants.json": "13ed8bf045268c67f37a9d4e33c413ec2cef9f197b69816cb4807c0555f9ffb7",
+    "ablation.json": "470d9f49582f3dcb9fd0b6fcccf25ca2bc14f0475a601552c16fb27da93ee99b",
+    "shadow.json": "02d87983b00642508e1e36ca4a9f98f9d1a7d00b58ba175c03b7b9ee14aafaad",
+    "prepare.py": "ecd44348566568d9408b2a671f36f1156a38e723286357252a5ace1897f0875a",
+    "replay.mjs": "fb0d104584ad21e6432830b61b2611c391e1aa46f2cb373c32ab53eee25216c3",
+    "shadow.mjs": "141e61bbcd09fe7ef53a169f6499e1d71b5bae5d0f56d8adcc2cab35f4d267a0"
+  },
+  "ablations": {
+    "engine": [
+      {
+        "functional": 0.57,
+        "documentation": 0.23,
+        "mechanical": 0.55
+      },
+      {
+        "functional": 0.58,
+        "documentation": 0.22,
+        "mechanical": 0.54
+      },
+      {
+        "functional": 0.58,
+        "documentation": 0.22,
+        "mechanical": 0.52
+      }
+    ],
+    "p1-questions": [
+      {
+        "functional": 0.11,
+        "documentation": 0.03,
+        "mechanical": 0.94
+      },
+      {
+        "functional": 0.1,
+        "documentation": 0.02,
+        "mechanical": 0.94
+      },
+      {
+        "functional": 0.12,
+        "documentation": 0.03,
+        "mechanical": 0.95
+      }
+    ],
+    "question-functional": [
+      {
+        "functional": 0.11,
+        "documentation": 0.21,
+        "mechanical": 0.57
+      },
+      {
+        "functional": 0.11,
+        "documentation": 0.22,
+        "mechanical": 0.55
+      },
+      {
+        "functional": 0.12,
+        "documentation": 0.22,
+        "mechanical": 0.51
+      }
+    ],
+    "question-documentation": [
+      {
+        "functional": 0.58,
+        "documentation": 0.02,
+        "mechanical": 0.53
+      },
+      {
+        "functional": 0.56,
+        "documentation": 0.02,
+        "mechanical": 0.57
+      },
+      {
+        "functional": 0.58,
+        "documentation": 0.03,
+        "mechanical": 0.54
+      }
+    ],
+    "question-mechanical": [
+      {
+        "functional": 0.58,
+        "documentation": 0.21,
+        "mechanical": 0.95
+      },
+      {
+        "functional": 0.58,
+        "documentation": 0.21,
+        "mechanical": 0.94
+      },
+      {
+        "functional": 0.59,
+        "documentation": 0.21,
+        "mechanical": 0.95
+      }
+    ],
+    "definition-only": [
+      {
+        "functional": 0.36,
+        "documentation": 0.27,
+        "mechanical": 0.9
+      },
+      {
+        "functional": 0.34,
+        "documentation": 0.32,
+        "mechanical": 0.87
+      },
+      {
+        "functional": 0.37,
+        "documentation": 0.33,
+        "mechanical": 0.88
+      }
+    ],
+    "question-endings-only": [
+      {
+        "functional": 0.39,
+        "documentation": 0.17,
+        "mechanical": 0.67
+      },
+      {
+        "functional": 0.4,
+        "documentation": 0.17,
+        "mechanical": 0.68
+      },
+      {
+        "functional": 0.41,
+        "documentation": 0.2,
+        "mechanical": 0.66
+      }
+    ],
+    "version-exception-only": [
+      {
+        "functional": 0.3,
+        "documentation": 0.22,
+        "mechanical": 0.81
+      },
+      {
+        "functional": 0.32,
+        "documentation": 0.21,
+        "mechanical": 0.81
+      },
+      {
+        "functional": 0.3,
+        "documentation": 0.21,
+        "mechanical": 0.83
+      }
+    ],
+    "unchanged-context": [
+      {
+        "functional": 0.42,
+        "documentation": 0.21,
+        "mechanical": 0.62
+      },
+      {
+        "functional": 0.44,
+        "documentation": 0.22,
+        "mechanical": 0.61
+      },
+      {
+        "functional": 0.38,
+        "documentation": 0.22,
+        "mechanical": 0.59
+      }
+    ],
+    "mechanical-scope": [
+      {
+        "functional": 0.4,
+        "documentation": 0.19,
+        "mechanical": 0.81
+      },
+      {
+        "functional": 0.37,
+        "documentation": 0.19,
+        "mechanical": 0.78
+      },
+      {
+        "functional": 0.38,
+        "documentation": 0.19,
+        "mechanical": 0.79
+      }
+    ],
+    "functional-detail": [
+      {
+        "functional": 0.38,
+        "documentation": 0.29,
+        "mechanical": 0.59
+      },
+      {
+        "functional": 0.4,
+        "documentation": 0.31,
+        "mechanical": 0.55
+      },
+      {
+        "functional": 0.37,
+        "documentation": 0.3,
+        "mechanical": 0.57
+      }
+    ],
+    "documentation-detail": [
+      {
+        "functional": 0.64,
+        "documentation": 0.12,
+        "mechanical": 0.48
+      },
+      {
+        "functional": 0.69,
+        "documentation": 0.13,
+        "mechanical": 0.49
+      },
+      {
+        "functional": 0.67,
+        "documentation": 0.13,
+        "mechanical": 0.45
+      }
+    ],
+    "fallback": [
+      {
+        "functional": 0.44,
+        "documentation": 0.21,
+        "mechanical": 0.57
+      },
+      {
+        "functional": 0.4,
+        "documentation": 0.22,
+        "mechanical": 0.52
+      },
+      {
+        "functional": 0.44,
+        "documentation": 0.22,
+        "mechanical": 0.58
+      }
+    ],
+    "omit-title": [
+      {
+        "functional": 0.61,
+        "documentation": 0.23,
+        "mechanical": 0.46
+      },
+      {
+        "functional": 0.59,
+        "documentation": 0.22,
+        "mechanical": 0.46
+      },
+      {
+        "functional": 0.57,
+        "documentation": 0.23,
+        "mechanical": 0.45
+      }
+    ],
+    "omit-body": [
+      {
+        "functional": 0.5,
+        "documentation": 0.12,
+        "mechanical": 0.67
+      },
+      {
+        "functional": 0.49,
+        "documentation": 0.13,
+        "mechanical": 0.67
+      },
+      {
+        "functional": 0.49,
+        "documentation": 0.12,
+        "mechanical": 0.68
+      }
+    ],
+    "omit-author": [
+      {
+        "functional": 0.58,
+        "documentation": 0.22,
+        "mechanical": 0.53
+      },
+      {
+        "functional": 0.59,
+        "documentation": 0.21,
+        "mechanical": 0.54
+      },
+      {
+        "functional": 0.57,
+        "documentation": 0.22,
+        "mechanical": 0.52
+      }
+    ],
+    "omit-base": [
+      {
+        "functional": 0.58,
+        "documentation": 0.21,
+        "mechanical": 0.58
+      },
+      {
+        "functional": 0.56,
+        "documentation": 0.21,
+        "mechanical": 0.56
+      },
+      {
+        "functional": 0.54,
+        "documentation": 0.21,
+        "mechanical": 0.55
+      }
+    ],
+    "omit-head": [
+      {
+        "functional": 0.56,
+        "documentation": 0.21,
+        "mechanical": 0.58
+      },
+      {
+        "functional": 0.56,
+        "documentation": 0.23,
+        "mechanical": 0.53
+      },
+      {
+        "functional": 0.55,
+        "documentation": 0.2,
+        "mechanical": 0.57
+      }
+    ],
+    "omit-complete": [
+      {
+        "functional": 0.56,
+        "documentation": 0.21,
+        "mechanical": 0.53
+      },
+      {
+        "functional": 0.59,
+        "documentation": 0.22,
+        "mechanical": 0.54
+      },
+      {
+        "functional": 0.57,
+        "documentation": 0.22,
+        "mechanical": 0.53
+      }
+    ],
+    "omit-checks": [
+      {
+        "functional": 0.57,
+        "documentation": 0.2,
+        "mechanical": 0.56
+      },
+      {
+        "functional": 0.57,
+        "documentation": 0.22,
+        "mechanical": 0.56
+      },
+      {
+        "functional": 0.57,
+        "documentation": 0.21,
+        "mechanical": 0.55
+      }
+    ],
+    "omit-triage": [
+      {
+        "functional": 0.55,
+        "documentation": 0.22,
+        "mechanical": 0.54
+      },
+      {
+        "functional": 0.57,
+        "documentation": 0.22,
+        "mechanical": 0.53
+      },
+      {
+        "functional": 0.6,
+        "documentation": 0.22,
+        "mechanical": 0.53
+      }
+    ],
+    "omit-autoMergeArmed": [
+      {
+        "functional": 0.56,
+        "documentation": 0.19,
+        "mechanical": 0.54
+      },
+      {
+        "functional": 0.51,
+        "documentation": 0.21,
+        "mechanical": 0.55
+      },
+      {
+        "functional": 0.54,
+        "documentation": 0.2,
+        "mechanical": 0.56
+      }
+    ],
+    "omit-prose": [
+      {
+        "functional": 0.54,
+        "documentation": 0.13,
+        "mechanical": 0.57
+      },
+      {
+        "functional": 0.53,
+        "documentation": 0.13,
+        "mechanical": 0.6
+      },
+      {
+        "functional": 0.52,
+        "documentation": 0.12,
+        "mechanical": 0.6
+      }
+    ],
+    "add-ownership": [
+      {
+        "functional": 0.56,
+        "documentation": 0.23,
+        "mechanical": 0.53
+      },
+      {
+        "functional": 0.59,
+        "documentation": 0.21,
+        "mechanical": 0.51
+      },
+      {
+        "functional": 0.56,
+        "documentation": 0.22,
+        "mechanical": 0.51
+      }
+    ],
+    "file-list-format": [
+      {
+        "functional": 0.59,
+        "documentation": 0.2,
+        "mechanical": 0.58
+      },
+      {
+        "functional": 0.57,
+        "documentation": 0.21,
+        "mechanical": 0.58
+      },
+      {
+        "functional": 0.57,
+        "documentation": 0.2,
+        "mechanical": 0.57
+      }
+    ],
+    "text-format-same-fields": [
+      {
+        "functional": 0.59,
+        "documentation": 0.22,
+        "mechanical": 0.54
+      },
+      {
+        "functional": 0.55,
+        "documentation": 0.22,
+        "mechanical": 0.54
+      },
+      {
+        "functional": 0.56,
+        "documentation": 0.21,
+        "mechanical": 0.55
+      }
+    ],
+    "p1-state": [
+      {
+        "functional": 0.51,
+        "documentation": 0.12,
+        "mechanical": 0.62
+      },
+      {
+        "functional": 0.52,
+        "documentation": 0.13,
+        "mechanical": 0.63
+      },
+      {
+        "functional": 0.53,
+        "documentation": 0.12,
+        "mechanical": 0.62
+      }
+    ],
+    "p1-full": [
+      {
+        "functional": 0.09,
+        "documentation": 0.02,
+        "mechanical": 0.94
+      },
+      {
+        "functional": 0.11,
+        "documentation": 0.02,
+        "mechanical": 0.93
+      },
+      {
+        "functional": 0.11,
+        "documentation": 0.02,
+        "mechanical": 0.94
+      }
+    ],
+    "python-wire-format": [
+      {
+        "functional": 0.56,
+        "documentation": 0.21,
+        "mechanical": 0.52
+      },
+      {
+        "functional": 0.54,
+        "documentation": 0.21,
+        "mechanical": 0.55
+      },
+      {
+        "functional": 0.6,
+        "documentation": 0.2,
+        "mechanical": 0.56
+      }
+    ]
+  },
+  "shadows": [
+    {
+      "name": "margot-pr-reviewer-7",
+      "head": "439feb449780eb0190187667e8dbe68d8dc35a57",
+      "repeat": 1,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.11,
+        "documentation": 0.02,
+        "mechanical": 0.92
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "margot-pr-reviewer-7",
+      "head": "439feb449780eb0190187667e8dbe68d8dc35a57",
+      "repeat": 2,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.11,
+        "documentation": 0.02,
+        "mechanical": 0.92
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "margot-pr-reviewer-7",
+      "head": "439feb449780eb0190187667e8dbe68d8dc35a57",
+      "repeat": 3,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.1,
+        "documentation": 0.02,
+        "mechanical": 0.93
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "core-skills-131",
+      "head": "582f517acbd978e08621197517a66ed830b8448f",
+      "repeat": 1,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.09,
+        "documentation": 0.02,
+        "mechanical": 0.95
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "core-skills-131",
+      "head": "582f517acbd978e08621197517a66ed830b8448f",
+      "repeat": 2,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.09,
+        "documentation": 0.02,
+        "mechanical": 0.93
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "core-skills-131",
+      "head": "582f517acbd978e08621197517a66ed830b8448f",
+      "repeat": 3,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.1,
+        "documentation": 0.02,
+        "mechanical": 0.94
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "margot-pr-reviewer-3",
+      "head": "1e9efd604d67a7e5395d892a01320c9bf2a6b33c",
+      "repeat": 1,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.07,
+        "documentation": 0.02,
+        "mechanical": 0.94
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "margot-pr-reviewer-3",
+      "head": "1e9efd604d67a7e5395d892a01320c9bf2a6b33c",
+      "repeat": 2,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.08,
+        "documentation": 0.02,
+        "mechanical": 0.94
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "margot-pr-reviewer-3",
+      "head": "1e9efd604d67a7e5395d892a01320c9bf2a6b33c",
+      "repeat": 3,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.09,
+        "documentation": 0.02,
+        "mechanical": 0.94
+      },
+      "classification": "mechanical",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "margot-pr-reviewer-2",
+      "head": "4fad52cd3652586829113741dfea318af36d0fe0",
+      "repeat": 1,
+      "phase": "review",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.02,
+        "documentation": 0.97,
+        "mechanical": 0.04
+      },
+      "classification": "documentation",
+      "band": "LOW",
+      "eligible": true
+    },
+    {
+      "name": "margot-pr-reviewer-2",
+      "head": "4fad52cd3652586829113741dfea318af36d0fe0",
+      "repeat": 2,
+      "phase": "triage",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.02,
+        "documentation": 0.96,
+        "mechanical": 0.04
+      },
+      "classification": "documentation",
+      "band": null,
+      "eligible": null
+    },
+    {
+      "name": "margot-pr-reviewer-2",
+      "head": "4fad52cd3652586829113741dfea318af36d0fe0",
+      "repeat": 3,
+      "phase": "triage",
+      "probabilities": {
+        "source": "jev",
+        "functional": 0.02,
+        "documentation": 0.97,
+        "mechanical": 0.04
+      },
+      "classification": "documentation",
+      "band": null,
+      "eligible": null
+    }
+  ]
+}

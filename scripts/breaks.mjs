@@ -27,7 +27,11 @@ try {
     restoreSource();
     writeFileSync(path, original);
     requireAssertionFailures(result);
-    if (result.failed.length !== 1 || result.failed[0].title !== scenario.name)
+    const expectedFailures = [scenario.name, ...(scenario.alsoFails ?? [])];
+    if (
+      result.failed.length !== expectedFailures.length ||
+      !expectedFailures.every((name) => result.failed.some((test) => test.title === name))
+    )
       throw new Error(
         `Break ${index + 1} did not fail only ${scenario.name}: ${result.failed.map((test) => test.title)}`,
       );
@@ -63,7 +67,7 @@ try {
   );
   writeFileSync(
     receiptPath,
-    `# Test and deliberate-break receipts\n\nRun: ${new Date().toISOString()}. Node ${process.version}.\n\nBaseline: ${baseline.report.numPassedTests}/${baseline.report.numTotalTests} passed. Each scenario break changes the named scenario's service output/caller input, or its explicitly declared source mutation; expected assertions stay unchanged. Every run executes the full suite. For each scenario break, the one named test failed at its behavioral result assertion, with all other tests passing. Each break was reverted before the next run. Restored baseline: ${restored.report.numPassedTests}/${baseline.report.numTotalTests} passed.\n\nMost breaks mutate only their own scenario input. For those breaks, the harness guarantees that other scenarios are unchanged, so the observed one-failure result cannot reveal a duplicated test. These are controlled service/input counterexamples plus declared source mutations, not a claim of independent or exhaustive implementation mutation coverage. Error scenarios repair exactly the invalid response to prove that the error test distinguishes it from usable evidence. Classification question tests protect the text sent to Jev, not Jev's interpretation of it. Exact paths, values, and expectations are in tests/scenarios.json and tests/source-breaks.json; run npm run test:breaks.\n\n${sourceSummary}\n\nScenario SHA-256: ${digest}.\n\nSource mutation SHA-256: ${sourceDigest}.\n\n| # | Single failing test | Deliberate break | Observed |\n| --- | --- | --- | --- |\n${rows.join("\n")}\n\n## Source mutations\n\n| Mutation | Observed failing tests | Result |\n| --- | --- | --- |\n${sourceRows.join("\n")}\n`,
+    `# Test and deliberate-break receipts\n\nRun: ${new Date().toISOString()}. Node ${process.version}.\n\nBaseline: ${baseline.report.numPassedTests}/${baseline.report.numTotalTests} passed. Each scenario break changes the named scenario's service output/caller input, or its explicitly declared source mutation; expected assertions stay unchanged. Every run executes the full suite. For each scenario break, the named test and any explicitly declared alsoFails tests failed, with all other tests passing. The two older prompt-rule mutations also fail the complete P1 wire contract. Each break was reverted before the next run. Restored baseline: ${restored.report.numPassedTests}/${baseline.report.numTotalTests} passed.\n\nMost breaks mutate only their own scenario input. For those breaks, the harness guarantees that other scenarios are unchanged, so the observed one-failure result cannot reveal a duplicated test. These are controlled service/input counterexamples plus declared source mutations, not a claim of independent or exhaustive implementation mutation coverage. Error scenarios repair exactly the invalid response to prove that the error test distinguishes it from usable evidence. Classification question tests protect the text sent to Jev, not Jev's interpretation of it. Exact paths, values, and expectations are in tests/scenarios.json and tests/source-breaks.json; run npm run test:breaks.\n\n${sourceSummary}\n\nScenario SHA-256: ${digest}.\n\nSource mutation SHA-256: ${sourceDigest}.\n\n| # | Single failing test | Deliberate break | Observed |\n| --- | --- | --- | --- |\n${rows.join("\n")}\n\n## Source mutations\n\n| Mutation | Observed failing tests | Result |\n| --- | --- | --- |\n${sourceRows.join("\n")}\n`,
   );
   process.stdout.write(
     `Receipts: ${rows.length} scenario breaks and ${sourceRuns.length} source mutations caught; restored ${restored.report.numPassedTests}/${baseline.report.numTotalTests} passed.\n`,

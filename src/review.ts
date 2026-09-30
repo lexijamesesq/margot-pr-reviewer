@@ -122,7 +122,8 @@ export async function review(
         !checks.every(
           (check) =>
             check.head === request.head &&
-            check.conclusion === "success" &&
+            (check.conclusion === "success" ||
+              (check.conclusion === "skipped" && config.allowedSkippedChecks.includes(name))) &&
             config.trustedCheckActors.includes(check.actor),
         )
       )
@@ -199,7 +200,9 @@ export async function review(
                         round: {
                           ...scope,
                           entries: scope.entries.filter(
-                            (e) => e.card === name && ["standing", "dismissed"].includes(e.status),
+                            (e) =>
+                              e.card === name &&
+                              ["standing", "dismissed", "advisory"].includes(e.status),
                           ),
                         },
                       },
@@ -273,7 +276,7 @@ export async function review(
       request.head
     )
       throw new Error("Head moved before publication");
-    if (config.publication === "record") {
+    if (config.publication !== "none") {
       if (
         !result.decision.mergeEligible &&
         facts.autoMergeArmed &&
