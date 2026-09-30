@@ -330,15 +330,18 @@
     "questionContract": {
       "key": "mechanical",
       "rules": [
-        "Judge changed lines, never author, source, extension or size.",
-        "Version bumps and behavior-preserving formatting are mechanical."
+        "Judge what changed, not the author, generator, file extension, or size.",
+        "behavior-preserving lint/format changes."
       ]
     },
     "sourceBreak": {
       "file": "src/questions.ts",
-      "from": "Version bumps and behavior-preserving formatting are mechanical. ",
+      "from": "behavior-preserving lint/format changes. ",
       "to": ""
-    }
+    },
+    "alsoFails": [
+      "Jev classification sends the exact measured P1 questions"
+    ]
   },
   {
     "name": "classification question tells Jev agent instructions are functional",
@@ -365,14 +368,18 @@
     "questionContract": {
       "key": "functional",
       "rules": [
-        "Agent instructions, directives, tests, paths and executable settings are functional."
+        "Text that a tool or an agent reads to change behaviour is FUNCTIONAL",
+        "agent or skill instructions"
       ]
     },
     "sourceBreak": {
       "file": "src/questions.ts",
-      "from": "Agent instructions, directives, tests, paths and executable settings are functional. ",
+      "from": "agent or skill instructions, ",
       "to": ""
-    }
+    },
+    "alsoFails": [
+      "Jev classification sends the exact measured P1 questions"
+    ]
   },
   {
     "name": "substantive documentation defaults to works-and-proven",

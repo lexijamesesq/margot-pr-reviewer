@@ -31,7 +31,8 @@
     "audit:recordings": "node scripts/audit-recordings.mjs",
     "test:adapter-breaks": "node scripts/adapter-breaks.mjs",
     "test:ledger-breaks": "node scripts/ledger-breaks.mjs",
-    "test:publication-breaks": "node scripts/publication-breaks.mjs"
+    "test:publication-breaks": "node scripts/publication-breaks.mjs",
+    "test:mechanical-breaks": "node scripts/mechanical-breaks.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",

@@ -132,7 +132,10 @@ export function jevAdapter(options: {
       ]),
     );
   const classify: Services["classify"] = async (facts, questions, c) => {
-    const a = await decide(nouls(questions), facts, c);
+    // Match the measured classifier's code-only evidence. Release notes and author
+    // claims describe external behavior and must not change the light-path decision.
+    const { title: _title, body: _body, author: _author, ...evidence } = facts;
+    const a = await decide(nouls(questions), evidence, c);
     return classificationSchema.parse({
       source: "jev",
       ...Object.fromEntries(Object.keys(questions).map((k) => [k, noul.parse(a[k]).noul])),

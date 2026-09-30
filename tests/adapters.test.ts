@@ -23,6 +23,7 @@ import {
   routeSchema,
 } from "../src/schemas.js";
 import cases from "./adapter-scenarios.json" with { type: "json" };
+import measuredP1 from "./p1-questions.json" with { type: "json" };
 
 const recording = JSON.parse(
   await readFile(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
@@ -225,6 +226,38 @@ scenario("jev-class", async (broken) => {
   const j = jev({ ...classes, mechanical: { type: "noul", noul: broken ? 0 : 1 } });
   const result = await j.adapter.classify(facts, classificationQuestions, context());
   return { ok: classificationSchema.parse(result).mechanical === 1 };
+});
+scenario("jev-measured-p1", async () => {
+  const j = jev(classes);
+  await j.adapter.classify(facts, classificationQuestions, context());
+  // Compare the actual wire request with the independently retained eval contract.
+  return {
+    ok:
+      JSON.stringify((j.calls[0] as { questions: unknown }).questions) ===
+      JSON.stringify(measuredP1),
+  };
+});
+scenario("jev-classification-code-only", async () => {
+  const j = jev(classes);
+  await j.adapter.classify(
+    {
+      ...facts,
+      title: "External release changes",
+      body: "New external behavior",
+      author: "release-bot",
+    },
+    classificationQuestions,
+    context(),
+  );
+  const sent = (j.calls[0] as { state: Record<string, unknown> }).state;
+  return {
+    ok:
+      j.calls.length === 1 &&
+      sent.diff === facts.diff &&
+      sent.head === facts.head &&
+      sent.base === facts.base &&
+      ["title", "body", "author", "history"].every((name) => !(name in sent)),
+  };
 });
 scenario("jev-invalid", (broken) =>
   rejects(() =>

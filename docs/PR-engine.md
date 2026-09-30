@@ -38,14 +38,24 @@ with the same decisions, new reconciled tallies and identical no-model retries.
 
 Read-only live shadows cover all three engine classes and a HIGH hold at Python's
 exact heads. A README review completes where Python's first attempt lost card
-reports. One ambiguous bump remains LOW after functional review; another becomes
-MEDIUM and held. These are retained model differences, not claimed finding parity.
+reports. Restoring the complete measured P1 classification wording and excluding
+author prose fixes both missed hook bumps at the unchanged 0.60 threshold.
+Mechanical scores: #7 0.59 → 0.92/0.92/0.93; core-skills #131 0.55 →
+0.95/0.93/0.94; #3 0.64 → 0.94/0.94/0.94. The README remains documentation.
+All three bumps finish LOW and eligible without Claude. The cause predates
+Slice 3; these requests were unpaged. 29 three-run ablations isolate the wording
+and release-note effects; full request reconstruction, provenance correction
+(#131 golden versus saved P1 #132), and scores are in the Mechanical regression
+section. Two new wire-contract tests have source-mutation break receipts; all
+239 tests, typecheck and build pass.
 The held round-three result has Closed 11: nine fixes and two dismissals, all
 listed. Full comparisons and limitations are in `docs/SLICE4.md`.
 
 Total live use: three Jev credential reads, 19 Jev HTTP requests, ten completed
 Claude review calls, reported cost $1.647863. Keys remained in memory. Nothing
-was pushed, posted, dispatched or released by the builder.
+was pushed, posted, dispatched or released by the builder. The regression
+investigation separately used two credential reads, 100 Jev calls and one Claude
+card call for the README; all bump shadows used zero Claude.
 
 ## Risk and blast radius
 

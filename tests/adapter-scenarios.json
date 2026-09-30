@@ -318,5 +318,25 @@
       "from": "const probeEnvironment = claudeEnvironment(process.env);",
       "to": "const probeEnvironment = process.env;"
     }
+  },
+  {
+    "id": "jev-measured-p1",
+    "name": "Jev classification sends the exact measured P1 questions",
+    "defect": "Delete the explicit workflow/config version-bump exception from the production definition",
+    "sourceBreak": {
+      "file": "src/questions.ts",
+      "from": "  \"behavior-preserving lint/format changes. Pure version bumps are explicitly mechanical even in \" +\n  \"workflow/config files: changing which external release is referenced does not change code \" +\n  \"contained in the PR. A functional hunk wins over documentation or mechanical hunks; \" +",
+      "to": "  \"behavior-preserving lint/format changes. A functional hunk wins over documentation or mechanical hunks; \" +"
+    }
+  },
+  {
+    "id": "jev-classification-code-only",
+    "name": "Jev classification keeps full code evidence and excludes author prose",
+    "defect": "Pass full PR facts, including release notes, to classification again",
+    "sourceBreak": {
+      "file": "src/adapters/jev.ts",
+      "from": "const a = await decide(nouls(questions), evidence, c);",
+      "to": "const a = await decide(nouls(questions), facts, c);"
+    }
   }
 ]
