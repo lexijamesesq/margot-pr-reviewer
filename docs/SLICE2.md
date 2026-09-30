@@ -103,8 +103,9 @@ receipts say this explicitly. The harness caught an overlapping question/adapter
 assertion during development; the adapter case now tests only route confidence.
 No test runs a live service or spends model budget.
 
-Clean-clone verification is recorded separately in `clean-clone-proof.md` after
-local commit. The suite has 134 Vitest tests and the installed-package smoke.
+A clean Git clone of implementation commit `00adb09` passed install, typecheck,
+all 134 Vitest tests, build and the installed-package smoke under Node 22.
+[The clean-clone proof](clean-clone-proof.md) records the exact commands and tarball hash.
 No skipped tests or TODO placeholders were added.
 
 ## Reproduction

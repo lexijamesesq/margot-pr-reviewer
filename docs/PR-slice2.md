@@ -22,7 +22,8 @@ implementation. Cards and Margot's voice remain in publish-skills.
 
 ## Verification
 
-The local suite has 134 passing tests. Generated receipts cover the 96 inherited
+A clean clone passed install, typecheck, all 134 tests and build under Node 22.
+Generated receipts cover the 96 inherited
 scenario breaks, five additional core source mutations, and 38 new adapter breaks.
 The installed tarball passes an independent consumer smoke; replacing its CLI
 with an empty executable fails the entrypoint assertion and restoration passes.
