@@ -1,0 +1,44 @@
+{
+  "outage": {
+    "method": "Live GitHub facts, real HTTP connection to a closed local port, Jev retry exhausted",
+    "result": {
+      "kind": "error",
+      "stage": "classification",
+      "diagnostic": "Jev transport unavailable",
+      "mergeEligible": false
+    },
+    "actions": [
+      {
+        "action": "would-disable-auto-merge",
+        "request": {
+          "repository": "lexijamesesq/margot-pr-reviewer",
+          "pr": 7,
+          "base": "b95c2f8ca2246bf8fe8b8446e92d49e0eb5c9fb4",
+          "head": "439feb449780eb0190187667e8dbe68d8dc35a57",
+          "phase": "review"
+        }
+      }
+    ]
+  },
+  "movement": {
+    "method": "Live GitHub facts and head read; inject a different head at the boundary without changing the real PR. Recorded live classification reused.",
+    "result": {
+      "kind": "error",
+      "stage": "publication-head",
+      "diagnostic": "Head moved before publication",
+      "mergeEligible": false
+    },
+    "actions": [
+      {
+        "action": "would-disable-auto-merge",
+        "request": {
+          "repository": "lexijamesesq/margot-pr-reviewer",
+          "pr": 7,
+          "base": "b95c2f8ca2246bf8fe8b8446e92d49e0eb5c9fb4",
+          "head": "439feb449780eb0190187667e8dbe68d8dc35a57",
+          "phase": "review"
+        }
+      }
+    ]
+  }
+}

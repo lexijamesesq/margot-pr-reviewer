@@ -193,12 +193,12 @@ export async function review(
     };
     const report = render(result);
     let publication = null;
+    if (
+      shaSchema.parse(await call("publication-head", (c) => services.head(request, c))) !==
+      request.head
+    )
+      throw new Error("Head moved before publication");
     if (config.publication === "record") {
-      if (
-        shaSchema.parse(await call("publication-head", (c) => services.head(request, c))) !==
-        request.head
-      )
-        throw new Error("Head moved before publication");
       if (
         !result.decision.mergeEligible &&
         facts.autoMergeArmed &&

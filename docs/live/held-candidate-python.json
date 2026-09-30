@@ -1,0 +1,19 @@
+{
+  "repository": "lexijamesesq/eve-plus",
+  "pr": 9,
+  "head": "7198b9ead47ecc6f7fe08a6b61516d783e8eaad4",
+  "checks": [
+    {
+      "head_sha": "7198b9ead47ecc6f7fe08a6b61516d783e8eaad4",
+      "html_url": "https://github.com/lexijamesesq/eve-plus/runs/109534595049",
+      "conclusion": "neutral",
+      "output": {
+        "title": "held for the operator: above my authority",
+        "summary": "APPROVED, LOW: config comment only.",
+        "text": "verdict_source: verdict_voice\npipeline_ok: True\noutcome: APPROVED | band: LOW\nvector: {\"blast_radius\": 1.97, \"reversibility\": 0.37, \"data_security\": 0.8, \"operations\": 0.61, \"verification_gap\": 1.38}\nowned tier: required_owned\nsummoned: safety, works-and-proven, principal-engineer, maintainable-no-slop\nsummoned by ledger: none\nconvergence: {\"round\": 2, \"standing\": 0, \"fixed\": 1, \"new\": 0, \"late\": 0, \"unconfirmed\": 1}\ndecision_source: jev\ncan auto-merge: False\nadherence: flags\n  cards restating a shared finding: works-and-proven\nband_reason: Lowered from the suggested HIGH (R=3). Four cards independently confirm the whole diff is five added YAML comment lines inside the `release-check` job in `.github/workflows/ci.yml`. No deleted lines, and nothing changes in `run:`, `uses:`, `if:`, `needs:`, `permissions:` or the triggers. `ci / checks` (actionlint/zizmor) and `ci / release-check` pass on this head. The HIGH comes almost entirely from the blast_radius score of 1.97, which the model scored at 0.0 confidence, and verification_gap 1.38 at 0.45 confidence. Both reflect \"a CI workflow file was touched\", not any change in behaviour. Nothing in this repo reads the marker. Its only effect is on the estate caller-merge tool outside this repo, and there it keeps a required check running instead of letting it skip, which tightens a guard. No dimension combines into real exposure, and reverting is trivial. The PR does not touch Margot's own tooling (margot.md, pr-reviewer.md, the pr-council skill, the poster, the runtime pins).\nsetting finding: none\ndismissed:\n  - F1 \u00b7 .github/workflows/ci.yml:39 \u00b7 Fixed. At head 7198b9e, line 39 is exactly `    # floor: always-run` with no trailing text or whitespace, and the explanation now sits on lines 40\u201343. That matches the tool's `line.strip() == ALWAYS_RUN` rule, as the works-and-proven card's Resolved: section reports.\nfinding locations:\n  works-and-proven: issue @ .github/workflows/ci.yml:39",
+        "annotations_count": 0,
+        "annotations_url": "https://api.github.com/repos/lexijamesesq/eve-plus/check-runs/109534595049/annotations"
+      }
+    }
+  ]
+}

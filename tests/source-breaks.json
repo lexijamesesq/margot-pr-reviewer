@@ -45,5 +45,50 @@
     "tests": [
       "LOW council risk with uncertain dimension requires voice"
     ]
+  },
+  {
+    "name": "mis-mapped finding severity",
+    "file": "src/adapters/prose.ts",
+    "from": "severity: match[3],",
+    "to": "severity: \"MINOR\",",
+    "tests": [
+      "Card prose preserves a real mandatory finding"
+    ]
+  },
+  {
+    "name": "mis-mapped finding confidence",
+    "file": "src/adapters/prose.ts",
+    "from": "confidence: match[4],",
+    "to": "confidence: \"LOW\",",
+    "tests": [
+      "Card prose preserves a real mandatory finding"
+    ]
+  },
+  {
+    "name": "mis-mapped finding location",
+    "file": "src/adapters/prose.ts",
+    "from": "location: match[2],",
+    "to": "location: \"wrong.ts:99\",",
+    "tests": [
+      "Card prose preserves a real mandatory finding"
+    ]
+  },
+  {
+    "name": "mis-mapped voice outcome",
+    "file": "src/adapters/prose.ts",
+    "from": "outcome: field(raw, \"outcome\"),",
+    "to": "outcome: \"APPROVED\",",
+    "tests": [
+      "Voice prose preserves finding IDs and dispositions"
+    ]
+  },
+  {
+    "name": "mis-mapped voice band",
+    "file": "src/adapters/prose.ts",
+    "from": "band: field(raw, \"band\"),",
+    "to": "band: \"HIGH\",",
+    "tests": [
+      "Voice prose preserves finding IDs and dispositions"
+    ]
   }
 ]

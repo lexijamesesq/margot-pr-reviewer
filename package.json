@@ -1,7 +1,7 @@
 {
   "name": "margot-pr-reviewer",
-  "version": "0.1.0-slice1",
-  "description": "Margot's first-round PR review engine with recorded services",
+  "version": "0.2.0-slice2",
+  "description": "Margot's read-only first-round PR review engine",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -18,18 +18,26 @@
     "dist",
     "recordings",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "action.yml",
+    "samples"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:breaks": "node scripts/breaks.mjs",
+    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs",
     "prepack": "npm run build",
-    "audit:recordings": "node scripts/audit-recordings.mjs"
+    "audit:recordings": "node scripts/audit-recordings.mjs",
+    "test:adapter-breaks": "node scripts/adapter-breaks.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "octokit": "5.0.5",
+    "p-retry": "8.0.1",
+    "parse-diff": "0.12.0",
     "picomatch": "4.0.7",
+    "yaml": "2.9.1",
     "zod": "4.3.6"
   },
   "devDependencies": {
@@ -38,5 +46,8 @@
     "@types/picomatch": "4.0.3",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
+  },
+  "bin": {
+    "margot-review": "dist/cli.js"
   }
 }

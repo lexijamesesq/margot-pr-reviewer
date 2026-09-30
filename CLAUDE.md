@@ -1,7 +1,8 @@
 # Margot PR reviewer
 
-This package owns first-round review decisions. Slice 1 uses recorded services;
-GitHub, Jev, Claude and production deployment are not implemented here yet.
+This package owns first-round review decisions. Slice 2 adds live read-only
+GitHub, Jev and Claude adapters. Publication and auto-merge actions are recorded
+locally; production authority remains outside this package.
 
 ## Setup and checks
 

@@ -1,0 +1,19 @@
+{
+  "repository": "lexijamesesq/dotty",
+  "pr": 402,
+  "head": "11777c29b8405076acb315027a466967534b89fb",
+  "checks": [
+    {
+      "head_sha": "11777c29b8405076acb315027a466967534b89fb",
+      "html_url": "https://github.com/lexijamesesq/dotty/runs/109552712516",
+      "conclusion": "neutral",
+      "output": {
+        "title": "Margot: CHANGES_REQUESTED",
+        "summary": "CHANGES_REQUESTED, MEDIUM: untested template change.",
+        "text": "verdict_source: verdict_voice\npipeline_ok: True\noutcome: CHANGES_REQUESTED | band: MEDIUM\nvector: {\"blast_radius\": 2.34, \"reversibility\": 0.89, \"data_security\": 0.79, \"operations\": 1.47, \"verification_gap\": 1.87}\nowned tier: required_owned\nsummoned: safety, works-and-proven, principal-engineer, maintainable-no-slop, house-style\nsummoned by ledger: none\nconvergence: {\"round\": 1, \"standing\": 3, \"fixed\": 0, \"new\": 3, \"late\": 0, \"unconfirmed\": 0}\ndecision_source: jev\ncan auto-merge: False\nadherence: clean\nband_reason: Override HIGH\u2192MEDIUM. The model's R=3 comes from blast_radius=2.34 at very low confidence (0.34). The composition overstates how far this reaches. The change adds one anchored exclude (^pnpm-lock\\.yaml$) under check-yaml, a YAML-parse lint and not a security or access guard. gitleaks hooks are unchanged (safety card). merge() never modifies a hook that is already present (F2), so existing estate repos are untouched and only newly seeded repos receive the line. Reversibility is 0.89 and data_security 0.79; no dimension points to irreversible or security exposure. It is not LOW: this is shared estate provisioning infrastructure, and the new behavior has no automated test (F1).\nsetting finding: F1 (works-and-proven) \u00b7 .github/scripts/pre-commit-suite-merge.py:140 \u00b7 The new `exclude: ^pnpm-lock\\.yaml$` extra line for check-yaml has no automated test. The stale-suite case in provision-public-repo.test.sh and new-repo.test.sh:469 only grep for `id: check-yaml`, so a revert or typo would pass every test. Fix: add an assertion in the stale-suite case that the merged output has the exclude directly under `- id: check-yaml`.\nestablished:\n  - F1 \u00b7 .github/scripts/pre-commit-suite-merge.py:140 \u00b7 The pnpm-lock exclude added to the check-yaml suite entry has no test, unlike biome-check's exclude which has a grep assertion. Removing or mistyping it would go unnoticed.\n  - F2 \u00b7 .github/scripts/pre-commit-suite-merge.py:314-315 \u00b7 merge() treats an existing check-yaml as present and skips its extra lines, so the body's claims (\"every repo the provisioner manages\", and the margot-pr-reviewer \"reports no change\" proof) are not what the code does. Correct the body, or make the merge add extra lines to hooks that are already present, with a test.\n  - F3 \u00b7 .github/scripts/pre-commit-suite-merge.py:79 \u00b7 The header at lines 79\u201388 lists the only reasons a hook gets extra lines. check-yaml's file-scoping exclude fits none of them, so the note is now wrong. Widen it to cover file-scoping carve-outs on any hook.\nfinding locations:\n  works-and-proven: issue @ .github/scripts/pre-commit-suite-merge.py:140\n  works-and-proven: issue @ .github/scripts/pre-commit-suite-merge.py:314-315\n  principal-engineer: info @ .github/scripts/pre-commit-suite-merge.py:132\n  maintainable-no-slop: issue @ .github/scripts/pre-commit-suite-merge.py:79\n  house-style: info @ .github/scripts/pre-commit-suite-merge.py:135-139",
+        "annotations_count": 0,
+        "annotations_url": "https://api.github.com/repos/lexijamesesq/dotty/check-runs/109552712516/annotations"
+      }
+    }
+  ]
+}
