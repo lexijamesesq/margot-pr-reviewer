@@ -93,8 +93,11 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
       const diffText: unknown = diff.data;
       if (files.length !== before.changed_files || typeof diffText !== "string")
         throw new Error("Incomplete GitHub diff");
-      // Missing patches include binary/truncated changes. Refuse rather than quietly omit evidence.
-      if (files.some((f) => typeof f.patch !== "string"))
+      // Metadata-only changes have no patch. Binary or missing content remains incomplete.
+      if (
+        /^Binary files .* differ$|^GIT binary patch$/m.test(diffText) ||
+        files.some((f) => typeof f.patch !== "string" && (f.additions !== 0 || f.deletions !== 0))
+      )
         throw new Error("A changed file has no complete text patch");
       const diffFiles = [...diffText.matchAll(/^diff --git /gm)].length;
       if (diffFiles !== files.length) throw new Error("Diff and file inventory disagree");

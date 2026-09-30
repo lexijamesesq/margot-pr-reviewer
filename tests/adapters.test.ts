@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { Octokit } from "octokit";
 import { expect, it } from "vitest";
 import { resolveBundle } from "../src/adapters/bundle.js";
-import { claudeEnvironment } from "../src/adapters/claude.js";
+import { claudeAdapter, claudeEnvironment } from "../src/adapters/claude.js";
 import { ghFetch, githubAdapter } from "../src/adapters/github.js";
 import { jevAdapter } from "../src/adapters/jev.js";
 import { execute } from "../src/adapters/process.js";
@@ -29,11 +29,15 @@ const recording = JSON.parse(
 const request = requestSchema.parse(recording.request);
 const facts = factsSchema.parse(recording.facts);
 const context = () => ({ signal: AbortSignal.timeout(3000) });
-function scenario(id: string, exercise: (broken: boolean) => Promise<unknown>) {
+function scenario(
+  id: string,
+  exercise: (broken: boolean) => Promise<unknown>,
+  expected: Record<string, unknown> = { ok: true },
+) {
   const spec = cases.find((c) => c.id === id);
   if (!spec) throw new Error(`No break specification: ${id}`);
   it(spec.name, async () => {
-    expect(await exercise(process.env.MARGOT_ADAPTER_BREAK === id)).toMatchObject({ ok: true });
+    expect(await exercise(process.env.MARGOT_ADAPTER_BREAK === id)).toMatchObject(expected);
   });
 }
 async function rejects(fn: () => Promise<unknown>) {
@@ -53,6 +57,10 @@ function github(
     base?: string;
     count?: number;
     patch?: string | null;
+    additions?: number;
+    deletions?: number;
+    status?: string;
+    previousFilename?: string;
     draft?: boolean;
     fork?: boolean;
     moved?: boolean;
@@ -84,10 +92,14 @@ function github(
     if (url.pathname.endsWith("/files")) {
       data = [
         {
-          additions: 1,
-          deletions: 1,
+          additions: overrides.additions ?? 1,
+          deletions: overrides.deletions ?? 1,
+          status: overrides.status ?? "modified",
+          ...(overrides.previousFilename ? { previous_filename: overrides.previousFilename } : {}),
           filename: url.searchParams.get("page") === "2" ? "b.ts" : "a.ts",
-          patch: overrides.patch === undefined ? "@@ -1 +1 @@\n-old\n+new" : overrides.patch,
+          ...(overrides.patch === null
+            ? {}
+            : { patch: overrides.patch ?? "@@ -1 +1 @@\n-old\n+new" }),
         },
       ];
       if (overrides.pageTwo && url.searchParams.get("page") !== "2")
@@ -270,14 +282,27 @@ scenario("no-publish-head", async (broken) => {
   const result = await review(request, copy.config, recordedServices(copy));
   return { ok: result.kind === "error" && !result.mergeEligible };
 });
-scenario("card-findings", async (broken) => {
-  const raw =
-    cardText() +
-    (broken
-      ? ""
-      : "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n    consequence: Writes can escape.\n    action: Restore the guard.\n");
-  return { ok: parseCard(raw, "safety").findings.length === 1 };
-});
+scenario(
+  "card-findings",
+  async () => {
+    const raw =
+      cardText() +
+      "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n    consequence: Writes can escape.\n    action: Restore the guard.\n";
+    return { findings: parseCard(raw, "safety").findings };
+  },
+  {
+    findings: [
+      {
+        id: "safety-F1",
+        tag: "issue",
+        severity: "MAJOR",
+        confidence: "HIGH",
+        location: "a.ts:1",
+        what: "A guard is missing. Consequence: Writes can escape. Restore the guard.",
+      },
+    ],
+  },
+);
 scenario("card-missing-checked", (broken) =>
   rejects(async () =>
     parseCard(broken ? cardText() : cardText().replace("Checked:", "Examined:"), "safety"),
@@ -303,10 +328,24 @@ scenario("card-ambiguous", (broken) =>
     parseCard(cardText() + (broken ? "" : "\ncompletion: completed\n"), "safety"),
   ),
 );
-scenario("voice-accounting", async (broken) => {
-  const raw = `outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\nestablished:\n${broken ? "" : "- safety-F1 · a.ts:1 · The guard is missing.\n"}dismissed:\n`;
-  return { ok: parseVoice(raw).dispositions[0]?.id === "safety-F1" };
-});
+scenario(
+  "voice-accounting",
+  async () => {
+    return parseVoice(
+      "outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\nestablished:\n- safety-F1 · a.ts:1 · The guard is missing.\ndismissed:\n- safety-F2 · a.ts:2 · Existing check covers this.\n",
+    );
+  },
+  {
+    outcome: "CHANGES_REQUESTED",
+    band: "LOW",
+    rationale: "Bounded change.",
+    summary: "Restore the guard.",
+    dispositions: [
+      { id: "safety-F1", status: "established", reason: "a.ts:1 · The guard is missing." },
+      { id: "safety-F2", status: "dismissed", reason: "a.ts:2 · Existing check covers this." },
+    ],
+  },
+);
 scenario("voice-ambiguous", (broken) =>
   rejects(async () =>
     parseVoice(
@@ -421,8 +460,9 @@ scenario("evidence-tools", async (broken) => {
     await server.close();
   }
 });
-scenario("claude-tools", async () => {
-  const { claudeAdapter } = await import("../src/adapters/claude.js");
+async function fakeClaude(
+  options: { version?: string; tools?: string[]; envelope?: Record<string, unknown> } = {},
+) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
   try {
     await mkdir(join(root, "agents"));
@@ -432,9 +472,17 @@ scenario("claude-tools", async () => {
     );
     const executable = join(root, "claude.cjs"),
       capture = join(root, "capture.json");
+    const envelope = {
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: cardText(),
+      total_cost_usd: 0,
+      ...options.envelope,
+    };
     await writeFile(
       executable,
-      `#!/usr/bin/env node\nconst fs=require('node:fs');if(process.argv.includes('--version'))console.log('0.0.1 test');else{console.log(JSON.stringify({type:'system',subtype:'init',tools:[]}));fs.writeFileSync(${JSON.stringify(capture)},JSON.stringify(process.argv.slice(2)));console.log(JSON.stringify({type:'result',subtype:'success',is_error:false,result:${JSON.stringify(cardText())},total_cost_usd:0}));}`,
+      `#!/usr/bin/env node\nconst fs=require('node:fs');if(process.argv.includes('--version'))console.log(${JSON.stringify(options.version ?? "0.0.1 test")});else{console.log(JSON.stringify(${JSON.stringify({ type: "system", subtype: "init", tools: options.tools ?? [] })}));fs.writeFileSync(${JSON.stringify(capture)},JSON.stringify(process.argv.slice(2)));console.log(JSON.stringify(${JSON.stringify(envelope)}));}`,
       { mode: 0o700 },
     );
     await claudeAdapter({
@@ -452,25 +500,124 @@ scenario("claude-tools", async () => {
       },
       context(),
     );
-    const args = JSON.parse(await readFile(capture, "utf8")) as string[];
-    return {
-      ok:
-        args[args.indexOf("--tools") + 1] === "" &&
-        args.includes("--strict-mcp-config") &&
-        args.includes("--restricted") &&
-        args[args.indexOf("--setting-sources") + 1] === "",
-    };
+    return JSON.parse(await readFile(capture, "utf8")) as string[];
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+}
+scenario("claude-tools", async () => {
+  const args = await fakeClaude();
+  return {
+    ok:
+      args[args.indexOf("--tools") + 1] === "" &&
+      args.includes("--strict-mcp-config") &&
+      args.includes("--restricted") &&
+      args[args.indexOf("--setting-sources") + 1] === "",
+  };
 });
-scenario("truncated-hunk", (broken) =>
-  rejects(() =>
-    github({
-      diff: `diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n-old\n${broken ? "+new\n" : ""}`,
-    }).adapter.facts(request, context()),
+async function rejectsWith(fn: () => Promise<unknown>, message: string) {
+  try {
+    await fn();
+    return { ok: false };
+  } catch (error) {
+    return { ok: String(error).includes(message) };
+  }
+}
+scenario("claude-unexpected-tool", () =>
+  rejectsWith(() => fakeClaude({ tools: ["Bash"] }), "unexpected tool"),
+);
+scenario("claude-version", () =>
+  rejectsWith(() => fakeClaude({ version: "0.0.2 test" }), "pin mismatch"),
+);
+scenario("claude-envelope-subtype", () =>
+  rejectsWith(() => fakeClaude({ envelope: { subtype: "error_during_execution" } }), "success"),
+);
+scenario("claude-envelope-error", () =>
+  rejectsWith(() => fakeClaude({ envelope: { is_error: true } }), "is_error"),
+);
+scenario("claude-envelope-empty", () =>
+  rejectsWith(() => fakeClaude({ envelope: { result: "" } }), "result"),
+);
+scenario("truncated-hunk", () =>
+  rejectsWith(
+    () =>
+      github({
+        diff: "diff --git a/a.ts b/a.ts\n@@ -1,2 +1,2 @@\n-old\n+new",
+      }).adapter.facts(request, context()),
+    "Diff hunks are incomplete",
   ),
 );
+scenario("process-redaction", async () => {
+  const canary = "test-only-mcp-token-canary";
+  try {
+    await execute(process.execPath, [
+      "-e",
+      "process.stderr.write(process.argv[2]);process.exit(1)",
+      "--",
+      "--mcp-config",
+      JSON.stringify({ mcpServers: { evidence: { env: { GH_TOKEN: canary } } } }),
+    ]);
+    return { ok: false };
+  } catch (error) {
+    const saved = JSON.stringify({
+      message: String(error),
+      stack: error instanceof Error ? error.stack : "",
+    });
+    return {
+      ok:
+        String(error).includes("Process failed:") &&
+        !saved.includes(canary) &&
+        !saved.includes("GH_TOKEN") &&
+        !saved.includes("--mcp-config"),
+    };
+  }
+});
+const metadataDiffs = {
+  "zero-rename":
+    "diff --git a/old.ts b/a.ts\nsimilarity index 100%\nrename from old.ts\nrename to a.ts\n",
+  "empty-added": "diff --git a/a.ts b/a.ts\nnew file mode 100644\nindex 0000000..e69de29\n",
+  "mode-only": "diff --git a/a.ts b/a.ts\nold mode 100644\nnew mode 100755\n",
+};
+for (const [id, diff] of Object.entries(metadataDiffs)) {
+  scenario(id, async (broken) => {
+    try {
+      const result = await github({
+        patch: null,
+        additions: 0,
+        deletions: 0,
+        status: id === "zero-rename" ? "renamed" : id === "empty-added" ? "added" : "modified",
+        ...(id === "zero-rename" ? { previousFilename: "old.ts" } : {}),
+        diff: broken ? "" : diff,
+      }).adapter.facts(request, context());
+      return {
+        ok:
+          result.complete &&
+          result.fileCount === 1 &&
+          result.files[0]?.path === "a.ts" &&
+          (id !== "zero-rename" || result.files[0]?.previousPath === "old.ts"),
+      };
+    } catch {
+      return { ok: false };
+    }
+  });
+}
+for (const [id, marker] of Object.entries({
+  "binary-diff": "Binary files a/a.ts and b/a.ts differ",
+  "binary-patch": "GIT binary patch\nliteral 1\nIc${Nk000310RR91",
+})) {
+  scenario(id, (broken) =>
+    rejectsWith(
+      () =>
+        github({
+          patch: null,
+          additions: 0,
+          deletions: 0,
+          diff: metadataDiffs["mode-only"] + (broken ? "" : `${marker}\n`),
+        }).adapter.facts(request, context()),
+      "no complete text patch",
+    ),
+  );
+}
 scenario("evidence-range", async (broken) => {
   const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
   const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");

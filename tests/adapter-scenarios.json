@@ -97,7 +97,12 @@
   {
     "id": "card-findings",
     "name": "Card prose preserves a real mandatory finding",
-    "defect": "remove the finding from the response"
+    "defect": "source mutation: mis-map the finding tag",
+    "sourceBreak": {
+      "file": "src/adapters/prose.ts",
+      "from": "tag: match[1],",
+      "to": "tag: \"info\","
+    }
   },
   {
     "id": "card-missing-checked",
@@ -122,7 +127,12 @@
   {
     "id": "voice-accounting",
     "name": "Voice prose preserves finding IDs and dispositions",
-    "defect": "remove the established finding"
+    "defect": "source mutation: mis-map disposition status",
+    "sourceBreak": {
+      "file": "src/adapters/prose.ts",
+      "from": "return { id: match[1], status, reason: match[2] };",
+      "to": "return { id: match[1], status: \"dismissed\", reason: match[2] };"
+    }
   },
   {
     "id": "voice-ambiguous",
@@ -172,7 +182,12 @@
   {
     "id": "truncated-hunk",
     "name": "A partial final hunk cannot claim complete facts",
-    "defect": "restore the missing added line"
+    "defect": "source mutation: remove hunk line-count validation",
+    "sourceBreak": {
+      "file": "src/adapters/github.ts",
+      "from": "file.chunks.some(\n              (chunk) =>\n                chunk.changes.filter((c) => c.type !== \"add\" && !c.content.startsWith(\"\\\\\"))\n                  .length !== chunk.oldLines ||\n                chunk.changes.filter((c) => c.type !== \"del\" && !c.content.startsWith(\"\\\\\"))\n                  .length !== chunk.newLines,\n            )",
+      "to": "false"
+    }
   },
   {
     "id": "evidence-range",
@@ -193,5 +208,90 @@
     "id": "bundle-dirty",
     "name": "A dirty card bundle cannot pass as the pinned instructions",
     "defect": "restore the clean tracked bundle"
+  },
+  {
+    "id": "claude-unexpected-tool",
+    "name": "Claude rejects an unexpected reported tool",
+    "defect": "source mutation: remove the tool-grant guard",
+    "sourceBreak": {
+      "file": "src/adapters/claude.ts",
+      "from": "if (granted.some((name) => !tools.includes(name)))",
+      "to": "if (false)"
+    }
+  },
+  {
+    "id": "claude-version",
+    "name": "Claude rejects a mismatched CLI version",
+    "defect": "source mutation: remove the version-pin guard",
+    "sourceBreak": {
+      "file": "src/adapters/claude.ts",
+      "from": "if (!(await execute(options.executable, [\"--version\"], c)).startsWith(`${options.version} `))",
+      "to": "if (false)"
+    }
+  },
+  {
+    "id": "claude-envelope-subtype",
+    "name": "Claude rejects an unsuccessful result subtype",
+    "defect": "source mutation: accept any result subtype",
+    "sourceBreak": {
+      "file": "src/adapters/claude.ts",
+      "from": "subtype: z.literal(\"success\"),",
+      "to": "subtype: z.string(),"
+    }
+  },
+  {
+    "id": "claude-envelope-error",
+    "name": "Claude rejects an error-marked result",
+    "defect": "source mutation: accept an error flag",
+    "sourceBreak": {
+      "file": "src/adapters/claude.ts",
+      "from": "is_error: z.literal(false),",
+      "to": "is_error: z.boolean(),"
+    }
+  },
+  {
+    "id": "claude-envelope-empty",
+    "name": "Claude rejects an empty result body",
+    "defect": "source mutation: accept empty result text",
+    "sourceBreak": {
+      "file": "src/adapters/claude.ts",
+      "from": "result: z.string().min(1),",
+      "to": "result: z.string(),"
+    }
+  },
+  {
+    "id": "process-redaction",
+    "name": "Failed subprocess diagnostics redact MCP credentials",
+    "defect": "source mutation: reject the original subprocess error",
+    "sourceBreak": {
+      "file": "src/adapters/process.ts",
+      "from": "reject(\n            new Error(`Process failed: ${file.split(\"/\").at(-1)} (${error.code ?? \"unknown\"})`),\n          )",
+      "to": "reject(error)"
+    }
+  },
+  {
+    "id": "zero-rename",
+    "name": "GitHub accepts a zero-change rename without a patch",
+    "defect": "omit the metadata-only file from the diff inventory"
+  },
+  {
+    "id": "empty-added",
+    "name": "GitHub accepts an empty added file without a patch",
+    "defect": "omit the metadata-only file from the diff inventory"
+  },
+  {
+    "id": "mode-only",
+    "name": "GitHub accepts a mode-only change without a patch",
+    "defect": "omit the metadata-only file from the diff inventory"
+  },
+  {
+    "id": "binary-diff",
+    "name": "GitHub refuses binary changes with zero line counts",
+    "defect": "remove the binary diff marker"
+  },
+  {
+    "id": "binary-patch",
+    "name": "GitHub refuses an encoded binary patch",
+    "defect": "remove the encoded binary patch"
   }
 ]

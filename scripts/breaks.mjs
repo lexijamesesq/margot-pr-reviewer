@@ -1,7 +1,6 @@
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { stripVTControlCharacters } from "node:util";
+import { readFileSync, writeFileSync } from "node:fs";
+import { createBreakHarness } from "./break-harness.mjs";
 
 const path = new URL("../tests/scenarios.json", import.meta.url);
 const original = readFileSync(path, "utf8");
@@ -15,67 +14,20 @@ const sourceOriginal = readFileSync(
 );
 const sourceBreaks = JSON.parse(sourceOriginal);
 const receiptPath = new URL("../docs/test-break-receipts.md", import.meta.url);
-const resultPath = new URL("../.break-results.json", import.meta.url);
+const { run, requireBaseline, requireAssertionFailures, mutateSource, restoreSource, cleanup } =
+  createBreakHarness(".break-results.json");
 const rows = [];
 const sourceRuns = [];
-let restoreSource;
-function run() {
-  if (existsSync(resultPath)) unlinkSync(resultPath);
-  const result = spawnSync(
-    process.execPath,
-    [
-      "node_modules/vitest/vitest.mjs",
-      "run",
-      "--reporter=json",
-      "--outputFile=.break-results.json",
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.error) throw result.error;
-  const report = JSON.parse(readFileSync(resultPath, "utf8"));
-  if (
-    report.numTotalTests !== scenarios.length + adapterScenarios.length ||
-    report.numPassedTests + report.numFailedTests !== scenarios.length + adapterScenarios.length
-  )
-    throw new Error("Runner did not execute every scenario");
-  return {
-    status: result.status,
-    report,
-    failed: report.testResults.flatMap((suite) =>
-      suite.assertionResults.filter((test) => test.status === "failed"),
-    ),
-  };
-}
-function mutateSource({ file, from, to }) {
-  const contents = readFileSync(file, "utf8");
-  if (contents.split(from).length !== 2) throw new Error(`Source break must match once: ${file}`);
-  restoreSource = () => writeFileSync(file, contents);
-  writeFileSync(file, contents.replace(from, to));
-}
-function requireAssertionFailures(result) {
-  if (result.status !== 1 || result.failed.length === 0)
-    throw new Error("Mutation did not produce test failures");
-  for (const test of result.failed) {
-    const message = stripVTControlCharacters(test.failureMessages.join("\n"));
-    if (!message.includes("AssertionError") || !message.includes("to match object"))
-      throw new Error(`Unexpected failure: ${test.title}`);
-  }
-}
 try {
   const baseline = run();
-  if (
-    baseline.status !== 0 ||
-    baseline.report.numPassedTests !== scenarios.length + adapterScenarios.length
-  )
-    throw new Error("Baseline did not pass every test");
+  requireBaseline(baseline);
   for (const [index, scenario] of scenarios.entries()) {
     const mutated = structuredClone(scenarios);
     mutated[index].patches.push(...scenario.break);
     if (scenario.sourceBreak) mutateSource(scenario.sourceBreak);
     writeFileSync(path, `${JSON.stringify(mutated, null, 2)}\n`);
     const result = run();
-    restoreSource?.();
-    restoreSource = undefined;
+    restoreSource();
     writeFileSync(path, original);
     requireAssertionFailures(result);
     if (result.failed.length !== 1 || result.failed[0].title !== scenario.name)
@@ -91,7 +43,6 @@ try {
     mutateSource(mutation);
     const result = run();
     restoreSource();
-    restoreSource = undefined;
     requireAssertionFailures(result);
     const failedNames = result.failed.map((test) => test.title);
     if (mutation.tests.length === 0 || !mutation.tests.every((name) => failedNames.includes(name)))
@@ -105,11 +56,7 @@ try {
     process.stdout.write(`Source mutation: ${mutation.name}: ${failedNames.length} failed\n`);
   }
   const restored = run();
-  if (
-    restored.status !== 0 ||
-    restored.report.numPassedTests !== scenarios.length + adapterScenarios.length
-  )
-    throw new Error("Restored baseline did not pass");
+  requireBaseline(restored);
   const digest = createHash("sha256").update(original).digest("hex");
   const sourceDigest = createHash("sha256").update(sourceOriginal).digest("hex");
   const sourceSummary = `Separate source-level checks caught ${sourceRuns.length} mutations: ${sourceRuns.map((run) => run.name).join(", ")}. Each mutation failed its intended tests; all observed failures are listed below.`;
@@ -125,7 +72,6 @@ try {
     `Receipts: ${rows.length} scenario breaks and ${sourceRuns.length} source mutations caught; restored ${restored.report.numPassedTests}/${scenarios.length + adapterScenarios.length} passed.\n`,
   );
 } finally {
-  restoreSource?.();
+  cleanup();
   writeFileSync(path, original);
-  if (existsSync(resultPath)) unlinkSync(resultPath);
 }
