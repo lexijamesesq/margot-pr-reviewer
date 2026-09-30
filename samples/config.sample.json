@@ -1,0 +1,39 @@
+{
+  "review": {
+    "protectedPaths": [
+      "YOUR_AUTHORITY_PATH/**"
+    ],
+    "trustedCheckActors": [
+      "YOUR_CHECK_APP"
+    ],
+    "trustedTriageActors": [
+      "triage-app"
+    ],
+    "requiredChecks": [
+      "YOUR_REQUIRED_CHECK"
+    ],
+    "cardBundle": {
+      "commit": "0000000000000000000000000000000000000000"
+    },
+    "classificationThreshold": 0.6,
+    "routeThreshold": 0.35,
+    "riskTailThreshold": 0.3,
+    "confidenceThreshold": 0.3,
+    "noCouncilConfidenceFloor": 0.3,
+    "timeoutMs": 900000,
+    "publication": "record",
+    "calibration": false
+  },
+  "github": {
+    "freshShadow": true
+  },
+  "jev": {
+    "model": "YOUR_JEV_VERSION"
+  },
+  "claude": {
+    "executable": "/path/to/your/claude",
+    "version": "0.0.0",
+    "pluginDirectory": "/path/to/your/publish-skills",
+    "reviewerModel": "YOUR_REVIEWER_MODEL"
+  }
+}

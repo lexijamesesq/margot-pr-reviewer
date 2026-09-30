@@ -1,0 +1,21 @@
+# Provision margot-review, its pinned Claude CLI and pinned publish-skills clone
+# on an isolated self-hosted runner. Config/request files are trusted runner inputs.
+name: Margot shadow
+on: workflow_dispatch
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+jobs:
+  shadow:
+    runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
+    steps:
+      - uses: YOUR_OWNER/YOUR_REVIEWER@0000000000000000000000000000000000000000
+        with:
+          request: /path/to/your/request.json
+          config: /path/to/your/config.json
+          output: /path/to/your/result.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JEV_KEY: ${{ secrets.EXAMPLE_JEV_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.EXAMPLE_CLAUDE_OAUTH_TOKEN }}

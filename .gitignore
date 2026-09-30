@@ -3,3 +3,4 @@ dist/
 *.tgz
 coverage/
 .break-results.json
+.adapter-break-results.json

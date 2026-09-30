@@ -6,6 +6,9 @@ import { stripVTControlCharacters } from "node:util";
 const path = new URL("../tests/scenarios.json", import.meta.url);
 const original = readFileSync(path, "utf8");
 const scenarios = JSON.parse(original);
+const adapterScenarios = JSON.parse(
+  readFileSync(new URL("../tests/adapter-scenarios.json", import.meta.url), "utf8"),
+);
 const sourceOriginal = readFileSync(
   new URL("../tests/source-breaks.json", import.meta.url),
   "utf8",
@@ -31,8 +34,8 @@ function run() {
   if (result.error) throw result.error;
   const report = JSON.parse(readFileSync(resultPath, "utf8"));
   if (
-    report.numTotalTests !== scenarios.length ||
-    report.numPassedTests + report.numFailedTests !== scenarios.length
+    report.numTotalTests !== scenarios.length + adapterScenarios.length ||
+    report.numPassedTests + report.numFailedTests !== scenarios.length + adapterScenarios.length
   )
     throw new Error("Runner did not execute every scenario");
   return {
@@ -60,7 +63,10 @@ function requireAssertionFailures(result) {
 }
 try {
   const baseline = run();
-  if (baseline.status !== 0 || baseline.report.numPassedTests !== scenarios.length)
+  if (
+    baseline.status !== 0 ||
+    baseline.report.numPassedTests !== scenarios.length + adapterScenarios.length
+  )
     throw new Error("Baseline did not pass every test");
   for (const [index, scenario] of scenarios.entries()) {
     const mutated = structuredClone(scenarios);
@@ -99,7 +105,10 @@ try {
     process.stdout.write(`Source mutation: ${mutation.name}: ${failedNames.length} failed\n`);
   }
   const restored = run();
-  if (restored.status !== 0 || restored.report.numPassedTests !== scenarios.length)
+  if (
+    restored.status !== 0 ||
+    restored.report.numPassedTests !== scenarios.length + adapterScenarios.length
+  )
     throw new Error("Restored baseline did not pass");
   const digest = createHash("sha256").update(original).digest("hex");
   const sourceDigest = createHash("sha256").update(sourceOriginal).digest("hex");
@@ -110,10 +119,10 @@ try {
   );
   writeFileSync(
     receiptPath,
-    `# Test and deliberate-break receipts\n\nRun: ${new Date().toISOString()}. Node ${process.version}.\n\nBaseline: ${baseline.report.numPassedTests}/${scenarios.length} passed. Each scenario break changes the named scenario's service output/caller input, or its explicitly declared source mutation; expected assertions stay unchanged. Every run executes the full suite. For each scenario break, the one named test failed at its behavioral result assertion, with all other tests passing. Each break was reverted before the next run. Restored baseline: ${restored.report.numPassedTests}/${scenarios.length} passed.\n\nMost breaks mutate only their own scenario input. For those breaks, the harness guarantees that other scenarios are unchanged, so the observed one-failure result cannot reveal a duplicated test. These are controlled service/input counterexamples plus declared source mutations, not a claim of independent or exhaustive implementation mutation coverage. Error scenarios repair exactly the invalid response to prove that the error test distinguishes it from usable evidence. Classification question tests protect the text sent to Jev, not Jev's interpretation of it. Exact paths, values, and expectations are in tests/scenarios.json and tests/source-breaks.json; run npm run test:breaks.\n\n${sourceSummary}\n\nScenario SHA-256: ${digest}.\n\nSource mutation SHA-256: ${sourceDigest}.\n\n| # | Single failing test | Deliberate break | Observed |\n| --- | --- | --- | --- |\n${rows.join("\n")}\n\n## Source mutations\n\n| Mutation | Observed failing tests | Result |\n| --- | --- | --- |\n${sourceRows.join("\n")}\n`,
+    `# Test and deliberate-break receipts\n\nRun: ${new Date().toISOString()}. Node ${process.version}.\n\nBaseline: ${baseline.report.numPassedTests}/${scenarios.length + adapterScenarios.length} passed. Each scenario break changes the named scenario's service output/caller input, or its explicitly declared source mutation; expected assertions stay unchanged. Every run executes the full suite. For each scenario break, the one named test failed at its behavioral result assertion, with all other tests passing. Each break was reverted before the next run. Restored baseline: ${restored.report.numPassedTests}/${scenarios.length + adapterScenarios.length} passed.\n\nMost breaks mutate only their own scenario input. For those breaks, the harness guarantees that other scenarios are unchanged, so the observed one-failure result cannot reveal a duplicated test. These are controlled service/input counterexamples plus declared source mutations, not a claim of independent or exhaustive implementation mutation coverage. Error scenarios repair exactly the invalid response to prove that the error test distinguishes it from usable evidence. Classification question tests protect the text sent to Jev, not Jev's interpretation of it. Exact paths, values, and expectations are in tests/scenarios.json and tests/source-breaks.json; run npm run test:breaks.\n\n${sourceSummary}\n\nScenario SHA-256: ${digest}.\n\nSource mutation SHA-256: ${sourceDigest}.\n\n| # | Single failing test | Deliberate break | Observed |\n| --- | --- | --- | --- |\n${rows.join("\n")}\n\n## Source mutations\n\n| Mutation | Observed failing tests | Result |\n| --- | --- | --- |\n${sourceRows.join("\n")}\n`,
   );
   process.stdout.write(
-    `Receipts: ${rows.length} scenario breaks and ${sourceRuns.length} source mutations caught; restored ${restored.report.numPassedTests}/${scenarios.length} passed.\n`,
+    `Receipts: ${rows.length} scenario breaks and ${sourceRuns.length} source mutations caught; restored ${restored.report.numPassedTests}/${scenarios.length + adapterScenarios.length} passed.\n`,
   );
 } finally {
   restoreSource?.();

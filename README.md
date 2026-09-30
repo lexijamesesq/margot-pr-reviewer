@@ -1,9 +1,10 @@
 # Margot PR reviewer
 
-An ESM TypeScript engine for first-round PR reviews. Slice 1 runs recorded services:
-classification, selected review cards, risk, Margot's voice when needed, a rendered
-decision, and recorded publication. It does not call GitHub, Jev or Claude, and it
-never merges. Prior-ledger reviews return an error until slice 3.
+An ESM TypeScript engine for first-round PR reviews, with live GitHub, Jev and
+Claude Code adapters. Slice 2 runs in shadow mode: it records proposed publication
+and auto-merge disarming locally and has no GitHub write implementation. Python
+remains authoritative. Prior-ledger reviews remain unsupported; the live adapter
+explicitly runs fresh first-round comparisons without modifying their history.
 
 ## Install and run the recorded review
 
@@ -17,7 +18,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.1.0-slice1.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.2.0-slice2.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -59,7 +60,7 @@ The request identifies repository, PR number, exact base/head SHAs, and phase
 result. The service adapter is trusted infrastructure: it must authenticate actors,
 fetch complete evidence, bind facts to both SHAs, honor abort signals, and prevent
 writes if the head changes. Recorded services implement that boundary in memory.
-There is no live adapter or Action in this slice.
+The live adapter and thin composite Action expose only shadow operation.
 
 Configuration has no implicit authority defaults. An explicitly empty protection
 list is allowed; missing configuration is rejected. The recordings show every key:
@@ -86,65 +87,88 @@ questions live in `src/questions.ts`. Playbooks and the voice stay in publish-sk
 The voice model belongs to the bundle's `agents/margot.md`, not ReviewConfig.
 
 The final rating drives both display and eligibility. Every mandatory finding must
-have exactly one disposition. A held review disarms already armed auto-merge before
-publication; a failure after facts are available also attempts to disarm it.
-Publication errors return an error even if a service performed a partial write.
-Live adapters will need idempotent recovery for such partial writes.
+have exactly one disposition. A held review records a proposed auto-merge disable;
+it does not actually disarm anything. A moved head fails even with publication
+set to `none`. A shadow result is not an authorization for an external publisher.
 
-## Live consumer setup for slice 2
+## Live shadow review on a self-hosted runner
 
-This is the required installation contract, not a claim that live review is shipped.
-A consumer supplies Node 22, npm, git, `gh`, Claude Code **2.1.283**, a Claude OAuth
-token, a TypeSafe API key for Jev **jev-1.13.0**, and GitHub credentials. Reviewer
-tools receive only a read-scoped GitHub identity; the publisher's write credential
-must never enter a model process. OAuth comes from `claude setup-token` and is
-supplied as `CLAUDE_CODE_OAUTH_TOKEN`; the live Jev adapter will read `JEV_KEY`.
-Keep credential values outside repository configuration.
-
-Install the pinned CLI and the pinned local marketplace in a dedicated runtime:
+Provision Node 22+, git, Claude Code **2.1.283**, and a clean publish-skills clone
+at **dc82ec72eea97ae6b0e161dd2ec909cb75033045**. Supply `JEV_KEY` for Jev
+**jev-1.13.0**, `CLAUDE_CODE_OAUTH_TOKEN` for Claude, and a read-scoped `GH_TOKEN`.
+Local CLI login is also supported. Alternatively, configure an absolute `github.gh`
+path to a credential broker's gh executable. The bridge only permits GitHub GETs.
+Credentials are environment values, never configuration file values. The package
+contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
+npm install --global /absolute/path/margot-pr-reviewer-0.2.0-slice2.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
-mkdir -p runtime/claude
-export CLAUDE_CONFIG_DIR="$PWD/runtime/claude"
-git clone https://github.com/lexijamesesq/publish-skills.git runtime/publish-src
-git -C runtime/publish-src checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
-claude plugin marketplace add "$PWD/runtime/publish-src"
-claude plugin install publish@publish
-claude plugin enable publish
-claude plugin list
+git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
+git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
+cp samples/config.sample.json /absolute/runtime/config.json
+cp samples/request.sample.json /absolute/runtime/request.json
+# Replace sample values with trusted runner paths, pins, policy and exact PR SHAs.
+margot-review /absolute/runtime/request.json /absolute/runtime/config.json /absolute/runtime/result.json
 ```
 
-Enable is required because the plugin defaults to disabled. Verify both agents,
-`skills/pr-council/SKILL.md`, and all six playbooks at the pinned installation before
-review. The bundle resolver must verify these files and inject their resolved
-paths. Cards may need `Bash(gh:*)` for read-only evidence; a command-name permission
-alone does not make an overpowered GitHub token safe.
+All sample files use `*.sample.*` and contain placeholders. Only self-hosted runner
+setup is supplied. The composite `action.yml` calls the same installed
+`margot-review` executable. Provision its exact tarball version on the runner first;
+the Action does not install software, check out a PR or mint credentials. The sample
+workflow uses a placeholder action reference that must be pinned to a real commit.
+Store request/config outside the PR checkout. Do not use the shadow job as a merge gate.
+The output includes the engine result, proposed local actions and raw model responses.
+It exits nonzero for infrastructure/validation errors; a reviewed hold remains a valid result.
 
-Create a credential-free `empty-mcp.json` containing `{"mcpServers":{}}`. Every
-model process must use `--strict-mcp-config --mcp-config /absolute/path/empty-mcp.json`
-to exclude agent-declared MCP servers, including `linear-tactic`. Load no PR
-instructions or hooks, execute no PR code, and keep the base checkout read-only.
-Confinement and optional read-only ticket tools need live verification in slice 2.
+The GitHub adapter paginates files, checks and reviews; rejects draft/fork PRs,
+missing text patches, truncated hunks and moving revisions; and checks head freshness
+again before recording. Closed PRs are allowed for retrospective comparisons.
+`github.freshShadow: true` is mandatory: complete history is read, but earlier
+ledgers are deliberately not used as prior findings. Nothing is posted or overwritten.
+Binary changes and files outside GitHub's complete text evidence limits fail closed.
 
-The authenticated pinned CLI probe accepted the flags but returned no
-`structured_output` and violated the requested schema. The tested combination is
-not suitable as the live adapter contract. Slice 1 validates normalized service
-responses independently of CLI format. Slice 2 will translate the bundle's existing
-output convention and preserve raw diagnostics; switching to CLI schema mode needs
-a successful production-shaped probe. See [the exact receipt](docs/cli-compatibility.md),
-[Anthropic's CLI documentation](https://code.claude.com/docs/en/headless)
-for the interface and [Zod's documentation](https://zod.dev/basics) for runtime validation.
+The runner verifies the bundle's Git commit, clean tree, both agents, common law
+and all six playbooks. Agent prose, voice model and effort come from that pin.
+The original plugin agents' tool lists override CLI `--tools`; the live probe showed
+that they hid the replacement MCP tools. Therefore the runner loads the unchanged
+agent prose through the CLI's standard `--agents` mechanism and replaces only the
+runtime tool grant. It neither copies nor rewrites prompts into this package.
+Cards read their exact pinned playbook and common law through `read_card`.
+
+Each card has a new Claude process, its own empty working directory, no built-in
+tools, no project settings/instructions/hooks, and a strict MCP configuration.
+The standard MCP SDK exposes only `read_file`, `search_file` and `list_files` bound to this
+repository's base/head SHAs, plus `read_card` for the selected card. The voice sees
+only the repository read tools. No shell, PR code execution, GitHub mutation, local
+filesystem read or arbitrary URL fetch is available to the model. A runner must
+keep its trusted package and bundle immutable during a review. Ticket tools are
+not connected in this slice; a card must report unavailable evidence.
+
+Jev uses native fetch and bounded p-retry backoff. Terminal authentication errors
+fail immediately; exhausted transient failures cannot approve. Its Noul responses
+contain no confidence field: routing confidence comes from the exposure Score,
+as in Python. Risk confidence comes directly from Jev's five Score answers. No Claude fallback
+can substitute for failed Jev evidence.
+
+The runner retains prose and validates completion, Checked blocks, finding fields,
+unique verdict fields and complete finding accounting. It does not depend on
+`--json-schema`; see [the earlier probe](docs/cli-compatibility.md) and
+[the slice 2 proof](docs/SLICE2.md). Transport references:
+[Claude CLI](https://code.claude.com/docs/en/cli-reference),
+[TypeSafe API](https://docs.typesafe.ai/api),
+[Octokit](https://github.com/octokit/octokit.js),
+[MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk).
 
 ## Development
 
 - `npm run build`: ESM and declarations into `dist`.
 - `npm run typecheck`: strict checks of source and tests.
-- `npm test`: 84 named behavior tests, with no TODOs.
+- `npm test`: 134 named behavior tests, with no TODOs.
 - `npm run test:breaks`: baseline, one changed response/input at a time, full-suite
   single-failure verification, restore, final baseline; writes the receipts.
 - `pre-commit install`: install the repository's commit hooks. Fix findings;
   do not bypass them.
 
-The inherited CI floor remains unchanged. Package checks are reproducible locally;
-adding a live Action and deciding its workflow integration belong to slice 2.
+The estate-owned workflows remain unchanged. Package checks and break receipts
+are reproducible locally; no live network or paid models run in the test suite.

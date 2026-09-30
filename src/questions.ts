@@ -49,3 +49,9 @@ export const riskQuestions = {
     "cannot be established with execution or static proof",
   ],
 } as const;
+/** Python's route confidence comes from this Score, not an invented Noul confidence. */
+export const routingExposureQuestion = {
+  type: "score",
+  instructions: "Score this change's overall security and operational exposure.",
+  criteria: riskQuestions.data_security,
+} as const;

@@ -147,3 +147,15 @@ export const publicationSchema = z.strictObject({
   recorded: z.literal(true),
   id: text,
 });
+
+export const liveConfigSchema = z.strictObject({
+  review: configSchema,
+  github: z.strictObject({ gh: z.string().optional(), freshShadow: z.literal(true) }),
+  jev: z.strictObject({ model: z.string().min(1) }),
+  claude: z.strictObject({
+    executable: z.string().min(1),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/),
+    pluginDirectory: z.string().min(1),
+    reviewerModel: z.string().min(1),
+  }),
+});

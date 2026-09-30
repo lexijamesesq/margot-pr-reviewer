@@ -1,0 +1,49 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { copyFileSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const tarball = resolve(process.argv[2] ?? "margot-pr-reviewer-0.2.0-slice2.tgz");
+const consumer = mkdtempSync(join(tmpdir(), "margot-slice2-consumer-"));
+const run = (file, args) => spawnSync(file, args, { cwd: consumer, encoding: "utf8" });
+writeFileSync(join(consumer, "package.json"), '{"private":true,"type":"module"}\n');
+const installed = run("npm", ["install", "--ignore-scripts", tarball]);
+assert.equal(installed.status, 0, installed.stderr);
+copyFileSync(new URL("./consumer-smoke.mjs", import.meta.url), join(consumer, "smoke.mjs"));
+const smoke = () => run(process.execPath, ["smoke.mjs"]);
+assert.equal(smoke().status, 0, "Installed API must review a recorded PR");
+const cli = join(consumer, "node_modules/.bin/margot-review");
+const checkCli = () =>
+  assert.equal(run(cli, []).status, 1, "Installed CLI must execute argument validation");
+checkCli();
+const realCli = realpathSync(cli);
+const original = readFileSync(realCli);
+let detected = false;
+try {
+  writeFileSync(realCli, "#!/usr/bin/env node\n");
+  try {
+    checkCli();
+  } catch (error) {
+    if (!(error instanceof assert.AssertionError)) throw error;
+    detected = true;
+  }
+} finally {
+  writeFileSync(realCli, original);
+}
+assert.equal(detected, true, "Empty CLI mutation must fail the argument-validation smoke");
+checkCli();
+assert.equal(smoke().status, 0);
+writeFileSync(
+  new URL("../docs/package-smoke-receipt.md", import.meta.url),
+  `# Installed package receipt\n\nGenerated ${new Date().toISOString()}, Node ${process.version}.\n\nInstalled the tarball in an empty directory outside the source tree. The existing consumer smoke imported the public package, completed a recorded approval, introduced a mandatory finding, and observed CHANGES_REQUESTED in the same result and recorded publication. It passed before and after the CLI break.\n\nNew CLI smoke: invoking the npm-created executable link without arguments exits 1 through argument validation. Replacing its installed target with an empty executable changed the exit to 0 and failed exactly that assertion. Restoring the file restored the passing check. This proves installed entrypoint execution, not live service availability or a hosted Action run.\n\nReproduce: npm pack; node scripts/package-smoke.mjs ./margot-pr-reviewer-0.2.0-slice2.tgz.\n`,
+);
+console.log(
+  JSON.stringify({
+    consumer,
+    recordedApi: "passed",
+    cli: "passed",
+    cliBreak: "one assertion failed",
+    restored: "passed",
+  }),
+);

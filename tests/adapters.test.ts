@@ -1,0 +1,575 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Octokit } from "octokit";
+import { expect, it } from "vitest";
+import { resolveBundle } from "../src/adapters/bundle.js";
+import { claudeEnvironment } from "../src/adapters/claude.js";
+import { ghFetch, githubAdapter } from "../src/adapters/github.js";
+import { jevAdapter } from "../src/adapters/jev.js";
+import { execute } from "../src/adapters/process.js";
+import { parseCard, parseVoice } from "../src/adapters/prose.js";
+import { type Recording, recordedServices, review } from "../src/index.js";
+import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
+import {
+  cardNames,
+  classificationSchema,
+  configSchema,
+  dimensions,
+  factsSchema,
+  requestSchema,
+  riskSchema,
+  routeSchema,
+} from "../src/schemas.js";
+import cases from "./adapter-scenarios.json" with { type: "json" };
+
+const recording = JSON.parse(
+  await readFile(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
+) as Recording;
+const request = requestSchema.parse(recording.request);
+const facts = factsSchema.parse(recording.facts);
+const context = () => ({ signal: AbortSignal.timeout(3000) });
+function scenario(id: string, exercise: (broken: boolean) => Promise<unknown>) {
+  const spec = cases.find((c) => c.id === id);
+  if (!spec) throw new Error(`No break specification: ${id}`);
+  it(spec.name, async () => {
+    expect(await exercise(process.env.MARGOT_ADAPTER_BREAK === id)).toMatchObject({ ok: true });
+  });
+}
+async function rejects(fn: () => Promise<unknown>) {
+  try {
+    await fn();
+    return { ok: false };
+  } catch {
+    return { ok: true };
+  }
+}
+function cardText() {
+  return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
+}
+function github(
+  overrides: {
+    pageTwo?: boolean;
+    base?: string;
+    count?: number;
+    patch?: string | null;
+    draft?: boolean;
+    fork?: boolean;
+    moved?: boolean;
+    historyFailure?: boolean;
+    diff?: string;
+    ledger?: boolean;
+  } = {},
+) {
+  let pulls = 0;
+  const calls: string[] = [];
+  const transport = (async (input: string | URL | Request) => {
+    const url = new URL(String(input));
+    calls.push(url.pathname + url.search);
+    const pull = {
+      title: "Change",
+      body: "Intent",
+      user: { login: "author" },
+      draft: overrides.draft ?? false,
+      head: {
+        sha: overrides.moved && pulls > 1 ? "f".repeat(40) : request.head,
+        repo: { full_name: overrides.fork ? "fork/repo" : request.repository },
+      },
+      base: { sha: overrides.base ?? request.base },
+      changed_files: overrides.count ?? 1,
+      auto_merge: null,
+    };
+    let data: unknown = pull;
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (url.pathname.endsWith("/files")) {
+      data = [
+        {
+          additions: 1,
+          deletions: 1,
+          filename: url.searchParams.get("page") === "2" ? "b.ts" : "a.ts",
+          patch: overrides.patch === undefined ? "@@ -1 +1 @@\n-old\n+new" : overrides.patch,
+        },
+      ];
+      if (overrides.pageTwo && url.searchParams.get("page") !== "2")
+        headers.link = `<${url.origin}${url.pathname}?page=2>; rel="next"`;
+    } else if (url.pathname.endsWith("/check-runs")) data = { total_count: 0, check_runs: [] };
+    else if (url.pathname.endsWith("/reviews")) {
+      if (overrides.historyFailure) throw new Error("History unavailable");
+      data = overrides.ledger ? [{ body: "<!-- margot-ledger:v1 unknown -->" }] : [];
+    } else {
+      pulls++;
+      pull.head.sha = overrides.moved && pulls > 1 ? "f".repeat(40) : request.head;
+      data = pull;
+    }
+    const response = new Response(JSON.stringify(data), { headers });
+    Object.defineProperty(response, "url", { value: url.href });
+    return response;
+  }) as typeof fetch;
+  // Octokit's transport receives the media type; serve the actual wire format.
+  const fetcher: typeof fetch = async (input, init) => {
+    if (new Headers(init?.headers).get("accept")?.includes("diff")) {
+      const diff =
+        overrides.diff ??
+        `diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n-old\n+new\n${overrides.pageTwo ? "diff --git a/b.ts b/b.ts\n@@ -1 +1 @@\n-old\n+new\n" : ""}`;
+      const r = new Response(diff, { headers: { "content-type": "text/plain" } });
+      Object.defineProperty(r, "url", { value: String(input) });
+      return r;
+    }
+    return transport(input, init);
+  };
+  const client = new Octokit({
+    request: { fetch: fetcher },
+    retry: { enabled: false },
+    throttle: { enabled: false },
+  });
+  return { adapter: githubAdapter(client), calls };
+}
+scenario("pagination", async (broken) => {
+  const { adapter, calls } = github({ pageTwo: !broken, count: broken ? 1 : 2 });
+  const facts = await adapter.facts(request, context());
+  return { ok: facts.files.length === 2 && calls.some((c) => c.includes("page=2")) };
+});
+scenario("missing-file", (broken) =>
+  rejects(() => github({ count: broken ? 1 : 2 }).adapter.facts(request, context())),
+);
+scenario("missing-patch", (broken) =>
+  rejects(() =>
+    github({ patch: broken ? "@@ -1 +1 @@\n-a\n+b" : null }).adapter.facts(request, context()),
+  ),
+);
+scenario("partial-diff", (broken) =>
+  rejects(() =>
+    github({
+      diff: broken ? "diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n-a\n+b\n" : "not a diff",
+    }).adapter.facts(request, context()),
+  ),
+);
+scenario("moving-facts", (broken) =>
+  rejects(() => github({ moved: !broken }).adapter.facts(request, context())),
+);
+scenario("draft", (broken) =>
+  rejects(() => github({ draft: !broken }).adapter.facts(request, context())),
+);
+scenario("fork", (broken) =>
+  rejects(() => github({ fork: !broken }).adapter.facts(request, context())),
+);
+scenario("history-outage", (broken) =>
+  rejects(() => github({ historyFailure: !broken }).adapter.facts(request, context())),
+);
+scenario("ledger", async (broken) => ({
+  ok: (await github({ ledger: !broken }).adapter.facts(request, context())).history.priorLedger,
+}));
+scenario("bridge-write", (broken) =>
+  rejects(() =>
+    ghFetch("not-a-real-command")("https://api.github.com/repos/example/project", {
+      method: broken ? "GET" : "POST",
+    }).catch((e) => {
+      if (String(e).includes("GET only")) throw e;
+      return new Response("{}");
+    }),
+  ),
+);
+scenario("bridge-host", (broken) =>
+  rejects(() =>
+    ghFetch("not-a-real-command")(
+      broken ? "https://api.github.com/x" : "https://other.invalid/x",
+    ).catch((e) => {
+      if (String(e).includes("GET only")) throw e;
+      return new Response("{}");
+    }),
+  ),
+);
+function jev(answer: unknown, options: { failures?: number; status?: number } = {}) {
+  let attempts = 0;
+  const calls: unknown[] = [];
+  const adapter = jevAdapter({
+    key: "test-only",
+    model: "test-model",
+    retries: 1,
+    minTimeout: 1,
+    fetch: async (_input, init) => {
+      attempts++;
+      calls.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ model: "test-model", answers: answer }), {
+        status: attempts <= (options.failures ?? 0) ? (options.status ?? 503) : 200,
+      });
+    },
+  });
+  return { adapter, calls, attempts: () => attempts };
+}
+const classes = {
+  functional: { type: "noul", noul: 0 },
+  documentation: { type: "noul", noul: 0 },
+  mechanical: { type: "noul", noul: 1 },
+};
+scenario("jev-class", async (broken) => {
+  const j = jev({ ...classes, mechanical: { type: "noul", noul: broken ? 0 : 1 } });
+  const result = await j.adapter.classify(facts, classificationQuestions, context());
+  return { ok: classificationSchema.parse(result).mechanical === 1 };
+});
+scenario("jev-invalid", (broken) =>
+  rejects(() =>
+    jev({ ...classes, mechanical: { type: "noul", noul: broken ? 1 : "yes" } }).adapter.classify(
+      facts,
+      classificationQuestions,
+      context(),
+    ),
+  ),
+);
+scenario("jev-retry", async (broken) => {
+  const j = jev(classes, { failures: broken ? 0 : 1 });
+  await j.adapter.classify(facts, classificationQuestions, context());
+  return { ok: j.attempts() === 2 };
+});
+scenario("jev-auth", async (broken) => {
+  const j = jev(classes, { failures: 1, status: broken ? 503 : 401 });
+  const error = await rejects(() => j.adapter.classify(facts, classificationQuestions, context()));
+  return { ok: error.ok && j.attempts() === 1 };
+});
+scenario("jev-outage", async (broken) => {
+  const j = jev(classes, { failures: broken ? 0 : 3 });
+  const services = { ...recordedServices(recording), classify: j.adapter.classify };
+  const result = await review(request, recording.config, services);
+  return {
+    ok: result.kind === "error" && result.stage === "classification" && !result.mergeEligible,
+  };
+});
+scenario("jev-risk", async (broken) => {
+  const answers = Object.fromEntries(
+    dimensions.map((d) => [
+      d,
+      {
+        type: "score",
+        confidence: 0.8,
+        probabilities: { 0: 0, 1: broken ? 1 : 0, 2: broken ? 0 : 1, 3: 0 },
+      },
+    ]),
+  );
+  const r = await jev(answers).adapter.risk(facts, [], riskQuestions, context());
+  return { ok: riskSchema.parse(r).dimensions.operations.probabilities[2] === 1 };
+});
+scenario("jev-route", async (broken) => {
+  const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0.5 }]));
+  const r = await jev({
+    ...answers,
+    documentationSubstantive: { type: "noul", noul: 1 },
+    exposure: {
+      type: "score",
+      confidence: broken ? 1 : 0,
+      probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 },
+    },
+  }).adapter.route(facts, "documentation", routeQuestions, context());
+  return {
+    ok: routeSchema.parse(r).confidence === 0,
+  };
+});
+scenario("no-publish-head", async (broken) => {
+  const copy = structuredClone(recording);
+  copy.config = { ...configSchema.parse(copy.config), publication: "none" };
+  copy.head = broken ? request.head : "f".repeat(40);
+  const result = await review(request, copy.config, recordedServices(copy));
+  return { ok: result.kind === "error" && !result.mergeEligible };
+});
+scenario("card-findings", async (broken) => {
+  const raw =
+    cardText() +
+    (broken
+      ? ""
+      : "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n    consequence: Writes can escape.\n    action: Restore the guard.\n");
+  return { ok: parseCard(raw, "safety").findings.length === 1 };
+});
+scenario("card-missing-checked", (broken) =>
+  rejects(async () =>
+    parseCard(broken ? cardText() : cardText().replace("Checked:", "Examined:"), "safety"),
+  ),
+);
+scenario("card-incomplete", (broken) =>
+  rejects(async () =>
+    parseCard(
+      broken
+        ? cardText()
+        : cardText().replace("completion: completed", "completion: incomplete: missing evidence"),
+      "safety",
+    ),
+  ),
+);
+scenario("card-malformed", (broken) =>
+  rejects(async () =>
+    parseCard(cardText() + (broken ? "" : "- [issue] missing fields\n"), "safety"),
+  ),
+);
+scenario("card-ambiguous", (broken) =>
+  rejects(async () =>
+    parseCard(cardText() + (broken ? "" : "\ncompletion: completed\n"), "safety"),
+  ),
+);
+scenario("voice-accounting", async (broken) => {
+  const raw = `outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\nestablished:\n${broken ? "" : "- safety-F1 · a.ts:1 · The guard is missing.\n"}dismissed:\n`;
+  return { ok: parseVoice(raw).dispositions[0]?.id === "safety-F1" };
+});
+scenario("voice-ambiguous", (broken) =>
+  rejects(async () =>
+    parseVoice(
+      `outcome: APPROVED\nband: LOW\nband_reason: Bounded.\nsummary: Clear.\nestablished:\ndismissed:\n${broken ? "" : "band: HIGH\n"}`,
+    ),
+  ),
+);
+scenario("credential-isolation", async (broken) => {
+  const env = claudeEnvironment({
+    PATH: "/bin",
+    JEV_KEY: "jev-canary",
+    GH_TOKEN: "write-canary",
+    UNRELATED_SECRET: "other",
+  });
+  if (broken) env.GH_TOKEN = "write-canary";
+  return { ok: !env.JEV_KEY && !env.GH_TOKEN && !env.UNRELATED_SECRET && env.PATH === "/bin" };
+});
+scenario("process-error", (broken) =>
+  rejects(() => execute(process.execPath, ["-e", `process.exit(${broken ? 0 : 1})`])),
+);
+scenario("process-timeout", (broken) =>
+  rejects(() =>
+    execute(process.execPath, ["-e", broken ? "" : "setTimeout(()=>{},10000)"], {
+      signal: AbortSignal.timeout(100),
+    }),
+  ),
+);
+scenario("bundle-pin", async (broken) => {
+  const root = await mkdtemp(join(tmpdir(), "margot-bundle-test-"));
+  try {
+    await execute("git", ["init", "-q", root]);
+    await writeFile(join(root, "a"), "a");
+    await execute("git", ["-C", root, "add", "a"]);
+    await execute("git", [
+      "-C",
+      root,
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.invalid",
+      "commit",
+      "-qm",
+      "fixture",
+    ]);
+    const sha = (await execute("git", ["-C", root, "rev-parse", "HEAD"])).trim();
+    try {
+      await resolveBundle(root, broken ? sha : "f".repeat(40), context());
+      return { ok: false };
+    } catch (e) {
+      return { ok: String(e).includes("pin mismatch") };
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+scenario("evidence-bound", async (broken) => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+  const { createEvidenceServer } = await import("../src/adapters/evidence-server.js");
+  const calls: unknown[] = [];
+  const server = createEvidenceServer(
+    { request },
+    {
+      ...github().adapter,
+      async readFile(r, path, revision) {
+        calls.push({ r, path, revision });
+        return "safe file";
+      },
+    },
+  );
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "1" });
+  try {
+    await server.connect(a);
+    await client.connect(b);
+    await client.callTool({
+      name: "read_file",
+      arguments: {
+        path: "a.ts",
+        revision: broken ? "base" : "head",
+        repository: "attacker/repo",
+        head: "f".repeat(40),
+      },
+    });
+    return {
+      ok:
+        JSON.stringify(calls) === JSON.stringify([{ r: request, path: "a.ts", revision: "head" }]),
+    };
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+scenario("evidence-tools", async (broken) => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+  const { createEvidenceServer } = await import("../src/adapters/evidence-server.js");
+  const server = createEvidenceServer({ request }, github().adapter);
+  if (broken) server.registerTool("write_file", { inputSchema: {} }, async () => ({ content: [] }));
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "1" });
+  try {
+    await server.connect(a);
+    await client.connect(b);
+    return {
+      ok:
+        JSON.stringify((await client.listTools()).tools.map((t) => t.name).sort()) ===
+        JSON.stringify(["list_files", "read_file", "search_file"]),
+    };
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+scenario("claude-tools", async () => {
+  const { claudeAdapter } = await import("../src/adapters/claude.js");
+  const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
+  try {
+    await mkdir(join(root, "agents"));
+    await writeFile(
+      join(root, "agents/pr-reviewer.md"),
+      "---\ndescription: Test reviewer\nmodel: inherit\n---\nPinned test law.\n",
+    );
+    const executable = join(root, "claude.cjs"),
+      capture = join(root, "capture.json");
+    await writeFile(
+      executable,
+      `#!/usr/bin/env node\nconst fs=require('node:fs');if(process.argv.includes('--version'))console.log('0.0.1 test');else{console.log(JSON.stringify({type:'system',subtype:'init',tools:[]}));fs.writeFileSync(${JSON.stringify(capture)},JSON.stringify(process.argv.slice(2)));console.log(JSON.stringify({type:'result',subtype:'success',is_error:false,result:${JSON.stringify(cardText())},total_cost_usd:0}));}`,
+      { mode: 0o700 },
+    );
+    await claudeAdapter({
+      executable,
+      version: "0.0.1",
+      pluginDirectory: root,
+      reviewerModel: "example-model",
+    }).card(
+      {
+        facts,
+        name: "safety",
+        classification: "functional",
+        cardPath: join(root, "skills/pr-council/playbooks/safety.md"),
+        agent: "publish:pr-reviewer",
+      },
+      context(),
+    );
+    const args = JSON.parse(await readFile(capture, "utf8")) as string[];
+    return {
+      ok:
+        args[args.indexOf("--tools") + 1] === "" &&
+        args.includes("--strict-mcp-config") &&
+        args.includes("--restricted") &&
+        args[args.indexOf("--setting-sources") + 1] === "",
+    };
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+scenario("truncated-hunk", (broken) =>
+  rejects(() =>
+    github({
+      diff: `diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n-old\n${broken ? "+new\n" : ""}`,
+    }).adapter.facts(request, context()),
+  ),
+);
+scenario("evidence-range", async (broken) => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+  const { createEvidenceServer } = await import("../src/adapters/evidence-server.js");
+  const server = createEvidenceServer(
+    { request },
+    {
+      ...github().adapter,
+      async readFile() {
+        return Array.from({ length: 700 }, (_, i) => `line-${i + 1}`).join("\n");
+      },
+    },
+  );
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "1" });
+  try {
+    await server.connect(a);
+    await client.connect(b);
+    const result = await client.callTool({
+      name: "read_file",
+      arguments: { path: "large.ts", start_line: broken ? 1 : 601, max_lines: 2 },
+    });
+    return {
+      ok:
+        JSON.stringify(result).includes("601: line-601") &&
+        JSON.stringify(result).includes("602: line-602") &&
+        !JSON.stringify(result).includes("603: line-603"),
+    };
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+scenario("evidence-search", async (broken) => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+  const { createEvidenceServer } = await import("../src/adapters/evidence-server.js");
+  const server = createEvidenceServer(
+    { request },
+    {
+      ...github().adapter,
+      async readFile() {
+        return "other\ncheck-yaml\nend";
+      },
+    },
+  );
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test", version: "1" });
+  try {
+    await server.connect(a);
+    await client.connect(b);
+    const result = await client.callTool({
+      name: "search_file",
+      arguments: { path: "test.ts", text: broken ? "missing" : "check-yaml" },
+    });
+    return { ok: JSON.stringify(result).includes("2: check-yaml") };
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
+scenario("base-freshness", (broken) =>
+  rejects(() =>
+    github({ base: broken ? request.base : "f".repeat(40) }).adapter.head(request, context()),
+  ),
+);
+scenario("bundle-dirty", async (broken) => {
+  const root = await mkdtemp(join(tmpdir(), "margot-dirty-bundle-"));
+  try {
+    await execute("git", ["init", "-q", root]);
+    const paths = [
+      ".claude-plugin/plugin.json",
+      "agents/pr-reviewer.md",
+      "agents/margot.md",
+      "skills/pr-council/SKILL.md",
+      ...cardNames.map((n) => `skills/pr-council/playbooks/${n}.md`),
+    ];
+    for (const path of paths) {
+      const target = join(root, path);
+      await mkdir(target.slice(0, target.lastIndexOf("/")), { recursive: true });
+      await writeFile(target, "pinned content");
+      await execute("git", ["-C", root, "add", path]);
+    }
+    await execute("git", [
+      "-C",
+      root,
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.invalid",
+      "commit",
+      "-qm",
+      "fixture",
+    ]);
+    const sha = (await execute("git", ["-C", root, "rev-parse", "HEAD"])).trim();
+    if (!broken) await writeFile(join(root, "agents/margot.md"), "changed instructions");
+    return await rejects(() => resolveBundle(root, sha, context()));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
