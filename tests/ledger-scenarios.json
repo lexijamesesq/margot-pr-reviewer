@@ -31,7 +31,7 @@
   },
   {
     "id": "ledger-terminal",
-    "name": "Quoted nonterminal ledger is rejected",
+    "name": "Quoted nonterminal ledger is skipped",
     "defect": "Remove prose following the ledger block"
   },
   {
@@ -298,5 +298,10 @@
     "id": "ledger-page-two-failure",
     "name": "Unreadable second review page cannot forget history",
     "defect": "Repair the failed second page response"
+  },
+  {
+    "id": "ledger-human-quote",
+    "name": "Newer human marker quote does not hide the trusted App ledger",
+    "defect": "Replace the harmless quote with an untrusted trailing ledger block"
   }
 ]

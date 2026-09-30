@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { deflateSync, inflateSync } from "node:zlib";
 import parseDiff from "parse-diff";
+import { diffIsComplete } from "./diff.js";
 import { comparisonSchema, ledgerSchema } from "./schemas.js";
 import type {
   Card,
@@ -36,7 +37,9 @@ export const evidenceHash = (facts: Facts): string =>
     )
     .digest("hex");
 
-/** Only a final, App-authored block is history. Never fall back past a corrupt block. */
+/** Only trailing blocks claim history; prose mentions cannot hide the App's ledger.
+ * Explicit untrusted claims and corrupt payloads fail closed.
+ */
 export function selectLedger(facts: Facts, config: ReviewConfig): Ledger | null {
   if (!facts.history.complete) throw new Error("History unavailable");
   if (facts.history.priorLedger && !facts.history.reviews)
@@ -45,11 +48,10 @@ export function selectLedger(facts: Facts, config: ReviewConfig): Ledger | null 
     (a, b) => b.submittedAt.localeCompare(a.submittedAt) || b.id - a.id,
   );
   for (const review of reviews) {
-    if (!review.body.includes("margot-ledger:")) continue;
+    const match = review.body.match(/(?:^|\n)<!-- margot-ledger:v([12]) ([A-Za-z0-9+/=]+) -->\s*$/);
+    if (!match) continue;
     if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor))
       throw new Error("Untrusted ledger author");
-    const match = review.body.match(/\n<!-- margot-ledger:v([12]) ([A-Za-z0-9+/=]+) -->\s*$/);
-    if (!match) throw new Error("Unreadable ledger block");
     const ledger = ledgerSchema.parse(
       JSON.parse(
         (match[1] === "2"
@@ -89,21 +91,7 @@ export function roundScope(facts: Facts, prior: Ledger | null, comparison?: unkn
     throw new Error("Delta revision mismatch");
   if (!delta.complete || !["ahead", "identical"].includes(delta.status)) return full;
   const files = parseDiff(delta.diff);
-  if (
-    files.length !== [...delta.diff.matchAll(/^diff --git /gm)].length ||
-    (delta.diff.trim() && files.length === 0) ||
-    /^Binary files .* differ$|^GIT binary patch$/m.test(delta.diff) ||
-    files.some((file) =>
-      file.chunks.some(
-        (chunk) =>
-          chunk.changes.filter((c) => c.type !== "add" && !c.content.startsWith("\\")).length !==
-            chunk.oldLines ||
-          chunk.changes.filter((c) => c.type !== "del" && !c.content.startsWith("\\")).length !==
-            chunk.newLines,
-      ),
-    )
-  )
-    return full;
+  if (!diffIsComplete(delta.diff, files)) return full;
   const own = new Set(
     facts.files.flatMap((f) => [f.path, ...(f.previousPath ? [f.previousPath] : [])]),
   );

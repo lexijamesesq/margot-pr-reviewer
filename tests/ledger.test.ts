@@ -176,13 +176,30 @@ scenario(
   },
   { round: 3 },
 );
+scenario(
+  "ledger-human-quote",
+  (broken) => {
+    const f = history();
+    f.history.reviews.push({
+      ...posted(prior([], 3), "human"),
+      actorType: "User",
+      id: 2,
+      submittedAt: "2026-09-02T00:00:00Z",
+      body: broken
+        ? `review\n${ledgerBlock(prior([], 3))}`
+        : 'The review quotes "margot-ledger:" here.',
+    });
+    return { ledger: selectLedger(f, config) };
+  },
+  { ledger: prior() },
+);
 scenario("ledger-duplicate", (b) =>
   rejects(() => selectLedger(history(prior(b ? [entry()] : [entry(), entry()])), config)),
 );
 scenario("ledger-terminal", (b) => {
   const f = history();
   if (!b) f.history.reviews[0]!.body += "\nquoted text";
-  return rejects(() => selectLedger(f, config));
+  return { ok: selectLedger(f, config) === null };
 });
 const diff = (path = "a.ts") =>
   `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n@@ -1 +1 @@\n-old\n+new\n`;

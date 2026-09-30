@@ -461,7 +461,13 @@ scenario("evidence-tools", async (broken) => {
   }
 });
 async function fakeClaude(
-  options: { version?: string; tools?: string[]; envelope?: Record<string, unknown> } = {},
+  options: {
+    version?: string;
+    tools?: string[];
+    envelope?: Record<string, unknown>;
+    facts?: typeof facts;
+    delta?: string;
+  } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
   try {
@@ -482,7 +488,22 @@ async function fakeClaude(
     };
     await writeFile(
       executable,
-      `#!/usr/bin/env node\nconst fs=require('node:fs');if(process.argv.includes('--version'))console.log(${JSON.stringify(options.version ?? "0.0.1 test")});else{console.log(JSON.stringify(${JSON.stringify({ type: "system", subtype: "init", tools: options.tools ?? [] })}));fs.writeFileSync(${JSON.stringify(capture)},JSON.stringify(process.argv.slice(2)));console.log(JSON.stringify(${JSON.stringify(envelope)}));}`,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+if (process.argv.includes("--version")) {
+  console.log(${JSON.stringify(options.version ?? "0.0.1 test")});
+} else {
+  console.log(JSON.stringify(${JSON.stringify({ type: "system", subtype: "init", tools: options.tools ?? [] })}));
+  const args = process.argv.slice(2);
+  const mcp = JSON.parse(args[args.indexOf("--mcp-config") + 1]);
+  const evidence = JSON.parse(mcp.mcpServers.evidence.env.MARGOT_EVIDENCE);
+  fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({
+    args,
+    stdin: fs.readFileSync(0, "utf8"),
+    diff: fs.readFileSync(evidence.diffPath, "utf8"),
+  }));
+  console.log(JSON.stringify(${JSON.stringify(envelope)}));
+}`,
       { mode: 0o700 },
     );
     await claudeAdapter({
@@ -492,29 +513,33 @@ async function fakeClaude(
       reviewerModel: "example-model",
     }).card(
       {
-        facts,
+        facts: options.facts ?? facts,
         name: "safety",
         classification: "functional",
         cardPath: join(root, "skills/pr-council/playbooks/safety.md"),
         agent: "publish:pr-reviewer",
         round: {
-          round: 1,
-          priorHead: null,
-          full: true,
-          diff: facts.diff,
-          files: facts.files,
+          round: options.delta === undefined ? 1 : 2,
+          priorHead: options.delta === undefined ? null : "b".repeat(40),
+          full: options.delta === undefined,
+          diff: options.delta ?? (options.facts ?? facts).diff,
+          files: (options.facts ?? facts).files,
           entries: [],
         },
       },
       context(),
     );
-    return JSON.parse(await readFile(capture, "utf8")) as string[];
+    return JSON.parse(await readFile(capture, "utf8")) as {
+      args: string[];
+      stdin: string;
+      diff: string;
+    };
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 }
 scenario("claude-tools", async () => {
-  const args = await fakeClaude();
+  const { args } = await fakeClaude();
   return {
     ok:
       args[args.indexOf("--tools") + 1] === "" &&
@@ -523,6 +548,45 @@ scenario("claude-tools", async () => {
       args[args.indexOf("--setting-sources") + 1] === "",
   };
 });
+scenario(
+  "claude-stdin-delta",
+  async () => {
+    const fullDiff = `diff --git a/a.ts b/a.ts\n@@ -1 +1,20000 @@\n-old\n${"+full PR evidence\n".repeat(20000)}`;
+    const delta = `diff --git a/a.ts b/a.ts\n@@ -1 +1,2000 @@\n-old\n${"+round delta\n".repeat(1999)}+delta tail\n`;
+    const inputFacts = { ...facts, body: "Review context. ".repeat(2000), diff: fullDiff };
+    try {
+      const { args, stdin, diff } = await fakeClaude({ facts: inputFacts, delta });
+      const supplied = JSON.parse(stdin.split("\n").at(-1) ?? "");
+      return {
+        stdinPrompt:
+          stdin.startsWith("Perform shadow review round 2.") &&
+          stdin.includes("Review only the supplied delta plus standing entries."),
+        argvPrompt: args.some((arg) => arg.includes("Perform shadow review round")),
+        facts: supplied.facts,
+        round: supplied.round,
+        diff,
+        inlineDiff: stdin.includes("full PR evidence") || stdin.includes("delta tail"),
+      };
+    } catch {
+      return { stdinPrompt: false };
+    }
+  },
+  {
+    stdinPrompt: true,
+    argvPrompt: false,
+    facts: { ...facts, body: "Review context. ".repeat(2000), diff: "Available through read_diff" },
+    round: {
+      round: 2,
+      priorHead: "b".repeat(40),
+      full: false,
+      diff: "Available through read_diff",
+      files: facts.files,
+      entries: [],
+    },
+    diff: `diff --git a/a.ts b/a.ts\n@@ -1 +1,2000 @@\n-old\n${"+round delta\n".repeat(1999)}+delta tail\n`,
+    inlineDiff: false,
+  },
+);
 async function rejectsWith(fn: () => Promise<unknown>, message: string) {
   try {
     await fn();
@@ -546,11 +610,11 @@ scenario("claude-envelope-error", () =>
 scenario("claude-envelope-empty", () =>
   rejectsWith(() => fakeClaude({ envelope: { result: "" } }), "result"),
 );
-scenario("truncated-hunk", () =>
+scenario("truncated-hunk", (broken) =>
   rejectsWith(
     () =>
       github({
-        diff: "diff --git a/a.ts b/a.ts\n@@ -1,2 +1,2 @@\n-old\n+new",
+        diff: `diff --git a/a.ts b/a.ts\n@@ -1,${broken ? 1 : 2} +1,${broken ? 1 : 2} @@\n-old\n+new`,
       }).adapter.facts(request, context()),
     "Diff hunks are incomplete",
   ),
@@ -622,7 +686,7 @@ for (const [id, marker] of Object.entries({
           deletions: 0,
           diff: metadataDiffs["mode-only"] + (broken ? "" : `${marker}\n`),
         }).adapter.facts(request, context()),
-      "no complete text patch",
+      "Diff hunks are incomplete",
     ),
   );
 }

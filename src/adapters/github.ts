@@ -1,6 +1,7 @@
 import { Octokit } from "octokit";
 import parseDiff from "parse-diff";
 import { z } from "zod";
+import { diffIsComplete } from "../diff.js";
 import { factsSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
@@ -112,13 +113,11 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
         throw new Error("Incomplete GitHub diff");
       // Metadata-only changes have no patch. Binary or missing content remains incomplete.
       if (
-        /^Binary files .* differ$|^GIT binary patch$/m.test(diffText) ||
         files.some((f) => typeof f.patch !== "string" && (f.additions !== 0 || f.deletions !== 0))
       )
         throw new Error("A changed file has no complete text patch");
-      const diffFiles = [...diffText.matchAll(/^diff --git /gm)].length;
-      if (diffFiles !== files.length) throw new Error("Diff and file inventory disagree");
       const parsed = parseDiff(diffText);
+      if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
       if (
         parsed.length !== files.length ||
         parsed.some((file, index) => {
@@ -126,14 +125,7 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
           return (
             !expected ||
             file.additions !== expected.additions ||
-            file.deletions !== expected.deletions ||
-            file.chunks.some(
-              (chunk) =>
-                chunk.changes.filter((c) => c.type !== "add" && !c.content.startsWith("\\"))
-                  .length !== chunk.oldLines ||
-                chunk.changes.filter((c) => c.type !== "del" && !c.content.startsWith("\\"))
-                  .length !== chunk.newLines,
-            )
+            file.deletions !== expected.deletions
           );
         })
       )

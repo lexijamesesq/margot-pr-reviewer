@@ -117,5 +117,33 @@
     "tests": [
       "Silent MAJOR returns to voice for confirmation"
     ]
+  },
+  {
+    "name": "removed shared diff hunk validation",
+    "file": "src/diff.ts",
+    "from": "    files.every((file) =>\n      file.chunks.every(\n        (chunk) =>\n          chunk.changes.filter((c) => c.type !== \"add\" && !c.content.startsWith(\"\\\\\")).length ===\n            chunk.oldLines &&\n          chunk.changes.filter((c) => c.type !== \"del\" && !c.content.startsWith(\"\\\\\")).length ===\n            chunk.newLines,\n      ),\n    )",
+    "to": "true",
+    "tests": [
+      "A partial final hunk cannot claim complete facts",
+      "Truncated delta hunk uses complete full PR"
+    ]
+  },
+  {
+    "name": "dropped Claude stdin prompt",
+    "file": "src/adapters/claude.ts",
+    "from": "env: claudeEnvironment(process.env), input: prompt",
+    "to": "env: claudeEnvironment(process.env)",
+    "tests": [
+      "Claude receives its complete prompt on stdin and only the round delta through read_diff"
+    ]
+  },
+  {
+    "name": "replaced Claude round delta with full PR diff",
+    "file": "src/adapters/claude.ts",
+    "from": "writeFile(evidence.diffPath, input.round.diff,",
+    "to": "writeFile(evidence.diffPath, input.facts.diff,",
+    "tests": [
+      "Claude receives its complete prompt on stdin and only the round delta through read_diff"
+    ]
   }
 ]
