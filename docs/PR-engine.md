@@ -1,0 +1,73 @@
+<!-- pr-body:v1 -->
+<!-- markdownlint-disable MD041 -->
+## Intent
+
+Let an instance publish the engine's single decision to GitHub, and replace the
+old finding tally with New, Open, Closed that reconcile with the listed issues.
+
+## What changed
+
+Added an Octokit publisher that adopts the caller's pending check by App/name/head,
+fences superseded runs, withdraws earlier App approvals, confirms hold disarming,
+posts the SHA-bound native review and completes the required check last. Errors
+attempt independent cleanup and remain errors if cleanup fails. Held reviews use
+COMMENT plus neutral; only eligible results APPROVE plus success. No merge or
+enable-auto-merge path exists. Check names and App identity are caller configuration.
+
+The CLI supports explicit GitHub mode with a separate publication credential.
+Models and their version probes never receive it. Shadows retain prior-head
+history but can omit already posted current-head reviews; this option is refused
+in GitHub mode. Named skipped CI jobs require explicit caller permission.
+
+The renderer lists every ledger issue once. Advisory findings remain Open;
+fixed and dismissed findings remain Closed across rounds, with fate and late
+attribution on each entry. Open advisories can be recalled and fixed. Legacy
+internal diagnostic counters remain readable but do not drive the visible tally.
+Posted ledgers keep Python-readable entries and a compressed TypeScript receipt,
+so reverting authority preserves the canary findings without modifying r32.
+The release is 0.4.0, with a self-hosted sample and unchanged pinned skill loading.
+
+## Verification
+
+See `docs/slice4-verification.md` for final clean-clone, package, test and break
+receipts. Recorded Octokit transport tests cover approval, hold/disarm, every
+write-failure boundary, malformed receipts, stale admission, caller check adoption
+and superseded ownership. Every new test has a failing break receipt; deliberately
+adding one to Closed fails tally reconciliation. The slice-three corpus replays
+with the same decisions, new reconciled tallies and identical no-model retries.
+
+Read-only live shadows cover all three engine classes and a HIGH hold at Python's
+exact heads. A README review completes where Python's first attempt lost card
+reports. One ambiguous bump remains LOW after functional review; another becomes
+MEDIUM and held. These are retained model differences, not claimed finding parity.
+The held round-three result has Closed 11: nine fixes and two dismissals, all
+listed. Full comparisons and limitations are in `docs/SLICE4.md`.
+
+Total live use: three Jev credential reads, 19 Jev HTTP requests, ten completed
+Claude review calls, reported cost $1.647863. Keys remained in memory. Nothing
+was pushed, posted, dispatched or released by the builder.
+
+## Risk and blast radius
+
+Production App publication, released installation on the Pi, actual estate
+consumption, the live authority/rollback canary and Python retirement remain
+unproven. GitHub has no transaction across review/check writes; failed cleanup can
+leave pending/error state, and callers must serialize same-PR writers. Reconcile
+all canary differences before authority. Keep adoption and retirement separate.
+
+## Rollback
+
+Before authority, Python continues publishing. The instance's authority commit
+has one documented revert back to Python. Do not merge the retirement PR until
+the live canary and full-estate rollout pass. Preserve the rollback image.
+
+## Ticket
+
+None.
+
+## Dependencies
+
+Existing Octokit, Zod and Node tooling; no npm dependency added. Consumer-provided
+check names, App credentials, runner, policy and pinned publish-skills bundle.
+Release 0.4.0 must be published before instance adoption. The instance hand-over
+contains the exact five-step canary procedure and pass criteria.

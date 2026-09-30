@@ -220,8 +220,8 @@
     "defect": "source mutation: remove the version-pin guard",
     "sourceBreak": {
       "file": "src/adapters/claude.ts",
-      "from": "if (!(await execute(options.executable, [\"--version\"], c)).startsWith(`${options.version} `))",
-      "to": "if (false)"
+      "from": ".startsWith(`${options.version} `)",
+      "to": ".startsWith(\"\")"
     }
   },
   {
@@ -297,6 +297,26 @@
       "file": "src/adapters/claude.ts",
       "from": "          \"-p\",",
       "to": "          \"-p\",\n          prompt,"
+    }
+  },
+  {
+    "id": "shadow-before-head",
+    "name": "Same-head Python publication cannot turn a before-head shadow into a retry",
+    "defect": "Include same-head reviews in the shadow facts"
+  },
+  {
+    "id": "shadow-cannot-publish",
+    "name": "A shadow history selection cannot be granted GitHub write authority",
+    "defect": "Turn off the shadow history selection"
+  },
+  {
+    "id": "claude-probe-credential",
+    "name": "Even the Claude version probe cannot inherit the publication credential",
+    "defect": "Pass the full process environment to the version probe",
+    "sourceBreak": {
+      "file": "src/adapters/claude.ts",
+      "from": "const probeEnvironment = claudeEnvironment(process.env);",
+      "to": "const probeEnvironment = process.env;"
     }
   }
 ]

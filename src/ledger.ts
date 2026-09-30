@@ -52,15 +52,31 @@ export function selectLedger(facts: Facts, config: ReviewConfig): Ledger | null 
     if (!match) continue;
     if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor))
       throw new Error("Untrusted ledger author");
-    const ledger = ledgerSchema.parse(
-      JSON.parse(
-        (match[1] === "2"
-          ? inflateSync(Buffer.from(match[2] ?? "", "base64"), { maxOutputLength: 1048576 })
-          : Buffer.from(match[2] ?? "", "base64")
-        ).toString("utf8"),
-      ),
+    let decoded = JSON.parse(
+      (match[1] === "2"
+        ? inflateSync(Buffer.from(match[2] ?? "", "base64"), { maxOutputLength: 1048576 })
+        : Buffer.from(match[2] ?? "", "base64")
+      ).toString("utf8"),
     );
-    if (ledger.v !== Number(match[1]) || ledger.head !== review.head)
+    let version = Number(match[1]);
+    // The legacy reader ignores this extension and sees the same plain entries.
+    // The engine restores its saved receipt without maintaining a second ledger.
+    if (version === 1 && decoded && typeof decoded.receipt_v2 === "string") {
+      const { receipt_v2, ...legacy } = decoded;
+      if (legacy.v !== 1 || "receipt" in legacy) throw new Error("Invalid rollback ledger");
+      decoded = {
+        ...legacy,
+        v: 2,
+        receipt: JSON.parse(
+          inflateSync(Buffer.from(receipt_v2, "base64"), { maxOutputLength: 1048576 }).toString(
+            "utf8",
+          ),
+        ),
+      };
+      version = 2;
+    }
+    const ledger = ledgerSchema.parse(decoded);
+    if (ledger.v !== version || ledger.head !== review.head)
       throw new Error("Ledger revision mismatch");
     if (
       ledger.receipt &&
@@ -115,7 +131,9 @@ export function roundScope(facts: Facts, prior: Ledger | null, comparison?: unkn
   };
 }
 export const standingCards = (scope: RoundScope): Card["name"][] => [
-  ...new Set(scope.entries.filter((e) => e.status === "standing").map((e) => e.card)),
+  ...new Set(
+    scope.entries.filter((e) => ["standing", "advisory"].includes(e.status)).map((e) => e.card),
+  ),
 ];
 
 /** Matching, reach and fix evidence are model judgments; severity and memory are code. */
@@ -131,7 +149,7 @@ export function prepareFindings(cards: Card[], scope: RoundScope): void {
           (e) =>
             e.key === finding.ledger &&
             e.card === card.name &&
-            ["standing", "dismissed"].includes(e.status),
+            ["standing", "dismissed", "advisory"].includes(e.status),
         )
       )
         throw new Error("Unknown or foreign ledger key");
@@ -153,7 +171,10 @@ export function prepareFindings(cards: Card[], scope: RoundScope): void {
     for (const resolved of card.resolved ?? []) {
       if (
         !scope.entries.some(
-          (e) => e.key === resolved.key && e.card === card.name && e.status === "standing",
+          (e) =>
+            e.key === resolved.key &&
+            e.card === card.name &&
+            ["standing", "advisory"].includes(e.status),
         )
       )
         throw new Error("Unknown resolved ledger key");
@@ -187,11 +208,7 @@ export function nextLedger(
   config: ReviewConfig,
   facts: Facts,
 ): { ledger: Ledger; convergence: Convergence } {
-  const entries = new Map(
-    scope.entries
-      .filter((e) => e.status === "standing" || e.status === "dismissed")
-      .map((e) => [e.key, { ...e }]),
-  );
+  const entries = new Map(scope.entries.map((e) => [e.key, { ...e }]));
   const counts: Convergence = {
     round: scope.round,
     standing: 0,
@@ -210,6 +227,16 @@ export function nextLedger(
     ),
   );
   for (const card of cards) {
+    for (const resolved of card.resolved ?? []) {
+      const old = entries.get(resolved.key);
+      if (old?.status === "advisory")
+        entries.set(old.key, {
+          ...old,
+          status: "fixed",
+          fixed_round: scope.round,
+          reason: resolved.reason,
+        });
+    }
     for (const entry of scope.entries.filter(
       (e) => e.card === card.name && e.status === "standing" && e.severity === "MINOR",
     )) {
@@ -234,8 +261,20 @@ export function nextLedger(
       if (f.unconfirmed) counts.unconfirmed++;
       if (f.advisory) {
         const old = f.ledger ? entries.get(f.ledger) : undefined;
-        if (old?.status === "standing" && !upheld.has(f.ledger))
-          entries.set(old.key, { ...old, status: "advisory", advisory_round: scope.round });
+        if (!old || (old.status === "standing" && !upheld.has(f.ledger))) {
+          const key = old?.key ?? `R${scope.round}-F${++index}`;
+          entries.set(key, {
+            key,
+            card: card.name,
+            round_raised: old?.round_raised ?? scope.round,
+            location: f.location,
+            what: f.what,
+            severity: f.severity,
+            status: "advisory",
+            advisory_round: scope.round,
+            ...(f.late ? { late: f.late } : {}),
+          });
+        }
         continue;
       }
       const ruling = dispositions.get(f.id);
@@ -254,13 +293,14 @@ export function nextLedger(
         severity: f.severity,
         status: fixed ? "fixed" : ruling.status === "dismissed" ? "dismissed" : "standing",
         reason: ruling.reason,
+        ...(f.late ? { late: f.late } : old?.late ? { late: old.late } : {}),
         ...(fixed ? { fixed_round: scope.round } : {}),
       };
       entries.set(key, entry);
     }
   }
   counts.fixed += [...entries.values()].filter(
-    (e) => e.status === "fixed" && e.severity !== "MINOR",
+    (e) => e.status === "fixed" && e.fixed_round === scope.round && e.severity !== "MINOR",
   ).length;
   counts.standing = [...entries.values()].filter((e) => e.status === "standing").length;
   if (counts.standing > 0 && core.decision.outcome === "APPROVED")
@@ -282,8 +322,21 @@ export function nextLedger(
 export function ledgerBlock(ledger: Ledger): string {
   const raw = Buffer.from(JSON.stringify(ledger));
   if (raw.length > 1048576) throw new Error("Ledger exceeds decoded budget");
-  const encoded = (ledger.v === 2 ? deflateSync(raw) : raw).toString("base64");
+  const { receipt, ...fields } = ledger;
+  const transport =
+    ledger.v === 2
+      ? Buffer.from(
+          JSON.stringify({
+            ...fields,
+            v: 1,
+            receipt_v2: deflateSync(Buffer.from(JSON.stringify(receipt)), { level: 9 }).toString(
+              "base64",
+            ),
+          }),
+        )
+      : raw;
+  const encoded = transport.toString("base64");
   // Never discard an open finding or a dismissal to make a result fit.
   if (encoded.length > 48000) throw new Error("Ledger exceeds review body budget");
-  return `<!-- margot-ledger:v${ledger.v} ${encoded} -->`;
+  return `<!-- margot-ledger:v1 ${encoded} -->`;
 }

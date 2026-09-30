@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { liveConfigSchema, liveServices } from "./adapters/live.js";
-import { review } from "./review.js";
 import { requestSchema } from "./schemas.js";
 
 async function main(args: string[]) {
@@ -13,12 +12,16 @@ async function main(args: string[]) {
   const jevKey = process.env.JEV_KEY;
   if (!jevKey) throw new Error("JEV_KEY is required");
   const responses: unknown[] = [];
-  const { services, actions } = liveServices(
+  const { run, actions } = liveServices(
     config,
-    { jevKey, ...(process.env.GH_TOKEN ? { githubToken: process.env.GH_TOKEN } : {}) },
+    {
+      jevKey,
+      ...(process.env.GH_TOKEN ? { githubToken: process.env.GH_TOKEN } : {}),
+      ...(process.env.MARGOT_WRITE_TOKEN ? { writeToken: process.env.MARGOT_WRITE_TOKEN } : {}),
+    },
     (r) => responses.push(r),
   );
-  const result = await review(request, config.review, services);
+  const result = await run(request);
   await writeFile(outputFile, `${JSON.stringify({ result, actions, responses }, null, 2)}\n`, {
     mode: 0o600,
   });

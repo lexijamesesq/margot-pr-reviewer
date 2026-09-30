@@ -42,7 +42,12 @@ export function claudeAdapter(options: ClaudeOptions) {
     input: Parameters<Services["card"]>[0] | Parameters<Services["voice"]>[0],
     c: CallContext,
   ) {
-    if (!(await execute(options.executable, ["--version"], c)).startsWith(`${options.version} `))
+    const probeEnvironment = claudeEnvironment(process.env);
+    if (
+      !(
+        await execute(options.executable, ["--version"], { ...c, env: probeEnvironment })
+      ).startsWith(`${options.version} `)
+    )
       throw new Error("Claude CLI pin mismatch");
     const cwd = await mkdtemp(join(tmpdir(), "margot-claude-"));
     const request = {

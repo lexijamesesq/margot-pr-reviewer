@@ -7,6 +7,7 @@ import { resolveBundle } from "../src/adapters/bundle.js";
 import { claudeAdapter, claudeEnvironment } from "../src/adapters/claude.js";
 import { ghFetch, githubAdapter } from "../src/adapters/github.js";
 import { jevAdapter } from "../src/adapters/jev.js";
+import { liveServices } from "../src/adapters/live.js";
 import { execute } from "../src/adapters/process.js";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
@@ -54,6 +55,7 @@ function cardText() {
 function github(
   overrides: {
     pageTwo?: boolean;
+    shadowBeforeHead?: boolean;
     base?: string;
     count?: number;
     patch?: string | null;
@@ -107,7 +109,9 @@ function github(
     } else if (url.pathname.endsWith("/check-runs")) data = { total_count: 0, check_runs: [] };
     else if (url.pathname.endsWith("/reviews")) {
       if (overrides.historyFailure) throw new Error("History unavailable");
-      data = overrides.ledger ? [{ body: "<!-- margot-ledger:v1 unknown -->" }] : [];
+      data = overrides.ledger
+        ? [{ body: "<!-- margot-ledger:v1 unknown -->", commit_id: request.head }]
+        : [];
     } else {
       pulls++;
       pull.head.sha = overrides.moved && pulls > 1 ? "f".repeat(40) : request.head;
@@ -134,7 +138,10 @@ function github(
     retry: { enabled: false },
     throttle: { enabled: false },
   });
-  return { adapter: githubAdapter(client), calls };
+  return {
+    adapter: githubAdapter(client, { shadowBeforeHead: overrides.shadowBeforeHead ?? false }),
+    calls,
+  };
 }
 scenario("pagination", async (broken) => {
   const { adapter, calls } = github({ pageTwo: !broken, count: broken ? 1 : 2 });
@@ -491,6 +498,7 @@ async function fakeClaude(
       `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
+  if (process.env.MARGOT_WRITE_TOKEN) process.exit(19);
   console.log(${JSON.stringify(options.version ?? "0.0.1 test")});
 } else {
   console.log(JSON.stringify(${JSON.stringify({ type: "system", subtype: "init", tools: options.tools ?? [] })}));
@@ -790,5 +798,46 @@ scenario("bundle-dirty", async (broken) => {
     return await rejects(() => resolveBundle(root, sha, context()));
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+scenario(
+  "shadow-before-head",
+  async (b) => {
+    const facts = await github({ ledger: true, shadowBeforeHead: !b }).adapter.facts(
+      request,
+      context(),
+    );
+    return { priorLedger: facts.history.priorLedger };
+  },
+  { priorLedger: false },
+);
+scenario("shadow-cannot-publish", async (b) => {
+  const config = JSON.parse(
+    await readFile(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
+  );
+  config.review.publication = "github";
+  config.github.shadowBeforeHead = !b;
+  config.publisher = {
+    checks: { triage: "triage", review: "review", authority: "authority" },
+    actor: "example[bot]",
+    appId: 1,
+    runUrl: "https://example.invalid/run/1",
+  };
+  return rejects(async () => {
+    liveServices(config, { jevKey: "unused", writeToken: "unused" });
+  });
+});
+scenario("claude-probe-credential", async () => {
+  const previous = process.env.MARGOT_WRITE_TOKEN;
+  process.env.MARGOT_WRITE_TOKEN = "test-only-publication-credential";
+  try {
+    await fakeClaude();
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  } finally {
+    if (previous === undefined) delete process.env.MARGOT_WRITE_TOKEN;
+    else process.env.MARGOT_WRITE_TOKEN = previous;
   }
 });

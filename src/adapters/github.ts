@@ -41,7 +41,10 @@ export function ghFetch(executable: string): typeof fetch {
   }) as typeof fetch;
 }
 
-export function githubAdapter(client: Octokit, options: { freshShadow?: boolean } = {}) {
+export function githubAdapter(
+  client: Octokit,
+  options: { freshShadow?: boolean; shadowBeforeHead?: boolean } = {},
+) {
   const params = (r: ReviewRequest, c: CallContext) => {
     requestSchema.parse(r);
     const [owner = "", repo = ""] = r.repository.split("/");
@@ -130,6 +133,9 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
         })
       )
         throw new Error("Diff hunks are incomplete");
+      const historyReviews = options.shadowBeforeHead
+        ? reviews.filter((v) => v.commit_id !== r.head)
+        : reviews;
       return factsSchema.parse({
         repository: r.repository,
         pr: r.pr,
@@ -161,10 +167,10 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
         history: {
           complete: true,
           priorLedger:
-            !options.freshShadow && reviews.some((r) => r.body.includes("margot-ledger:")),
+            !options.freshShadow && historyReviews.some((r) => r.body.includes("margot-ledger:")),
           ...(!options.freshShadow
             ? {
-                reviews: reviews
+                reviews: historyReviews
                   .filter((r) => r.submitted_at)
                   .map((r) => ({
                     id: r.id,
@@ -210,10 +216,10 @@ export function githubAdapter(client: Octokit, options: { freshShadow?: boolean 
     },
   };
 }
-export function githubClient(options: { token?: string; gh?: string }) {
+export function githubClient(options: { token?: string; gh?: string; retries?: number }) {
   return new Octokit({
     ...(options.token ? { auth: options.token } : {}),
     ...(options.gh ? { request: { fetch: ghFetch(options.gh) } } : {}),
-    retry: { retries: 2 },
+    retry: { retries: options.retries ?? 2 },
   });
 }

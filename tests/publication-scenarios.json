@@ -1,0 +1,142 @@
+[
+  {
+    "id": "pub-clear",
+    "name": "Clearance writes an SHA-bound approval before the final success",
+    "defect": "Change the result to a held decision"
+  },
+  {
+    "id": "pub-hold",
+    "name": "Held review disarms auto-merge and comments with neutral checks",
+    "defect": "Remove the hold"
+  },
+  {
+    "id": "pub-authority",
+    "name": "Authority hold remains neutral on the self-instrument check",
+    "defect": "Remove the authority hold"
+  },
+  {
+    "id": "pub-calibration",
+    "name": "Calibration cannot satisfy the review check",
+    "defect": "Remove calibration hold"
+  },
+  {
+    "id": "pub-triage",
+    "name": "Triage exposes the estate classification JSON without approving",
+    "defect": "Change classification to functional"
+  },
+  {
+    "id": "pub-closed",
+    "name": "Closed PR cannot receive a publication",
+    "defect": "Reopen the PR"
+  },
+  {
+    "id": "pub-fork",
+    "name": "Fork PR cannot receive a publication",
+    "defect": "Restore same-repository head"
+  },
+  {
+    "id": "pub-draft",
+    "name": "Draft PR cannot receive a publication",
+    "defect": "Mark ready for review"
+  },
+  {
+    "id": "pub-base",
+    "name": "Base movement cannot receive a publication",
+    "defect": "Restore requested base"
+  },
+  {
+    "id": "pub-head",
+    "name": "Head movement before approval fails closed",
+    "defect": "Stop moving the head"
+  },
+  {
+    "id": "pub-start-fail",
+    "name": "Failure to create the pending gate stops evaluation",
+    "defect": "Allow the initial check write"
+  },
+  {
+    "id": "pub-review-fail",
+    "name": "Failed native review never completes a success check",
+    "defect": "Allow review write"
+  },
+  {
+    "id": "pub-final-fail",
+    "name": "Failed final check dismisses the posted approval",
+    "defect": "Allow the final check write"
+  },
+  {
+    "id": "pub-disarm-fail",
+    "name": "Unconfirmed auto-merge disable cannot publish a held verdict",
+    "defect": "Confirm the disable"
+  },
+  {
+    "id": "pub-error",
+    "name": "Evaluation error withdraws earlier approval and closes the gate",
+    "defect": "Return the clean review"
+  },
+  {
+    "id": "pub-identity",
+    "name": "A wrong-App check receipt cannot approve",
+    "defect": "Return the configured App identity"
+  },
+  {
+    "id": "pub-receipt",
+    "name": "A mismatched native review receipt is compensated",
+    "defect": "Return the requested commit"
+  },
+  {
+    "id": "pub-order",
+    "name": "A prior same-head approval is withdrawn before evaluating again",
+    "defect": "Remove prior approval"
+  },
+  {
+    "id": "pub-shadow",
+    "name": "Shadow services record publication without any write credential",
+    "defect": "Select none instead of recorded publication"
+  },
+  {
+    "id": "tally",
+    "name": "New Open Closed reconcile with every listed finding including dismissals and advisories",
+    "defect": "Increment the displayed Closed tally",
+    "sourceBreak": {
+      "file": "src/render.ts",
+      "from": "Closed: ${tally.closed}",
+      "to": "Closed: ${tally.closed + 1}"
+    }
+  },
+  {
+    "id": "tally-history",
+    "name": "Closed entries and late attribution survive later rounds",
+    "defect": "Discard an earlier closed entry"
+  },
+  {
+    "id": "pub-adopt",
+    "name": "The caller pending check is adopted without a stranded duplicate",
+    "defect": "Remove the dispatched check from the recorded target"
+  },
+  {
+    "id": "pub-superseded",
+    "name": "A superseded run cannot close the newer run check or approve",
+    "defect": "Keep the original check ownership"
+  },
+  {
+    "id": "pub-skip-policy",
+    "name": "Only explicitly configured skipped jobs satisfy required checks",
+    "defect": "Remove the skipped job from caller permission"
+  },
+  {
+    "id": "tally-advisory-fix",
+    "name": "An open advisory is recalled and can be closed with fix evidence",
+    "defect": "Omit the confirmed advisory resolution"
+  },
+  {
+    "id": "pub-run-url",
+    "name": "A new workflow run keeps same-head review compatibility but a policy change does not",
+    "defect": "Change the App identity along with the operational run URL"
+  },
+  {
+    "id": "pub-rollback-ledger",
+    "name": "The posted ledger is readable by unchanged Python and retains the exact TypeScript receipt",
+    "defect": "Replace the terminal legacy marker with an incompatible compressed marker"
+  }
+]

@@ -126,7 +126,7 @@
   },
   {
     "id": "ledger-prune",
-    "name": "Old fixes retire and dismissals persist",
+    "name": "Closed fixes and dismissals remain listed",
     "defect": "Change old fixed entry to standing"
   },
   {

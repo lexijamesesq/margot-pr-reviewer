@@ -1,5 +1,5 @@
-# Provision margot-review, its pinned Claude CLI and pinned publish-skills clone
-# on an isolated self-hosted runner. Config/request files are trusted runner inputs.
+# Node 22+, gh, the pinned Claude CLI and publish-skills must be provisioned
+# on this isolated self-hosted runner. Config and request are trusted inputs.
 name: Margot shadow
 on: workflow_dispatch
 permissions:
@@ -10,12 +10,13 @@ jobs:
   shadow:
     runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
     steps:
-      - uses: YOUR_OWNER/YOUR_REVIEWER@0000000000000000000000000000000000000000
-        with:
-          request: /path/to/your/request.json
-          config: /path/to/your/config.json
-          output: /path/to/your/result.json
+      - name: Install the exact package release
+        run: npm install --prefix "$RUNNER_TEMP/YOUR_REVIEW_INSTALL" --ignore-scripts --save-exact margot-pr-reviewer@0.4.0
+      - name: Review the requested head
         env:
           GH_TOKEN: ${{ github.token }}
           JEV_KEY: ${{ secrets.EXAMPLE_JEV_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.EXAMPLE_CLAUDE_OAUTH_TOKEN }}
+        run: |
+          "$RUNNER_TEMP/YOUR_REVIEW_INSTALL/node_modules/.bin/margot-review" \
+            /path/to/your/request.json /path/to/your/config.json /path/to/your/result.json

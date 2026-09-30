@@ -37,6 +37,7 @@ export const configSchema = z
     trustedTriageActors: z.array(text),
     trustedLedgerActors: z.array(text).default([]),
     requiredChecks: z.array(text),
+    allowedSkippedChecks: z.array(text).default([]),
     cardBundle: z.strictObject({ commit: shaSchema }),
     classificationThreshold: probability,
     routeThreshold: probability,
@@ -44,7 +45,7 @@ export const configSchema = z
     confidenceThreshold: probability,
     noCouncilConfidenceFloor: probability,
     timeoutMs: z.number().int().positive(),
-    publication: z.enum(["record", "none"]),
+    publication: z.enum(["record", "none", "github"]),
     calibration: z.boolean(),
   })
   .refine(
@@ -174,7 +175,7 @@ export const bundleSchema = z.strictObject({
 });
 export const publicationSchema = z.strictObject({
   head: shaSchema,
-  recorded: z.literal(true),
+  recorded: z.boolean(),
   id: text,
 });
 
@@ -182,9 +183,20 @@ export const referencesSchema = z.record(
   z.string(),
   z.strictObject({ repository: requestSchema.shape.repository, head: shaSchema }),
 );
+export const publisherSchema = z.strictObject({
+  checks: z.strictObject({ triage: text, review: text, authority: text }),
+  actor: text,
+  appId: z.number().int().positive(),
+  runUrl: z.url(),
+});
 export const liveConfigSchema = z.strictObject({
   review: configSchema,
-  github: z.strictObject({ gh: z.string().optional(), freshShadow: z.boolean().default(false) }),
+  github: z.strictObject({
+    gh: z.string().optional(),
+    freshShadow: z.boolean().default(false),
+    shadowBeforeHead: z.boolean().default(false),
+  }),
+  publisher: publisherSchema.optional(),
   jev: z.strictObject({ model: z.string().min(1) }),
   claude: z.strictObject({
     executable: z.string().min(1),
@@ -238,6 +250,7 @@ export const ledgerEntrySchema = z
     status: z.enum(["standing", "fixed", "dismissed", "advisory"]),
     round_raised: z.number().int().positive(),
     reason: text.optional(),
+    late: text.optional(),
     fixed_round: z.number().int().positive().optional(),
     advisory_round: z.number().int().positive().optional(),
   })
