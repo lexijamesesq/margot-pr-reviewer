@@ -1,0 +1,161 @@
+{
+  "provenance": "Historical capture 1; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication.",
+  "request": {
+    "repository": "example/project",
+    "pr": 1,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000001",
+    "phase": "review"
+  },
+  "config": {
+    "protectedPaths": [],
+    "trustedCheckActors": [
+      "checks-app"
+    ],
+    "trustedTriageActors": [
+      "triage-app"
+    ],
+    "requiredChecks": [
+      "ci"
+    ],
+    "cardBundle": {
+      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+    },
+    "classificationThreshold": 0.6,
+    "routeThreshold": 0.35,
+    "riskTailThreshold": 0.3,
+    "confidenceThreshold": 0.3,
+    "noCouncilConfidenceFloor": 0.3,
+    "timeoutMs": 1000,
+    "publication": "record",
+    "calibration": false
+  },
+  "facts": {
+    "repository": "example/project",
+    "pr": 1,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000001",
+    "title": "Update pre-commit hook example/project to v2026.09.27-16",
+    "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
+    "author": "contributor",
+    "diff": "diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml\nindex 2437c48..629a1a0 100644\n--- a/.pre-commit-config.yaml\n+++ b/.pre-commit-config.yaml\n@@ -5,7 +5,7 @@ default_stages: [pre-commit]\n \n repos:\n   - repo: [external reference removed]\n-    rev: v2026.09.27-15\n+    rev: v2026.09.27-16\n     hooks:\n       - id: gitleaks-staged\n       - id: gitleaks-pre-push\n",
+    "complete": true,
+    "fileCount": 1,
+    "files": [
+      {
+        "path": ".pre-commit-config.yaml"
+      }
+    ],
+    "checks": [
+      {
+        "name": "ci",
+        "actor": "checks-app",
+        "head": "0000000000000000000000000000000000000001",
+        "conclusion": "success"
+      }
+    ],
+    "history": {
+      "complete": true,
+      "priorLedger": false
+    },
+    "triage": null,
+    "autoMergeArmed": true
+  },
+  "classification": {
+    "source": "jev",
+    "functional": 0,
+    "documentation": 0,
+    "mechanical": 1
+  },
+  "route": {
+    "source": "jev",
+    "cards": {
+      "safety": 0,
+      "works-and-proven": 0,
+      "principal-engineer": 0,
+      "achieves-the-objective": 0,
+      "maintainable-no-slop": 0,
+      "house-style": 0
+    },
+    "confidence": 1,
+    "documentationSubstantive": null
+  },
+  "risk": {
+    "source": "jev",
+    "dimensions": {
+      "blast_radius": {
+        "probabilities": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "confidence": 1.0
+      },
+      "reversibility": {
+        "probabilities": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "confidence": 1.0
+      },
+      "data_security": {
+        "probabilities": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "confidence": 1.0
+      },
+      "operations": {
+        "probabilities": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "confidence": 1.0
+      },
+      "verification_gap": {
+        "probabilities": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "confidence": 1.0
+      }
+    }
+  },
+  "bundle": {
+    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "reviewerAgent": "publish:pr-reviewer",
+    "voiceAgent": "publish:margot",
+    "cardPaths": {
+      "safety": "/recorded-bundle/skills/pr-council/playbooks/safety.md",
+      "works-and-proven": "/recorded-bundle/skills/pr-council/playbooks/works-and-proven.md",
+      "principal-engineer": "/recorded-bundle/skills/pr-council/playbooks/principal-engineer.md",
+      "achieves-the-objective": "/recorded-bundle/skills/pr-council/playbooks/achieves-the-objective.md",
+      "maintainable-no-slop": "/recorded-bundle/skills/pr-council/playbooks/maintainable-no-slop.md",
+      "house-style": "/recorded-bundle/skills/pr-council/playbooks/house-style.md"
+    }
+  },
+  "cards": {},
+  "voice": {
+    "outcome": "APPROVED",
+    "band": "LOW",
+    "rationale": "Recorded risk judgment",
+    "summary": "A mechanical change (dependency bump, or linter/formatter output) with no functional change \u2014 no review was required.",
+    "dispositions": []
+  },
+  "head": "0000000000000000000000000000000000000001",
+  "disableAutoMerge": true,
+  "publication": {
+    "head": "0000000000000000000000000000000000000001",
+    "recorded": true,
+    "id": "recorded-1"
+  }
+}

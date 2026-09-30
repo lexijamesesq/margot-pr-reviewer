@@ -1,0 +1,3466 @@
+[
+  {
+    "name": "recorded mechanical bump spends no Claude",
+    "recording": "mechanical-bump",
+    "patches": [],
+    "expected": {
+      "cards": [],
+      "voice": false,
+      "calls": [
+        "facts",
+        "classification",
+        "head",
+        "publish"
+      ]
+    },
+    "break": [
+      {
+        "path": "classification.functional",
+        "value": 1
+      }
+    ],
+    "defect": "Misclassify a version-only bump as functional."
+  },
+  {
+    "name": "recorded clear council reaches publication",
+    "recording": "council-clear",
+    "patches": [],
+    "expected": {
+      "kind": "reviewed",
+      "eligible": true,
+      "writes": 1
+    },
+    "break": [
+      {
+        "path": "failures",
+        "value": {
+          "card:safety": "report lost"
+        }
+      }
+    ],
+    "defect": "Lose a selected safety report."
+  },
+  {
+    "name": "recorded voice rating holds the same displayed band",
+    "recording": "voice-hold",
+    "patches": [],
+    "expected": {
+      "band": "MEDIUM",
+      "eligible": false,
+      "holds": [
+        "risk"
+      ]
+    },
+    "break": [
+      {
+        "path": "voice.band",
+        "value": "LOW"
+      }
+    ],
+    "defect": "Lower the voice band while retaining its approval."
+  },
+  {
+    "name": "recorded malformed accounting cannot approve",
+    "recording": "invalid-accounting",
+    "patches": [],
+    "expected": {
+      "kind": "error",
+      "stage": "voice",
+      "writes": 0
+    },
+    "break": [
+      {
+        "path": "voice.dispositions",
+        "value": [
+          {
+            "id": "F1",
+            "status": "established",
+            "reason": "Missing regression evidence."
+          }
+        ]
+      }
+    ],
+    "defect": "Repair the missing disposition; the error assertion must detect it."
+  },
+  {
+    "name": "recorded author findings request changes",
+    "recording": "author-changes",
+    "patches": [],
+    "expected": {
+      "outcome": "CHANGES_REQUESTED",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "voice.outcome",
+        "value": "APPROVED"
+      }
+    ],
+    "defect": "Return approval despite established issues."
+  },
+  {
+    "name": "recorded prior ledger is refused without overwrite",
+    "recording": "prior-ledger",
+    "patches": [],
+    "expected": {
+      "kind": "error",
+      "stage": "history",
+      "writes": 0
+    },
+    "break": [
+      {
+        "path": "facts.history.priorLedger",
+        "value": false
+      }
+    ],
+    "defect": "Erase the prior-ledger marker."
+  },
+  {
+    "name": "recorded no council excludes only uncertain dimensions",
+    "recording": "no-council-floor",
+    "patches": [],
+    "expected": {
+      "band": "LOW",
+      "voice": false,
+      "ignored": [
+        "verification_gap"
+      ]
+    },
+    "break": [
+      {
+        "path": "risk.dimensions.verification_gap.confidence",
+        "value": 1
+      }
+    ],
+    "defect": "Claim confidence in the otherwise ignored MEDIUM dimension."
+  },
+  {
+    "name": "functional takes precedence over other confident classes",
+    "recording": "mechanical-bump",
+    "patches": [
+      {
+        "path": "classification.functional",
+        "value": 1
+      },
+      {
+        "path": "classification.documentation",
+        "value": 1
+      }
+    ],
+    "expected": {
+      "classification": "functional"
+    },
+    "break": [
+      {
+        "path": "classification.functional",
+        "value": 0
+      }
+    ],
+    "defect": "Remove the functional classification evidence."
+  },
+  {
+    "name": "documentation takes precedence over mechanical",
+    "recording": "mechanical-bump",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": []
+        }
+      },
+      {
+        "path": "classification.mechanical",
+        "value": 1
+      }
+    ],
+    "expected": {
+      "classification": "documentation"
+    },
+    "break": [
+      {
+        "path": "classification.documentation",
+        "value": 0
+      }
+    ],
+    "defect": "Remove the documentation classification evidence."
+  },
+  {
+    "name": "ambiguous classification selects full review",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0.2,
+          "documentation": 0.2,
+          "mechanical": 0.2
+        }
+      }
+    ],
+    "expected": {
+      "classification": "functional"
+    },
+    "break": [
+      {
+        "path": "classification.mechanical",
+        "value": 1
+      }
+    ],
+    "defect": "Turn ambiguity into a confident mechanical answer."
+  },
+  {
+    "name": "fresh classification raises a trusted mechanical receipt",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.triage",
+        "value": {
+          "actor": "triage-app",
+          "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head": "0000000000000000000000000000000000000002",
+          "classification": "mechanical"
+        }
+      }
+    ],
+    "expected": {
+      "classification": "functional"
+    },
+    "break": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 0,
+          "mechanical": 1
+        }
+      }
+    ],
+    "defect": "Replace the fresh functional judgment with mechanical."
+  },
+  {
+    "name": "trusted triage can only raise the test profile",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 0,
+          "mechanical": 1
+        }
+      },
+      {
+        "path": "facts.triage",
+        "value": {
+          "actor": "triage-app",
+          "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head": "0000000000000000000000000000000000000002",
+          "classification": "functional"
+        }
+      }
+    ],
+    "expected": {
+      "classification": "functional"
+    },
+    "break": [
+      {
+        "path": "facts.triage.classification",
+        "value": "mechanical"
+      }
+    ],
+    "defect": "Lower the earlier trusted profile."
+  },
+  {
+    "name": "a human formatting change is mechanical",
+    "recording": "mechanical-bump",
+    "patches": [
+      {
+        "path": "facts.author",
+        "value": "human"
+      },
+      {
+        "path": "facts.diff",
+        "value": "Formatting only: indentation changes."
+      }
+    ],
+    "expected": {
+      "classification": "mechanical"
+    },
+    "break": [
+      {
+        "path": "classification.functional",
+        "value": 1
+      }
+    ],
+    "defect": "Misclassify a human formatting pass."
+  },
+  {
+    "name": "agent instructions in markdown are functional",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.files",
+        "value": [
+          {
+            "path": "AGENTS.md"
+          }
+        ]
+      },
+      {
+        "path": "facts.diff",
+        "value": "Change the agent instructions to run a different command."
+      }
+    ],
+    "expected": {
+      "classification": "functional"
+    },
+    "break": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      }
+    ],
+    "defect": "Classify agent behavior as ordinary documentation."
+  },
+  {
+    "name": "substantive documentation defaults to works-and-proven",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": []
+        }
+      }
+    ],
+    "expected": {
+      "classification": "documentation",
+      "cards": [
+        "works-and-proven"
+      ],
+      "band": "LOW"
+    },
+    "break": [
+      {
+        "path": "route.documentationSubstantive",
+        "value": 0
+      }
+    ],
+    "defect": "Claim the substantive change has no changed meaning."
+  },
+  {
+    "name": "editorial documentation skips council and voice",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 0
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": []
+        }
+      }
+    ],
+    "expected": {
+      "cards": [],
+      "voice": false
+    },
+    "break": [
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      }
+    ],
+    "defect": "Report changed meaning on an editorial edit."
+  },
+  {
+    "name": "missing documentation meaning answer requires review",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": null
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": []
+        }
+      }
+    ],
+    "expected": {
+      "cards": [
+        "works-and-proven"
+      ]
+    },
+    "break": [
+      {
+        "path": "route.documentationSubstantive",
+        "value": 0
+      }
+    ],
+    "defect": "Replace missing meaning evidence with a confident no."
+  },
+  {
+    "name": "documentation defects go to the author at LOW",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": [
+            {
+              "id": "one",
+              "tag": "issue",
+              "severity": "MAJOR",
+              "confidence": "HIGH",
+              "location": "guide.md:1",
+              "what": "The documented command deletes required data."
+            }
+          ]
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "CHANGES_REQUESTED",
+          "band": "HIGH",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": [
+            {
+              "id": "one",
+              "status": "established",
+              "reason": "The command and its effect disagree."
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "outcome": "CHANGES_REQUESTED",
+      "band": "LOW",
+      "holds": [
+        "author-action"
+      ]
+    },
+    "break": [
+      {
+        "path": "voice.dispositions",
+        "value": []
+      }
+    ],
+    "defect": "Drop the documented defect from the voice accounting."
+  },
+  {
+    "name": "documentation questions request clarification at LOW",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": [
+            {
+              "id": "one",
+              "tag": "issue",
+              "severity": "MAJOR",
+              "confidence": "HIGH",
+              "location": "guide.md:1",
+              "what": "The documented command deletes required data."
+            }
+          ]
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "CLARIFICATION_REQUESTED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": [
+            {
+              "id": "one",
+              "status": "question",
+              "reason": "Which command is intended?"
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "outcome": "CLARIFICATION_REQUESTED",
+      "band": "LOW"
+    },
+    "break": [
+      {
+        "path": "voice.outcome",
+        "value": "CHANGES_REQUESTED"
+      }
+    ],
+    "defect": "Replace an intent question with a change demand."
+  },
+  {
+    "name": "a selected functional lens runs",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0.35,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      }
+    ],
+    "expected": {
+      "cards": [
+        "safety"
+      ]
+    },
+    "break": [
+      {
+        "path": "route.cards.safety",
+        "value": 0.349
+      }
+    ],
+    "defect": "Move the safety probability below the summon boundary."
+  },
+  {
+    "name": "confident no council clears without voice",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "risk",
+        "value": {
+          "source": "jev",
+          "dimensions": {
+            "blast_radius": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "reversibility": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "data_security": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "operations": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "verification_gap": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      }
+    ],
+    "expected": {
+      "cards": [],
+      "voice": false,
+      "eligible": true
+    },
+    "break": [
+      {
+        "path": "route.confidence",
+        "value": 0.1
+      }
+    ],
+    "defect": "Make the empty routing decision uncertain."
+  },
+  {
+    "name": "uncertain empty routing escalates to voice",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "risk",
+        "value": {
+          "source": "jev",
+          "dimensions": {
+            "blast_radius": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "reversibility": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "data_security": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "operations": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "verification_gap": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      },
+      {
+        "path": "route.confidence",
+        "value": 0.1
+      }
+    ],
+    "expected": {
+      "voice": true
+    },
+    "break": [
+      {
+        "path": "route.confidence",
+        "value": 1
+      }
+    ],
+    "defect": "Claim confident empty routing."
+  },
+  {
+    "name": "confident MEDIUM no council is held",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "risk",
+        "value": {
+          "source": "jev",
+          "dimensions": {
+            "blast_radius": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "reversibility": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "data_security": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "operations": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "verification_gap": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "MEDIUM",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      },
+      {
+        "path": "risk.dimensions.operations",
+        "value": {
+          "probabilities": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "confidence": 1
+        }
+      }
+    ],
+    "expected": {
+      "band": "MEDIUM",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "voice.band",
+        "value": "LOW"
+      }
+    ],
+    "defect": "Voice overrides a MEDIUM decision down to LOW."
+  },
+  {
+    "name": "risk tail at the boundary raises the band",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "risk",
+        "value": {
+          "source": "jev",
+          "dimensions": {
+            "blast_radius": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "reversibility": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "data_security": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "operations": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "verification_gap": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "MEDIUM",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      },
+      {
+        "path": "risk.dimensions.operations",
+        "value": {
+          "probabilities": [
+            0,
+            0.7,
+            0.3,
+            0
+          ],
+          "confidence": 1
+        }
+      }
+    ],
+    "expected": {
+      "band": "MEDIUM",
+      "voice": true
+    },
+    "break": [
+      {
+        "path": "risk.dimensions.operations.probabilities",
+        "value": [
+          0,
+          0.701,
+          0.299,
+          0
+        ]
+      }
+    ],
+    "defect": "Move high-level tail mass just below the boundary."
+  },
+  {
+    "name": "risk tail below boundary stays LOW",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "risk",
+        "value": {
+          "source": "jev",
+          "dimensions": {
+            "blast_radius": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "reversibility": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "data_security": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "operations": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            },
+            "verification_gap": {
+              "probabilities": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "confidence": 1
+            }
+          }
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "MEDIUM",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      },
+      {
+        "path": "risk.dimensions.operations",
+        "value": {
+          "probabilities": [
+            0,
+            0.701,
+            0.299,
+            0
+          ],
+          "confidence": 1
+        }
+      }
+    ],
+    "expected": {
+      "band": "LOW",
+      "voice": false
+    },
+    "break": [
+      {
+        "path": "risk.dimensions.operations.probabilities",
+        "value": [
+          0,
+          0.7,
+          0.3,
+          0
+        ]
+      }
+    ],
+    "defect": "Move tail mass onto the boundary."
+  },
+  {
+    "name": "no confident risk dimension cannot use the floor",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "risk",
+        "value": {
+          "source": "jev",
+          "dimensions": {
+            "blast_radius": {
+              "probabilities": [
+                0,
+                0,
+                1,
+                0
+              ],
+              "confidence": 0.1
+            },
+            "reversibility": {
+              "probabilities": [
+                0,
+                0,
+                1,
+                0
+              ],
+              "confidence": 0.1
+            },
+            "data_security": {
+              "probabilities": [
+                0,
+                0,
+                1,
+                0
+              ],
+              "confidence": 0.1
+            },
+            "operations": {
+              "probabilities": [
+                0,
+                0,
+                1,
+                0
+              ],
+              "confidence": 0.1
+            },
+            "verification_gap": {
+              "probabilities": [
+                0,
+                0,
+                1,
+                0
+              ],
+              "confidence": 0.1
+            }
+          }
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "MEDIUM",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      }
+    ],
+    "expected": {
+      "band": "MEDIUM",
+      "ignored": []
+    },
+    "break": [
+      {
+        "path": "voice.band",
+        "value": "LOW"
+      }
+    ],
+    "defect": "Voice lowers a band with no confident dimension."
+  },
+  {
+    "name": "council prevents the no council confidence floor",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "risk",
+        "value": {
+          "source": "jev",
+          "dimensions": {
+            "blast_radius": {
+              "probabilities": [
+                1.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "confidence": 1.0
+            },
+            "reversibility": {
+              "probabilities": [
+                0.39,
+                0.61,
+                0.0,
+                0.0
+              ],
+              "confidence": 0.61
+            },
+            "data_security": {
+              "probabilities": [
+                0.89,
+                0.11,
+                0.0,
+                0.0
+              ],
+              "confidence": 0.89
+            },
+            "operations": {
+              "probabilities": [
+                1.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "confidence": 0.99
+            },
+            "verification_gap": {
+              "probabilities": [
+                0.55,
+                0.11,
+                0.23,
+                0.11
+              ],
+              "confidence": 0.1
+            }
+          }
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "MEDIUM",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      }
+    ],
+    "expected": {
+      "band": "MEDIUM",
+      "ignored": []
+    },
+    "break": [
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      }
+    ],
+    "defect": "Remove the council and permit the no-council floor."
+  },
+  {
+    "name": "voice can lower functional risk for both display and merge",
+    "recording": "voice-hold",
+    "patches": [
+      {
+        "path": "voice.band",
+        "value": "LOW"
+      }
+    ],
+    "expected": {
+      "band": "LOW",
+      "eligible": true
+    },
+    "break": [
+      {
+        "path": "voice.band",
+        "value": "HIGH"
+      }
+    ],
+    "defect": "Raise the final voice rating."
+  },
+  {
+    "name": "dismissed mandatory findings permit approval",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": [
+            {
+              "id": "one",
+              "tag": "issue",
+              "severity": "MAJOR",
+              "confidence": "HIGH",
+              "location": "guide.md:1",
+              "what": "The documented command deletes required data."
+            }
+          ]
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": [
+            {
+              "id": "one",
+              "status": "dismissed",
+              "reason": "Execution disproves the allegation."
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "eligible": true
+    },
+    "break": [
+      {
+        "path": "voice.dispositions.0.status",
+        "value": "established"
+      }
+    ],
+    "defect": "Turn a dismissal into an established unresolved finding."
+  },
+  {
+    "name": "duplicate dispositions are rejected",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": [
+            {
+              "id": "one",
+              "tag": "issue",
+              "severity": "MAJOR",
+              "confidence": "HIGH",
+              "location": "guide.md:1",
+              "what": "The documented command deletes required data."
+            }
+          ]
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "CHANGES_REQUESTED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": [
+            {
+              "id": "one",
+              "status": "established",
+              "reason": "The command and its effect disagree."
+            },
+            {
+              "id": "one",
+              "status": "established",
+              "reason": "The command and its effect disagree."
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "voice"
+    },
+    "break": [
+      {
+        "path": "voice.dispositions",
+        "value": [
+          {
+            "id": "one",
+            "status": "established",
+            "reason": "The command and its effect disagree."
+          }
+        ]
+      }
+    ],
+    "defect": "Remove the duplicate disposition."
+  },
+  {
+    "name": "unknown disposition IDs are rejected",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": [
+            {
+              "id": "one",
+              "tag": "issue",
+              "severity": "MAJOR",
+              "confidence": "HIGH",
+              "location": "guide.md:1",
+              "what": "The documented command deletes required data."
+            }
+          ]
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "CHANGES_REQUESTED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": [
+            {
+              "id": "one",
+              "status": "established",
+              "reason": "The command and its effect disagree."
+            },
+            {
+              "id": "unknown",
+              "status": "dismissed",
+              "reason": "No matching finding."
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "voice"
+    },
+    "break": [
+      {
+        "path": "voice.dispositions",
+        "value": [
+          {
+            "id": "one",
+            "status": "established",
+            "reason": "The command and its effect disagree."
+          }
+        ]
+      }
+    ],
+    "defect": "Remove the unknown finding disposition."
+  },
+  {
+    "name": "contradictory approval is rejected",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": [
+            {
+              "id": "one",
+              "tag": "issue",
+              "severity": "MAJOR",
+              "confidence": "HIGH",
+              "location": "guide.md:1",
+              "what": "The documented command deletes required data."
+            }
+          ]
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "APPROVED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": [
+            {
+              "id": "one",
+              "status": "established",
+              "reason": "The command and its effect disagree."
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "voice"
+    },
+    "break": [
+      {
+        "path": "voice.outcome",
+        "value": "CHANGES_REQUESTED"
+      }
+    ],
+    "defect": "Repair approval with established findings."
+  },
+  {
+    "name": "BLOCKING info findings require voice accounting",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": [
+            {
+              "id": "one",
+              "tag": "info",
+              "severity": "BLOCKING",
+              "confidence": "HIGH",
+              "location": "guide.md:1",
+              "what": "The documented command deletes required data."
+            }
+          ]
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "CHANGES_REQUESTED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "voice"
+    },
+    "break": [
+      {
+        "path": "cards.works-and-proven.findings.0.severity",
+        "value": "MINOR"
+      }
+    ],
+    "defect": "Reduce the informational finding below the blocking threshold."
+  },
+  {
+    "name": "objective questions require voice accounting",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 1,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": []
+        }
+      },
+      {
+        "path": "cards.achieves-the-objective",
+        "value": {
+          "name": "achieves-the-objective",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": [
+            {
+              "id": "one",
+              "tag": "info",
+              "severity": "MAJOR",
+              "confidence": "HIGH",
+              "location": "guide.md:1",
+              "what": "The documented command deletes required data."
+            }
+          ]
+        }
+      },
+      {
+        "path": "voice",
+        "value": {
+          "outcome": "CHANGES_REQUESTED",
+          "band": "LOW",
+          "rationale": "The bounded behavior is proven.",
+          "summary": "The selected checks establish the change.",
+          "dispositions": []
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "voice"
+    },
+    "break": [
+      {
+        "path": "cards.achieves-the-objective.findings",
+        "value": []
+      }
+    ],
+    "defect": "Lose the objective question."
+  },
+  {
+    "name": "functional authority paths hold",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "config.protectedPaths",
+        "value": [
+          ".github/**"
+        ]
+      }
+    ],
+    "expected": {
+      "eligible": false,
+      "holds": [
+        "review-authority"
+      ]
+    },
+    "break": [
+      {
+        "path": "config.protectedPaths",
+        "value": []
+      }
+    ],
+    "defect": "Remove configured authority protection."
+  },
+  {
+    "name": "ordinary documentation on a protected path stays author-owned",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": []
+        }
+      },
+      {
+        "path": "config.protectedPaths",
+        "value": [
+          ".github/**"
+        ]
+      }
+    ],
+    "expected": {
+      "eligible": true,
+      "holds": []
+    },
+    "break": [
+      {
+        "path": "facts.files.0.previousPath",
+        "value": "old.md"
+      }
+    ],
+    "defect": "Turn a protected edit into a rename."
+  },
+  {
+    "name": "protected old rename path always holds",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": []
+        }
+      },
+      {
+        "path": "config.protectedPaths",
+        "value": [
+          ".github/**"
+        ]
+      },
+      {
+        "path": "facts.files",
+        "value": [
+          {
+            "path": "guide.md",
+            "previousPath": ".github/workflows/old.yml"
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "eligible": false,
+      "holds": [
+        "review-authority"
+      ]
+    },
+    "break": [
+      {
+        "path": "facts.files",
+        "value": [
+          {
+            "path": "guide.md",
+            "previousPath": "old-guide.md"
+          }
+        ]
+      }
+    ],
+    "defect": "Remove the protected old rename endpoint."
+  },
+  {
+    "name": "protected new rename path always holds",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      },
+      {
+        "path": "route.cards",
+        "value": {
+          "safety": 0,
+          "works-and-proven": 0,
+          "principal-engineer": 0,
+          "achieves-the-objective": 0,
+          "maintainable-no-slop": 0,
+          "house-style": 0
+        }
+      },
+      {
+        "path": "route.documentationSubstantive",
+        "value": 1
+      },
+      {
+        "path": "cards.works-and-proven",
+        "value": {
+          "name": "works-and-proven",
+          "completion": "completed",
+          "checked": [
+            "Compared the documented command to executable behavior."
+          ],
+          "notCovered": [],
+          "findings": []
+        }
+      },
+      {
+        "path": "config.protectedPaths",
+        "value": [
+          ".github/**"
+        ]
+      },
+      {
+        "path": "facts.files",
+        "value": [
+          {
+            "path": ".github/workflows/new.yml",
+            "previousPath": "guide.md"
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "eligible": false,
+      "holds": [
+        "review-authority"
+      ]
+    },
+    "break": [
+      {
+        "path": "facts.files",
+        "value": [
+          {
+            "path": "guide.md",
+            "previousPath": "old-guide.md"
+          }
+        ]
+      }
+    ],
+    "defect": "Remove the protected new rename endpoint."
+  },
+  {
+    "name": "missing trusted configuration cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "config",
+        "value": null
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "input",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "config",
+        "value": {
+          "protectedPaths": [],
+          "trustedCheckActors": [
+            "checks-app"
+          ],
+          "trustedTriageActors": [
+            "triage-app"
+          ],
+          "requiredChecks": [
+            "ci"
+          ],
+          "cardBundle": {
+            "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+          },
+          "classificationThreshold": 0.6,
+          "routeThreshold": 0.35,
+          "riskTailThreshold": 0.3,
+          "confidenceThreshold": 0.3,
+          "noCouncilConfidenceFloor": 0.3,
+          "timeoutMs": 1000,
+          "publication": "record",
+          "calibration": false
+        }
+      }
+    ],
+    "defect": "Repair only the missing trusted configuration response."
+  },
+  {
+    "name": "malformed request cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "request.pr",
+        "value": 0
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "input",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "request.pr",
+        "value": 2
+      }
+    ],
+    "defect": "Repair only the malformed request response."
+  },
+  {
+    "name": "incomplete facts cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.complete",
+        "value": false
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "facts",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.complete",
+        "value": true
+      }
+    ],
+    "defect": "Repair only the incomplete facts response."
+  },
+  {
+    "name": "truncated file listing cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.fileCount",
+        "value": 61
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "facts",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.fileCount",
+        "value": 1
+      }
+    ],
+    "defect": "Repair only the truncated file listing response."
+  },
+  {
+    "name": "stale fetched head cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.head",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "facts",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.head",
+        "value": "0000000000000000000000000000000000000002"
+      }
+    ],
+    "defect": "Repair only the stale fetched head response."
+  },
+  {
+    "name": "wrong repository facts cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.repository",
+        "value": "example/other"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "facts",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.repository",
+        "value": "example/project"
+      }
+    ],
+    "defect": "Repair only the wrong repository facts response."
+  },
+  {
+    "name": "unreadable history cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.history.complete",
+        "value": false
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "history",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.history.complete",
+        "value": true
+      }
+    ],
+    "defect": "Repair only the unreadable history response."
+  },
+  {
+    "name": "degraded classification cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification.source",
+        "value": "fallback"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "classification",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "classification.source",
+        "value": "jev"
+      }
+    ],
+    "defect": "Repair only the degraded classification response."
+  },
+  {
+    "name": "malformed classification probability cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification.mechanical",
+        "value": 2
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "classification",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "classification.mechanical",
+        "value": 0
+      }
+    ],
+    "defect": "Repair only the malformed classification probability response."
+  },
+  {
+    "name": "malformed route cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "route.cards.safety",
+        "value": null
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "route",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "route.cards.safety",
+        "value": 0.53
+      }
+    ],
+    "defect": "Repair only the malformed route response."
+  },
+  {
+    "name": "fallback risk cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "risk.source",
+        "value": "fallback"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "risk",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "risk.source",
+        "value": "jev"
+      }
+    ],
+    "defect": "Repair only the fallback risk response."
+  },
+  {
+    "name": "missing risk dimension cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "risk.dimensions.operations",
+        "value": null
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "risk",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "risk.dimensions.operations",
+        "value": {
+          "probabilities": [
+            0.64,
+            0.09,
+            0.27,
+            0.0
+          ],
+          "confidence": 0.35
+        }
+      }
+    ],
+    "defect": "Repair only the missing risk dimension response."
+  },
+  {
+    "name": "invalid risk distribution cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "risk.dimensions.operations.probabilities",
+        "value": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "risk",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "risk.dimensions.operations.probabilities",
+        "value": [
+          0.64,
+          0.09,
+          0.27,
+          0.0
+        ]
+      }
+    ],
+    "defect": "Repair only the invalid risk distribution response."
+  },
+  {
+    "name": "wrong bundle pin cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "bundle.commit",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "bundle",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "bundle.commit",
+        "value": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+      }
+    ],
+    "defect": "Repair only the wrong bundle pin response."
+  },
+  {
+    "name": "missing explicit card path cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "bundle.cardPaths.safety",
+        "value": ""
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "bundle",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "bundle.cardPaths.safety",
+        "value": "/recorded-bundle/skills/pr-council/playbooks/safety.md"
+      }
+    ],
+    "defect": "Repair only the missing explicit card path response."
+  },
+  {
+    "name": "incomplete selected card cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "cards.safety.completion",
+        "value": "incomplete"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "card:safety",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "cards.safety.completion",
+        "value": "completed"
+      }
+    ],
+    "defect": "Repair only the incomplete selected card response."
+  },
+  {
+    "name": "wrong returned card cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "cards.safety.name",
+        "value": "house-style"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "card:safety",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "cards.safety.name",
+        "value": "safety"
+      }
+    ],
+    "defect": "Repair only the wrong returned card response."
+  },
+  {
+    "name": "missing required check cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.checks",
+        "value": []
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "checks",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.checks",
+        "value": [
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "defect": "Repair only the missing required check response."
+  },
+  {
+    "name": "forged required-check actor cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.checks.0.actor",
+        "value": "forger"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "checks",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.checks.0.actor",
+        "value": "checks-app"
+      }
+    ],
+    "defect": "Repair only the forged required-check actor response."
+  },
+  {
+    "name": "stale required-check SHA cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.checks.0.head",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "checks",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.checks.0.head",
+        "value": "0000000000000000000000000000000000000002"
+      }
+    ],
+    "defect": "Repair only the stale required-check SHA response."
+  },
+  {
+    "name": "failed required check cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.checks.0.conclusion",
+        "value": "failure"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "checks",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.checks.0.conclusion",
+        "value": "success"
+      }
+    ],
+    "defect": "Repair only the failed required check response."
+  },
+  {
+    "name": "duplicate required check cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.checks",
+        "value": [
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "success"
+          },
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "checks",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "facts.checks",
+        "value": [
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "defect": "Repair only the duplicate required check response."
+  },
+  {
+    "name": "head movement before publication cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "head",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "publication-head",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "head",
+        "value": "0000000000000000000000000000000000000002"
+      }
+    ],
+    "defect": "Repair only the head movement before publication response."
+  },
+  {
+    "name": "wrong publication receipt SHA cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "publication.head",
+        "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "publication",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "publication.head",
+        "value": "0000000000000000000000000000000000000002"
+      }
+    ],
+    "defect": "Repair only the wrong publication receipt SHA response."
+  },
+  {
+    "name": "untrusted triage actor cannot lower review",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.triage",
+        "value": {
+          "actor": "forger",
+          "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head": "0000000000000000000000000000000000000002",
+          "classification": "mechanical"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "triage"
+    },
+    "break": [
+      {
+        "path": "facts.triage.actor",
+        "value": "triage-app"
+      }
+    ],
+    "defect": "Repair the triage actor binding."
+  },
+  {
+    "name": "untrusted triage head cannot lower review",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.triage",
+        "value": {
+          "actor": "triage-app",
+          "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "classification": "mechanical"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "triage"
+    },
+    "break": [
+      {
+        "path": "facts.triage.head",
+        "value": "0000000000000000000000000000000000000002"
+      }
+    ],
+    "defect": "Repair the triage head binding."
+  },
+  {
+    "name": "untrusted triage base cannot lower review",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.triage",
+        "value": {
+          "actor": "triage-app",
+          "base": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "head": "0000000000000000000000000000000000000002",
+          "classification": "mechanical"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "triage"
+    },
+    "break": [
+      {
+        "path": "facts.triage.base",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "defect": "Repair the triage base binding."
+  },
+  {
+    "name": "classification service failure is not empty success",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "failures",
+        "value": {
+          "classification": "service unavailable"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "classification",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "failures",
+        "value": {}
+      }
+    ],
+    "defect": "Restore the failed classification service response."
+  },
+  {
+    "name": "route service failure is not empty success",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "failures",
+        "value": {
+          "route": "service unavailable"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "route",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "failures",
+        "value": {}
+      }
+    ],
+    "defect": "Restore the failed route service response."
+  },
+  {
+    "name": "risk service failure is not empty success",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "failures",
+        "value": {
+          "risk": "service unavailable"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "risk",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "failures",
+        "value": {}
+      }
+    ],
+    "defect": "Restore the failed risk service response."
+  },
+  {
+    "name": "card:safety service failure is not empty success",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "failures",
+        "value": {
+          "card:safety": "service unavailable"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "card:safety",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "failures",
+        "value": {}
+      }
+    ],
+    "defect": "Restore the failed card:safety service response."
+  },
+  {
+    "name": "publish service failure is not empty success",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "failures",
+        "value": {
+          "publish": "service unavailable"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "publication",
+      "eligible": false
+    },
+    "break": [
+      {
+        "path": "failures",
+        "value": {}
+      }
+    ],
+    "defect": "Restore the failed publish service response."
+  },
+  {
+    "name": "card timeout cannot approve",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "failures",
+        "value": {
+          "card:safety": "never-returns"
+        }
+      },
+      {
+        "path": "config.timeoutMs",
+        "value": 10
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "card:safety"
+    },
+    "break": [
+      {
+        "path": "failures",
+        "value": {}
+      }
+    ],
+    "defect": "Let the timed-out card complete."
+  },
+  {
+    "name": "voice transport failure cannot approve",
+    "recording": "voice-hold",
+    "patches": [
+      {
+        "path": "failures",
+        "value": {
+          "voice": "voice failed"
+        }
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "voice"
+    },
+    "break": [
+      {
+        "path": "failures",
+        "value": {}
+      }
+    ],
+    "defect": "Restore the missing voice response."
+  },
+  {
+    "name": "malformed voice cannot approve",
+    "recording": "voice-hold",
+    "patches": [
+      {
+        "path": "voice.outcome",
+        "value": "ERROR"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "voice"
+    },
+    "break": [
+      {
+        "path": "voice.outcome",
+        "value": "APPROVED"
+      }
+    ],
+    "defect": "Return a well-formed voice outcome."
+  },
+  {
+    "name": "duplicate finding IDs cannot disappear",
+    "recording": "author-changes",
+    "patches": [
+      {
+        "path": "cards.maintainable-no-slop.findings.0.id",
+        "value": "F1"
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "cards"
+    },
+    "break": [
+      {
+        "path": "cards.maintainable-no-slop.findings.0.id",
+        "value": "F2"
+      }
+    ],
+    "defect": "Restore the unique finding ID."
+  },
+  {
+    "name": "held review disables already armed auto merge",
+    "recording": "voice-hold",
+    "patches": [],
+    "expected": {
+      "calls": [
+        "facts",
+        "classification",
+        "route",
+        "bundle",
+        "card:safety",
+        "card:works-and-proven",
+        "card:principal-engineer",
+        "card:maintainable-no-slop",
+        "risk",
+        "voice",
+        "head",
+        "disableAutoMerge",
+        "publish"
+      ]
+    },
+    "break": [
+      {
+        "path": "facts.autoMergeArmed",
+        "value": false
+      }
+    ],
+    "defect": "Report that auto-merge is not armed."
+  },
+  {
+    "name": "unconfirmed auto merge disable fails closed",
+    "recording": "voice-hold",
+    "patches": [
+      {
+        "path": "disableAutoMerge",
+        "value": false
+      }
+    ],
+    "expected": {
+      "kind": "error",
+      "stage": "disable-auto-merge"
+    },
+    "break": [
+      {
+        "path": "disableAutoMerge",
+        "value": true
+      }
+    ],
+    "defect": "Confirm the previously unconfirmed disable."
+  },
+  {
+    "name": "error path attempts to disarm auto merge",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "failures",
+        "value": {
+          "risk": "unavailable"
+        }
+      }
+    ],
+    "expected": {
+      "calls": [
+        "facts",
+        "classification",
+        "route",
+        "bundle",
+        "card:safety",
+        "card:works-and-proven",
+        "card:principal-engineer",
+        "card:maintainable-no-slop",
+        "risk",
+        "disableAutoMerge"
+      ]
+    },
+    "break": [
+      {
+        "path": "facts.autoMergeArmed",
+        "value": false
+      }
+    ],
+    "defect": "Hide the armed merge state on a failed review."
+  },
+  {
+    "name": "calibration never clears",
+    "recording": "mechanical-bump",
+    "patches": [
+      {
+        "path": "config.calibration",
+        "value": true
+      }
+    ],
+    "expected": {
+      "eligible": false,
+      "holds": [
+        "calibration"
+      ]
+    },
+    "break": [
+      {
+        "path": "config.calibration",
+        "value": false
+      }
+    ],
+    "defect": "Switch off calibration mode."
+  },
+  {
+    "name": "publication uses the rendered governing result",
+    "recording": "author-changes",
+    "patches": [],
+    "expected": {
+      "publicationMatches": true
+    },
+    "break": [
+      {
+        "path": "config.publication",
+        "value": "none"
+      }
+    ],
+    "defect": "Suppress the recorded publication."
+  },
+  {
+    "name": "explicit card paths reach every selected reviewer",
+    "recording": "council-clear",
+    "patches": [],
+    "expected": {
+      "cardPaths": [
+        "/recorded-bundle/skills/pr-council/playbooks/safety.md",
+        "/recorded-bundle/skills/pr-council/playbooks/works-and-proven.md",
+        "/recorded-bundle/skills/pr-council/playbooks/principal-engineer.md",
+        "/recorded-bundle/skills/pr-council/playbooks/maintainable-no-slop.md"
+      ]
+    },
+    "break": [
+      {
+        "path": "bundle.cardPaths.safety",
+        "value": "/missing-card.md"
+      }
+    ],
+    "defect": "Inject a nonexistent safety card path."
+  },
+  {
+    "name": "triage classifies without publishing approval",
+    "recording": "mechanical-bump",
+    "patches": [
+      {
+        "path": "request.phase",
+        "value": "triage"
+      }
+    ],
+    "expected": {
+      "kind": "classified",
+      "classification": "mechanical",
+      "writes": 0
+    },
+    "break": [
+      {
+        "path": "request.phase",
+        "value": "review"
+      }
+    ],
+    "defect": "Dispatch triage as review."
+  },
+  {
+    "name": "publication none produces no write",
+    "recording": "mechanical-bump",
+    "patches": [
+      {
+        "path": "config.publication",
+        "value": "none"
+      }
+    ],
+    "expected": {
+      "writes": 0,
+      "publication": null
+    },
+    "break": [
+      {
+        "path": "config.publication",
+        "value": "record"
+      }
+    ],
+    "defect": "Enable publication on a dry run."
+  },
+  {
+    "name": "sixty first file is retained in authority protection",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.files",
+        "value": [
+          {
+            "path": "file-0.ts"
+          },
+          {
+            "path": "file-1.ts"
+          },
+          {
+            "path": "file-2.ts"
+          },
+          {
+            "path": "file-3.ts"
+          },
+          {
+            "path": "file-4.ts"
+          },
+          {
+            "path": "file-5.ts"
+          },
+          {
+            "path": "file-6.ts"
+          },
+          {
+            "path": "file-7.ts"
+          },
+          {
+            "path": "file-8.ts"
+          },
+          {
+            "path": "file-9.ts"
+          },
+          {
+            "path": "file-10.ts"
+          },
+          {
+            "path": "file-11.ts"
+          },
+          {
+            "path": "file-12.ts"
+          },
+          {
+            "path": "file-13.ts"
+          },
+          {
+            "path": "file-14.ts"
+          },
+          {
+            "path": "file-15.ts"
+          },
+          {
+            "path": "file-16.ts"
+          },
+          {
+            "path": "file-17.ts"
+          },
+          {
+            "path": "file-18.ts"
+          },
+          {
+            "path": "file-19.ts"
+          },
+          {
+            "path": "file-20.ts"
+          },
+          {
+            "path": "file-21.ts"
+          },
+          {
+            "path": "file-22.ts"
+          },
+          {
+            "path": "file-23.ts"
+          },
+          {
+            "path": "file-24.ts"
+          },
+          {
+            "path": "file-25.ts"
+          },
+          {
+            "path": "file-26.ts"
+          },
+          {
+            "path": "file-27.ts"
+          },
+          {
+            "path": "file-28.ts"
+          },
+          {
+            "path": "file-29.ts"
+          },
+          {
+            "path": "file-30.ts"
+          },
+          {
+            "path": "file-31.ts"
+          },
+          {
+            "path": "file-32.ts"
+          },
+          {
+            "path": "file-33.ts"
+          },
+          {
+            "path": "file-34.ts"
+          },
+          {
+            "path": "file-35.ts"
+          },
+          {
+            "path": "file-36.ts"
+          },
+          {
+            "path": "file-37.ts"
+          },
+          {
+            "path": "file-38.ts"
+          },
+          {
+            "path": "file-39.ts"
+          },
+          {
+            "path": "file-40.ts"
+          },
+          {
+            "path": "file-41.ts"
+          },
+          {
+            "path": "file-42.ts"
+          },
+          {
+            "path": "file-43.ts"
+          },
+          {
+            "path": "file-44.ts"
+          },
+          {
+            "path": "file-45.ts"
+          },
+          {
+            "path": "file-46.ts"
+          },
+          {
+            "path": "file-47.ts"
+          },
+          {
+            "path": "file-48.ts"
+          },
+          {
+            "path": "file-49.ts"
+          },
+          {
+            "path": "file-50.ts"
+          },
+          {
+            "path": "file-51.ts"
+          },
+          {
+            "path": "file-52.ts"
+          },
+          {
+            "path": "file-53.ts"
+          },
+          {
+            "path": "file-54.ts"
+          },
+          {
+            "path": "file-55.ts"
+          },
+          {
+            "path": "file-56.ts"
+          },
+          {
+            "path": "file-57.ts"
+          },
+          {
+            "path": "file-58.ts"
+          },
+          {
+            "path": "file-59.ts"
+          },
+          {
+            "path": "authority.ts"
+          }
+        ]
+      },
+      {
+        "path": "facts.fileCount",
+        "value": 61
+      },
+      {
+        "path": "config.protectedPaths",
+        "value": [
+          "authority.ts"
+        ]
+      }
+    ],
+    "expected": {
+      "holds": [
+        "review-authority"
+      ]
+    },
+    "break": [
+      {
+        "path": "facts.files.60.path",
+        "value": "ordinary.ts"
+      }
+    ],
+    "defect": "Remove the protected sixty-first file from the returned evidence."
+  },
+  {
+    "name": "documentation asks whether meaning changed",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 1,
+          "mechanical": 0
+        }
+      }
+    ],
+    "expected": {
+      "askedMeaning": true
+    },
+    "break": [],
+    "sourceBreak": {
+      "file": "src/questions.ts",
+      "from": "  documentationSubstantive:",
+      "to": "  omittedMeaningQuestion:"
+    },
+    "defect": "Remove the documentation meaning question from the route contract."
+  },
+  {
+    "name": "functional routing omits the documentation meaning question",
+    "recording": "council-clear",
+    "patches": [],
+    "expected": {
+      "askedMeaning": false
+    },
+    "break": [],
+    "sourceBreak": {
+      "file": "src/review.ts",
+      "from": "classification === \"documentation\" ? routeQuestions : functionalRouteQuestions",
+      "to": "classification !== \"mechanical\" ? routeQuestions : functionalRouteQuestions"
+    },
+    "defect": "Send the documentation-only question on the functional route."
+  }
+]

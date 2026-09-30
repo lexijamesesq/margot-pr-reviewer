@@ -1,0 +1,224 @@
+{
+  "provenance": "Historical capture 4; normalized card/risk/voice outputs; reconstructed complete inputs and publication; recorded first-round behavior",
+  "request": {
+    "repository": "example/project",
+    "pr": 4,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000004",
+    "phase": "review"
+  },
+  "config": {
+    "protectedPaths": [],
+    "trustedCheckActors": [
+      "checks-app"
+    ],
+    "trustedTriageActors": [
+      "triage-app"
+    ],
+    "requiredChecks": [
+      "ci"
+    ],
+    "cardBundle": {
+      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+    },
+    "classificationThreshold": 0.6,
+    "routeThreshold": 0.35,
+    "riskTailThreshold": 0.3,
+    "confidenceThreshold": 0.3,
+    "noCouncilConfidenceFloor": 0.3,
+    "timeoutMs": 1000,
+    "publication": "record",
+    "calibration": false
+  },
+  "facts": {
+    "repository": "example/project",
+    "pr": 4,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000004",
+    "title": "biome: exclude generated and non-JS config files",
+    "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
+    "author": "contributor",
+    "diff": "Reconstructed evidence: Add file exclusions to the shared linter configuration.",
+    "complete": true,
+    "fileCount": 1,
+    "files": [
+      {
+        "path": "biome.json"
+      }
+    ],
+    "checks": [
+      {
+        "name": "ci",
+        "actor": "checks-app",
+        "head": "0000000000000000000000000000000000000004",
+        "conclusion": "success"
+      }
+    ],
+    "history": {
+      "complete": true,
+      "priorLedger": false
+    },
+    "triage": null,
+    "autoMergeArmed": true
+  },
+  "classification": {
+    "source": "jev",
+    "functional": 1,
+    "documentation": 0,
+    "mechanical": 0
+  },
+  "route": {
+    "source": "jev",
+    "cards": {
+      "safety": 0.12,
+      "works-and-proven": 0.92,
+      "principal-engineer": 0.51,
+      "achieves-the-objective": 0.24,
+      "maintainable-no-slop": 0.45,
+      "house-style": 0.38
+    },
+    "confidence": 0.53,
+    "documentationSubstantive": null
+  },
+  "risk": {
+    "source": "jev",
+    "dimensions": {
+      "blast_radius": {
+        "probabilities": [
+          0.0,
+          0.03,
+          0.14,
+          0.83
+        ],
+        "confidence": 0.8
+      },
+      "reversibility": {
+        "probabilities": [
+          0.19,
+          0.79,
+          0.02,
+          0.0
+        ],
+        "confidence": 0.79
+      },
+      "data_security": {
+        "probabilities": [
+          0.53,
+          0.47,
+          0.0,
+          0.0
+        ],
+        "confidence": 0.52
+      },
+      "operations": {
+        "probabilities": [
+          0.09,
+          0.55,
+          0.35,
+          0.01
+        ],
+        "confidence": 0.54
+      },
+      "verification_gap": {
+        "probabilities": [
+          0.01,
+          0.09,
+          0.9,
+          0.0
+        ],
+        "confidence": 0.88
+      }
+    }
+  },
+  "bundle": {
+    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "reviewerAgent": "publish:pr-reviewer",
+    "voiceAgent": "publish:margot",
+    "cardPaths": {
+      "safety": "/recorded-bundle/skills/pr-council/playbooks/safety.md",
+      "works-and-proven": "/recorded-bundle/skills/pr-council/playbooks/works-and-proven.md",
+      "principal-engineer": "/recorded-bundle/skills/pr-council/playbooks/principal-engineer.md",
+      "achieves-the-objective": "/recorded-bundle/skills/pr-council/playbooks/achieves-the-objective.md",
+      "maintainable-no-slop": "/recorded-bundle/skills/pr-council/playbooks/maintainable-no-slop.md",
+      "house-style": "/recorded-bundle/skills/pr-council/playbooks/house-style.md"
+    }
+  },
+  "cards": {
+    "works-and-proven": {
+      "name": "works-and-proven",
+      "completion": "completed",
+      "checked": [
+        "Mapped the one changed behavior, the new `files.includes` in `biome.json` (lines 4\u201316), against every eval that reads `biome.json`: `.claude/eval/web-lint-configs.test.sh`, `new-repo.test.sh` and `provision-public-repo.test.sh:4540-4545`. The goal was to find the assertion that would fail if the `dist`/`build`/`coverage` skip or the JSON/`.vue`/`.svelte`/`.astro` skip stopped working. None of them asserts it. `web-lint-configs.test.sh` only runs `biome lint`/`check`/`format` on files named explicitly (`bad.ts`, `good.ts`, `ugly.ts`). The provisioner eval only diffs the written bytes against project's copy, and those bytes change together with the file. This probe would have caught a changed behavior with no automated pin; it found one (see finding)."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": [
+        {
+          "id": "F1",
+          "tag": "issue",
+          "severity": "MINOR",
+          "confidence": "MEDIUM",
+          "location": "biome.json:4",
+          "what": "The new rule that tells the code checker to skip build output and config files was checked by hand once, but no automated test would notice if it stopped working."
+        }
+      ]
+    },
+    "principal-engineer": {
+      "name": "principal-engineer",
+      "completion": "completed",
+      "checked": [
+        "Fetched `biome.json` at head sha c966c5d and compared its new `files.includes` (lines 4\u201316) with the hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` in `.pre-commit-config.yaml:180` and `.github/scripts/pre-commit-suite-merge.py:171`. This would have caught a context bug where the config and the hook disagree about which extensions are in scope. They agree: json, jsonc, vue, svelte and astro are excluded in both places. The list also starts with `\"**\"`, so the negations have something to subtract from, and all other files stay in scope."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": [
+        {
+          "id": "principal-engineer-info-1",
+          "tag": "info",
+          "severity": "MINOR",
+          "confidence": "MEDIUM",
+          "location": "biome.json:7",
+          "what": "The new rule that skips build output matches any folder called \"dist\", \"build\" or \"coverage\" at any depth, so real source code kept in a folder with one of those names would quietly stop being checked in every repo."
+        }
+      ]
+    },
+    "maintainable-no-slop": {
+      "name": "maintainable-no-slop",
+      "completion": "completed",
+      "checked": [
+        "Fetched the diff at c966c5d. The whole PR is one hunk: `biome.json:4-16` adds a `files.includes` block. I read it for comments, code paths or dependencies. That would have caught comment drift, an error-swallowing path or a new package name. There are none: the file is pure JSON config with no comments, no logic and no dependency."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    },
+    "house-style": {
+      "name": "house-style",
+      "completion": "completed",
+      "checked": [
+        "Held the new `files.includes` block in `biome.json` (lines 4\u201316 at c966c5d) against the biome-check hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` (`.pre-commit-config.yaml:180`). I also compared it with the suite generator's copy of that exclude (`.github/scripts/pre-commit-suite-merge.py:171`) and the eval's copy (`.claude/eval/provision-public-repo.test.sh:4173`). This would have caught a file-type exclusion list that differs from the organization's one existing statement of what Biome must skip (for example, `.jsonc` or one of the three framework extensions missing, or an extra type). The five types match exactly."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    }
+  },
+  "voice": {
+    "outcome": "CHANGES_REQUESTED",
+    "band": "HIGH",
+    "rationale": "organization-wide untested config",
+    "summary": "This change tells the code checker to skip build output and some file types, which fixes two real problems where the checker failed or rewrote files it shouldn't touch. The fix was checked by hand, but no automated test would notice if it stopped working. This file is copied to every repository, so a future tool upgrade or edit could quietly bring both problems back everywhere. Adding a small test that proves build folders and config files are skipped, plus a control case showing the test can fail, would clear this.",
+    "dispositions": []
+  },
+  "head": "0000000000000000000000000000000000000004",
+  "disableAutoMerge": true,
+  "publication": {
+    "head": "0000000000000000000000000000000000000004",
+    "recorded": true,
+    "id": "recorded-4"
+  }
+}

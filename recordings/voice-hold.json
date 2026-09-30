@@ -1,0 +1,206 @@
+{
+  "provenance": "Historical capture 3; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication.",
+  "request": {
+    "repository": "example/project",
+    "pr": 3,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000003",
+    "phase": "review"
+  },
+  "config": {
+    "protectedPaths": [],
+    "trustedCheckActors": [
+      "checks-app"
+    ],
+    "trustedTriageActors": [
+      "triage-app"
+    ],
+    "requiredChecks": [
+      "ci"
+    ],
+    "cardBundle": {
+      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+    },
+    "classificationThreshold": 0.6,
+    "routeThreshold": 0.35,
+    "riskTailThreshold": 0.3,
+    "confidenceThreshold": 0.3,
+    "noCouncilConfidenceFloor": 0.3,
+    "timeoutMs": 1000,
+    "publication": "record",
+    "calibration": false
+  },
+  "facts": {
+    "repository": "example/project",
+    "pr": 3,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "0000000000000000000000000000000000000003",
+    "title": "ci: drop the aggregator job; the required checks name the jobs directly",
+    "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
+    "author": "contributor",
+    "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 396b814..d9be46f 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -43,34 +43,6 @@ jobs:\n       project_ref: v1\n       check_name: checks\n \n-  all-checks-passed:\n-    name: ci / all-passed\n-    needs: [floor, validate-and-test, drift-check, standalone-check]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Require every dependency to have succeeded (a job skipped on a mechanical PR is satisfied)\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-          MECHANICAL: ${{ needs.floor.outputs.mechanical }}\n-          EVENT: ${{ github.event_name }}\n-        run: |\n-          set -euo pipefail\n-          # A skipped job is satisfied on a mechanical PR (the floor skipped\n-          # it) and on any non-PR event (a push to the default branch, where\n-          # any job skipped by its own `if:` is not a PR's failure); on a\n-          # functional PR a skipped job is a failure.\n-          bad=\"$(jq -r --arg mech \"$MECHANICAL\" --arg event \"$EVENT\" '\n-            to_entries[]\n-            | select(.value.result == \"failure\" or .value.result == \"cancelled\"\n-                     or (.value.result == \"skipped\" and $mech != \"true\" and $event == \"pull_request\"))\n-            | .key' <<<\"$RESULTS\")\"\n-          if [[ -n \"$bad\" ]]; then\n-            echo \"required job(s) not satisfied: $bad\"\n-            exit 1\n-          fi\n-          echo \"all checks passed (event=${EVENT} mechanical=${MECHANICAL:-false})\"\n-\n   validate-and-test:\n     name: ci / validate-and-test\n     needs: [floor]\n",
+    "complete": true,
+    "fileCount": 1,
+    "files": [
+      {
+        "path": ".github/workflows/ci.yml"
+      }
+    ],
+    "checks": [
+      {
+        "name": "ci",
+        "actor": "checks-app",
+        "head": "0000000000000000000000000000000000000003",
+        "conclusion": "success"
+      }
+    ],
+    "history": {
+      "complete": true,
+      "priorLedger": false
+    },
+    "triage": null,
+    "autoMergeArmed": true
+  },
+  "classification": {
+    "source": "jev",
+    "functional": 1,
+    "documentation": 0,
+    "mechanical": 0
+  },
+  "route": {
+    "source": "jev",
+    "cards": {
+      "safety": 0.56,
+      "works-and-proven": 0.77,
+      "principal-engineer": 0.62,
+      "achieves-the-objective": 0.25,
+      "maintainable-no-slop": 0.36,
+      "house-style": 0.27
+    },
+    "confidence": 0.52,
+    "documentationSubstantive": null
+  },
+  "risk": {
+    "source": "jev",
+    "dimensions": {
+      "blast_radius": {
+        "probabilities": [
+          0.09,
+          0.8,
+          0.04,
+          0.07
+        ],
+        "confidence": 0.73
+      },
+      "reversibility": {
+        "probabilities": [
+          0.04,
+          0.8,
+          0.16,
+          0.0
+        ],
+        "confidence": 0.81
+      },
+      "data_security": {
+        "probabilities": [
+          0.54,
+          0.46,
+          0.0,
+          0.0
+        ],
+        "confidence": 0.53
+      },
+      "operations": {
+        "probabilities": [
+          0.54,
+          0.11,
+          0.34,
+          0.01
+        ],
+        "confidence": 0.19
+      },
+      "verification_gap": {
+        "probabilities": [
+          0.22,
+          0.66,
+          0.11,
+          0.01
+        ],
+        "confidence": 0.66
+      }
+    }
+  },
+  "bundle": {
+    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "reviewerAgent": "publish:pr-reviewer",
+    "voiceAgent": "publish:margot",
+    "cardPaths": {
+      "safety": "/recorded-bundle/skills/pr-council/playbooks/safety.md",
+      "works-and-proven": "/recorded-bundle/skills/pr-council/playbooks/works-and-proven.md",
+      "principal-engineer": "/recorded-bundle/skills/pr-council/playbooks/principal-engineer.md",
+      "achieves-the-objective": "/recorded-bundle/skills/pr-council/playbooks/achieves-the-objective.md",
+      "maintainable-no-slop": "/recorded-bundle/skills/pr-council/playbooks/maintainable-no-slop.md",
+      "house-style": "/recorded-bundle/skills/pr-council/playbooks/house-style.md"
+    }
+  },
+  "cards": {
+    "safety": {
+      "name": "safety",
+      "completion": "completed",
+      "checked": [
+        "Weakened-guard probe. I read the live rules for the default branch with `gh api repos/example/project/rules/branches/main` and the active rulesets. Ruleset 23658219 (\"Protect main \u2014 checks\", active, updated 2026-09-27) requires exactly these checks: `trusted-scan / trusted-scan`, `ci / release-check`, `ci / checks`, `ci / validate-and-test`, `ci / drift-check`, `ci / standalone-check`. `ci / all-passed` is not on that list. So the check this PR removes was not a live required check at head, and the ruleset's own required-check list permits removing it. This probe would have caught the removal of a required check that still gates merges."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    },
+    "works-and-proven": {
+      "name": "works-and-proven",
+      "completion": "completed",
+      "checked": [
+        "Compared the PR body's verification claims with the live ruleset from `gh api repos/example/project/rules/branches/main`. It requires exactly `trusted-scan / trusted-scan`, `ci / release-check`, `ci / checks`, `ci / validate-and-test`, `ci / drift-check` and `ci / standalone-check`, and `ci / all-passed` is not among them. This would have caught a false claim that nothing requires the aggregator: if it were still required, removing it would leave every PR stuck on \"Pending\" forever."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    },
+    "principal-engineer": {
+      "name": "principal-engineer",
+      "completion": "completed",
+      "checked": [
+        "Edge case the change allows: what happens to the checks that depend on the floor when the floor fails or is cancelled on a functional PR. Those checks are `validate-and-test`, `drift-check` and `standalone-check`, all gated by `needs: [floor]` and `if: mechanical != 'true'` (`.github/workflows/ci.yml:46-115` at head). In that case they report \"skipped\", and a skipped check satisfies a required check. Catching that case was the one thing the removed aggregator did that nothing else did. I traced it. The only way those jobs skip on a functional PR is for the floor itself to fail or be cancelled. The floor reports as `ci / checks`, and the live ruleset on `main` requires `ci / checks` (fetched read-only via `gh api repos/.../rules/branches/main`). A red or cancelled floor therefore still blocks the merge. This probe would have caught a functional PR merging with its real checks skipped and no required check failing. It is not present."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    },
+    "maintainable-no-slop": {
+      "name": "maintainable-no-slop",
+      "completion": "completed",
+      "checked": [
+        "Fetched the diff at head 21a18c6c. It changes one file, `.github/workflows/ci.yml`, with 0 additions and 28 deletions: the `all-checks-passed` job and its inline comment. Checking the file list and the add/delete counts would have caught any new helper, abstraction layer, dependency, or try/except added alongside the removal."
+      ],
+      "notCovered": [
+        "Other repositories and live service behavior."
+      ],
+      "findings": []
+    }
+  },
+  "voice": {
+    "outcome": "APPROVED",
+    "band": "MEDIUM",
+    "rationale": "merge-gate change",
+    "summary": "This change removes an extra CI step that only summarised the other checks. Nothing requires it anymore, so every check that decides whether code can merge still runs and still blocks when it fails. The reviewers found no problems. Because it changes how merges are gated, the operator should merge it rather than let it merge on its own.",
+    "dispositions": []
+  },
+  "head": "0000000000000000000000000000000000000003",
+  "disableAutoMerge": true,
+  "publication": {
+    "head": "0000000000000000000000000000000000000003",
+    "recorded": true,
+    "id": "recorded-3"
+  }
+}
