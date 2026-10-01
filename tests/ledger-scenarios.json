@@ -152,7 +152,12 @@
   {
     "id": "ledger-retry",
     "name": "Same head reuses identical result without paid calls",
-    "defect": "Change routing configuration after saving the result"
+    "defect": "Strip the Jev answers from the written receipt",
+    "sourceBreak": {
+      "file": "src/ledger.ts",
+      "from": "JSON.stringify(receipt)",
+      "to": "JSON.stringify(receipt, (key, value) =>\n                key === \"routeAnswer\" || key === \"riskAnswer\" ? undefined : value,\n              )"
+    }
   },
   {
     "id": "ledger-retry-checks",
@@ -303,5 +308,15 @@
     "id": "ledger-human-quote",
     "name": "Newer human marker quote does not hide the trusted App ledger",
     "defect": "Replace the harmless quote with an untrusted trailing ledger block"
+  },
+  {
+    "id": "ledger-retry-040-receipt",
+    "name": "A receipt written by Margot 0.4.0 remains readable",
+    "defect": "Remove the null defaults for Jev answers",
+    "sourceBreak": {
+      "file": "src/schemas.ts",
+      "from": "  routeAnswer: routeSchema.nullable().default(null),\n  riskAnswer: riskSchema.nullable().default(null),",
+      "to": "  routeAnswer: routeSchema.nullable(),\n  riskAnswer: riskSchema.nullable(),"
+    }
   }
 ]

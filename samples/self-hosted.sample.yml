@@ -1,5 +1,6 @@
-# Node 22+, gh, the pinned Claude CLI and publish-skills must be provisioned
-# on this isolated self-hosted runner. Config and request are trusted inputs.
+# gh, the pinned Claude CLI and publish-skills must be provisioned on this
+# isolated self-hosted runner. Config and request are trusted inputs.
+# Replace the version and the SHA-256 with the values on the GitHub release you pin.
 name: Margot shadow
 on: workflow_dispatch
 permissions:
@@ -10,8 +11,21 @@ jobs:
   shadow:
     runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
     steps:
-      - name: Install the exact package release
-        run: npm install --prefix "$RUNNER_TEMP/YOUR_REVIEW_INSTALL" --ignore-scripts --save-exact margot-pr-reviewer@0.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Install the exact release asset after verifying it
+        env:
+          VERSION: 0.4.1
+          SHA256: YOUR_RECORDED_SHA256_FROM_THE_RELEASE
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/margot-pr-reviewer-$VERSION.tgz"
+          curl --fail --location --silent --show-error \
+            "https://github.com/lexijamesesq/margot-pr-reviewer/releases/download/v$VERSION/margot-pr-reviewer-$VERSION.tgz" \
+            --output "$archive"
+          echo "$SHA256  $archive" | sha256sum --check
+          npm install --prefix "$RUNNER_TEMP/YOUR_REVIEW_INSTALL" --ignore-scripts --save-exact "$archive"
       - name: Review the requested head
         env:
           GH_TOKEN: ${{ github.token }}

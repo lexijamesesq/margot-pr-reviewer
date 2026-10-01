@@ -67,6 +67,10 @@ for (const scenario of scenarios) {
       Object.assign(observed, {
         convergence: result.convergence,
         classification: result.classification,
+        routeAnswer: result.routeAnswer,
+        riskAnswer: result.riskAnswer,
+        routeAnswerMatches: JSON.stringify(result.routeAnswer) === JSON.stringify(recording.route),
+        riskAnswerMatches: JSON.stringify(result.riskAnswer) === JSON.stringify(recording.risk),
         outcome: result.decision.outcome,
         band: result.decision.rating.band,
         eligible: result.decision.mergeEligible,
@@ -84,6 +88,8 @@ for (const scenario of scenarios) {
               review: {
                 request: result.request,
                 classification: result.classification,
+                routeAnswer: result.routeAnswer,
+                riskAnswer: result.riskAnswer,
                 cards: result.cards,
                 voice: result.voice,
                 decision: result.decision,

@@ -60,7 +60,7 @@ export function selectLedger(facts: Facts, config: ReviewConfig): Ledger | null 
     );
     let version = Number(match[1]);
     // The legacy reader ignores this extension and sees the same plain entries.
-    // The engine restores its saved receipt without maintaining a second ledger.
+    // Margot restores her saved receipt without maintaining a second ledger.
     if (version === 1 && decoded && typeof decoded.receipt_v2 === "string") {
       const { receipt_v2, ...legacy } = decoded;
       if (legacy.v !== 1 || "receipt" in legacy) throw new Error("Invalid rollback ledger");
@@ -140,9 +140,9 @@ export const standingCards = (scope: RoundScope): Card["name"][] => [
 export function prepareFindings(cards: Card[], scope: RoundScope): void {
   for (const card of cards) {
     for (const finding of card.findings) {
-      // These are engine-owned annotations, never accepted from a card.
+      // These are Margot's own annotations, never accepted from a card.
       if (finding.unconfirmed !== undefined || finding.advisory !== undefined)
-        throw new Error("Card supplied engine annotations");
+        throw new Error("Card supplied Margot's own annotations");
       if (
         finding.ledger &&
         !scope.entries.some(
