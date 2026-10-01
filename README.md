@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.4.2.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.5.0.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -108,7 +108,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.4.2.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.5.0.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
@@ -133,6 +133,54 @@ again before recording. Closed PRs are allowed for retrospective comparisons.
 `github.freshShadow` defaults to false, so complete authenticated history participates
 in later rounds. Nothing is posted or overwritten.
 Binary changes and files outside GitHub's complete text evidence limits fail closed.
+
+## Instance commands
+
+Margot ships `margot-instance` so a consumer does not need a parallel JavaScript
+implementation of routing and request admission. The commands are strict: malformed
+JSON, incomplete pins, invalid policy inputs, or uncertain GitHub facts fail nonzero.
+
+`validate-deployment` checks a trusted deployment file's `version`, exact GitHub
+release asset URL, npm SHA-512 integrity, and bootstrap SHA-256. It also checks the
+target against caller-supplied enrolled repositories, limits authority to a supplied
+authority subset, and appends `authority` plus `repositoryName` to `GITHUB_OUTPUT`
+when that variable is present:
+
+```sh
+margot-instance validate-deployment \
+  --deployment /trusted/deployment.json \
+  --release-repository YOUR_ORG/margot-pr-reviewer \
+  --repository YOUR_ORG/YOUR_REPOSITORY \
+  --enrolled-repositories '["YOUR_ORG/YOUR_REPOSITORY"]' \
+  --authority-repositories '[]'
+```
+
+`bind-request` reads the PR through Octokit using `GH_TOKEN`. It rejects a closed,
+draft, forked, or moved request, then writes mode-0600 `request.json` and `config.json`
+under the absolute engine root. Required checks, protected paths, permitted skipped
+checks, and authority are explicit inputs. Authority selects GitHub publication;
+otherwise the configuration is a before-head shadow. Authority requires a nonempty,
+invocation-unique `--run-url` so the publisher can reject a superseded writer.
+`${ENGINE_ROOT}` in the Claude executable, plugin directory, and ticketing command is
+replaced with the trusted root.
+
+```sh
+margot-instance bind-request \
+  --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
+  --phase review --authority false --engine-root "$ENGINE_ROOT" \
+  --config /trusted/config.json --required-checks '["ci / checks"]' \
+  --protected-paths '[".github/**"]' --allowed-skipped-checks '[]' \
+  --run-url "$RUN_URL"
+```
+
+The consumer still owns estate policy derivation, token minting, package download,
+and exact-byte verification. The SHA-256 check before installation is deliberately the
+integrity control over the downloaded bytes. `validate-deployment` then runs from the
+installed artifact as a post-install consistency check of the pin's shape and target
+enrolment; it is not the byte-integrity control. Before Margot is installed, use stock
+shell tools to read `packageReference` and `packageSha256`, download the asset, run
+`sha256sum --check`, and install that tarball with `npm install --ignore-scripts`; see
+`samples/self-hosted.sample.yml`.
 
 The runner verifies the bundle's Git commit, clean tree, both agents, common law
 and all six playbooks. Agent prose, voice model and effort come from that pin.

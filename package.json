@@ -1,6 +1,6 @@
 {
   "name": "margot-pr-reviewer",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Margot, the PR reviewer: review, convergence and GitHub publication",
   "type": "module",
   "license": "MIT",
@@ -26,12 +26,13 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs && node scripts/ledger-breaks.mjs && node scripts/publication-breaks.mjs",
+    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs && node scripts/ledger-breaks.mjs && node scripts/publication-breaks.mjs && node scripts/instance-breaks.mjs",
     "prepack": "npm run build",
     "audit:recordings": "node scripts/audit-recordings.mjs",
     "test:adapter-breaks": "node scripts/adapter-breaks.mjs",
     "test:ledger-breaks": "node scripts/ledger-breaks.mjs",
     "test:publication-breaks": "node scripts/publication-breaks.mjs",
+    "test:instance-command-breaks": "node scripts/instance-breaks.mjs",
     "test:mechanical-breaks": "node scripts/mechanical-breaks.mjs"
   },
   "dependencies": {
@@ -51,6 +52,7 @@
     "vitest": "4.1.11"
   },
   "bin": {
-    "margot-review": "dist/cli.js"
+    "margot-review": "dist/cli.js",
+    "margot-instance": "dist/instance-cli.js"
   }
 }
