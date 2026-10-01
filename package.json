@@ -32,6 +32,7 @@
     "test:adapter-breaks": "node scripts/adapter-breaks.mjs",
     "test:ledger-breaks": "node scripts/ledger-breaks.mjs",
     "test:publication-breaks": "node scripts/publication-breaks.mjs",
+    "test:instance-command-breaks": "node scripts/instance-breaks.mjs",
     "test:mechanical-breaks": "node scripts/mechanical-breaks.mjs"
   },
   "dependencies": {

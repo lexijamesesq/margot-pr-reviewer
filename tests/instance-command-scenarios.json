@@ -1,0 +1,177 @@
+[
+  {
+    "id": "deployment-success",
+    "name": "accepts the exact configured release and records authority",
+    "defect": "Replace the exact release reference with an invalid value"
+  },
+  {
+    "id": "release-repository",
+    "name": "release-repository: rejects a release asset from a different repository",
+    "defect": "Restore the configured release repository"
+  },
+  {
+    "id": "release-version",
+    "name": "release-version: rejects disagreement among deployment and asset versions",
+    "defect": "Restore agreement between the declared and asset versions"
+  },
+  {
+    "id": "release-integrity",
+    "name": "release-integrity: requires npm integrity",
+    "defect": "Restore the valid npm integrity value"
+  },
+  {
+    "id": "release-sha256",
+    "name": "release-sha256: requires the bootstrap SHA-256",
+    "defect": "Restore the valid bootstrap SHA-256"
+  },
+  {
+    "id": "enrolment",
+    "name": "enrolment: rejects an unenrolled target",
+    "defect": "Restore the enrolled target"
+  },
+  {
+    "id": "authority-enrolment",
+    "name": "authority-enrolment: rejects authority outside enrolment",
+    "defect": "Restore authority to the enrolled subset"
+  },
+  {
+    "id": "release-protocol",
+    "name": "release-protocol: rejects a non-HTTPS release asset",
+    "defect": "Restore the HTTPS release reference"
+  },
+  {
+    "id": "release-host",
+    "name": "release-host: rejects a release asset from another host",
+    "defect": "Restore the GitHub release host"
+  },
+  {
+    "id": "release-port",
+    "name": "release-port: rejects a release asset with an explicit port",
+    "defect": "Remove the explicit release-reference port"
+  },
+  {
+    "id": "release-credentials",
+    "name": "release-credentials: rejects a release asset with credentials",
+    "defect": "Remove credentials from the release reference"
+  },
+  {
+    "id": "release-query",
+    "name": "release-query: rejects a release asset with a query",
+    "defect": "Remove the query from the release reference"
+  },
+  {
+    "id": "release-fragment",
+    "name": "release-fragment: rejects a release asset with a fragment",
+    "defect": "Remove the fragment from the release reference"
+  },
+  {
+    "id": "duplicate-enrolled",
+    "name": "duplicate-enrolled: rejects duplicate enrolled repositories",
+    "defect": "Restore a unique enrolled-repository list"
+  },
+  {
+    "id": "duplicate-authority",
+    "name": "duplicate-authority: rejects duplicate authority repositories",
+    "defect": "Restore a unique authority-repository list"
+  },
+  {
+    "id": "shadow-selection",
+    "name": "returns false authority for an enrolled shadow",
+    "defect": "Put the shadow target in the authority list"
+  },
+  {
+    "id": "github-output",
+    "name": "appends only the two safe GitHub outputs when the path is present",
+    "defect": "Write the wrong authority output"
+  },
+  {
+    "id": "authority-binding",
+    "name": "binds trusted policy and current PR facts for authority",
+    "defect": "Replace the bound required-check list"
+  },
+  {
+    "id": "shadow-binding",
+    "name": "binds non-authority execution as a before-head shadow",
+    "defect": "Grant authority to the shadow binding"
+  },
+  {
+    "id": "authority-publisher",
+    "name": "requires publisher configuration for authority",
+    "defect": "Restore publisher configuration to the rejected authority input"
+  },
+  {
+    "id": "run-url-publisher",
+    "name": "requires publisher configuration when a run URL is supplied",
+    "defect": "Remove the run URL from the rejected publisher-free input"
+  },
+  {
+    "id": "authority-run-url",
+    "name": "requires a unique run URL for authority",
+    "defect": "Restore a run URL to the rejected authority input"
+  },
+  {
+    "id": "placeholder-resolution",
+    "name": "resolves runtime placeholders in Claude and ticketing paths",
+    "defect": "Expect paths under a different runtime root"
+  },
+  {
+    "id": "closed",
+    "name": "closed: rejects a closed PR",
+    "defect": "Restore the open pull request"
+  },
+  {
+    "id": "draft",
+    "name": "draft: rejects a draft PR",
+    "defect": "Restore the non-draft pull request"
+  },
+  {
+    "id": "fork",
+    "name": "fork: rejects a fork PR",
+    "defect": "Restore the same-repository pull request"
+  },
+  {
+    "id": "moved",
+    "name": "moved: rejects a moved head",
+    "defect": "Restore the expected pull-request head"
+  },
+  {
+    "id": "trusted-config",
+    "name": "rejects an invalid trusted configuration before reading GitHub",
+    "defect": "Restore the valid trusted configuration"
+  },
+  {
+    "id": "absolute-root",
+    "name": "requires an absolute runtime root",
+    "defect": "Restore the absolute runtime root"
+  },
+  {
+    "id": "bound-files",
+    "name": "writes the two bound files privately under the engine root",
+    "defect": "Bind a different base revision"
+  },
+  {
+    "id": "github-token",
+    "name": "requires GH_TOKEN before reading configuration or GitHub",
+    "defect": "Supply a token and continue past the token guard"
+  },
+  {
+    "id": "command-arguments",
+    "name": "rejects unknown deployment command arguments",
+    "defect": "Remove the unknown command argument"
+  },
+  {
+    "id": "command-bind-lists",
+    "name": "maps every bind-request CLI flag into the bound files",
+    "defect": "Swap the required-check and protected-path list values"
+  },
+  {
+    "id": "command-bind-authority",
+    "name": "maps every bind-request CLI flag into the bound files",
+    "defect": "Read false authority as true"
+  },
+  {
+    "id": "command-empty-run-url",
+    "name": "rejects an explicitly empty bind-request run URL",
+    "defect": "Replace the empty run URL with a valid URL"
+  }
+]

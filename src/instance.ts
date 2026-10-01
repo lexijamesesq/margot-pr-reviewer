@@ -110,6 +110,7 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
   const config = structuredClone(suppliedConfig);
   if (input.authority && !config.publisher)
     throw new Error("Authority requires publisher configuration");
+  if (input.authority && !input.runUrl) throw new Error("Authority requires a run URL");
   config.review.requiredChecks = input.requiredChecks;
   config.review.protectedPaths = input.protectedPaths;
   config.review.allowedSkippedChecks = input.allowedSkippedChecks;

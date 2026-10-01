@@ -2,6 +2,7 @@
 import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import type { Octokit } from "octokit";
 import { bindRequestFiles, validateDeployment, writeGitHubOutput } from "./instance.js";
 
 type Options = Record<string, string>;
@@ -45,7 +46,11 @@ function rejectUnknown(input: Options, names: string[]) {
   if (unknown) throw new Error(`Unknown argument: --${unknown}`);
 }
 
-export async function runInstanceCommand(args: string[], environment: NodeJS.ProcessEnv) {
+export async function runInstanceCommand(
+  args: string[],
+  environment: NodeJS.ProcessEnv,
+  client?: Pick<Octokit, "rest">,
+) {
   const [command, ...rest] = args;
   const input = options(rest);
   if (command === "validate-deployment") {
@@ -83,6 +88,7 @@ export async function runInstanceCommand(args: string[], environment: NodeJS.Pro
       "allowed-skipped-checks",
       "run-url",
     ]);
+    if (input["run-url"] === "") throw new Error("--run-url must not be empty");
     return bindRequestFiles(
       {
         repository: required(input, "repository"),
@@ -98,6 +104,7 @@ export async function runInstanceCommand(args: string[], environment: NodeJS.Pro
         ...(input["run-url"] ? { runUrl: input["run-url"] } : {}),
       },
       environment.GH_TOKEN,
+      client,
     );
   }
   throw new Error("Usage: margot-instance <validate-deployment|bind-request> [named arguments]");

@@ -6,6 +6,7 @@ import {
   type BindRequestInput,
   bindRequest,
   bindRequestFiles,
+  type DeploymentSelection,
   validateDeployment,
   writeGitHubOutput,
 } from "../src/instance.js";
@@ -99,18 +100,67 @@ const readPull =
   async () =>
     value;
 const directories: string[] = [];
+
+async function captureError(operation: () => Promise<unknown>) {
+  try {
+    await operation();
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}
+
+async function bindCommandFixture(authority: "true" | "false" = "false") {
+  const directory = await mkdtemp(join(tmpdir(), "margot-command-bind-"));
+  directories.push(directory);
+  const configFile = join(directory, "trusted.json");
+  await writeFile(configFile, JSON.stringify(config));
+  return {
+    directory,
+    args: [
+      "bind-request",
+      "--repository",
+      "example/project",
+      "--pr",
+      "7",
+      "--head",
+      head,
+      "--phase",
+      "review",
+      "--authority",
+      authority,
+      "--engine-root",
+      directory,
+      "--config",
+      configFile,
+      "--required-checks",
+      '["ci / required"]',
+      "--protected-paths",
+      '["protected/**"]',
+      "--allowed-skipped-checks",
+      '["ci / skipped"]',
+      "--run-url",
+      "https://github.com/example/control/actions/runs/3",
+    ],
+    client: { rest: { pulls: { get: async () => ({ data: pull }) } } },
+  };
+}
+
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true })));
 });
 
 it("accepts the exact configured release and records authority", () => {
-  const selected = validateDeployment(
-    route(
-      broken === "deployment-success"
-        ? { deployment: { ...deployment, packageReference: "latest" } }
-        : {},
-    ),
-  );
+  let selected: DeploymentSelection | undefined;
+  expect(() => {
+    selected = validateDeployment(
+      route(
+        broken === "deployment-success"
+          ? { deployment: { ...deployment, packageReference: "latest" } }
+          : {},
+      ),
+    );
+  }).not.toThrow();
   expect(selected).toEqual({ authority: true, repositoryName: "project" });
 });
 
@@ -148,6 +198,40 @@ it.each([
   ],
 ] as const)("%s: %s", (id, _name, invalid) => {
   expect(() => validateDeployment(route(broken === id ? {} : invalid))).toThrow();
+});
+
+it.each([
+  ["release-protocol", "rejects a non-HTTPS release asset", "http://github.com"],
+  ["release-host", "rejects a release asset from another host", "https://example.com"],
+  ["release-port", "rejects a release asset with an explicit port", "https://github.com:444"],
+  ["release-credentials", "rejects a release asset with credentials", "https://user@github.com"],
+  ["release-query", "rejects a release asset with a query", `${deployment.packageReference}?x=1`],
+  [
+    "release-fragment",
+    "rejects a release asset with a fragment",
+    `${deployment.packageReference}#x`,
+  ],
+] as const)("%s: %s", (id, _name, replacement) => {
+  const packageReference = replacement.includes("margot-pr-reviewer-0.5.0.tgz")
+    ? replacement
+    : deployment.packageReference.replace("https://github.com", replacement);
+  expect(() =>
+    validateDeployment(
+      route({
+        deployment: broken === id ? deployment : { ...deployment, packageReference },
+      }),
+    ),
+  ).toThrow();
+});
+
+it.each([
+  ["duplicate-enrolled", "rejects duplicate enrolled repositories", "enrolledRepositories"],
+  ["duplicate-authority", "rejects duplicate authority repositories", "authorityRepositories"],
+] as const)("%s: %s", (id, _name, field) => {
+  const duplicate = ["example/project", "example/project"];
+  expect(() => validateDeployment(route(broken === id ? {} : { [field]: duplicate }))).toThrow(
+    /duplicates/,
+  );
 });
 
 it("returns false authority for an enrolled shadow", () => {
@@ -201,6 +285,39 @@ it("binds non-authority execution as a before-head shadow", async () => {
   expect(result.config.github.shadowBeforeHead).toBe(true);
 });
 
+it("requires publisher configuration for authority", async () => {
+  const { publisher: _publisher, ...withoutPublisher } = config;
+  const error = await captureError(() =>
+    bindRequest(
+      bindInput({ config: broken === "authority-publisher" ? config : withoutPublisher }),
+      readPull(),
+    ),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/publisher/);
+});
+
+it("requires publisher configuration when a run URL is supplied", async () => {
+  const { publisher: _publisher, ...withoutPublisher } = config;
+  const withRunUrl = bindInput({ authority: false, config: withoutPublisher });
+  const { runUrl: _runUrl, ...withoutRunUrl } = withRunUrl;
+  const error = await captureError(() =>
+    bindRequest(broken === "run-url-publisher" ? withoutRunUrl : withRunUrl, readPull()),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/publisher/);
+});
+
+it("requires a unique run URL for authority", async () => {
+  const withRunUrl = bindInput();
+  const { runUrl: _runUrl, ...withoutRunUrl } = withRunUrl;
+  const error = await captureError(() =>
+    bindRequest(broken === "authority-run-url" ? withRunUrl : withoutRunUrl, readPull()),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/run URL/);
+});
+
 it("resolves runtime placeholders in Claude and ticketing paths", async () => {
   const root = broken === "placeholder-resolution" ? "/other" : "/runtime/margot";
   const result = await bindRequest(bindInput(), readPull());
@@ -218,28 +335,33 @@ it.each([
   ["moved", "rejects a moved head", { head: { ...pull.head, sha: "f".repeat(40) } }],
 ] as const)("%s: %s", async (id, _name, changed) => {
   const candidate = broken === id ? pull : { ...pull, ...changed };
-  await expect(bindRequest(bindInput(), readPull(candidate))).rejects.toThrow();
+  expect(await captureError(() => bindRequest(bindInput(), readPull(candidate)))).toBeInstanceOf(
+    Error,
+  );
 });
 
 it("rejects an invalid trusted configuration before reading GitHub", async () => {
   let reads = 0;
   const invalid = { ...config, claude: { ...config.claude, executable: "" } };
-  await expect(
+  const error = await captureError(() =>
     bindRequest(bindInput({ config: broken === "trusted-config" ? config : invalid }), async () => {
       reads++;
       return pull;
     }),
-  ).rejects.toThrow();
+  );
+  expect(error).toBeInstanceOf(Error);
   expect(reads).toBe(0);
 });
 
 it("requires an absolute runtime root", async () => {
-  await expect(
-    bindRequest(
-      bindInput({ engineRoot: broken === "absolute-root" ? "/runtime" : "relative" }),
-      readPull(),
+  expect(
+    await captureError(() =>
+      bindRequest(
+        bindInput({ engineRoot: broken === "absolute-root" ? "/runtime" : "relative" }),
+        readPull(),
+      ),
     ),
-  ).rejects.toThrow();
+  ).toBeInstanceOf(Error);
 });
 
 it("writes the two bound files privately under the engine root", async () => {
@@ -250,7 +372,9 @@ it("writes the two bound files privately under the engine root", async () => {
   const github = {
     rest: {
       pulls: {
-        get: async () => ({ data: broken === "bound-files" ? { ...pull, draft: true } : pull }),
+        get: async () => ({
+          data: broken === "bound-files" ? { ...pull, base: { sha: "e".repeat(40) } } : pull,
+        }),
       },
     },
   };
@@ -259,6 +383,7 @@ it("writes the two bound files privately under the engine root", async () => {
     "read-token",
     github as never,
   );
+  expect(result.request.base).toBe(base);
   expect(JSON.parse(await readFile(join(directory, "request.json"), "utf8"))).toEqual(
     result.request,
   );
@@ -268,12 +393,14 @@ it("writes the two bound files privately under the engine root", async () => {
 });
 
 it("requires GH_TOKEN before reading configuration or GitHub", async () => {
-  await expect(
+  const error = await captureError(() =>
     bindRequestFiles(
       { ...bindInput(), configFile: broken === "github-token" ? "/missing" : "/not-read" },
       broken === "github-token" ? "token" : undefined,
     ),
-  ).rejects.toThrow(/GH_TOKEN/);
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/GH_TOKEN/);
 });
 
 it("parses the strict deployment command and emits its outputs", async () => {
@@ -295,10 +422,68 @@ it("parses the strict deployment command and emits its outputs", async () => {
     "--authority-repositories",
     '["example/project"]',
   ];
-  if (broken === "command-arguments") args.push("--unknown", "value");
   expect(await runInstanceCommand(args, { GITHUB_OUTPUT: output })).toEqual({
     authority: true,
     repositoryName: "project",
   });
   expect(await readFile(output, "utf8")).toBe("authority=true\nrepositoryName=project\n");
+});
+
+it("rejects unknown deployment command arguments", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "margot-command-unknown-"));
+  directories.push(directory);
+  const deploymentFile = join(directory, "deployment.json");
+  await writeFile(deploymentFile, JSON.stringify(deployment));
+  const args = [
+    "validate-deployment",
+    "--deployment",
+    deploymentFile,
+    "--release-repository",
+    "example/margot-pr-reviewer",
+    "--repository",
+    "example/project",
+    "--enrolled-repositories",
+    '["example/project"]',
+    "--authority-repositories",
+    '["example/project"]',
+  ];
+  if (broken !== "command-arguments") args.push("--unknown", "value");
+  const error = await captureError(() => runInstanceCommand(args, {}));
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/Unknown argument/);
+});
+
+it("maps every bind-request CLI flag into the bound files", async () => {
+  const fixture = await bindCommandFixture(broken === "command-bind-authority" ? "true" : "false");
+  if (broken === "command-bind-lists") {
+    const required = fixture.args.indexOf("--required-checks") + 1;
+    const protectedPaths = fixture.args.indexOf("--protected-paths") + 1;
+    [fixture.args[required], fixture.args[protectedPaths]] = [
+      fixture.args[protectedPaths] ?? "",
+      fixture.args[required] ?? "",
+    ];
+  }
+  await runInstanceCommand(fixture.args, { GH_TOKEN: "read-token" }, fixture.client as never);
+  const request = JSON.parse(await readFile(join(fixture.directory, "request.json"), "utf8"));
+  const bound = JSON.parse(await readFile(join(fixture.directory, "config.json"), "utf8"));
+  expect(request).toEqual({ repository: "example/project", pr: 7, base, head, phase: "review" });
+  expect(bound.review).toMatchObject({
+    publication: "none",
+    requiredChecks: ["ci / required"],
+    protectedPaths: ["protected/**"],
+    allowedSkippedChecks: ["ci / skipped"],
+  });
+  expect(bound.github.shadowBeforeHead).toBe(true);
+  expect(bound.publisher.runUrl).toBe("https://github.com/example/control/actions/runs/3");
+});
+
+it("rejects an explicitly empty bind-request run URL", async () => {
+  const fixture = await bindCommandFixture("true");
+  const runUrl = fixture.args.indexOf("--run-url") + 1;
+  fixture.args[runUrl] = broken === "command-empty-run-url" ? config.publisher.runUrl : "";
+  const error = await captureError(() =>
+    runInstanceCommand(fixture.args, { GH_TOKEN: "read-token" }, fixture.client as never),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/run-url/);
 });

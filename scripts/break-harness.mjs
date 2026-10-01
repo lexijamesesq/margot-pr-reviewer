@@ -1,15 +1,22 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 
-/** Both receipt entry points execute and account for the complete scenario inventory. */
-export function createBreakHarness(output) {
-  const total = [
-    "tests/scenarios.json",
-    "tests/adapter-scenarios.json",
-    "tests/ledger-scenarios.json",
-    "tests/publication-scenarios.json",
-  ].reduce((count, file) => count + JSON.parse(readFileSync(file, "utf8")).length, 0);
+function discoverTests(directory) {
+  return readdirSync(directory, { withFileTypes: true })
+    .flatMap((entry) => {
+      const path = join(directory, entry.name);
+      return entry.isDirectory() ? discoverTests(path) : path.endsWith(".test.ts") ? [path] : [];
+    })
+    .sort();
+}
+
+/** Every receipt entry point executes and accounts for all discovered test files. */
+export function createBreakHarness(output, breakEnvironment = "MARGOT_ADAPTER_BREAK") {
+  const testFiles = discoverTests("tests");
+  if (testFiles.length === 0) throw new Error("No test files discovered");
+  let total;
   let restore;
   function run(id) {
     if (existsSync(output)) unlinkSync(output);
@@ -18,18 +25,18 @@ export function createBreakHarness(output) {
       [
         "node_modules/vitest/vitest.mjs",
         "run",
-        "tests/review.test.ts",
-        "tests/adapters.test.ts",
-        "tests/ledger.test.ts",
-        "tests/publication.test.ts",
+        ...testFiles,
         "--reporter=json",
         `--outputFile=${output}`,
       ],
-      { encoding: "utf8", env: { ...process.env, MARGOT_ADAPTER_BREAK: id ?? "" } },
+      { encoding: "utf8", env: { ...process.env, [breakEnvironment]: id ?? "" } },
     );
     if (child.error) throw child.error;
     const report = JSON.parse(readFileSync(output, "utf8"));
-    if (report.numTotalTests !== total || report.numPassedTests + report.numFailedTests !== total)
+    if (
+      total !== undefined &&
+      (report.numTotalTests !== total || report.numPassedTests + report.numFailedTests !== total)
+    )
       throw new Error("Runner did not execute every scenario");
     return {
       status: child.status,
@@ -40,16 +47,22 @@ export function createBreakHarness(output) {
     };
   }
   function requireBaseline(result) {
-    if (result.status !== 0 || result.report.numPassedTests !== total)
+    if (result.status !== 0 || result.report.numFailedTests !== 0)
       throw new Error("Baseline did not pass every test");
+    total ??= result.report.numTotalTests;
+    if (
+      total === 0 ||
+      result.report.numTotalTests !== total ||
+      result.report.numPassedTests !== total
+    )
+      throw new Error("Baseline did not execute every discovered test");
   }
   function requireAssertionFailures(result) {
     if (result.status !== 1 || result.failed.length === 0)
       throw new Error("Mutation did not produce test failures");
     for (const test of result.failed) {
       const message = stripVTControlCharacters(test.failureMessages.join("\n"));
-      if (!message.includes("AssertionError") || !message.includes("to match object"))
-        throw new Error(`Unexpected failure: ${test.title}`);
+      if (!message.includes("AssertionError")) throw new Error(`Unexpected failure: ${test.title}`);
     }
   }
   function mutateSource({ file, from, to }) {

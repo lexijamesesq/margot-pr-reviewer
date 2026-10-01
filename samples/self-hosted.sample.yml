@@ -27,6 +27,9 @@ jobs:
           echo "$sha256  $archive" | sha256sum --check
           npm install --prefix "$ENGINE_ROOT" --ignore-scripts --save-exact "$archive"
           echo "ENGINE_ROOT=$ENGINE_ROOT" >> "$GITHUB_ENV"
+      # Integrity is established before install by the SHA-256 check above.
+      # This installed command is the post-install consistency check of the
+      # pin's shape and target enrolment; it is not the byte-integrity control.
       - name: Validate the deployment and enrolled target
         id: route
         env:
@@ -44,6 +47,7 @@ jobs:
           TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
           PR_NUMBER: "1"
           HEAD_SHA: "0000000000000000000000000000000000000000"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           "$ENGINE_ROOT/node_modules/.bin/margot-instance" bind-request \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
@@ -51,7 +55,7 @@ jobs:
             --engine-root "$ENGINE_ROOT" --config /trusted/margot/config.json \
             --required-checks '["YOUR_REQUIRED_CHECK"]' \
             --protected-paths '["YOUR_AUTHORITY_PATH/**"]' \
-            --allowed-skipped-checks '[]'
+            --allowed-skipped-checks '[]' --run-url "$RUN_URL"
       - name: Review the bound request
         env:
           GH_TOKEN: ${{ github.token }}

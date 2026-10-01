@@ -159,8 +159,10 @@ margot-instance validate-deployment \
 draft, forked, or moved request, then writes mode-0600 `request.json` and `config.json`
 under the absolute engine root. Required checks, protected paths, permitted skipped
 checks, and authority are explicit inputs. Authority selects GitHub publication;
-otherwise the configuration is a before-head shadow. `${ENGINE_ROOT}` in the Claude
-executable, plugin directory, and ticketing command is replaced with the trusted root.
+otherwise the configuration is a before-head shadow. Authority requires a nonempty,
+invocation-unique `--run-url` so the publisher can reject a superseded writer.
+`${ENGINE_ROOT}` in the Claude executable, plugin directory, and ticketing command is
+replaced with the trusted root.
 
 ```sh
 margot-instance bind-request \
@@ -172,8 +174,11 @@ margot-instance bind-request \
 ```
 
 The consumer still owns estate policy derivation, token minting, package download,
-and exact-byte verification. Before Margot is installed, use stock shell tools to
-read `packageReference` and `packageSha256`, download the asset, run
+and exact-byte verification. The SHA-256 check before installation is deliberately the
+integrity control over the downloaded bytes. `validate-deployment` then runs from the
+installed artifact as a post-install consistency check of the pin's shape and target
+enrolment; it is not the byte-integrity control. Before Margot is installed, use stock
+shell tools to read `packageReference` and `packageSha256`, download the asset, run
 `sha256sum --check`, and install that tarball with `npm install --ignore-scripts`; see
 `samples/self-hosted.sample.yml`.
 

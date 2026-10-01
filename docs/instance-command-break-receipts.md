@@ -1,29 +1,47 @@
 # Instance command break receipts
 
-Run: 2026-10-01T16:33:55.213Z. Node v26.3.1.
+Generated 2026-10-01T17:32:36.282Z, Node v26.3.1. Baseline and restored suite: 287/287 passed. Each of 35 isolated breaks ran the complete suite and failed exactly its named assertion.
 
-Baseline: 21/21 passed. Each row changes one command input or expected decision, runs the complete instance-command Vitest file, and observes exactly one assertion failure. The input is restored before the next run. Restored baseline: 21/21 passed.
+Instance command cases exercise exact release references, enrolment, authority selection, GitHub outputs, request admission, trusted policy binding, CLI flag mapping, and bound-file writes.
 
-| Break | Observed |
-| --- | --- |
-| deployment-success | 1 failed, 20 passed |
-| release-repository | 1 failed, 20 passed |
-| release-version | 1 failed, 20 passed |
-| release-integrity | 1 failed, 20 passed |
-| release-sha256 | 1 failed, 20 passed |
-| enrolment | 1 failed, 20 passed |
-| authority-enrolment | 1 failed, 20 passed |
-| shadow-selection | 1 failed, 20 passed |
-| github-output | 1 failed, 20 passed |
-| authority-binding | 1 failed, 20 passed |
-| shadow-binding | 1 failed, 20 passed |
-| placeholder-resolution | 1 failed, 20 passed |
-| closed | 1 failed, 20 passed |
-| draft | 1 failed, 20 passed |
-| fork | 1 failed, 20 passed |
-| moved | 1 failed, 20 passed |
-| trusted-config | 1 failed, 20 passed |
-| absolute-root | 1 failed, 20 passed |
-| bound-files | 1 failed, 20 passed |
-| github-token | 1 failed, 20 passed |
-| command-arguments | 1 failed, 20 passed |
+Most breaks are controlled service/input counterexamples selected by MARGOT_INSTANCE_BREAK; error cases repair their bad input. They do not claim exhaustive source mutation coverage or independence. Declared source mutations run without that variable and are identified in the manifest. No live service or paid model call occurs in the harness.
+
+Manifest SHA-256: 27f66f248b4a9bc84b456fdb5d511ae8f14e4fdbcfb6bc0db8e0b1c9c20db490. Reproduce: npm run test:instance-command-breaks.
+
+| Test | Deliberate break | Observed |
+| --- | --- | --- |
+| accepts the exact configured release and records authority | Replace the exact release reference with an invalid value | 1 failed; 286 passed |
+| release-repository: rejects a release asset from a different repository | Restore the configured release repository | 1 failed; 286 passed |
+| release-version: rejects disagreement among deployment and asset versions | Restore agreement between the declared and asset versions | 1 failed; 286 passed |
+| release-integrity: requires npm integrity | Restore the valid npm integrity value | 1 failed; 286 passed |
+| release-sha256: requires the bootstrap SHA-256 | Restore the valid bootstrap SHA-256 | 1 failed; 286 passed |
+| enrolment: rejects an unenrolled target | Restore the enrolled target | 1 failed; 286 passed |
+| authority-enrolment: rejects authority outside enrolment | Restore authority to the enrolled subset | 1 failed; 286 passed |
+| release-protocol: rejects a non-HTTPS release asset | Restore the HTTPS release reference | 1 failed; 286 passed |
+| release-host: rejects a release asset from another host | Restore the GitHub release host | 1 failed; 286 passed |
+| release-port: rejects a release asset with an explicit port | Remove the explicit release-reference port | 1 failed; 286 passed |
+| release-credentials: rejects a release asset with credentials | Remove credentials from the release reference | 1 failed; 286 passed |
+| release-query: rejects a release asset with a query | Remove the query from the release reference | 1 failed; 286 passed |
+| release-fragment: rejects a release asset with a fragment | Remove the fragment from the release reference | 1 failed; 286 passed |
+| duplicate-enrolled: rejects duplicate enrolled repositories | Restore a unique enrolled-repository list | 1 failed; 286 passed |
+| duplicate-authority: rejects duplicate authority repositories | Restore a unique authority-repository list | 1 failed; 286 passed |
+| returns false authority for an enrolled shadow | Put the shadow target in the authority list | 1 failed; 286 passed |
+| appends only the two safe GitHub outputs when the path is present | Write the wrong authority output | 1 failed; 286 passed |
+| binds trusted policy and current PR facts for authority | Replace the bound required-check list | 1 failed; 286 passed |
+| binds non-authority execution as a before-head shadow | Grant authority to the shadow binding | 1 failed; 286 passed |
+| requires publisher configuration for authority | Restore publisher configuration to the rejected authority input | 1 failed; 286 passed |
+| requires publisher configuration when a run URL is supplied | Remove the run URL from the rejected publisher-free input | 1 failed; 286 passed |
+| requires a unique run URL for authority | Restore a run URL to the rejected authority input | 1 failed; 286 passed |
+| resolves runtime placeholders in Claude and ticketing paths | Expect paths under a different runtime root | 1 failed; 286 passed |
+| closed: rejects a closed PR | Restore the open pull request | 1 failed; 286 passed |
+| draft: rejects a draft PR | Restore the non-draft pull request | 1 failed; 286 passed |
+| fork: rejects a fork PR | Restore the same-repository pull request | 1 failed; 286 passed |
+| moved: rejects a moved head | Restore the expected pull-request head | 1 failed; 286 passed |
+| rejects an invalid trusted configuration before reading GitHub | Restore the valid trusted configuration | 1 failed; 286 passed |
+| requires an absolute runtime root | Restore the absolute runtime root | 1 failed; 286 passed |
+| writes the two bound files privately under the engine root | Bind a different base revision | 1 failed; 286 passed |
+| requires GH_TOKEN before reading configuration or GitHub | Supply a token and continue past the token guard | 1 failed; 286 passed |
+| rejects unknown deployment command arguments | Remove the unknown command argument | 1 failed; 286 passed |
+| maps every bind-request CLI flag into the bound files | Swap the required-check and protected-path list values | 1 failed; 286 passed |
+| maps every bind-request CLI flag into the bound files | Read false authority as true | 1 failed; 286 passed |
+| rejects an explicitly empty bind-request run URL | Replace the empty run URL with a valid URL | 1 failed; 286 passed |
