@@ -1,5 +1,6 @@
 import type { Octokit } from "octokit";
 import type { z } from "zod";
+import { checkText } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
 
@@ -179,9 +180,14 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       r,
       config.checks.review,
       reviewConclusion,
-      decision.mergeEligible ? "Margot: approved" : `Margot: ${decision.outcome} — held`,
+      // Titles the estate's readers already know: Ollie turns a held title into its ask.
+      decision.mergeEligible
+        ? "Margot: approved"
+        : decision.outcome === "APPROVED"
+          ? `held for the operator: risk is ${decision.rating.band}`
+          : `Margot: ${decision.outcome}`,
       `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
-      undefined,
+      checkText(review),
       c,
     );
     await confirmReviewCheck(r, reviewConclusion, c);

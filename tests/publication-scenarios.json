@@ -10,6 +10,16 @@
     "defect": "Remove the hold"
   },
   {
+    "id": "pub-ollie-verdict",
+    "name": "The verdict check's text carries the lines Ollie parses to request the operator on a hold",
+    "defect": "Post the verdict check without its text",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "      checkText(review),\n      c,\n    );",
+      "to": "      undefined,\n      c,\n    );"
+    }
+  },
+  {
     "id": "pub-authority",
     "name": "Authority hold remains neutral on the self-instrument check",
     "defect": "Remove the authority hold"

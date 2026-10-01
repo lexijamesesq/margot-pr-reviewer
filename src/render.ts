@@ -45,3 +45,24 @@ export function render(review: Review): string {
     );
   return report;
 }
+
+/**
+ * The verdict check's text: the lines the estate's readers consume. Ollie's state script
+ * (dotty `.github/scripts/ollie-state.py`, `parse_verdict`) reads `outcome: X | band: Y` and
+ * `decision_source:` to decide whether a held PR is waiting on the operator and to request
+ * her review. Python's check carried these lines; they are the contract, not decoration.
+ */
+export function checkText(review: Review): string {
+  const { decision, cards, voice } = review;
+  const tally = findingTally(review);
+  return [
+    `outcome: ${decision.outcome} | band: ${decision.rating.band}`,
+    `decision_source: jev`,
+    `verdict_source: ${voice ? "verdict_voice" : "deterministic"}`,
+    `class: ${review.classification}`,
+    `summoned: ${cards.length ? cards.map((c) => c.name).join(", ") : "none"}`,
+    `convergence: round ${review.convergence.round} · new ${tally.new} · open ${tally.open} · closed ${tally.closed}`,
+    `can auto-merge: ${decision.mergeEligible ? "True" : "False"}`,
+    `band_reason: ${decision.rating.rationale}`,
+  ].join("\n");
+}

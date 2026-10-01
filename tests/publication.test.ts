@@ -253,6 +253,38 @@ scenario(
   },
   { armed: false, conclusion: "neutral", event: "COMMENT" },
 );
+// Ollie's state script (dotty .github/scripts/ollie-state.py, parse_verdict) reads these
+// lines from the check text and requests the operator's review on a held PR. Without them
+// a hold is invisible to her; this is the live defect found on margot #94.
+function parseVerdictLikeOllie(text: string | undefined) {
+  const out = { outcome: "", band: "", source: "" };
+  for (const line of (text ?? "").split("\n")) {
+    if (line.startsWith("outcome:")) {
+      const parts = line
+        .slice("outcome:".length)
+        .split("|")
+        .map((p) => p.trim());
+      out.outcome = parts[0] ?? "";
+      for (const p of parts.slice(1)) if (p.startsWith("band:")) out.band = p.slice(5).trim();
+    } else if (line.startsWith("decision_source:")) out.source = line.slice(16).trim();
+  }
+  return out;
+}
+scenario(
+  "pub-ollie-verdict",
+  async (b) => {
+    const x = await wire("hold", b);
+    const output = (x.final?.output ?? {}) as { text?: string; title?: string };
+    const parsed = parseVerdictLikeOllie(output.text);
+    return { ...parsed, title: output.title };
+  },
+  {
+    outcome: "APPROVED",
+    band: "HIGH",
+    source: "jev",
+    title: "held for the operator: risk is HIGH",
+  },
+);
 scenario(
   "pub-authority",
   async (b) => ({ conclusion: (await wire("authority", b)).authority?.conclusion }),
