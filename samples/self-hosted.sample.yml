@@ -1,6 +1,5 @@
-# gh, the pinned Claude CLI and publish-skills must be provisioned on this
-# isolated self-hosted runner. Config and request are trusted inputs.
-# Replace the version and the SHA-256 with the values on the GitHub release you pin.
+# Store these trusted files outside the pull-request checkout. Provision the pinned
+# Claude CLI, ticketing server, and publish-skills at the configured runtime paths.
 name: Margot shadow
 on: workflow_dispatch
 permissions:
@@ -14,24 +13,51 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      - name: Install the exact release asset after verifying it
+      - name: Bootstrap the exact release bytes
         env:
-          VERSION: 0.4.2
-          SHA256: YOUR_RECORDED_SHA256_FROM_THE_RELEASE
+          ENGINE_ROOT: ${{ runner.temp }}/margot
+          DEPLOYMENT: /trusted/margot/deployment.json
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/margot-pr-reviewer-$VERSION.tgz"
-          curl --fail --location --silent --show-error \
-            "https://github.com/lexijamesesq/margot-pr-reviewer/releases/download/v$VERSION/margot-pr-reviewer-$VERSION.tgz" \
-            --output "$archive"
-          echo "$SHA256  $archive" | sha256sum --check
-          npm install --prefix "$RUNNER_TEMP/YOUR_REVIEW_INSTALL" --ignore-scripts --save-exact "$archive"
-      - name: Review the requested head
+          mkdir -p "$ENGINE_ROOT"
+          package=$(jq -r .packageReference "$DEPLOYMENT")
+          sha256=$(jq -r .packageSha256 "$DEPLOYMENT")
+          archive="$ENGINE_ROOT/margot-pr-reviewer.tgz"
+          curl --fail --location --silent --show-error "$package" --output "$archive"
+          echo "$sha256  $archive" | sha256sum --check
+          npm install --prefix "$ENGINE_ROOT" --ignore-scripts --save-exact "$archive"
+          echo "ENGINE_ROOT=$ENGINE_ROOT" >> "$GITHUB_ENV"
+      - name: Validate the deployment and enrolled target
+        id: route
+        env:
+          TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
+        run: |
+          "$ENGINE_ROOT/node_modules/.bin/margot-instance" validate-deployment \
+            --deployment /trusted/margot/deployment.json \
+            --release-repository YOUR_ORG/margot-pr-reviewer \
+            --repository "$TARGET_REPO" \
+            --enrolled-repositories '["YOUR_ORG/YOUR_REPOSITORY"]' \
+            --authority-repositories '[]'
+      - name: Bind trusted configuration to the requested PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
+          PR_NUMBER: "1"
+          HEAD_SHA: "0000000000000000000000000000000000000000"
+        run: |
+          "$ENGINE_ROOT/node_modules/.bin/margot-instance" bind-request \
+            --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
+            --phase review --authority "${{ steps.route.outputs.authority }}" \
+            --engine-root "$ENGINE_ROOT" --config /trusted/margot/config.json \
+            --required-checks '["YOUR_REQUIRED_CHECK"]' \
+            --protected-paths '["YOUR_AUTHORITY_PATH/**"]' \
+            --allowed-skipped-checks '[]'
+      - name: Review the bound request
         env:
           GH_TOKEN: ${{ github.token }}
           JEV_KEY: ${{ secrets.EXAMPLE_JEV_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.EXAMPLE_CLAUDE_OAUTH_TOKEN }}
           YOUR_TICKETING_CREDENTIAL_ENV_VAR: ${{ secrets.EXAMPLE_TICKETING_CREDENTIAL }}
         run: |
-          "$RUNNER_TEMP/YOUR_REVIEW_INSTALL/node_modules/.bin/margot-review" \
-            /path/to/your/request.json /path/to/your/config.json /path/to/your/result.json
+          "$ENGINE_ROOT/node_modules/.bin/margot-review" \
+            "$ENGINE_ROOT/request.json" "$ENGINE_ROOT/config.json" "$ENGINE_ROOT/result.json"

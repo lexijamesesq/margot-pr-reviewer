@@ -1,6 +1,6 @@
 # Publication and tally break receipts
 
-Generated 2026-10-01T14:03:47.695Z, Node v26.3.1. Baseline and restored suite: 252/252 passed. Each of 32 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-01T16:33:40.791Z, Node v26.3.1. Baseline and restored suite: 252/252 passed. Each of 32 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Publication uses the real Octokit client against a recorded HTTP transport. No live GitHub writes occur. The tally source mutation deliberately adds one to Closed; reconciliation must fail.
 

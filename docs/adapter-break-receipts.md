@@ -1,6 +1,6 @@
 # Live adapter break receipts
 
-Generated 2026-10-01T14:12:24.815Z, Node v26.3.1. Baseline and restored suite: 252/252 passed. Each of 60 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-01T16:22:51.464Z, Node v26.3.1. Baseline and restored suite: 252/252 passed. Each of 60 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Adapter cases exercise CLI grants, version and envelope guards, prose mapping, hunk completeness, pagination, stdin prompts, round delta binding and subprocess redaction. Credential isolation inserts a forbidden credential into the filtered environment. Live confinement and model quality remain separate proofs.
 

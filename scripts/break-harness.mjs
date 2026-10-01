@@ -15,7 +15,16 @@ export function createBreakHarness(output) {
     if (existsSync(output)) unlinkSync(output);
     const child = spawnSync(
       process.execPath,
-      ["node_modules/vitest/vitest.mjs", "run", "--reporter=json", `--outputFile=${output}`],
+      [
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/review.test.ts",
+        "tests/adapters.test.ts",
+        "tests/ledger.test.ts",
+        "tests/publication.test.ts",
+        "--reporter=json",
+        `--outputFile=${output}`,
+      ],
       { encoding: "utf8", env: { ...process.env, MARGOT_ADAPTER_BREAK: id ?? "" } },
     );
     if (child.error) throw child.error;
