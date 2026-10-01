@@ -40,6 +40,16 @@ function scenario(
 async function wire(mode = "clear", broken = false) {
   const writes: { method: string; path: string; body: Record<string, unknown> }[] = [];
   const stored = new Map<number, Record<string, unknown>>();
+  if (mode === "retry")
+    stored.set(89, {
+      id: 89,
+      name: options.checks.review,
+      head_sha: r.head,
+      app: { id: options.appId },
+      status: "completed",
+      conclusion: "action_required",
+      details_url: "https://github.com/example/caller/actions/runs/1",
+    });
   if (mode === "adopt" && !broken)
     stored.set(88, {
       id: 88,
@@ -542,6 +552,21 @@ scenario(
     };
   },
   { adopted: true, duplicates: 0 },
+);
+scenario(
+  "pub-retry",
+  async (b) => {
+    const x = await wire("retry", b);
+    return {
+      kind: x.result.kind,
+      reopenedCompleted: x.writes.some(
+        (w) => w.path.endsWith("/check-runs/89") && w.body.status === "in_progress",
+      ),
+      opened: x.writes.filter((w) => w.method === "POST" && w.body.name === options.checks.review)
+        .length,
+    };
+  },
+  { kind: "reviewed", reopenedCompleted: false, opened: 1 },
 );
 scenario(
   "pub-superseded",

@@ -160,6 +160,16 @@
     "defect": "Remove the dispatched check from the recorded target"
   },
   {
+    "id": "pub-retry",
+    "name": "A same-head retry opens a new check instead of reopening the completed one",
+    "defect": "Reopen the completed check",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "if (existing && !(payload.status === \"in_progress\" && existing.status === \"completed\"))",
+      "to": "if (existing)"
+    }
+  },
+  {
     "id": "pub-superseded",
     "name": "A superseded run cannot close the newer run check or approve",
     "defect": "Keep the original check ownership"

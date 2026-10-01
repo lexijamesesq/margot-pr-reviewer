@@ -69,25 +69,30 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         filter: "latest",
         app_id: config.appId,
       });
-      id = checks
+      const existing = checks
         .filter((v) => v.name === name && v.head_sha === r.head && v.app?.id === config.appId)
-        .sort((a, b) => b.id - a.id)[0]?.id;
+        .sort((a, b) => b.id - a.id)[0];
+      // A same-head retry finds the previous run's check already completed. GitHub does
+      // not reopen a completed check-run, so a retry opens a new one rather than
+      // failing on the readback of a PATCH that could not take.
+      if (existing && !(payload.status === "in_progress" && existing.status === "completed"))
+        id = existing.id;
     }
     const { data } = id
       ? await client.rest.checks.update({ ...payload, check_run_id: id })
       : await client.rest.checks.create(payload);
     // Save a valid ID even if other response fields are wrong, for error cleanup.
     if (Number.isSafeInteger(data.id)) ids.set(name, data.id);
-    if (
-      !Number.isSafeInteger(data.id) ||
-      data.id <= 0 ||
-      data.head_sha !== r.head ||
-      data.name !== name ||
-      data.app?.id !== config.appId ||
-      data.status !== payload.status ||
-      (conclusion && data.conclusion !== conclusion)
-    )
-      throw new Error("Invalid check write receipt");
+    const mismatches = [
+      !Number.isSafeInteger(data.id) || data.id <= 0 ? "id" : "",
+      data.head_sha !== r.head ? `head_sha=${data.head_sha}` : "",
+      data.name !== name ? `name=${data.name}` : "",
+      data.app?.id !== config.appId ? `app=${data.app?.id}` : "",
+      data.status !== payload.status ? `status=${data.status}` : "",
+      conclusion && data.conclusion !== conclusion ? `conclusion=${data.conclusion}` : "",
+    ].filter(Boolean);
+    if (mismatches.length)
+      throw new Error(`Invalid check write receipt for ${name}: ${mismatches.join(", ")}`);
   }
   async function withdraw(r: ReviewRequest, c: CallContext) {
     const reviews = await client.paginate(client.rest.pulls.listReviews, {
