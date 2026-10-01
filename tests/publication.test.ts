@@ -286,6 +286,27 @@ scenario(
   },
 );
 scenario(
+  "pub-held-reason",
+  async () => {
+    const x = await wire("authority", false);
+    return { title: ((x.final?.output ?? {}) as { title?: string }).title };
+  },
+  { title: "held for the operator: a change to Margot's own machinery" },
+);
+scenario(
+  "pub-error-text",
+  async () => {
+    const x = await wire("review-fail", false);
+    const output = (x.final?.output ?? {}) as { text?: string };
+    return {
+      kind: x.result.kind,
+      staleApproval: parseVerdictLikeOllie(output.text).outcome,
+      hasText: typeof output.text === "string" && output.text.length > 0,
+    };
+  },
+  { kind: "error", staleApproval: "", hasText: true },
+);
+scenario(
   "pub-authority",
   async (b) => ({ conclusion: (await wire("authority", b)).authority?.conclusion }),
   { conclusion: "neutral" },

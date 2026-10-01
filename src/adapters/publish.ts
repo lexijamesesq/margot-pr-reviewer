@@ -149,6 +149,12 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       c,
     );
   }
+  const heldReason = (decision: { holdReasons: string[]; rating: { band: string } }) =>
+    decision.holdReasons.includes("review-authority")
+      ? "a change to Margot's own machinery"
+      : decision.holdReasons.includes("calibration")
+        ? "calibration mode"
+        : `risk is ${decision.rating.band}`;
   const publish: Services["publish"] = async ({ expectedHead, review, report }, c) => {
     const r = review.request;
     if (!active || JSON.stringify(active) !== JSON.stringify(r) || expectedHead !== r.head)
@@ -180,11 +186,12 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       r,
       config.checks.review,
       reviewConclusion,
-      // Titles the estate's readers already know: Ollie turns a held title into its ask.
+      // Titles the estate's readers already know: Ollie turns a held title into its ask,
+      // so the title names the reason the PR is actually held.
       decision.mergeEligible
         ? "Margot: approved"
         : decision.outcome === "APPROVED"
-          ? `held for the operator: risk is ${decision.rating.band}`
+          ? `held for the operator: ${heldReason(decision)}`
           : `Margot: ${decision.outcome}`,
       `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
       checkText(review),
@@ -256,7 +263,9 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
               "action_required",
               "Margot: not reviewed (error)",
               "Publication or evaluation failed; no clearance.",
-              undefined,
+              // Overwrite any verdict text already written for this head: with no
+              // `outcome:` line Ollie reads "held without a verdict", never "approved".
+              "no verdict: publication or evaluation failed after the check was opened",
               context(),
             ),
         ],

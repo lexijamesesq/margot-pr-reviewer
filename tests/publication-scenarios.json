@@ -20,6 +20,26 @@
     }
   },
   {
+    "id": "pub-held-reason",
+    "name": "A held title names the reason the PR is held, not the band",
+    "defect": "Title every hold with the band",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "`held for the operator: ${heldReason(decision)}`",
+      "to": "`held for the operator: risk is ${decision.rating.band}`"
+    }
+  },
+  {
+    "id": "pub-error-text",
+    "name": "A failure after the verdict check overwrites its text so Ollie never reads a stale approval",
+    "defect": "Leave the verdict text in place on error",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "\"no verdict: publication or evaluation failed after the check was opened\",",
+      "to": "undefined,"
+    }
+  },
+  {
     "id": "pub-authority",
     "name": "Authority hold remains neutral on the self-instrument check",
     "defect": "Remove the authority hold"
