@@ -155,6 +155,8 @@ export function githubAdapter(
           name: check.name,
           actor: check.app?.slug ?? "unknown",
           head: check.head_sha,
+          ...(check.started_at ? { startedAt: check.started_at } : {}),
+          id: check.id,
           conclusion:
             check.status !== "completed"
               ? "pending"

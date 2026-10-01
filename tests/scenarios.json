@@ -2715,7 +2715,7 @@
     "defect": "Repair only the failed required check response."
   },
   {
-    "name": "duplicate required check cannot approve",
+    "name": "a superseded run of a required check does not block the current one",
     "recording": "council-clear",
     "patches": [
       {
@@ -2725,13 +2725,72 @@
             "name": "ci",
             "actor": "checks-app",
             "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success"
+            "conclusion": "failure",
+            "startedAt": "2026-10-01T21:35:42Z",
+            "id": 1
           },
           {
             "name": "ci",
             "actor": "checks-app",
             "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success"
+            "conclusion": "success",
+            "startedAt": "2026-10-01T21:36:01Z",
+            "id": 2
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "kind": "reviewed",
+      "eligible": true
+    },
+    "break": [
+      {
+        "path": "facts.checks",
+        "value": [
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "failure",
+            "startedAt": "2026-10-01T21:36:01Z",
+            "id": 2
+          },
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "success",
+            "startedAt": "2026-10-01T21:35:42Z",
+            "id": 1
+          }
+        ]
+      }
+    ],
+    "defect": "Make the failed run the current one."
+  },
+  {
+    "name": "the current run of a required check decides when an older one succeeded",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.checks",
+        "value": [
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "success",
+            "startedAt": "2026-10-01T21:35:42Z",
+            "id": 1
+          },
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "failure",
+            "startedAt": "2026-10-01T21:36:01Z",
+            "id": 2
           }
         ]
       }
@@ -2749,12 +2808,22 @@
             "name": "ci",
             "actor": "checks-app",
             "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success"
+            "conclusion": "success",
+            "startedAt": "2026-10-01T21:36:01Z",
+            "id": 2
+          },
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "failure",
+            "startedAt": "2026-10-01T21:35:42Z",
+            "id": 1
           }
         ]
       }
     ],
-    "defect": "Repair only the duplicate required check response."
+    "defect": "Make the successful run the current one."
   },
   {
     "name": "head movement before publication cannot approve",

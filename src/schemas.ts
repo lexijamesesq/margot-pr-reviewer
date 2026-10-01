@@ -75,6 +75,10 @@ export const factsSchema = z.strictObject({
       actor: text,
       head: shaSchema,
       conclusion: z.enum(["success", "failure", "pending", "skipped"]),
+      // Recency, for a name that carries several runs on one head (a superseded run
+      // stays in the list). Optional: older recordings lack them and fall back to order.
+      startedAt: z.string().optional(),
+      id: z.number().int().optional(),
     }),
   ),
   history: z.strictObject({
