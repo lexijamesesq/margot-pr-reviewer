@@ -189,6 +189,28 @@ export const publisherSchema = z.strictObject({
   appId: z.number().int().positive(),
   runUrl: z.url(),
 });
+const environmentVariableNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+const ticketingSchema = z
+  .strictObject({
+    server: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]+$/)
+      .refine((server) => server !== "evidence", "The evidence server name is reserved"),
+    command: text,
+    args: z.array(z.string()),
+    env: z
+      .array(environmentVariableNameSchema)
+      .min(1)
+      .refine((names) => new Set(names).size === names.length, "Environment names must be unique"),
+    tools: z
+      .array(text)
+      .min(1)
+      .refine((tools) => new Set(tools).size === tools.length, "Ticketing tools must be unique"),
+  })
+  .refine(
+    ({ server, tools }) => tools.every((tool) => tool.startsWith(`mcp__${server}__`)),
+    "Ticketing tools must address the configured server",
+  );
 export const liveConfigSchema = z.strictObject({
   review: configSchema,
   github: z.strictObject({
@@ -200,7 +222,7 @@ export const liveConfigSchema = z.strictObject({
   jev: z.strictObject({ model: z.string().min(1) }),
   claude: z.strictObject({
     executable: z.string().min(1),
-    linearExecutable: z.string().min(1).optional(),
+    ticketing: ticketingSchema.optional(),
     version: z.string().regex(/^\d+\.\d+\.\d+$/),
     pluginDirectory: z.string().min(1),
     reviewerModel: z.string().min(1),

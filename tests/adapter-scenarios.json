@@ -180,29 +180,29 @@
     }
   },
   {
-    "id": "linear-card-tools",
-    "name": "Configured Linear evidence is granted only to card runs",
-    "defect": "attach the Linear server to the voice invocation"
+    "id": "ticketing-card-tools",
+    "name": "Configured ticket evidence is granted only to card runs",
+    "defect": "attach the configured ticket server to the voice invocation"
   },
   {
-    "id": "linear-cli-token",
-    "name": "The CLI passes its Linear environment token to card runs",
-    "defect": "source mutation: delete the Linear credential spread",
-    "sourceBreak": {
-      "file": "src/cli-services.ts",
-      "from": "      ...(environment.MARGOT_LINEAR_TOKEN ? { linearToken: environment.MARGOT_LINEAR_TOKEN } : {}),\n",
-      "to": ""
-    }
+    "id": "ticketing-cli-environment",
+    "name": "The CLI forwards exactly the configured environment variables",
+    "defect": "include the unrelated process credential in the inspected forwarding boundary"
   },
   {
-    "id": "linear-no-token",
-    "name": "Linear evidence stays detached without a caller token",
-    "defect": "supply a token to the otherwise tokenless invocation"
+    "id": "ticketing-unconfigured",
+    "name": "Ticket evidence stays detached without configuration",
+    "defect": "supply ticket configuration to the otherwise unconfigured invocation"
   },
   {
-    "id": "linear-secret-boundary",
-    "name": "The Linear token stays out of the model prompt and parsed result",
-    "defect": "append the token to the inspected model boundary"
+    "id": "ticketing-unset-environment",
+    "name": "Ticket evidence stays detached when a named environment variable is unset",
+    "defect": "supply the missing named environment variable"
+  },
+  {
+    "id": "ticketing-secret-boundary",
+    "name": "Ticket credentials stay out of the model prompt and parsed result",
+    "defect": "append a credential to the inspected model boundary"
   },
   {
     "id": "truncated-hunk",

@@ -10,7 +10,7 @@ import { jevAdapter } from "../src/adapters/jev.js";
 import { liveServices } from "../src/adapters/live.js";
 import { execute } from "../src/adapters/process.js";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
-import { cliServices } from "../src/cli-services.js";
+import { cliServices, configuredTicketingEnvironment } from "../src/cli-services.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
 import {
@@ -511,9 +511,15 @@ async function fakeClaude(
     envelope?: Record<string, unknown>;
     facts?: typeof facts;
     delta?: string;
-    linearToken?: string;
-    linearEnvironmentToken?: string;
-    linearExecutable?: string;
+    ticketing?: {
+      server: string;
+      command: string;
+      args: string[];
+      env: string[];
+      tools: string[];
+    };
+    ticketingEnvironment?: Record<string, string>;
+    cliEnvironment?: NodeJS.ProcessEnv;
     role?: "card" | "voice";
   } = {},
 ) {
@@ -562,12 +568,12 @@ if (process.argv.includes("--version")) {
     );
     const claude = {
       executable,
-      ...(options.linearExecutable ? { linearExecutable: options.linearExecutable } : {}),
+      ...(options.ticketing ? { ticketing: options.ticketing } : {}),
       version: "0.0.1",
       pluginDirectory: root,
       reviewerModel: "example-model",
     };
-    const adapter = options.linearEnvironmentToken
+    const adapter = options.cliEnvironment
       ? cliServices(
           {
             ...JSON.parse(
@@ -575,11 +581,13 @@ if (process.argv.includes("--version")) {
             ),
             claude,
           },
-          { JEV_KEY: "unused", MARGOT_LINEAR_TOKEN: options.linearEnvironmentToken },
+          { JEV_KEY: "unused", ...options.cliEnvironment },
         ).services
       : claudeAdapter({
           ...claude,
-          ...(options.linearToken ? { linearToken: options.linearToken } : {}),
+          ...(options.ticketingEnvironment
+            ? { ticketingEnvironment: options.ticketingEnvironment }
+            : {}),
         });
     const round = {
       round: options.delta === undefined ? 1 : 2,
@@ -636,17 +644,22 @@ scenario("claude-tools", async () => {
       args[args.indexOf("--setting-sources") + 1] === "",
   };
 });
-const linearTools = [
-  "mcp__linear-tactic__linear_getIssueById",
-  "mcp__linear-tactic__linear_getComments",
-  "mcp__linear-tactic__linear_getProjectById",
-];
+const ticketing = {
+  server: "tickets",
+  command: "/opt/margot/bin/ticket-reader",
+  args: ["--read-only", "--tenant", "example"],
+  env: ["TICKETING_TOKEN", "TICKETING_TENANT"],
+  tools: ["mcp__tickets__get_issue", "mcp__tickets__get_comments"],
+};
 scenario(
-  "linear-card-tools",
+  "ticketing-card-tools",
   async (broken) => {
     const configured = {
-      linearToken: "test-only-linear-token",
-      linearExecutable: "/opt/margot/bin/mcp-linear",
+      ticketing,
+      ticketingEnvironment: {
+        TICKETING_TOKEN: "test-only-ticket-token",
+        TICKETING_TENANT: "test-only-tenant",
+      },
     };
     const card = await fakeClaude(configured);
     const voice = await fakeClaude({ ...configured, role: "voice" });
@@ -656,67 +669,129 @@ scenario(
     const voiceAgent = JSON.parse(voice.args[voice.args.indexOf("--agents") + 1] ?? "{}")[
       "margot-bound"
     ];
-    const cardServer = card.mcp.mcpServers["linear-tactic"];
-    if (broken && cardServer) voice.mcp.mcpServers["linear-tactic"] = cardServer;
+    const cardServer = card.mcp.mcpServers.tickets;
+    if (broken && cardServer) voice.mcp.mcpServers.tickets = cardServer;
     return {
+      cardTicketingServers: Object.keys(card.mcp.mcpServers)
+        .filter((server) => server !== "evidence")
+        .sort(),
       cardServer,
-      cardLinearTools: cardAgent.tools.filter((tool: string) =>
-        tool.startsWith("mcp__linear-tactic__"),
+      cardTicketingTools: cardAgent.tools.filter((tool: string) =>
+        tool.startsWith("mcp__tickets__"),
       ),
-      voiceServer: voice.mcp.mcpServers["linear-tactic"] ?? null,
-      voiceLinearTools: voiceAgent.tools.filter((tool: string) =>
-        tool.startsWith("mcp__linear-tactic__"),
+      voiceTicketingServers: Object.keys(voice.mcp.mcpServers)
+        .filter((server) => server !== "evidence")
+        .sort(),
+      voiceServer: voice.mcp.mcpServers.tickets ?? null,
+      voiceTicketingTools: voiceAgent.tools.filter((tool: string) =>
+        tool.startsWith("mcp__tickets__"),
       ),
     };
   },
   {
+    cardTicketingServers: ["tickets"],
     cardServer: {
-      command: "/opt/margot/bin/mcp-linear",
-      env: { LINEAR_OAUTH_ACCESS_TOKEN: "test-only-linear-token" },
+      command: "/opt/margot/bin/ticket-reader",
+      args: ["--read-only", "--tenant", "example"],
+      env: {
+        TICKETING_TOKEN: "test-only-ticket-token",
+        TICKETING_TENANT: "test-only-tenant",
+      },
     },
-    cardLinearTools: linearTools,
+    cardTicketingTools: ticketing.tools,
+    voiceTicketingServers: [],
     voiceServer: null,
-    voiceLinearTools: [],
+    voiceTicketingTools: [],
   },
 );
 scenario(
-  "linear-cli-token",
-  async () => {
+  "ticketing-cli-environment",
+  async (broken) => {
+    const environment = {
+      JEV_KEY: "unused",
+      TICKETING_TOKEN: "test-only-cli-token",
+      TICKETING_TENANT: "test-only-cli-tenant",
+      UNRELATED_SECRET: "must-not-be-forwarded",
+    };
     const invocation = await fakeClaude({
-      linearEnvironmentToken: "test-only-cli-linear-token",
-      linearExecutable: "/opt/margot/bin/mcp-linear",
+      ticketing,
+      cliEnvironment: environment,
     });
+    const selected = broken ? environment : configuredTicketingEnvironment(ticketing, environment);
+    const forwarded = invocation.mcp.mcpServers.tickets?.env ?? {};
     return {
-      token: invocation.mcp.mcpServers["linear-tactic"]?.env?.LINEAR_OAUTH_ACCESS_TOKEN,
+      selectedKeys: Object.keys(selected).sort(),
+      selectedValues: selected,
+      forwardedKeys: Object.keys(forwarded).sort(),
+      forwardedValues: forwarded,
     };
   },
-  { token: "test-only-cli-linear-token" },
+  {
+    selectedKeys: ["TICKETING_TENANT", "TICKETING_TOKEN"],
+    selectedValues: {
+      TICKETING_TOKEN: "test-only-cli-token",
+      TICKETING_TENANT: "test-only-cli-tenant",
+    },
+    forwardedKeys: ["TICKETING_TENANT", "TICKETING_TOKEN"],
+    forwardedValues: {
+      TICKETING_TOKEN: "test-only-cli-token",
+      TICKETING_TENANT: "test-only-cli-tenant",
+    },
+  },
 );
 scenario(
-  "linear-no-token",
+  "ticketing-unconfigured",
   async (broken) => {
     const invocation = await fakeClaude({
-      linearExecutable: "/opt/margot/bin/mcp-linear",
-      ...(broken ? { linearToken: "unexpected-token" } : {}),
+      ...(broken ? { ticketing } : {}),
+      ticketingEnvironment: {
+        TICKETING_TOKEN: "test-only-ticket-token",
+        TICKETING_TENANT: "test-only-tenant",
+      },
     });
     const agent = JSON.parse(invocation.args[invocation.args.indexOf("--agents") + 1] ?? "{}")[
       "margot-bound"
     ];
     return {
-      server: invocation.mcp.mcpServers["linear-tactic"] ?? null,
-      tools: agent.tools.filter((tool: string) => tool.startsWith("mcp__linear-tactic__")),
+      server: invocation.mcp.mcpServers.tickets ?? null,
+      tools: agent.tools.filter((tool: string) => tool.startsWith("mcp__tickets__")),
     };
   },
   { server: null, tools: [] },
 );
-scenario("linear-secret-boundary", async (broken) => {
-  const token = "test-only-linear-secret";
+scenario(
+  "ticketing-unset-environment",
+  async (broken) => {
+    const invocation = await fakeClaude({
+      ticketing,
+      ticketingEnvironment: {
+        TICKETING_TOKEN: "test-only-ticket-token",
+        ...(broken ? { TICKETING_TENANT: "unexpected-tenant" } : {}),
+      },
+    });
+    const agent = JSON.parse(invocation.args[invocation.args.indexOf("--agents") + 1] ?? "{}")[
+      "margot-bound"
+    ];
+    return {
+      server: invocation.mcp.mcpServers.tickets ?? null,
+      tools: agent.tools.filter((tool: string) => tool.startsWith("mcp__tickets__")),
+    };
+  },
+  { server: null, tools: [] },
+);
+scenario("ticketing-secret-boundary", async (broken) => {
+  const secrets = ["test-only-ticket-secret", "test-only-tenant-secret"] as const;
   const invocation = await fakeClaude({
-    linearToken: token,
-    linearExecutable: "/opt/margot/bin/mcp-linear",
+    ticketing,
+    ticketingEnvironment: {
+      TICKETING_TOKEN: secrets[0],
+      TICKETING_TENANT: secrets[1],
+    },
   });
   const exposed = `${JSON.stringify(invocation.result)}\n${invocation.stdin}`;
-  return { ok: !(broken ? `${exposed}\n${token}` : exposed).includes(token) };
+  return {
+    ok: secrets.every((secret) => !(broken ? `${exposed}\n${secret}` : exposed).includes(secret)),
+  };
 });
 scenario(
   "claude-stdin-delta",

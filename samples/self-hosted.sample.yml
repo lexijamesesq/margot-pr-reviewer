@@ -31,7 +31,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           JEV_KEY: ${{ secrets.EXAMPLE_JEV_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.EXAMPLE_CLAUDE_OAUTH_TOKEN }}
-          MARGOT_LINEAR_TOKEN: ${{ secrets.EXAMPLE_LINEAR_TOKEN }}
+          YOUR_TICKETING_CREDENTIAL_ENV_VAR: ${{ secrets.EXAMPLE_TICKETING_CREDENTIAL }}
         run: |
           "$RUNNER_TEMP/YOUR_REVIEW_INSTALL/node_modules/.bin/margot-review" \
             /path/to/your/request.json /path/to/your/config.json /path/to/your/result.json

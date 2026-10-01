@@ -18,7 +18,7 @@ export function liveServices(
     jevKey: string;
     githubToken?: string;
     writeToken?: string;
-    linearToken?: string;
+    ticketingEnvironment?: Record<string, string>;
   },
   onResponse?: ClaudeOptions["onResponse"],
 ) {
@@ -60,7 +60,9 @@ export function liveServices(
       ...config.claude,
       ...(config.github.gh ? { gh: config.github.gh } : {}),
       ...(credentials.githubToken ? { githubToken: credentials.githubToken } : {}),
-      ...(credentials.linearToken ? { linearToken: credentials.linearToken } : {}),
+      ...(credentials.ticketingEnvironment
+        ? { ticketingEnvironment: credentials.ticketingEnvironment }
+        : {}),
       ...(onResponse ? { onResponse } : {}),
     }),
     bundle: (commit, context) => resolveBundle(config.claude.pluginDirectory, commit, context),

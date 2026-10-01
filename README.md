@@ -150,8 +150,10 @@ only the repository read tools. Optional `claude.references` maps a reference na
 to `{ repository, head }`, where `head` is an immutable 40-character SHA; it enables
 `read_reference` only for those configured pins. No shell, PR code execution, GitHub mutation, local
 arbitrary filesystem read or arbitrary URL fetch is available to the model. A runner must
-keep its trusted package and bundle immutable during a review. Ticket tools are
-not connected in this slice; a card must report unavailable evidence.
+keep its trusted package and bundle immutable during a review. Optional
+`claude.ticketing` configuration gives card runs, but never the voice, a named
+MCP server and an exact tool allowlist. The consumer's own MCP server for their
+ticketing system goes here.
 
 Jev uses native fetch and bounded p-retry backoff. Terminal authentication errors
 fail immediately; exhausted transient failures cannot approve. Its Noul responses
@@ -243,10 +245,11 @@ It is never forwarded to the model environment or read-only evidence server.
 The CLI calls `liveServices(...).run(request)`; API consumers using publication
 must use that lifecycle too. Calling its publisher outside the lifecycle fails.
 
-For self-hosted Linear evidence, the caller mints a read-scoped OAuth application
-token and supplies it as `MARGOT_LINEAR_TOKEN`. Install
-`@tacticlaunch/mcp-linear@1.4.3` beside the Claude CLI and set
-`claude.linearExecutable` to its `mcp-linear` executable; both are optional.
+The optional `claude.ticketing` block specifies `server`, `command`, `args`,
+`env`, and `tools`. `env` contains environment-variable names, never values;
+Margot forwards only those named values to the ticketing server. If the block is
+absent or any named value is empty or unset, Margot attaches neither the server
+nor its tools.
 
 The publisher adopts the caller's check by App, name and head, records run
 ownership and refuses to let a superseded invocation close the newer run's check.
