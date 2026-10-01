@@ -90,6 +90,8 @@ const voice = (status: "established" | "dismissed" = "dismissed", id = "verify-R
 const core = (cards: Card[], v: Voice | null): ReviewCore => ({
   request: requestSchema.parse(source.request),
   classification: "functional",
+  routeAnswer: null,
+  riskAnswer: null,
   cards,
   voice: v,
   decision: {

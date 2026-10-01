@@ -1,5 +1,51 @@
 [
   {
+    "name": "result records the route answer Jev returned",
+    "recording": "council-clear",
+    "patches": [],
+    "expected": {
+      "routeAnswerMatches": true
+    },
+    "break": [],
+    "sourceBreak": {
+      "file": "src/review.ts",
+      "from": "        classification,\n        routeAnswer,\n        riskAnswer,\n        cards,",
+      "to": "        classification,\n        routeAnswer: null,\n        riskAnswer,\n        cards,"
+    },
+    "defect": "Drop Jev's route answer from the result."
+  },
+  {
+    "name": "functional result records the risk answer Jev returned",
+    "recording": "council-clear",
+    "patches": [],
+    "expected": {
+      "riskAnswerMatches": true
+    },
+    "break": [],
+    "sourceBreak": {
+      "file": "src/review.ts",
+      "from": "        classification,\n        routeAnswer,\n        riskAnswer,\n        cards,",
+      "to": "        classification,\n        routeAnswer,\n        riskAnswer: null,\n        cards,"
+    },
+    "defect": "Drop Jev's risk answer from the result."
+  },
+  {
+    "name": "mechanical result records null Jev answers when no question was asked",
+    "recording": "mechanical-bump",
+    "patches": [],
+    "expected": {
+      "routeAnswer": null,
+      "riskAnswer": null
+    },
+    "break": [
+      {
+        "path": "classification.functional",
+        "value": 1
+      }
+    ],
+    "defect": "Route the mechanical change so a Jev answer is recorded."
+  },
+  {
     "name": "recorded mechanical bump spends no Claude",
     "recording": "mechanical-bump",
     "patches": [],

@@ -145,6 +145,8 @@ export async function review(
     } else {
       const cards: Card[] = [];
       let rating = rate(null, false, config);
+      let routeAnswer: ReviewCore["routeAnswer"] = null;
+      let riskAnswer: ReviewCore["riskAnswer"] = null;
       let voice: Voice | null = null;
       let bundle: Bundle | undefined;
       const loadBundle = async (): Promise<Bundle> => {
@@ -170,14 +172,14 @@ export async function review(
           files: scope.files,
           fileCount: scope.files.length,
         };
-        const route = routeSchema.parse(
+        routeAnswer = routeSchema.parse(
           await call("route", (c) => services.route(scopedFacts, classification, questions, c)),
         );
-        const path = reviewPath(classification, route, config);
+        const path = reviewPath(classification, routeAnswer, config);
         if (path.council || recalled.length > 0) {
           const selected = [
             ...new Set([
-              ...(path.council ? selectCards(route, classification, config) : []),
+              ...(path.council ? selectCards(routeAnswer, classification, config) : []),
               ...recalled,
             ]),
           ];
@@ -226,15 +228,13 @@ export async function review(
             const ids = cards.flatMap((c) => c.findings.map((f) => f.id));
             if (new Set(ids).size !== ids.length) throw new Error("Duplicate finding IDs");
           }
-          if (path.risk)
-            rating = rate(
-              riskSchema.parse(
-                await call("risk", (c) => services.risk(facts, cards, riskQuestions, c)),
-              ),
-              cards.length === 0,
-              config,
+          if (path.risk) {
+            riskAnswer = riskSchema.parse(
+              await call("risk", (c) => services.risk(facts, cards, riskQuestions, c)),
             );
-          if (needsVoice(cards, rating, route.confidence, config)) {
+            rating = rate(riskAnswer, cards.length === 0, config);
+          }
+          if (needsVoice(cards, rating, routeAnswer.confidence, config)) {
             const resolved = await loadBundle();
             voice = voiceSchema.parse(
               await call("voice", (c) =>
@@ -258,6 +258,8 @@ export async function review(
       const core: ReviewCore = {
         request,
         classification,
+        routeAnswer,
+        riskAnswer,
         cards,
         voice,
         decision: decide(classification, facts, config, rating, voice),

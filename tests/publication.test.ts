@@ -553,6 +553,8 @@ scenario(
       {
         request: value.request,
         classification: value.classification,
+        routeAnswer: value.routeAnswer,
+        riskAnswer: value.riskAnswer,
         cards: [card],
         voice: null,
         decision: value.decision,
