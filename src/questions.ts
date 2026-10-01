@@ -1,4 +1,4 @@
-/** Engine-owned Jev questions. Card playbooks and Margot's voice stay in publish-skills. */
+/** Margot's own Jev questions. Card playbooks and Margot's voice stay in publish-skills. */
 // P1 from flag-build/harness/profiles.py, measured in three runs of 75 PRs.
 // Keep the complete definition and endings: shortening them changed classification.
 const definition =

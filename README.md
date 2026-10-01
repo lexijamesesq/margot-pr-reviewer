@@ -1,6 +1,6 @@
 # Margot PR reviewer
 
-An ESM TypeScript engine for PR reviews and later-round verification, with live GitHub, Jev and
+Margot, the PR reviewer, as an ESM TypeScript package: first-round review and later-round verification, with live GitHub, Jev and
 Claude Code adapters. Live operation defaults to shadow mode: it records proposed publication
 and auto-merge disarming locally. Explicit GitHub mode posts checks and native
 reviews, and disarms holds. Later rounds read authenticated review ledgers.
@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.4.0.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.4.1.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -41,7 +41,7 @@ if (result.kind === "reviewed") {
 The seven recordings preserve historical review behavior under neutral names.
 Five exact historical diffs were retrieved from public GitHub. Classifier answers,
 check receipts and publication are reconstructed where the original harness lacked
-compatible evidence; each file labels that limitation. These prove recorded engine
+compatible evidence; each file labels that limitation. These prove recorded
 wiring, not current live model quality.
 See [recording provenance](docs/recordings.md). Change a card finding and its voice
 disposition to see clearance disappear; `scripts/consumer-smoke.mjs` demonstrates
@@ -108,7 +108,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.4.0.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.4.1.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
@@ -124,7 +124,7 @@ setup is supplied. The composite `action.yml` calls the same installed
 the Action does not install software, check out a PR or mint credentials. The sample
 workflow uses a placeholder action reference that must be pinned to a real commit.
 Store request/config outside the PR checkout. Do not use the shadow job as a merge gate.
-The output includes the engine result, proposed local actions and raw model responses.
+The output includes Margot's result, proposed local actions and raw model responses.
 It exits nonzero for infrastructure/validation errors; a reviewed hold remains a valid result.
 
 The GitHub adapter paginates files, checks and reviews; rejects draft/fork PRs,
@@ -198,7 +198,7 @@ own standing, advisory and dismissed entries. The compare JSON file list is not 
 inventory. A rebase, unreadable compare or incomplete diff keeps the ledger and
 uses the already validated full PR evidence. Every card with an open finding
 is recalled, including on mechanical and editorial paths. Matching, fix evidence,
-dismissal reopening and late attribution remain model judgments. The engine does
+dismissal reopening and late attribution remain model judgments. Margot does
 not infer finding identity or fixes from line-number arithmetic.
 
 From round two, MINOR findings become advisory. A missed finding blocks only at
@@ -256,6 +256,7 @@ and are not issues. These are the operator's three labels, not Python arithmetic
 The saved receipt retains old diagnostic counters for compatibility; the
 visible tally is derived from the listed entries. Oversize history fails closed.
 
-The self-hosted sample workflow installs the exact release. No hosted-runner
+The self-hosted sample workflow installs the exact release asset and verifies its
+SHA-256 before installing. No hosted-runner
 sample is supplied. Publication remains subject to a consumer's reversible live
 canary; see `docs/SLICE4.md` for the local proof and its limits.
