@@ -303,5 +303,15 @@
     "id": "ledger-human-quote",
     "name": "Newer human marker quote does not hide the trusted App ledger",
     "defect": "Replace the harmless quote with an untrusted trailing ledger block"
+  },
+  {
+    "id": "ledger-retry-040-receipt",
+    "name": "A receipt written by Margot 0.4.0 remains readable",
+    "defect": "Remove the null defaults for Jev answers",
+    "sourceBreak": {
+      "file": "src/schemas.ts",
+      "from": "  routeAnswer: routeSchema.nullable().default(null),\n  riskAnswer: riskSchema.nullable().default(null),",
+      "to": "  routeAnswer: routeSchema.nullable(),\n  riskAnswer: riskSchema.nullable(),"
+    }
   }
 ]

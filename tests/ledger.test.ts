@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { deflateSync } from "node:zlib";
 import { Octokit } from "octokit";
 import { expect, it } from "vitest";
 import { githubAdapter } from "../src/adapters/github.js";
@@ -548,6 +549,39 @@ scenario(
     };
   },
   { equal: true, calls: ["facts", "head"] },
+);
+scenario(
+  "ledger-retry-040-receipt",
+  async () => {
+    const { result, r } = await engine(false);
+    if (result.kind !== "reviewed" || !result.ledger.receipt) throw new Error("baseline");
+    const {
+      routeAnswer: _routeAnswer,
+      riskAnswer: _riskAnswer,
+      ...review040
+    } = result.ledger.receipt.review;
+    const { receipt, ...ledger040 } = result.ledger;
+    const receipt040 = { ...receipt, review: review040 };
+    const transport040 = {
+      ...ledger040,
+      v: 1,
+      receipt_v2: deflateSync(Buffer.from(JSON.stringify(receipt040)), { level: 9 }).toString(
+        "base64",
+      ),
+    };
+    const review040Body = `review\n<!-- margot-ledger:v1 ${Buffer.from(
+      JSON.stringify(transport040),
+    ).toString("base64")} -->`;
+    const f = factsSchema.parse(r.facts);
+    f.history = {
+      complete: true,
+      priorLedger: true,
+      reviews: [{ ...posted(result.ledger), body: review040Body }],
+    };
+    r.facts = f;
+    return await review(r.request, r.config, recordedServices(r));
+  },
+  { kind: "reviewed", routeAnswer: null, riskAnswer: null },
 );
 scenario(
   "ledger-retry-checks",

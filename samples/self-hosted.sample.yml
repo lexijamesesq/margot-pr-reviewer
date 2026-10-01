@@ -1,5 +1,5 @@
-# Node 22+, gh, the pinned Claude CLI and publish-skills must be provisioned
-# on this isolated self-hosted runner. Config and request are trusted inputs.
+# gh, the pinned Claude CLI and publish-skills must be provisioned on this
+# isolated self-hosted runner. Config and request are trusted inputs.
 # Replace the version and the SHA-256 with the values on the GitHub release you pin.
 name: Margot shadow
 on: workflow_dispatch

@@ -223,8 +223,8 @@ export const decisionSchema = z.strictObject({
 export const reviewCoreSchema = z.strictObject({
   request: requestSchema,
   classification: classSchema,
-  routeAnswer: routeSchema.nullable(),
-  riskAnswer: riskSchema.nullable(),
+  routeAnswer: routeSchema.nullable().default(null),
+  riskAnswer: riskSchema.nullable().default(null),
   cards: z.array(cardSchema),
   voice: voiceSchema.nullable(),
   decision: decisionSchema,
