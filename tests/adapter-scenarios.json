@@ -185,6 +185,16 @@
     "defect": "attach the Linear server to the voice invocation"
   },
   {
+    "id": "linear-cli-token",
+    "name": "The CLI passes its Linear environment token to card runs",
+    "defect": "source mutation: delete the Linear credential spread",
+    "sourceBreak": {
+      "file": "src/cli-services.ts",
+      "from": "      ...(environment.MARGOT_LINEAR_TOKEN ? { linearToken: environment.MARGOT_LINEAR_TOKEN } : {}),\n",
+      "to": ""
+    }
+  },
+  {
     "id": "linear-no-token",
     "name": "Linear evidence stays detached without a caller token",
     "defect": "supply a token to the otherwise tokenless invocation"

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
-import { liveConfigSchema, liveServices } from "./adapters/live.js";
+import { liveConfigSchema } from "./adapters/live.js";
+import { cliServices } from "./cli-services.js";
 import { requestSchema } from "./schemas.js";
 
 async function main(args: string[]) {
@@ -9,19 +10,8 @@ async function main(args: string[]) {
     throw new Error("Usage: margot-review REQUEST.json CONFIG.json OUTPUT.json");
   const request = requestSchema.parse(JSON.parse(await readFile(requestFile, "utf8")));
   const config = liveConfigSchema.parse(JSON.parse(await readFile(configFile, "utf8")));
-  const jevKey = process.env.JEV_KEY;
-  if (!jevKey) throw new Error("JEV_KEY is required");
   const responses: unknown[] = [];
-  const { run, actions } = liveServices(
-    config,
-    {
-      jevKey,
-      ...(process.env.GH_TOKEN ? { githubToken: process.env.GH_TOKEN } : {}),
-      ...(process.env.MARGOT_WRITE_TOKEN ? { writeToken: process.env.MARGOT_WRITE_TOKEN } : {}),
-      ...(process.env.MARGOT_LINEAR_TOKEN ? { linearToken: process.env.MARGOT_LINEAR_TOKEN } : {}),
-    },
-    (r) => responses.push(r),
-  );
+  const { run, actions } = cliServices(config, process.env, (r) => responses.push(r));
   const result = await run(request);
   await writeFile(outputFile, `${JSON.stringify({ result, actions, responses }, null, 2)}\n`, {
     mode: 0o600,

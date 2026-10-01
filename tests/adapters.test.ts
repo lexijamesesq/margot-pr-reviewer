@@ -10,6 +10,7 @@ import { jevAdapter } from "../src/adapters/jev.js";
 import { liveServices } from "../src/adapters/live.js";
 import { execute } from "../src/adapters/process.js";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
+import { cliServices } from "../src/cli-services.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
 import {
@@ -511,6 +512,7 @@ async function fakeClaude(
     facts?: typeof facts;
     delta?: string;
     linearToken?: string;
+    linearEnvironmentToken?: string;
     linearExecutable?: string;
     role?: "card" | "voice";
   } = {},
@@ -558,14 +560,27 @@ if (process.argv.includes("--version")) {
 }`,
       { mode: 0o700 },
     );
-    const adapter = claudeAdapter({
+    const claude = {
       executable,
       ...(options.linearExecutable ? { linearExecutable: options.linearExecutable } : {}),
       version: "0.0.1",
       pluginDirectory: root,
       reviewerModel: "example-model",
-      ...(options.linearToken ? { linearToken: options.linearToken } : {}),
-    });
+    };
+    const adapter = options.linearEnvironmentToken
+      ? cliServices(
+          {
+            ...JSON.parse(
+              await readFile(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
+            ),
+            claude,
+          },
+          { JEV_KEY: "unused", MARGOT_LINEAR_TOKEN: options.linearEnvironmentToken },
+        ).services
+      : claudeAdapter({
+          ...claude,
+          ...(options.linearToken ? { linearToken: options.linearToken } : {}),
+        });
     const round = {
       round: options.delta === undefined ? 1 : 2,
       priorHead: options.delta === undefined ? null : "b".repeat(40),
@@ -663,6 +678,19 @@ scenario(
     voiceServer: null,
     voiceLinearTools: [],
   },
+);
+scenario(
+  "linear-cli-token",
+  async () => {
+    const invocation = await fakeClaude({
+      linearEnvironmentToken: "test-only-cli-linear-token",
+      linearExecutable: "/opt/margot/bin/mcp-linear",
+    });
+    return {
+      token: invocation.mcp.mcpServers["linear-tactic"]?.env?.LINEAR_OAUTH_ACCESS_TOKEN,
+    };
+  },
+  { token: "test-only-cli-linear-token" },
 );
 scenario(
   "linear-no-token",
