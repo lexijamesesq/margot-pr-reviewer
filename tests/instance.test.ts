@@ -10,16 +10,16 @@ import {
   validateDeployment,
   writeGitHubOutput,
 } from "../src/instance.js";
-import { runInstanceCommand } from "../src/instance-cli.js";
+import { instanceExitCode, runInstanceCommand } from "../src/instance-cli.js";
 
 const broken = process.env.MARGOT_INSTANCE_BREAK;
 const engineRootPlaceholder = `\${ENGINE_ROOT}`;
 const head = "a".repeat(40);
 const base = "b".repeat(40);
 const deployment = {
-  version: "0.5.3",
+  version: "0.6.0",
   packageReference:
-    "https://github.com/example/margot-pr-reviewer/releases/download/v0.5.3/margot-pr-reviewer-0.5.3.tgz",
+    "https://github.com/example/margot-pr-reviewer/releases/download/v0.6.0/margot-pr-reviewer-0.6.0.tgz",
   packageIntegrity: `sha512-${"A".repeat(86)}==`,
   packageSha256: "c".repeat(64),
 };
@@ -176,7 +176,7 @@ it.each([
     {
       deployment: {
         ...deployment,
-        packageReference: deployment.packageReference.replaceAll("0.5.3", "0.5.4"),
+        packageReference: deployment.packageReference.replaceAll("0.6.0", "0.6.1"),
       },
     },
   ],
@@ -212,7 +212,7 @@ it.each([
     `${deployment.packageReference}#x`,
   ],
 ] as const)("%s: %s", (id, _name, replacement) => {
-  const packageReference = replacement.includes("margot-pr-reviewer-0.5.3.tgz")
+  const packageReference = replacement.includes("margot-pr-reviewer-0.6.0.tgz")
     ? replacement
     : deployment.packageReference.replace("https://github.com", replacement);
   expect(() =>
@@ -340,6 +340,17 @@ it.each([
   expect((error as Error).message).toBe(reason);
 });
 
+it("signals a superseded head to shell callers with EX_TEMPFAIL", async () => {
+  const candidate =
+    broken === "stale-signal"
+      ? { ...pull, head: { ...pull.head, repo: { full_name: "fork/project" } } }
+      : { ...pull, head: { ...pull.head, sha: "f".repeat(40) } };
+  const error = await captureError(() => bindRequest(bindInput(), readPull(candidate)));
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toBe("Margot: not reviewed: stale");
+  expect(instanceExitCode(error)).toBe(75);
+});
+
 it("rejects an invalid trusted configuration before reading GitHub", async () => {
   let reads = 0;
   const invalid = { ...config, claude: { ...config.claude, executable: "" } };
@@ -451,6 +462,90 @@ it("rejects unknown deployment command arguments", async () => {
   const error = await captureError(() => runInstanceCommand(args, {}));
   expect(error).toBeInstanceOf(Error);
   expect((error as Error).message).toMatch(/Unknown argument/);
+});
+
+it("rejects duplicate flags after parseArgs", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "margot-command-duplicate-"));
+  directories.push(directory);
+  const deploymentFile = join(directory, "deployment.json");
+  await writeFile(deploymentFile, JSON.stringify(deployment));
+  const args = [
+    "validate-deployment",
+    "--deployment",
+    deploymentFile,
+    "--release-repository",
+    "example/margot-pr-reviewer",
+    "--repository",
+    "example/project",
+    "--enrolled-repositories",
+    '["example/project"]',
+    "--authority-repositories",
+    '["example/project"]',
+  ];
+  if (broken !== "command-duplicate") args.push("--repository", "example/project");
+  const error = await captureError(() => runInstanceCommand(args, {}));
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toBe("Duplicate argument: --repository");
+});
+
+it("maps the close-stranded-check command into the guarded closer", async () => {
+  const writes: Record<string, unknown>[] = [];
+  const client = {
+    rest: {
+      repos: {
+        listPullRequestsAssociatedWithCommit: async () => ({
+          data: [{ number: 7, state: "open", head: { sha: head } }],
+        }),
+      },
+      checks: {
+        listForRef: async () => ({
+          data: {
+            check_runs: [
+              {
+                id: 88,
+                status: "in_progress",
+                details_url: "https://github.com/example/control/actions/runs/1",
+              },
+            ],
+          },
+        }),
+        update: async (input: Record<string, unknown>) => {
+          writes.push(input);
+          return { data: input };
+        },
+      },
+    },
+  };
+  const result = await runInstanceCommand(
+    [
+      "close-stranded-check",
+      "--repository",
+      "example/project",
+      "--pr",
+      "7",
+      "--head",
+      head,
+      "--app-id",
+      "42",
+      "--own-runs",
+      "https://github.com/example/control/actions/runs/",
+      "--own-run-id",
+      "1",
+      "--route-result",
+      "success",
+      "--review-result",
+      "success",
+      "--published",
+      broken === "command-closer" ? "true" : "false",
+      "--stop-reason",
+      "floor",
+    ],
+    { GH_TOKEN: "write-token" },
+    client as never,
+  );
+  expect(result).toMatchObject({ action: "closed" });
+  expect(writes).toHaveLength(1);
+  expect(writes[0]).toMatchObject({ conclusion: "action_required" });
 });
 
 it("maps every bind-request CLI flag into the bound files", async () => {

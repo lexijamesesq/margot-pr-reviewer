@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.5.3.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.6.0.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -110,7 +110,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.5.3.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.6.0.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
@@ -121,10 +121,8 @@ margot-review /absolute/runtime/request.json /absolute/runtime/config.json /abso
 ```
 
 All sample files use `*.sample.*` and contain placeholders. Only self-hosted runner
-setup is supplied. The composite `action.yml` calls the same installed
-`margot-review` executable. Provision its exact tarball version on the runner first;
-the Action does not install software, check out a PR or mint credentials. The sample
-workflow uses a placeholder action reference that must be pinned to a real commit.
+setup is supplied. The sample workflow calls the hash-verified installed
+`margot-review` executable directly.
 Store request/config outside the PR checkout. Do not use the shadow job as a merge gate.
 The output includes Margot's result, proposed local actions and raw model responses.
 It exits nonzero for infrastructure/validation errors; a reviewed hold remains a valid result.
@@ -164,7 +162,9 @@ checks, and authority are explicit inputs. Authority selects GitHub publication;
 otherwise the configuration is a before-head shadow. Authority requires a nonempty,
 invocation-unique `--run-url` so the publisher can reject a superseded writer.
 `${ENGINE_ROOT}` in the Claude executable, plugin directory, and ticketing command is
-replaced with the trusted root.
+replaced with the trusted root. A moved head keeps the `Margot: not reviewed: stale`
+refusal and exits 75 (`EX_TEMPFAIL`); the other refusals exit 1. This lets a
+shell caller set `stop_reason=stale` without reading the PR again.
 
 ```sh
 margot-instance bind-request \
@@ -174,6 +174,28 @@ margot-instance bind-request \
   --protected-paths '[".github/**"]' --allowed-skipped-checks '[]' \
   --run-url "$RUN_URL"
 ```
+
+`close-stranded-check` is the hosted cleanup decision as a package command. It acts
+when routing failed, review failed, or a selected package reports
+`--published false`; an empty `--published` means the package was not selected. It
+checks commit-to-PR membership, shared live-head ownership, the open
+`review / margot` (then legacy `margot`) check, and run ownership before PATCHing.
+The token is read from `GH_TOKEN`.
+
+```sh
+margot-instance close-stranded-check \
+  --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
+  --app-id "$MARGOT_APP_ID" --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
+  --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
+  --published "$PUBLISHED" --stop-reason "$STOP_REASON"
+```
+
+A superseded head (`--stop-reason stale`) closes `skipped` and names the current
+head's short SHA; a cancelled stopped job
+closes `cancelled`; every other close is `action_required`. A floor stop uses the
+preflight title. All other stops say Margot stopped before a verdict. The command
+exits 0 after a close or when there is nothing safe to close, and 2 on a GitHub
+read/write failure.
 
 The consumer still owns estate policy derivation, token minting, package download,
 and exact-byte verification. The SHA-256 check before installation is deliberately the
