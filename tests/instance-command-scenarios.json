@@ -100,9 +100,9 @@
     "defect": "Restore publisher configuration to the rejected authority input"
   },
   {
-    "id": "run-url-publisher",
-    "name": "requires publisher configuration when a run URL is supplied",
-    "defect": "Remove the run URL from the rejected publisher-free input"
+    "id": "command-shadow-run-url",
+    "name": "binds the sample config as a shadow when a run URL is supplied",
+    "defect": "Grant authority to the publisher-free sample binding"
   },
   {
     "id": "authority-run-url",

@@ -1,12 +1,12 @@
 # Instance command break receipts
 
-Generated 2026-10-01T17:32:36.282Z, Node v26.3.1. Baseline and restored suite: 287/287 passed. Each of 35 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-01T19:06:38.609Z, Node v26.3.1. Baseline and restored suite: 287/287 passed. Each of 35 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Instance command cases exercise exact release references, enrolment, authority selection, GitHub outputs, request admission, trusted policy binding, CLI flag mapping, and bound-file writes.
 
 Most breaks are controlled service/input counterexamples selected by MARGOT_INSTANCE_BREAK; error cases repair their bad input. They do not claim exhaustive source mutation coverage or independence. Declared source mutations run without that variable and are identified in the manifest. No live service or paid model call occurs in the harness.
 
-Manifest SHA-256: 27f66f248b4a9bc84b456fdb5d511ae8f14e4fdbcfb6bc0db8e0b1c9c20db490. Reproduce: npm run test:instance-command-breaks.
+Manifest SHA-256: ed813801d38f9203ab7500cb1efe28f9cbcccc4d03f1998356b5e411f3759557. Reproduce: npm run test:instance-command-breaks.
 
 | Test | Deliberate break | Observed |
 | --- | --- | --- |
@@ -30,7 +30,7 @@ Manifest SHA-256: 27f66f248b4a9bc84b456fdb5d511ae8f14e4fdbcfb6bc0db8e0b1c9c20db4
 | binds trusted policy and current PR facts for authority | Replace the bound required-check list | 1 failed; 286 passed |
 | binds non-authority execution as a before-head shadow | Grant authority to the shadow binding | 1 failed; 286 passed |
 | requires publisher configuration for authority | Restore publisher configuration to the rejected authority input | 1 failed; 286 passed |
-| requires publisher configuration when a run URL is supplied | Remove the run URL from the rejected publisher-free input | 1 failed; 286 passed |
+| binds the sample config as a shadow when a run URL is supplied | Grant authority to the publisher-free sample binding | 1 failed; 286 passed |
 | requires a unique run URL for authority | Restore a run URL to the rejected authority input | 1 failed; 286 passed |
 | resolves runtime placeholders in Claude and ticketing paths | Expect paths under a different runtime root | 1 failed; 286 passed |
 | closed: rejects a closed PR | Restore the open pull request | 1 failed; 286 passed |

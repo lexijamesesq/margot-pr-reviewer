@@ -16,8 +16,8 @@ const deploymentSchema = z.object({
   packageSha256: z.string().regex(/^[a-f0-9]{64}$/),
 });
 const pullSchema = z.object({
-  state: z.literal("open"),
-  draft: z.literal(false),
+  state: z.string(),
+  draft: z.boolean(),
   base: z.object({ sha: shaSchema }),
   head: z.object({ sha: shaSchema, repo: z.object({ full_name: repositorySchema }) }),
 });
@@ -104,13 +104,18 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
 
   const suppliedConfig = liveConfigSchema.parse(input.config);
   const pull = pullSchema.parse(await readPull(repository, input.pr));
+  // Refusals name their reason; a closed or draft PR is a decision, not a schema error.
+  if (pull.state !== "open") throw new Error("Pull request is not open");
+  if (pull.draft) throw new Error("Pull request is a draft");
   if (pull.head.repo.full_name !== repository || pull.head.sha !== expectedHead)
     throw new Error("Stale or untrusted request");
 
   const config = structuredClone(suppliedConfig);
-  if (input.authority && !config.publisher)
-    throw new Error("Authority requires publisher configuration");
-  if (input.authority && !input.runUrl) throw new Error("Authority requires a run URL");
+  if (input.authority) {
+    if (!config.publisher) throw new Error("Authority requires publisher configuration");
+    if (!input.runUrl) throw new Error("Authority requires a run URL");
+    config.publisher.runUrl = input.runUrl;
+  }
   config.review.requiredChecks = input.requiredChecks;
   config.review.protectedPaths = input.protectedPaths;
   config.review.allowedSkippedChecks = input.allowedSkippedChecks;
@@ -126,10 +131,6 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
       config.claude.ticketing.command,
       input.engineRoot,
     );
-  if (input.runUrl !== undefined) {
-    if (!config.publisher) throw new Error("Run URL requires publisher configuration");
-    config.publisher.runUrl = input.runUrl;
-  }
   const boundConfig = liveConfigSchema.parse(config);
   const request = requestSchema.parse({
     repository,

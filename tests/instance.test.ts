@@ -297,17 +297,6 @@ it("requires publisher configuration for authority", async () => {
   expect((error as Error).message).toMatch(/publisher/);
 });
 
-it("requires publisher configuration when a run URL is supplied", async () => {
-  const { publisher: _publisher, ...withoutPublisher } = config;
-  const withRunUrl = bindInput({ authority: false, config: withoutPublisher });
-  const { runUrl: _runUrl, ...withoutRunUrl } = withRunUrl;
-  const error = await captureError(() =>
-    bindRequest(broken === "run-url-publisher" ? withoutRunUrl : withRunUrl, readPull()),
-  );
-  expect(error).toBeInstanceOf(Error);
-  expect((error as Error).message).toMatch(/publisher/);
-});
-
 it("requires a unique run URL for authority", async () => {
   const withRunUrl = bindInput();
   const { runUrl: _runUrl, ...withoutRunUrl } = withRunUrl;
@@ -329,15 +318,26 @@ it("resolves runtime placeholders in Claude and ticketing paths", async () => {
 });
 
 it.each([
-  ["closed", "rejects a closed PR", { state: "closed" }],
-  ["draft", "rejects a draft PR", { draft: true }],
-  ["fork", "rejects a fork PR", { head: { ...pull.head, repo: { full_name: "fork/project" } } }],
-  ["moved", "rejects a moved head", { head: { ...pull.head, sha: "f".repeat(40) } }],
-] as const)("%s: %s", async (id, _name, changed) => {
+  ["closed", "rejects a closed PR", { state: "closed" }, "Pull request is not open"],
+  ["draft", "rejects a draft PR", { draft: true }, "Pull request is a draft"],
+  [
+    "fork",
+    "rejects a fork PR",
+    { head: { ...pull.head, repo: { full_name: "fork/project" } } },
+    "Stale or untrusted request",
+  ],
+  [
+    "moved",
+    "rejects a moved head",
+    { head: { ...pull.head, sha: "f".repeat(40) } },
+    "Stale or untrusted request",
+  ],
+] as const)("%s: %s", async (id, _name, changed, reason) => {
   const candidate = broken === id ? pull : { ...pull, ...changed };
-  expect(await captureError(() => bindRequest(bindInput(), readPull(candidate)))).toBeInstanceOf(
-    Error,
-  );
+  const error = await captureError(() => bindRequest(bindInput(), readPull(candidate)));
+  // A refusal states its reason in plain words; a schema dump is not a refusal.
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toBe(reason);
 });
 
 it("rejects an invalid trusted configuration before reading GitHub", async () => {
@@ -474,7 +474,24 @@ it("maps every bind-request CLI flag into the bound files", async () => {
     allowedSkippedChecks: ["ci / skipped"],
   });
   expect(bound.github.shadowBeforeHead).toBe(true);
-  expect(bound.publisher.runUrl).toBe("https://github.com/example/control/actions/runs/3");
+  expect(bound.publisher.runUrl).toBe("https://github.com/example/control/actions/runs/1");
+});
+
+it("binds the sample config as a shadow when a run URL is supplied", async () => {
+  const fixture = await bindCommandFixture(broken === "command-shadow-run-url" ? "true" : "false");
+  const configFile = fixture.args.indexOf("--config") + 1;
+  fixture.args[configFile] = "samples/config.sample.json";
+  const error = await captureError(async () => {
+    const result = await runInstanceCommand(
+      fixture.args,
+      { GH_TOKEN: "read-token" },
+      fixture.client as never,
+    );
+    if (!("config" in result)) throw new Error("Expected bound request");
+    expect(result.config.review.publication).toBe("none");
+    expect(result.config.publisher).toBeUndefined();
+  });
+  expect(error).toBeUndefined();
 });
 
 it("rejects an explicitly empty bind-request run URL", async () => {
