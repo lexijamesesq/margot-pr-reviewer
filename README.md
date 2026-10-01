@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.4.1.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.4.2.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -108,7 +108,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.4.1.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.4.2.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
@@ -150,8 +150,10 @@ only the repository read tools. Optional `claude.references` maps a reference na
 to `{ repository, head }`, where `head` is an immutable 40-character SHA; it enables
 `read_reference` only for those configured pins. No shell, PR code execution, GitHub mutation, local
 arbitrary filesystem read or arbitrary URL fetch is available to the model. A runner must
-keep its trusted package and bundle immutable during a review. Ticket tools are
-not connected in this slice; a card must report unavailable evidence.
+keep its trusted package and bundle immutable during a review. Optional
+`claude.ticketing` configuration gives card runs, but never the voice, a named
+MCP server and an exact tool allowlist. The consumer's own MCP server for their
+ticketing system goes here.
 
 Jev uses native fetch and bounded p-retry backoff. Terminal authentication errors
 fail immediately; exhausted transient failures cannot approve. Its Noul responses
@@ -242,6 +244,12 @@ and pull-request write access, plus the permission needed to disable auto-merge.
 It is never forwarded to the model environment or read-only evidence server.
 The CLI calls `liveServices(...).run(request)`; API consumers using publication
 must use that lifecycle too. Calling its publisher outside the lifecycle fails.
+
+The optional `claude.ticketing` block specifies `server`, `command`, `args`,
+`env`, and `tools`. `env` contains environment-variable names, never values;
+Margot forwards only those named values to the ticketing server. If the block is
+absent or any named value is empty or unset, Margot attaches neither the server
+nor its tools.
 
 The publisher adopts the caller's check by App, name and head, records run
 ownership and refuses to let a superseded invocation close the newer run's check.

@@ -14,7 +14,12 @@ export type LiveConfig = z.infer<typeof liveConfigSchema>;
 /** Shadow by default; explicit GitHub mode owns publication through run(). */
 export function liveServices(
   configInput: LiveConfig,
-  credentials: { jevKey: string; githubToken?: string; writeToken?: string },
+  credentials: {
+    jevKey: string;
+    githubToken?: string;
+    writeToken?: string;
+    ticketingEnvironment?: Record<string, string>;
+  },
   onResponse?: ClaudeOptions["onResponse"],
 ) {
   const config = liveConfigSchema.parse(configInput);
@@ -55,6 +60,9 @@ export function liveServices(
       ...config.claude,
       ...(config.github.gh ? { gh: config.github.gh } : {}),
       ...(credentials.githubToken ? { githubToken: credentials.githubToken } : {}),
+      ...(credentials.ticketingEnvironment
+        ? { ticketingEnvironment: credentials.ticketingEnvironment }
+        : {}),
       ...(onResponse ? { onResponse } : {}),
     }),
     bundle: (commit, context) => resolveBundle(config.claude.pluginDirectory, commit, context),

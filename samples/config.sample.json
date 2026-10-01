@@ -35,6 +35,13 @@
   },
   "claude": {
     "executable": "/path/to/your/claude",
+    "ticketing": {
+      "server": "YOUR_TICKETING_MCP_SERVER_NAME",
+      "command": "/path/to/your/ticketing-mcp-server",
+      "args": ["YOUR_SERVER_ARGUMENT"],
+      "env": ["YOUR_TICKETING_CREDENTIAL_ENV_VAR"],
+      "tools": ["mcp__YOUR_TICKETING_MCP_SERVER_NAME__YOUR_READ_TOOL"]
+    },
     "version": "0.0.0",
     "pluginDirectory": "/path/to/your/publish-skills",
     "reviewerModel": "YOUR_REVIEWER_MODEL"

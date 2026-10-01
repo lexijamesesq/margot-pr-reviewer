@@ -16,7 +16,7 @@ jobs:
           node-version: 22
       - name: Install the exact release asset after verifying it
         env:
-          VERSION: 0.4.1
+          VERSION: 0.4.2
           SHA256: YOUR_RECORDED_SHA256_FROM_THE_RELEASE
         run: |
           set -euo pipefail
@@ -31,6 +31,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           JEV_KEY: ${{ secrets.EXAMPLE_JEV_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.EXAMPLE_CLAUDE_OAUTH_TOKEN }}
+          YOUR_TICKETING_CREDENTIAL_ENV_VAR: ${{ secrets.EXAMPLE_TICKETING_CREDENTIAL }}
         run: |
           "$RUNNER_TEMP/YOUR_REVIEW_INSTALL/node_modules/.bin/margot-review" \
             /path/to/your/request.json /path/to/your/config.json /path/to/your/result.json

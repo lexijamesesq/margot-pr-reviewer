@@ -10,6 +10,7 @@ import { jevAdapter } from "../src/adapters/jev.js";
 import { liveServices } from "../src/adapters/live.js";
 import { execute } from "../src/adapters/process.js";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
+import { cliServices, configuredTicketingEnvironment } from "../src/cli-services.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
 import {
@@ -52,6 +53,9 @@ async function rejects(fn: () => Promise<unknown>) {
 }
 function cardText() {
   return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
+}
+function voiceText() {
+  return "outcome: APPROVED\nband: LOW\nband_reason: Bounded.\nsummary: Clear.\nestablished:\ndismissed:\n";
 }
 function github(
   overrides: {
@@ -507,6 +511,16 @@ async function fakeClaude(
     envelope?: Record<string, unknown>;
     facts?: typeof facts;
     delta?: string;
+    ticketing?: {
+      server: string;
+      command: string;
+      args: string[];
+      env: string[];
+      tools: string[];
+    };
+    ticketingEnvironment?: Record<string, string>;
+    cliEnvironment?: NodeJS.ProcessEnv;
+    role?: "card" | "voice";
   } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
@@ -516,13 +530,17 @@ async function fakeClaude(
       join(root, "agents/pr-reviewer.md"),
       "---\ndescription: Test reviewer\nmodel: inherit\n---\nPinned test law.\n",
     );
+    await writeFile(
+      join(root, "agents/margot.md"),
+      "---\ndescription: Test voice\nmodel: inherit\n---\nPinned test voice.\n",
+    );
     const executable = join(root, "claude.cjs"),
       capture = join(root, "capture.json");
     const envelope = {
       type: "result",
       subtype: "success",
       is_error: false,
-      result: cardText(),
+      result: options.role === "voice" ? voiceText() : cardText(),
       total_cost_usd: 0,
       ...options.envelope,
     };
@@ -540,6 +558,7 @@ if (process.argv.includes("--version")) {
   const evidence = JSON.parse(mcp.mcpServers.evidence.env.MARGOT_EVIDENCE);
   fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({
     args,
+    mcp,
     stdin: fs.readFileSync(0, "utf8"),
     diff: fs.readFileSync(evidence.diffPath, "utf8"),
   }));
@@ -547,33 +566,69 @@ if (process.argv.includes("--version")) {
 }`,
       { mode: 0o700 },
     );
-    await claudeAdapter({
+    const claude = {
       executable,
+      ...(options.ticketing ? { ticketing: options.ticketing } : {}),
       version: "0.0.1",
       pluginDirectory: root,
       reviewerModel: "example-model",
-    }).card(
-      {
-        facts: options.facts ?? facts,
-        name: "safety",
-        classification: "functional",
-        cardPath: join(root, "skills/pr-council/playbooks/safety.md"),
-        agent: "publish:pr-reviewer",
-        round: {
-          round: options.delta === undefined ? 1 : 2,
-          priorHead: options.delta === undefined ? null : "b".repeat(40),
-          full: options.delta === undefined,
-          diff: options.delta ?? (options.facts ?? facts).diff,
-          files: (options.facts ?? facts).files,
-          entries: [],
-        },
-      },
-      context(),
-    );
-    return JSON.parse(await readFile(capture, "utf8")) as {
-      args: string[];
-      stdin: string;
-      diff: string;
+    };
+    const adapter = options.cliEnvironment
+      ? cliServices(
+          {
+            ...JSON.parse(
+              await readFile(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
+            ),
+            claude,
+          },
+          { JEV_KEY: "unused", ...options.cliEnvironment },
+        ).services
+      : claudeAdapter({
+          ...claude,
+          ...(options.ticketingEnvironment
+            ? { ticketingEnvironment: options.ticketingEnvironment }
+            : {}),
+        });
+    const round = {
+      round: options.delta === undefined ? 1 : 2,
+      priorHead: options.delta === undefined ? null : "b".repeat(40),
+      full: options.delta === undefined,
+      diff: options.delta ?? (options.facts ?? facts).diff,
+      files: (options.facts ?? facts).files,
+      entries: [],
+    };
+    const result =
+      options.role === "voice"
+        ? await adapter.voice(
+            {
+              facts: options.facts ?? facts,
+              classification: "functional",
+              cards: [],
+              rating: {} as never,
+              agent: "publish:margot",
+              round,
+            },
+            context(),
+          )
+        : await adapter.card(
+            {
+              facts: options.facts ?? facts,
+              name: "safety",
+              classification: "functional",
+              cardPath: join(root, "skills/pr-council/playbooks/safety.md"),
+              agent: "publish:pr-reviewer",
+              round,
+            },
+            context(),
+          );
+    return {
+      ...(JSON.parse(await readFile(capture, "utf8")) as {
+        args: string[];
+        mcp: { mcpServers: Record<string, { command: string; env?: Record<string, string> }> };
+        stdin: string;
+        diff: string;
+      }),
+      result,
     };
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -587,6 +642,155 @@ scenario("claude-tools", async () => {
       args.includes("--strict-mcp-config") &&
       args.includes("--restricted") &&
       args[args.indexOf("--setting-sources") + 1] === "",
+  };
+});
+const ticketing = {
+  server: "tickets",
+  command: "/opt/margot/bin/ticket-reader",
+  args: ["--read-only", "--tenant", "example"],
+  env: ["TICKETING_TOKEN", "TICKETING_TENANT"],
+  tools: ["mcp__tickets__get_issue", "mcp__tickets__get_comments"],
+};
+scenario(
+  "ticketing-card-tools",
+  async (broken) => {
+    const configured = {
+      ticketing,
+      ticketingEnvironment: {
+        TICKETING_TOKEN: "test-only-ticket-token",
+        TICKETING_TENANT: "test-only-tenant",
+      },
+    };
+    const card = await fakeClaude(configured);
+    const voice = await fakeClaude({ ...configured, role: "voice" });
+    const cardAgent = JSON.parse(card.args[card.args.indexOf("--agents") + 1] ?? "{}")[
+      "margot-bound"
+    ];
+    const voiceAgent = JSON.parse(voice.args[voice.args.indexOf("--agents") + 1] ?? "{}")[
+      "margot-bound"
+    ];
+    const cardServer = card.mcp.mcpServers.tickets;
+    if (broken && cardServer) voice.mcp.mcpServers.tickets = cardServer;
+    return {
+      cardTicketingServers: Object.keys(card.mcp.mcpServers)
+        .filter((server) => server !== "evidence")
+        .sort(),
+      cardServer,
+      cardTicketingTools: cardAgent.tools.filter((tool: string) =>
+        tool.startsWith("mcp__tickets__"),
+      ),
+      voiceTicketingServers: Object.keys(voice.mcp.mcpServers)
+        .filter((server) => server !== "evidence")
+        .sort(),
+      voiceServer: voice.mcp.mcpServers.tickets ?? null,
+      voiceTicketingTools: voiceAgent.tools.filter((tool: string) =>
+        tool.startsWith("mcp__tickets__"),
+      ),
+    };
+  },
+  {
+    cardTicketingServers: ["tickets"],
+    cardServer: {
+      command: "/opt/margot/bin/ticket-reader",
+      args: ["--read-only", "--tenant", "example"],
+      env: {
+        TICKETING_TOKEN: "test-only-ticket-token",
+        TICKETING_TENANT: "test-only-tenant",
+      },
+    },
+    cardTicketingTools: ticketing.tools,
+    voiceTicketingServers: [],
+    voiceServer: null,
+    voiceTicketingTools: [],
+  },
+);
+scenario(
+  "ticketing-cli-environment",
+  async (broken) => {
+    const environment = {
+      JEV_KEY: "unused",
+      TICKETING_TOKEN: "test-only-cli-token",
+      TICKETING_TENANT: "test-only-cli-tenant",
+      UNRELATED_SECRET: "must-not-be-forwarded",
+    };
+    const invocation = await fakeClaude({
+      ticketing,
+      cliEnvironment: environment,
+    });
+    const selected = broken ? environment : configuredTicketingEnvironment(ticketing, environment);
+    const forwarded = invocation.mcp.mcpServers.tickets?.env ?? {};
+    return {
+      selectedKeys: Object.keys(selected).sort(),
+      selectedValues: selected,
+      forwardedKeys: Object.keys(forwarded).sort(),
+      forwardedValues: forwarded,
+    };
+  },
+  {
+    selectedKeys: ["TICKETING_TENANT", "TICKETING_TOKEN"],
+    selectedValues: {
+      TICKETING_TOKEN: "test-only-cli-token",
+      TICKETING_TENANT: "test-only-cli-tenant",
+    },
+    forwardedKeys: ["TICKETING_TENANT", "TICKETING_TOKEN"],
+    forwardedValues: {
+      TICKETING_TOKEN: "test-only-cli-token",
+      TICKETING_TENANT: "test-only-cli-tenant",
+    },
+  },
+);
+scenario(
+  "ticketing-unconfigured",
+  async (broken) => {
+    const invocation = await fakeClaude({
+      ...(broken ? { ticketing } : {}),
+      ticketingEnvironment: {
+        TICKETING_TOKEN: "test-only-ticket-token",
+        TICKETING_TENANT: "test-only-tenant",
+      },
+    });
+    const agent = JSON.parse(invocation.args[invocation.args.indexOf("--agents") + 1] ?? "{}")[
+      "margot-bound"
+    ];
+    return {
+      server: invocation.mcp.mcpServers.tickets ?? null,
+      tools: agent.tools.filter((tool: string) => tool.startsWith("mcp__tickets__")),
+    };
+  },
+  { server: null, tools: [] },
+);
+scenario(
+  "ticketing-unset-environment",
+  async (broken) => {
+    const invocation = await fakeClaude({
+      ticketing,
+      ticketingEnvironment: {
+        TICKETING_TOKEN: "test-only-ticket-token",
+        ...(broken ? { TICKETING_TENANT: "unexpected-tenant" } : {}),
+      },
+    });
+    const agent = JSON.parse(invocation.args[invocation.args.indexOf("--agents") + 1] ?? "{}")[
+      "margot-bound"
+    ];
+    return {
+      server: invocation.mcp.mcpServers.tickets ?? null,
+      tools: agent.tools.filter((tool: string) => tool.startsWith("mcp__tickets__")),
+    };
+  },
+  { server: null, tools: [] },
+);
+scenario("ticketing-secret-boundary", async (broken) => {
+  const secrets = ["test-only-ticket-secret", "test-only-tenant-secret"] as const;
+  const invocation = await fakeClaude({
+    ticketing,
+    ticketingEnvironment: {
+      TICKETING_TOKEN: secrets[0],
+      TICKETING_TENANT: secrets[1],
+    },
+  });
+  const exposed = `${JSON.stringify(invocation.result)}\n${invocation.stdin}`;
+  return {
+    ok: secrets.every((secret) => !(broken ? `${exposed}\n${secret}` : exposed).includes(secret)),
   };
 });
 scenario(
