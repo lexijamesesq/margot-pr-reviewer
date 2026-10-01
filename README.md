@@ -193,6 +193,13 @@ TypeScript restores the exact saved receipt. Earlier compressed v2 blocks remain
 readable. Decoding has a one-MiB limit. Oversized
 results fail rather than silently dropping open findings or dismissals.
 
+### 0.4.1 receipt compatibility
+
+Margot 0.4.1 reads receipts written by 0.4.0; Margot 0.4.0 does not read receipts
+written by 0.4.1. This boundary is acceptable because 0.4.0 has never published
+a receipt (shadow only, publication none) and will not; the rollback target during
+the canary is the Python runtime, not 0.4.0.
+
 Cards review the complete unified delta, restricted to the PR's files, plus their
 own standing, advisory and dismissed entries. The compare JSON file list is not used as an
 inventory. A rebase, unreadable compare or incomplete diff keeps the ledger and

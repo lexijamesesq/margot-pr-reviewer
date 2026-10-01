@@ -324,21 +324,15 @@ export function ledgerBlock(ledger: Ledger): string {
   const raw = Buffer.from(JSON.stringify(ledger));
   if (raw.length > 1048576) throw new Error("Ledger exceeds decoded budget");
   const { receipt, ...fields } = ledger;
-  const writtenReceipt = receipt
-    ? (() => {
-        const { routeAnswer: _routeAnswer, riskAnswer: _riskAnswer, ...review } = receipt.review;
-        return { ...receipt, review };
-      })()
-    : undefined;
   const transport =
     ledger.v === 2
       ? Buffer.from(
           JSON.stringify({
             ...fields,
             v: 1,
-            receipt_v2: deflateSync(Buffer.from(JSON.stringify(writtenReceipt)), {
-              level: 9,
-            }).toString("base64"),
+            receipt_v2: deflateSync(Buffer.from(JSON.stringify(receipt)), { level: 9 }).toString(
+              "base64",
+            ),
           }),
         )
       : raw;
