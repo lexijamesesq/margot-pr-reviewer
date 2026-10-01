@@ -53,6 +53,9 @@ async function rejects(fn: () => Promise<unknown>) {
 function cardText() {
   return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
 }
+function voiceText() {
+  return "outcome: APPROVED\nband: LOW\nband_reason: Bounded.\nsummary: Clear.\nestablished:\ndismissed:\n";
+}
 function github(
   overrides: {
     pageTwo?: boolean;
@@ -507,6 +510,9 @@ async function fakeClaude(
     envelope?: Record<string, unknown>;
     facts?: typeof facts;
     delta?: string;
+    linearToken?: string;
+    linearExecutable?: string;
+    role?: "card" | "voice";
   } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
@@ -516,13 +522,17 @@ async function fakeClaude(
       join(root, "agents/pr-reviewer.md"),
       "---\ndescription: Test reviewer\nmodel: inherit\n---\nPinned test law.\n",
     );
+    await writeFile(
+      join(root, "agents/margot.md"),
+      "---\ndescription: Test voice\nmodel: inherit\n---\nPinned test voice.\n",
+    );
     const executable = join(root, "claude.cjs"),
       capture = join(root, "capture.json");
     const envelope = {
       type: "result",
       subtype: "success",
       is_error: false,
-      result: cardText(),
+      result: options.role === "voice" ? voiceText() : cardText(),
       total_cost_usd: 0,
       ...options.envelope,
     };
@@ -540,6 +550,7 @@ if (process.argv.includes("--version")) {
   const evidence = JSON.parse(mcp.mcpServers.evidence.env.MARGOT_EVIDENCE);
   fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({
     args,
+    mcp,
     stdin: fs.readFileSync(0, "utf8"),
     diff: fs.readFileSync(evidence.diffPath, "utf8"),
   }));
@@ -547,33 +558,54 @@ if (process.argv.includes("--version")) {
 }`,
       { mode: 0o700 },
     );
-    await claudeAdapter({
+    const adapter = claudeAdapter({
       executable,
+      ...(options.linearExecutable ? { linearExecutable: options.linearExecutable } : {}),
       version: "0.0.1",
       pluginDirectory: root,
       reviewerModel: "example-model",
-    }).card(
-      {
-        facts: options.facts ?? facts,
-        name: "safety",
-        classification: "functional",
-        cardPath: join(root, "skills/pr-council/playbooks/safety.md"),
-        agent: "publish:pr-reviewer",
-        round: {
-          round: options.delta === undefined ? 1 : 2,
-          priorHead: options.delta === undefined ? null : "b".repeat(40),
-          full: options.delta === undefined,
-          diff: options.delta ?? (options.facts ?? facts).diff,
-          files: (options.facts ?? facts).files,
-          entries: [],
-        },
-      },
-      context(),
-    );
-    return JSON.parse(await readFile(capture, "utf8")) as {
-      args: string[];
-      stdin: string;
-      diff: string;
+      ...(options.linearToken ? { linearToken: options.linearToken } : {}),
+    });
+    const round = {
+      round: options.delta === undefined ? 1 : 2,
+      priorHead: options.delta === undefined ? null : "b".repeat(40),
+      full: options.delta === undefined,
+      diff: options.delta ?? (options.facts ?? facts).diff,
+      files: (options.facts ?? facts).files,
+      entries: [],
+    };
+    const result =
+      options.role === "voice"
+        ? await adapter.voice(
+            {
+              facts: options.facts ?? facts,
+              classification: "functional",
+              cards: [],
+              rating: {} as never,
+              agent: "publish:margot",
+              round,
+            },
+            context(),
+          )
+        : await adapter.card(
+            {
+              facts: options.facts ?? facts,
+              name: "safety",
+              classification: "functional",
+              cardPath: join(root, "skills/pr-council/playbooks/safety.md"),
+              agent: "publish:pr-reviewer",
+              round,
+            },
+            context(),
+          );
+    return {
+      ...(JSON.parse(await readFile(capture, "utf8")) as {
+        args: string[];
+        mcp: { mcpServers: Record<string, { command: string; env?: Record<string, string> }> };
+        stdin: string;
+        diff: string;
+      }),
+      result,
     };
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -588,6 +620,75 @@ scenario("claude-tools", async () => {
       args.includes("--restricted") &&
       args[args.indexOf("--setting-sources") + 1] === "",
   };
+});
+const linearTools = [
+  "mcp__linear-tactic__linear_getIssueById",
+  "mcp__linear-tactic__linear_getComments",
+  "mcp__linear-tactic__linear_getProjectById",
+];
+scenario(
+  "linear-card-tools",
+  async (broken) => {
+    const configured = {
+      linearToken: "test-only-linear-token",
+      linearExecutable: "/opt/margot/bin/mcp-linear",
+    };
+    const card = await fakeClaude(configured);
+    const voice = await fakeClaude({ ...configured, role: "voice" });
+    const cardAgent = JSON.parse(card.args[card.args.indexOf("--agents") + 1] ?? "{}")[
+      "margot-bound"
+    ];
+    const voiceAgent = JSON.parse(voice.args[voice.args.indexOf("--agents") + 1] ?? "{}")[
+      "margot-bound"
+    ];
+    const cardServer = card.mcp.mcpServers["linear-tactic"];
+    if (broken && cardServer) voice.mcp.mcpServers["linear-tactic"] = cardServer;
+    return {
+      cardServer,
+      cardLinearTools: cardAgent.tools.filter((tool: string) =>
+        tool.startsWith("mcp__linear-tactic__"),
+      ),
+      voiceServer: voice.mcp.mcpServers["linear-tactic"] ?? null,
+      voiceLinearTools: voiceAgent.tools.filter((tool: string) =>
+        tool.startsWith("mcp__linear-tactic__"),
+      ),
+    };
+  },
+  {
+    cardServer: {
+      command: "/opt/margot/bin/mcp-linear",
+      env: { LINEAR_OAUTH_ACCESS_TOKEN: "test-only-linear-token" },
+    },
+    cardLinearTools: linearTools,
+    voiceServer: null,
+    voiceLinearTools: [],
+  },
+);
+scenario(
+  "linear-no-token",
+  async (broken) => {
+    const invocation = await fakeClaude({
+      linearExecutable: "/opt/margot/bin/mcp-linear",
+      ...(broken ? { linearToken: "unexpected-token" } : {}),
+    });
+    const agent = JSON.parse(invocation.args[invocation.args.indexOf("--agents") + 1] ?? "{}")[
+      "margot-bound"
+    ];
+    return {
+      server: invocation.mcp.mcpServers["linear-tactic"] ?? null,
+      tools: agent.tools.filter((tool: string) => tool.startsWith("mcp__linear-tactic__")),
+    };
+  },
+  { server: null, tools: [] },
+);
+scenario("linear-secret-boundary", async (broken) => {
+  const token = "test-only-linear-secret";
+  const invocation = await fakeClaude({
+    linearToken: token,
+    linearExecutable: "/opt/margot/bin/mcp-linear",
+  });
+  const exposed = `${JSON.stringify(invocation.result)}\n${invocation.stdin}`;
+  return { ok: !(broken ? `${exposed}\n${token}` : exposed).includes(token) };
 });
 scenario(
   "claude-stdin-delta",

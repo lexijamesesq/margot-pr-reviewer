@@ -180,6 +180,21 @@
     }
   },
   {
+    "id": "linear-card-tools",
+    "name": "Configured Linear evidence is granted only to card runs",
+    "defect": "attach the Linear server to the voice invocation"
+  },
+  {
+    "id": "linear-no-token",
+    "name": "Linear evidence stays detached without a caller token",
+    "defect": "supply a token to the otherwise tokenless invocation"
+  },
+  {
+    "id": "linear-secret-boundary",
+    "name": "The Linear token stays out of the model prompt and parsed result",
+    "defect": "append the token to the inspected model boundary"
+  },
+  {
     "id": "truncated-hunk",
     "name": "A partial final hunk cannot claim complete facts",
     "defect": "Restore the truncated hunk line counts"

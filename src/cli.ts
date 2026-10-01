@@ -18,6 +18,7 @@ async function main(args: string[]) {
       jevKey,
       ...(process.env.GH_TOKEN ? { githubToken: process.env.GH_TOKEN } : {}),
       ...(process.env.MARGOT_WRITE_TOKEN ? { writeToken: process.env.MARGOT_WRITE_TOKEN } : {}),
+      ...(process.env.MARGOT_LINEAR_TOKEN ? { linearToken: process.env.MARGOT_LINEAR_TOKEN } : {}),
     },
     (r) => responses.push(r),
   );

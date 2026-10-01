@@ -35,6 +35,7 @@
   },
   "claude": {
     "executable": "/path/to/your/claude",
+    "linearExecutable": "/path/to/your/mcp-linear",
     "version": "0.0.0",
     "pluginDirectory": "/path/to/your/publish-skills",
     "reviewerModel": "YOUR_REVIEWER_MODEL"

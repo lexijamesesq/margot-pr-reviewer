@@ -200,6 +200,7 @@ export const liveConfigSchema = z.strictObject({
   jev: z.strictObject({ model: z.string().min(1) }),
   claude: z.strictObject({
     executable: z.string().min(1),
+    linearExecutable: z.string().min(1).optional(),
     version: z.string().regex(/^\d+\.\d+\.\d+$/),
     pluginDirectory: z.string().min(1),
     reviewerModel: z.string().min(1),

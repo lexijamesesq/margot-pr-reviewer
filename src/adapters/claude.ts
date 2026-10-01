@@ -12,6 +12,7 @@ import { parseCard, parseVoice } from "./prose.js";
 export type ClaudeOptions = z.infer<typeof liveConfigSchema>["claude"] & {
   gh?: string;
   githubToken?: string;
+  linearToken?: string;
   onResponse?: (response: {
     role: string;
     raw: string;
@@ -77,8 +78,24 @@ export function claudeAdapter(options: ClaudeOptions) {
             ...(options.githubToken ? { GH_TOKEN: options.githubToken } : {}),
           },
         },
+        ...(card && options.linearToken && options.linearExecutable
+          ? {
+              "linear-tactic": {
+                command: options.linearExecutable,
+                env: { LINEAR_OAUTH_ACCESS_TOKEN: options.linearToken },
+              },
+            }
+          : {}),
       },
     };
+    const linearTools =
+      card && options.linearToken && options.linearExecutable
+        ? [
+            "mcp__linear-tactic__linear_getIssueById",
+            "mcp__linear-tactic__linear_getComments",
+            "mcp__linear-tactic__linear_getProjectById",
+          ]
+        : [];
     const tools = [
       "mcp__evidence__read_file",
       "mcp__evidence__read_diff",
@@ -86,6 +103,7 @@ export function claudeAdapter(options: ClaudeOptions) {
       "mcp__evidence__list_files",
       "mcp__evidence__search_file",
       ...(card ? ["mcp__evidence__read_card"] : []),
+      ...linearTools,
     ];
     // Bind the pinned agent's unchanged prose and model to the runtime's read-only tools.
     // Plugin frontmatter tool lists override CLI --tools, so never use them as our grant.

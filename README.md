@@ -243,6 +243,11 @@ It is never forwarded to the model environment or read-only evidence server.
 The CLI calls `liveServices(...).run(request)`; API consumers using publication
 must use that lifecycle too. Calling its publisher outside the lifecycle fails.
 
+For self-hosted Linear evidence, the caller mints a read-scoped OAuth application
+token and supplies it as `MARGOT_LINEAR_TOKEN`. Install
+`@tacticlaunch/mcp-linear@1.4.3` beside the Claude CLI and set
+`claude.linearExecutable` to its `mcp-linear` executable; both are optional.
+
 The publisher adopts the caller's check by App, name and head, records run
 ownership and refuses to let a superseded invocation close the newer run's check.
 It withdraws earlier App approvals before reevaluation, keeps the required check
