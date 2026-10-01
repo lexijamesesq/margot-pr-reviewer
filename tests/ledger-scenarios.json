@@ -151,7 +151,7 @@
   },
   {
     "id": "ledger-retry",
-    "name": "Same head reuses identical result without paid calls",
+    "name": "Same head reuses the receipt without paid calls",
     "defect": "Change routing configuration after saving the result"
   },
   {
@@ -305,13 +305,18 @@
     "defect": "Replace the harmless quote with an untrusted trailing ledger block"
   },
   {
+    "id": "ledger-write-040-receipt",
+    "name": "Written receipts retain the Margot 0.4.0 shape",
+    "defect": "Write Jev answers into the receipt",
+    "sourceBreak": {
+      "file": "src/ledger.ts",
+      "from": "        return { ...receipt, review };",
+      "to": "        return { ...receipt, review: receipt.review };"
+    }
+  },
+  {
     "id": "ledger-retry-040-receipt",
     "name": "A receipt written by Margot 0.4.0 remains readable",
-    "defect": "Remove the null defaults for Jev answers",
-    "sourceBreak": {
-      "file": "src/schemas.ts",
-      "from": "  routeAnswer: routeSchema.nullable().default(null),\n  riskAnswer: riskSchema.nullable().default(null),",
-      "to": "  routeAnswer: routeSchema.nullable(),\n  riskAnswer: riskSchema.nullable(),"
-    }
+    "defect": "Replace the 0.4.0 fixture with a receipt carrying a Jev answer"
   }
 ]

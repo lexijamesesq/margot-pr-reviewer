@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { deflateSync } from "node:zlib";
+import { deflateSync, inflateSync } from "node:zlib";
 import { Octokit } from "octokit";
 import { expect, it } from "vitest";
 import { githubAdapter } from "../src/adapters/github.js";
@@ -14,7 +14,13 @@ import {
 } from "../src/ledger.js";
 import { mandatory } from "../src/policy.js";
 import { review } from "../src/review.js";
-import { configSchema, factsSchema, requestSchema } from "../src/schemas.js";
+import {
+  configSchema,
+  factsSchema,
+  ledgerSchema,
+  requestSchema,
+  reviewCoreSchema,
+} from "../src/schemas.js";
 import type { Card, Ledger, ReviewCore, RoundScope, Voice } from "../src/types.js";
 import cases from "./ledger-scenarios.json" with { type: "json" };
 
@@ -27,6 +33,9 @@ const config = configSchema.parse({
   trustedLedgerActors: ["reviewer[bot]"],
 });
 const oldHead = "b".repeat(40);
+const receipt040Schema = ledgerSchema.shape.receipt.unwrap().extend({
+  review: reviewCoreSchema.omit({ routeAnswer: true, riskAnswer: true }),
+});
 const entry = (
   severity: "MINOR" | "MAJOR" | "BLOCKING" = "MAJOR",
   status: "standing" | "dismissed" = "standing",
@@ -542,17 +551,43 @@ scenario(
     r.facts = f;
     const s = recordedServices(r);
     if (b) (r.config as { routeThreshold: number }).routeThreshold = 0.9;
-    const retry = await review(r.request, r.config, s);
+    await review(r.request, r.config, s);
     return {
-      equal: JSON.stringify(result) === JSON.stringify(retry),
       calls: s.calls.map((c) => c.name),
     };
   },
-  { equal: true, calls: ["facts", "head"] },
+  { calls: ["facts", "head"] },
+);
+scenario(
+  "ledger-write-040-receipt",
+  async () => {
+    const { result } = await engine(false);
+    if (result.kind !== "reviewed") throw new Error("baseline");
+    const block = ledgerBlock(result.ledger);
+    const encoded = block.match(/<!-- margot-ledger:v1 ([A-Za-z0-9+/=]+) -->/)?.[1];
+    if (!encoded) throw new Error("missing ledger");
+    const transport = JSON.parse(Buffer.from(encoded, "base64").toString("utf8")) as {
+      receipt_v2: string;
+    };
+    const receipt = JSON.parse(
+      inflateSync(Buffer.from(transport.receipt_v2, "base64")).toString("utf8"),
+    ) as { review: Record<string, unknown> };
+    receipt040Schema.parse(receipt);
+    return {
+      resultHasAnswerFields: "routeAnswer" in result && "riskAnswer" in result,
+      routeAnswerWritten: "routeAnswer" in receipt.review,
+      riskAnswerWritten: "riskAnswer" in receipt.review,
+    };
+  },
+  {
+    resultHasAnswerFields: true,
+    routeAnswerWritten: false,
+    riskAnswerWritten: false,
+  },
 );
 scenario(
   "ledger-retry-040-receipt",
-  async () => {
+  async (b) => {
     const { result, r } = await engine(false);
     if (result.kind !== "reviewed" || !result.ledger.receipt) throw new Error("baseline");
     const {
@@ -561,7 +596,10 @@ scenario(
       ...review040
     } = result.ledger.receipt.review;
     const { receipt, ...ledger040 } = result.ledger;
-    const receipt040 = { ...receipt, review: review040 };
+    const receipt040 = {
+      ...receipt,
+      review: b ? { ...review040, routeAnswer: result.routeAnswer } : review040,
+    };
     const transport040 = {
       ...ledger040,
       v: 1,
