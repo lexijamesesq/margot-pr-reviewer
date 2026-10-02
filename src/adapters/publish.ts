@@ -193,11 +193,14 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     );
     // Complete all check writes before the approving review. The review-count rule
     // must hold even when the review check is informational, not required.
-    const reviewConclusion = decision.holdReasons.includes("calibration")
-      ? "action_required"
-      : decision.mergeEligible
-        ? "success"
-        : "neutral";
+    // Python's gate: Margot's own ERROR ruling is `action_required`, so an unreviewed PR
+    // never satisfies the required check; held and author-action verdicts stay `neutral`.
+    const reviewConclusion =
+      decision.holdReasons.includes("calibration") || decision.outcome === "ERROR"
+        ? "action_required"
+        : decision.mergeEligible
+          ? "success"
+          : "neutral";
     await check(
       r,
       config.checks.review,
@@ -208,7 +211,9 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         ? "Margot: approved"
         : decision.outcome === "APPROVED"
           ? `held for the operator: ${heldReason(decision)}`
-          : `Margot: ${decision.outcome}`,
+          : decision.outcome === "ERROR"
+            ? "not reviewed (error)"
+            : `Margot: ${decision.outcome}`,
       `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
       checkText(review),
       c,

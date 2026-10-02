@@ -2576,28 +2576,6 @@
     "defect": "Repair only the missing explicit card path response."
   },
   {
-    "name": "incomplete selected card cannot approve",
-    "recording": "council-clear",
-    "patches": [
-      {
-        "path": "cards.safety.completion",
-        "value": "incomplete"
-      }
-    ],
-    "expected": {
-      "kind": "error",
-      "stage": "card:safety",
-      "eligible": false
-    },
-    "break": [
-      {
-        "path": "cards.safety.completion",
-        "value": "completed"
-      }
-    ],
-    "defect": "Repair only the incomplete selected card response."
-  },
-  {
     "name": "wrong returned card cannot approve",
     "recording": "council-clear",
     "patches": [
@@ -3123,7 +3101,7 @@
     "patches": [
       {
         "path": "voice.outcome",
-        "value": "ERROR"
+        "value": "UNDECIDED"
       }
     ],
     "expected": {
@@ -3942,5 +3920,59 @@
         "value": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
       }
     ]
+  },
+  {
+    "name": "Margot's own ERROR ruling is a held verdict, never an exception",
+    "recording": "invalid-accounting",
+    "patches": [
+      {
+        "path": "voice.outcome",
+        "value": "ERROR"
+      }
+    ],
+    "expected": {
+      "kind": "reviewed",
+      "outcome": "ERROR",
+      "eligible": false,
+      "writes": 1
+    },
+    "break": [
+      {
+        "path": "voice.outcome",
+        "value": "CHANGES_REQUESTED"
+      }
+    ],
+    "defect": "Rule CHANGES_REQUESTED with the finding unaccounted; the verdict must then be refused."
+  },
+  {
+    "name": "a card that did not complete cannot clear without the voice",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "cards.safety.completion",
+        "value": "incomplete"
+      },
+      {
+        "path": "cards.safety.completionReason",
+        "value": "the fixture is in another repository"
+      }
+    ],
+    "expected": {
+      "kind": "reviewed",
+      "voice": true,
+      "cards": [
+        "safety",
+        "works-and-proven",
+        "principal-engineer",
+        "maintainable-no-slop"
+      ]
+    },
+    "break": [
+      {
+        "path": "cards.safety.completion",
+        "value": "completed"
+      }
+    ],
+    "defect": "Mark the card completed so nothing summons the voice."
   }
 ]

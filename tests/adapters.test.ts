@@ -12,6 +12,7 @@ import { execute } from "../src/adapters/process.js";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
 import { cliServices, configuredTicketingEnvironment } from "../src/cli-services.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
+import { assignFindingIds, mandatory, needsVoice, rate } from "../src/policy.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
 import {
   cardNames,
@@ -31,6 +32,7 @@ const recording = JSON.parse(
 ) as Recording;
 const request = requestSchema.parse(recording.request);
 const facts = factsSchema.parse(recording.facts);
+const config = configSchema.parse(recording.config);
 const context = () => ({ signal: AbortSignal.timeout(3000) });
 function scenario(
   id: string,
@@ -337,7 +339,6 @@ scenario(
   {
     findings: [
       {
-        id: "safety-F1",
         tag: "issue",
         severity: "MAJOR",
         confidence: "HIGH",
@@ -348,30 +349,137 @@ scenario(
     ],
   },
 );
-scenario("card-missing-checked", (broken) =>
-  rejects(async () =>
-    parseCard(broken ? cardText() : cardText().replace("Checked:", "Examined:"), "safety"),
-  ),
+// Python's parse_council reads the whole block for tagged bullets and never requires the
+// Checked, Not covered or Findings labels; a label mentioned again in free text is not an error.
+scenario(
+  "card-headers-optional",
+  async (broken) => {
+    const finding =
+      "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n    action: Restore the guard.\n";
+    const card = parseCard(
+      `card: safety\ncompletion: completed\n\nI reviewed the change; see Findings: below.\n${broken ? "" : finding}`,
+      "safety",
+    );
+    return { checked: card.checked, notCovered: card.notCovered, findings: card.findings.length };
+  },
+  { checked: [], notCovered: [], findings: 1 },
 );
-scenario("card-incomplete", (broken) =>
-  rejects(async () =>
-    parseCard(
+scenario(
+  "card-incomplete",
+  async (broken) => {
+    const card = parseCard(
       broken
         ? cardText()
-        : cardText().replace("completion: completed", "completion: incomplete: missing evidence"),
+        : cardText().replace(
+            "completion: completed",
+            "completion: incomplete: the eval fixture is in another repository",
+          ),
       "safety",
-    ),
-  ),
+    );
+    return {
+      completion: card.completion,
+      completionReason: card.completionReason ?? null,
+      voice: needsVoice([card], rate(null, false, config), 1, config),
+    };
+  },
+  {
+    completion: "incomplete",
+    completionReason: "the eval fixture is in another repository",
+    voice: true,
+  },
 );
 scenario("card-malformed", (broken) =>
   rejects(async () =>
     parseCard(cardText() + (broken ? "" : "- [issue] missing fields\n"), "safety"),
   ),
 );
-scenario("card-ambiguous", (broken) =>
-  rejects(async () =>
-    parseCard(cardText() + (broken ? "" : "\ncompletion: completed\n"), "safety"),
-  ),
+scenario(
+  "card-ambiguous",
+  async (broken) => {
+    const card = parseCard(
+      `card: safety\ncompletion: ${broken ? "skipped: no file matched" : "completed"}\n\nChecked:\n- Reviewed; completion: completed is restated here.\n\ncard: safety\ncompletion: incomplete: a draft line\n`,
+      "safety",
+    );
+    return { completion: card.completion, checked: card.checked.length };
+  },
+  { completion: "completed", checked: 1 },
+);
+// Python's _TAG_BULLET tolerates emphasis around the tag and numbered bullets; its
+// _finding_fields reads `k=v` in any order, ignores keys it does not know, and drops a
+// `ledger=` value that is not a ledger key. `(none)` under Findings is prose, not a finding.
+scenario(
+  "card-tag-forms",
+  async (broken) => {
+    const card = parseCard(
+      `card: safety\ncompletion: completed\nFindings:\n(none yet)\n- ${broken ? "**issue**" : "**[issue]**"} a.ts:1 · confidence=high · severity=**major** · owner=reviewer · ledger=not-a-key · late=missed\n    what: A guard is missing.\n1. *[ info ]* b.ts:2 · severity=MINOR · confidence=LOW\n    what: A note.\n    note: Optional.\n`,
+      "safety",
+    );
+    return { findings: card.findings };
+  },
+  {
+    findings: [
+      { tag: "issue", location: "a.ts:1", severity: "MAJOR", confidence: "HIGH", late: "missed" },
+      {
+        tag: "info",
+        location: "b.ts:2",
+        severity: "MINOR",
+        confidence: "LOW",
+        detail: "Optional.",
+      },
+    ],
+  },
+);
+// Python read only `what:`/`note:`; consequence and action are run-only fields that are never
+// a reason to refuse: missing is empty, a repeated label takes the last value.
+scenario(
+  "card-subfields",
+  async (broken) => {
+    const card = parseCard(
+      `card: safety\ncompletion: completed\nFindings:\n- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n${broken ? "    consequence: Writes escape.\n" : ""}    action: Draft fix.\n    action: Restore the guard.\n- [info] b.ts:2 · severity=MINOR · confidence=LOW\n    note: Only a note line.\n`,
+      "safety",
+    );
+    return { details: card.findings.map((f) => [f.what, f.detail ?? null]) };
+  },
+  {
+    details: [
+      ["A guard is missing.", "Restore the guard."],
+      ["Only a note line.", "Only a note line."],
+    ],
+  },
+);
+// Python's ids: `[issue]` findings are F1…Fn across the council in card order, assigned once
+// every card has parsed; an `[info]` carries none.
+scenario(
+  "card-global-ids",
+  async (broken) => {
+    const first = parseCard(
+      "card: safety\ncompletion: completed\nFindings:\n- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: One.\n- [info] a.ts:2 · severity=MINOR · confidence=LOW\n    what: Note.\n",
+      "safety",
+    );
+    const second = parseCard(
+      "card: works-and-proven\ncompletion: completed\nFindings:\n- [issue] b.ts:1 · severity=MAJOR · confidence=HIGH\n    what: Two.\n",
+      "works-and-proven",
+    );
+    const cards = broken ? [second, first] : [first, second];
+    assignFindingIds(cards);
+    return {
+      ids: [first, second].map((card) => card.findings.map((f) => f.id ?? null)),
+      mandatory: mandatory(cards),
+    };
+  },
+  { ids: [["F1", null], ["F2"]], mandatory: ["F1", "F2"] },
+);
+// Python's _OUTCOMES includes ERROR: Margot's own fail-closed ruling, with a finding she could
+// not resolve legitimately in neither list.
+scenario(
+  "voice-error-outcome",
+  async (broken) => {
+    const voice = parseVoice(
+      `I read the council's findings against the cited lines.\n\noutcome: ${broken ? "CHANGES_REQUESTED" : "ERROR"}\nband: MEDIUM\nband_reason: the change touches one bounded behavior with a revert as its recovery\nrisk: retry-loop exposure\nsummary: The retry wraps one call and is bounded; the findings below decide it.\nfinding: F1 could not be checked: the head's file could not be read\nclarification: \nestablished:\ndismissed:\n`,
+    );
+    return { outcome: voice.outcome, band: voice.band, dispositions: voice.dispositions.length };
+  },
+  { outcome: "ERROR", band: "MEDIUM", dispositions: 0 },
 );
 scenario(
   "voice-accounting",

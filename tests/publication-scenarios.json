@@ -185,9 +185,19 @@
     "defect": "Remove the skipped job from caller permission"
   },
   {
+    "id": "pub-voice-error",
+    "name": "Margot's ERROR ruling posts as a held, action-required comment",
+    "defect": "Publish a clean approval in place of the ERROR ruling"
+  },
+  {
+    "id": "comment-incomplete-card",
+    "name": "A card that did not complete shows its completion and reason, never clear",
+    "defect": "Mark the card completed"
+  },
+  {
     "id": "tally-advisory-fix",
-    "name": "An open advisory is recalled and can be closed with fix evidence",
-    "defect": "Omit the confirmed advisory resolution"
+    "name": "An open advisory is recalled and closes when its card stops raising it",
+    "defect": "Re-raise the advisory finding so it stays open"
   },
   {
     "id": "pub-run-url",

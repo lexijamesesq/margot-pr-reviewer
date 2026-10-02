@@ -214,6 +214,13 @@ async function wire(mode = "clear", broken = false) {
       await publisher.progress("Margot: posting the verdict", context);
     }
     const value = structuredClone(baseReview);
+    if (defect("voice-error")) {
+      // Margot's own ERROR ruling, as Python posted it: a COMMENT review, the check
+      // `action_required`, titled `not reviewed (error)`.
+      value.decision.outcome = "ERROR";
+      value.decision.mergeEligible = false;
+      value.decision.holdReasons = ["error"];
+    }
     if (
       (["hold", "authority", "authority-summary", "calibration"].includes(mode) && !broken) ||
       mode === "disarm-fail"
@@ -674,6 +681,46 @@ scenario(
 );
 
 scenario(
+  "pub-voice-error",
+  async (b) => {
+    const x = await wire("voice-error", b);
+    const review = x.writes.find((w) => w.path.endsWith("/reviews"));
+    return {
+      conclusion: x.final?.conclusion,
+      title: (x.final?.output as { title?: string } | undefined)?.title,
+      event: review?.body.event,
+      notReviewed: String(review?.body.body).includes(
+        "Not reviewed: the review could not be completed. Held for the operator.",
+      ),
+      header: String(review?.body.body).startsWith("### 🚫 ERROR"),
+    };
+  },
+  {
+    conclusion: "action_required",
+    title: "not reviewed (error)",
+    event: "COMMENT",
+    notReviewed: true,
+    header: true,
+  },
+);
+scenario(
+  "comment-incomplete-card",
+  (b) => {
+    const value = structuredClone(commentReview);
+    const card = value.cards.find((c) => c.name === "safety");
+    if (!card) throw new Error("Invalid comment test source");
+    if (!b) {
+      card.completion = "incomplete";
+      card.completionReason = "the eval fixture is in another repository; nothing else";
+    }
+    const report = render(value);
+    return {
+      row: report.split("\n").find((line) => line.includes("`safety`")),
+    };
+  },
+  { row: "* ⏳ `safety` — incomplete: the eval fixture is in another repository" },
+);
+scenario(
   "tally-advisory-fix",
   (b) => {
     const value = tallyReview();
@@ -691,10 +738,18 @@ scenario(
       completion: "completed",
       checked: ["Verified the earlier advisory"],
       notCovered: [],
-      findings: [],
-      resolved: b
-        ? []
-        : advisory.map((e) => ({ key: e.key, reason: "a.ts:1 now validates input" })),
+      // Fixed-ness is inferred from absence: the card no longer raises the advisory entry.
+      findings: b
+        ? advisory.map((e) => ({
+            id: "F1",
+            tag: "issue" as const,
+            severity: "MINOR" as const,
+            confidence: "HIGH" as const,
+            location: e.location,
+            what: e.what,
+            ledger: e.key,
+          }))
+        : [],
     };
     prepareFindings([card], scope);
     const next = nextLedger(

@@ -136,6 +136,9 @@ export const standingCards = (scope: RoundScope): Card["name"][] => [
   ),
 ];
 
+/** Python's `_late_missed`: a `late=` mark that starts with `missed`, with or without a reason. */
+const lateMissed = (late: string | undefined): boolean => /^missed\b/i.test(late ?? "");
+
 /** Matching, reach and fix evidence are model judgments; severity and memory are code. */
 export function prepareFindings(cards: Card[], scope: RoundScope): void {
   for (const card of cards) {
@@ -160,25 +163,14 @@ export function prepareFindings(cards: Card[], scope: RoundScope): void {
       if (entry?.status === "dismissed" && !finding.reopens) finding.advisory = "carried-dismissal";
       else if (finding.severity === "MINOR") finding.advisory = "minor-after-round-1";
       else if (
-        ((!entry && !scope.full && finding.late?.startsWith("missed:")) ||
+        ((!entry && !scope.full && lateMissed(finding.late)) ||
           (entry?.status === "advisory" &&
-            entry.late?.startsWith("missed:") &&
+            lateMissed(entry.late) &&
             !finding.late?.startsWith("reach:"))) &&
         finding.severity !== "BLOCKING" &&
         card.name !== "safety"
       )
         finding.advisory = "late-non-blocking";
-    }
-    for (const resolved of card.resolved ?? []) {
-      if (
-        !scope.entries.some(
-          (e) =>
-            e.key === resolved.key &&
-            e.card === card.name &&
-            ["standing", "advisory"].includes(e.status),
-        )
-      )
-        throw new Error("Unknown resolved ledger key");
     }
     for (const entry of scope.entries.filter(
       (e) => e.card === card.name && e.status === "standing",
@@ -223,42 +215,43 @@ export function nextLedger(
   const upheld = new Set(
     cards.flatMap((c) =>
       c.findings
-        .filter((f) => !f.advisory && dispositions.get(f.id)?.status !== "dismissed")
+        .filter((f) => !f.advisory && (!f.id || dispositions.get(f.id)?.status !== "dismissed"))
         .map((f) => f.ledger),
     ),
   );
   for (const card of cards) {
-    for (const resolved of card.resolved ?? []) {
-      const old = entries.get(resolved.key);
-      if (old?.status === "advisory")
-        entries.set(old.key, {
-          ...old,
+    // Fixed-ness is inferred from absence, as Python infers it: no card parses a `Resolved:`
+    // section. An entry that can no longer block (advisory, or MINOR from round two) its card
+    // stops raising is fixed without a ruling.
+    const raised = (key: string) =>
+      card.findings.some((f) => f.ledger === key && f.tag === "issue");
+    for (const entry of scope.entries.filter(
+      (e) => e.card === card.name && e.status === "advisory",
+    )) {
+      if (!raised(entry.key))
+        entries.set(entry.key, {
+          ...entry,
           status: "fixed",
           fixed_round: scope.round,
-          reason: resolved.reason,
+          reason: "Card completed and no longer raised this advisory finding",
         });
     }
     for (const entry of scope.entries.filter(
       (e) => e.card === card.name && e.status === "standing" && e.severity === "MINOR",
     )) {
-      if (
-        scope.round >= 2 &&
-        !card.findings.some((f) => f.ledger === entry.key && f.tag === "issue")
-      ) {
+      if (scope.round >= 2 && !raised(entry.key)) {
         entries.set(entry.key, {
           ...entry,
           status: "fixed",
           fixed_round: scope.round,
-          reason:
-            card.resolved?.find((r) => r.key === entry.key)?.reason ??
-            "Card completed and no longer raised this MINOR finding",
+          reason: "Card completed and no longer raised this MINOR finding",
         });
         counts.fixed++;
       }
     }
     for (const f of card.findings) {
       if (f.tag !== "issue") continue;
-      if (!f.ledger && !scope.full && f.late?.startsWith("missed:")) counts.late++;
+      if (!f.ledger && !scope.full && lateMissed(f.late)) counts.late++;
       if (f.unconfirmed) counts.unconfirmed++;
       if (f.advisory) {
         const old = f.ledger ? entries.get(f.ledger) : undefined;
@@ -278,8 +271,13 @@ export function nextLedger(
         }
         continue;
       }
-      const ruling = dispositions.get(f.id);
-      if (!ruling) throw new Error("Ledger finding has no ruling");
+      const ruling = f.id ? dispositions.get(f.id) : undefined;
+      // Under Margot's own ERROR ruling an unaccounted finding is legitimate (Python skips it);
+      // under any other outcome the voice already accounted for every one.
+      if (!ruling) {
+        if (core.decision.outcome === "ERROR") continue;
+        throw new Error("Ledger finding has no ruling");
+      }
       const key = f.ledger ?? `R${scope.round}-F${++index}`;
       const old = entries.get(key);
       if (!f.ledger) counts.new++;

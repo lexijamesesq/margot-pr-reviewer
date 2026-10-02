@@ -49,8 +49,8 @@
   {
     "name": "mis-mapped finding severity",
     "file": "src/adapters/prose.ts",
-    "from": "severity: match[3],",
-    "to": "severity: \"MINOR\",",
+    "from": "        severity,\n        confidence,",
+    "to": "        severity: \"MINOR\",\n        confidence,",
     "tests": [
       "Card prose preserves a real mandatory finding"
     ]
@@ -58,8 +58,8 @@
   {
     "name": "mis-mapped finding confidence",
     "file": "src/adapters/prose.ts",
-    "from": "confidence: match[4],",
-    "to": "confidence: \"LOW\",",
+    "from": "        confidence,\n        what,",
+    "to": "        confidence: \"LOW\",\n        what,",
     "tests": [
       "Card prose preserves a real mandatory finding"
     ]
@@ -67,8 +67,8 @@
   {
     "name": "mis-mapped finding location",
     "file": "src/adapters/prose.ts",
-    "from": "location: match[2],",
-    "to": "location: \"wrong.ts:99\",",
+    "from": "        location,\n        severity,",
+    "to": "        location: \"wrong.ts:99\",\n        severity,",
     "tests": [
       "Card prose preserves a real mandatory finding"
     ]

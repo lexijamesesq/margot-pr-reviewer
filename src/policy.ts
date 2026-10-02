@@ -98,20 +98,29 @@ export function rate(
     voiceOverride: null,
   };
 }
+/** Python's ids: every `[issue]` across the council, F1…Fn in card order, assigned once all
+ * cards have parsed. An id a card already carries (a recording) is kept; an `[info]` has none. */
+export function assignFindingIds(cards: Card[]): void {
+  let index = 0;
+  for (const card of cards)
+    for (const finding of card.findings)
+      if (finding.tag === "issue" && finding.id === undefined) finding.id = `F${++index}`;
+}
 /** The findings the voice must rule on: this round's non-advisory `[issue]` findings — Python's
  * rule. An `[info]` is never mandatory; a BLOCKING `[info]` or any achieves-the-objective
  * finding summons the voice (see `needsVoice`) but is not an ID it must dispose of. */
 export function mandatory(cards: Card[]): string[] {
   return cards.flatMap((card) =>
-    card.findings.filter((f) => !f.advisory && f.tag === "issue").map((f) => f.id),
+    card.findings.flatMap((f) => (!f.advisory && f.tag === "issue" && f.id ? [f.id] : [])),
   );
 }
 /** Code cannot affirmatively clear the PR, so the voice rules: any mandatory finding, an
- * achieves-the-objective finding (the clarification signal), a BLOCKING `[info]`, a band above
- * LOW, or Jev's own doubt. */
+ * achieves-the-objective finding (the clarification signal), a BLOCKING `[info]`, a card that
+ * did not complete (Python's `should_fire`), a band above LOW, or Jev's own doubt. */
 function summonsVoice(cards: Card[]): boolean {
   return cards.some(
     (card) =>
+      card.completion !== "completed" ||
       card.findings.some((f) => !f.advisory && f.tag === "issue") ||
       (card.name === "achieves-the-objective" && card.findings.length > 0) ||
       card.findings.some((f) => f.severity === "BLOCKING"),
@@ -135,7 +144,12 @@ export function needsVoice(
   );
 }
 export function validateVoice(cards: Card[], voice: Voice): void {
-  const advisory = cards.flatMap((c) => c.findings.filter((f) => f.advisory).map((f) => f.id));
+  // Python's rule: an honest ERROR is Margot's own fail-closed ruling, never an incomplete
+  // verdict; a finding she could not resolve legitimately lands in neither list.
+  if (voice.outcome === "ERROR") return;
+  const advisory = cards.flatMap((c) =>
+    c.findings.flatMap((f) => (f.advisory && f.id ? [f.id] : [])),
+  );
   if (voice.dispositions.some((d) => advisory.includes(d.id) && d.status !== "dismissed"))
     throw new Error("Voice cannot reestablish advisory findings");
   const required = mandatory(cards);
@@ -188,7 +202,10 @@ export function decide(
   if (finalRating.band !== "LOW") holdReasons.push("risk");
   if (config.calibration) holdReasons.push("calibration");
   const outcome = voice?.outcome ?? "APPROVED";
-  if (outcome !== "APPROVED") holdReasons.push("author-action");
+  // ERROR is held for the operator (Python posts it `action_required`); the other two go
+  // back to the author.
+  if (outcome === "ERROR") holdReasons.push("error");
+  else if (outcome !== "APPROVED") holdReasons.push("author-action");
   return {
     outcome,
     rating: finalRating,

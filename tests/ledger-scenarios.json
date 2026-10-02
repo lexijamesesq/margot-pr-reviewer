@@ -171,7 +171,7 @@
   },
   {
     "id": "ledger-prose",
-    "name": "Card prose preserves ledger marks and resolution citations",
+    "name": "Card prose preserves ledger marks and reads past a Resolved section",
     "defect": "Change the parsed finding ledger key"
   },
   {
@@ -208,6 +208,11 @@
     "id": "ledger-late-major",
     "name": "Late non-safety MAJOR is advisory",
     "defect": "Raise late MAJOR to BLOCKING"
+  },
+  {
+    "id": "ledger-late-bare",
+    "name": "A bare late=missed mark is late, as Python read it",
+    "defect": "Raise the bare-late MAJOR to BLOCKING"
   },
   {
     "id": "ledger-late-blocking",

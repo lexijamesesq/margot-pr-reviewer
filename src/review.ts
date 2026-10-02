@@ -9,6 +9,7 @@ import {
   standingCards,
 } from "./ledger.js";
 import {
+  assignFindingIds,
   classify,
   decide,
   needsVoice,
@@ -273,8 +274,9 @@ export async function review(
               cards.push(completion.value);
             }
             stage = "cards";
+            assignFindingIds(cards);
             prepareFindings(cards, scope);
-            const ids = cards.flatMap((c) => c.findings.map((f) => f.id));
+            const ids = cards.flatMap((c) => c.findings.flatMap((f) => (f.id ? [f.id] : [])));
             if (new Set(ids).size !== ids.length) throw new Error("Duplicate finding IDs");
           }
           if (path.risk) {

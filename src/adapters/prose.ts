@@ -1,81 +1,127 @@
 import { cardSchema, voiceSchema } from "../schemas.js";
 import type { Card } from "../types.js";
 
-function field(prose: string, name: string): string {
-  const hits = [...prose.matchAll(new RegExp(`^${name}:\\s*(.+)$`, "gmi"))];
-  if (hits.length !== 1) throw new Error(`Missing or ambiguous ${name}`);
-  return hits[0]?.[1]?.trim() ?? "";
+// The Python reviewer's parsers are the reference for every shape below: labels at line
+// start, first match wins, tolerated markdown decoration, and no refusal Python did not have.
+
+/** The first `name: value` line, or undefined; a later mention in free text never matters. */
+function firstField(prose: string, name: string): string | undefined {
+  return prose.match(new RegExp(`^\\s*${name}:\\s*(.*?)\\s*$`, "mi"))?.[1];
 }
-function section(prose: string, name: string): string {
+/** The bullets under the first `Name:` label, up to the next label line; absent → none. */
+function section(prose: string, name: string): string[] {
   const lines = prose.split(/\r?\n/);
-  const starts = lines.flatMap((line, i) =>
-    line.toLowerCase() === `${name.toLowerCase()}:` ? [i] : [],
-  );
-  if (starts.length !== 1) throw new Error(`Missing or ambiguous ${name}`);
-  const start = (starts[0] ?? 0) + 1;
-  const end = lines.findIndex((line, i) => i >= start && /^[A-Za-z][A-Za-z _]*:/.test(line));
-  return lines.slice(start, end < 0 ? undefined : end).join("\n");
-}
-const bullets = (s: string) =>
-  s
-    .split(/\r?\n/)
+  const start = lines.findIndex((line) => line.trim().toLowerCase() === `${name.toLowerCase()}:`);
+  if (start < 0) return [];
+  const end = lines.findIndex((line, i) => i > start && /^[A-Za-z][A-Za-z _]*:/.test(line));
+  return lines
+    .slice(start + 1, end < 0 ? undefined : end)
     .filter((l) => /^\s*[-*] /.test(l))
     .map((l) => l.replace(/^\s*[-*] /, "").trim());
+}
+
+// A tagged finding bullet: `- [issue] …` / `- **[info]** …`, as Python's `_TAG_BULLET`.
+const tagBullet = /^\s*(?:[-*]|\d+\.)\s*[*_ ]*\[\s*(issue|info)\s*\][*_ ]*\s*(.*?)\s*$/i;
+const severities = ["MINOR", "MAJOR", "BLOCKING"] as const;
+const confidences = ["LOW", "MEDIUM", "HIGH"] as const;
+
+/** `<location> · k=v · k=v` → location and lower-cased keys; first key wins, values undecorated. */
+function findingFields(rest: string): { location: string; fields: Map<string, string> } {
+  const parts = rest.split("·").map((p) => p.trim());
+  const fields = new Map<string, string>();
+  for (const part of parts.slice(1)) {
+    const at = part.indexOf("=");
+    if (at < 0) continue;
+    const key = part.slice(0, at).trim().toLowerCase();
+    if (!fields.has(key))
+      fields.set(
+        key,
+        part
+          .slice(at + 1)
+          .trim()
+          .replace(/^[*_` ]+|[*_` ]+$/g, ""),
+      );
+  }
+  return { location: parts[0] ?? "", fields };
+}
+
+/** The indented sub-lines after a finding bullet, up to a blank line or the next bullet. */
+function subFields(lines: string[], index: number): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const line of lines.slice(index + 1)) {
+    if (!line.trim() || tagBullet.test(line)) break;
+    const match = line.trim().match(/^(what|note|consequence|action)\s*:\s*(.*)$/i);
+    if (!match) continue;
+    const key = (match[1] ?? "").toLowerCase();
+    out.set(key, [...(out.get(key) ?? []), (match[2] ?? "").trim()]);
+  }
+  return out;
+}
+
+/** One card's prose. Findings carry no ids yet: the council assigns Python's global F1…Fn once
+ * every card has parsed (`assignFindingIds` in policy). */
 export function parseCard(raw: string, name: Card["name"]): Card {
-  if (field(raw, "card") !== name || field(raw, "completion") !== "completed")
+  const completionLine = firstField(raw, "completion");
+  const [token = "", ...reason] = (completionLine ?? "").split(":");
+  const completion = token.trim().toLowerCase();
+  if (completion !== "completed" && completion !== "incomplete" && completion !== "skipped")
     throw new Error("Card did not complete");
-  const findings = section(raw, "Findings");
-  const chunks = findings.split(/(?=^\s*[-*] \[)/m).filter((s) => s.trim());
-  const parsed = chunks.map((chunk, index) => {
-    const match = chunk.match(
-      /^\s*[-*] \[(issue|info)\] (.+?) · severity=(MINOR|MAJOR|BLOCKING) · confidence=(LOW|MEDIUM|HIGH)([^\n]*)\s*\n([\s\S]+)$/,
-    );
-    if (!match) throw new Error("Unreadable finding");
-    const body = (match[6] ?? "").replace(/^\s+/gm, "");
-    const extras = Object.fromEntries(
-      (match[5] ?? "")
-        .split(" · ")
-        .filter((x) => x.trim())
-        .map((x) => {
-          const at = x.indexOf("=");
-          if (at < 1 || !["ledger", "late", "reopens"].includes(x.slice(0, at)))
-            throw new Error("Unreadable finding attribution");
-          return [x.slice(0, at), x.slice(at + 1).trim()];
-        }),
-    );
-    return {
-      ...extras,
-      id: `${name}-F${index + 1}`,
-      tag: match[1],
-      location: match[2],
-      severity: match[3],
-      confidence: match[4],
-      what: field(body, "what"),
-      detail: `Consequence: ${field(body, "consequence")} ${match[1] === "issue" ? field(body, "action") : field(body, "note")}`,
-    };
+  const completionReason = reason.join(":").trim();
+  const lines = raw.split(/\r?\n/);
+  const findings = lines.flatMap((line, index) => {
+    const bullet = line.match(tagBullet);
+    if (!bullet) return [];
+    const tag = (bullet[1] ?? "").toLowerCase();
+    const { location, fields } = findingFields(bullet[2] ?? "");
+    const severity = fields.get("severity")?.toUpperCase() ?? "";
+    const confidence = fields.get("confidence")?.toUpperCase() ?? "";
+    if (
+      !location ||
+      !(severities as readonly string[]).includes(severity) ||
+      !(confidences as readonly string[]).includes(confidence)
+    )
+      throw new Error("Unreadable finding");
+    const sub = subFields(lines, index);
+    // Python's `what` is the first `what:`/`note:` sub-line; the run-only fields take the last.
+    const what = sub.get("what")?.[0] ?? sub.get("note")?.[0] ?? "";
+    const consequence = sub.get("consequence")?.at(-1) ?? "";
+    const action = (tag === "issue" ? sub.get("action") : sub.get("note"))?.at(-1) ?? "";
+    const detail = [consequence ? `Consequence: ${consequence}` : "", action]
+      .filter(Boolean)
+      .join(" ");
+    const ledger = fields.get("ledger") ?? "";
+    const late = fields.get("late") ?? "";
+    const reopens = fields.get("reopens") ?? "";
+    return [
+      {
+        tag,
+        location,
+        severity,
+        confidence,
+        what,
+        ...(detail ? { detail } : {}),
+        ...(/^R[1-9]\d*-F[1-9]\d*$/.test(ledger) ? { ledger } : {}),
+        ...(late ? { late } : {}),
+        ...(reopens ? { reopens } : {}),
+      },
+    ];
   });
-  // A misplaced tagged finding is an error, not an empty clean card.
-  if ((raw.match(/^\s*[-*] \[(?:issue|info)\]/gm) ?? []).length !== parsed.length)
-    throw new Error("Finding outside Findings section");
   return cardSchema.parse({
     name,
-    completion: "completed",
-    checked: bullets(section(raw, "Checked")),
-    notCovered: bullets(section(raw, "Not covered")),
-    findings: parsed,
-    ...(/^Resolved:$/im.test(raw)
-      ? {
-          resolved: bullets(section(raw, "Resolved")).map((line) => {
-            const match = line.match(/^(R[1-9]\d*-F[1-9]\d*) · (.+)$/);
-            if (!match) throw new Error("Unreadable resolution");
-            return { key: match[1], reason: match[2] };
-          }),
-        }
-      : {}),
+    completion,
+    ...(completionReason ? { completionReason } : {}),
+    checked: section(raw, "Checked"),
+    notCovered: section(raw, "Not covered"),
+    findings,
   });
 }
 
-const voiceOutcomes = ["APPROVED", "CHANGES_REQUESTED", "CLARIFICATION_REQUESTED"] as const;
+const voiceOutcomes = [
+  "APPROVED",
+  "CHANGES_REQUESTED",
+  "CLARIFICATION_REQUESTED",
+  "ERROR",
+] as const;
 const voiceBands = ["LOW", "MEDIUM", "HIGH"] as const;
 
 function undecorateKey(line: string): string {
@@ -116,6 +162,7 @@ export function parseVoice(raw: string) {
   const start = strict.at(-1) ?? loose.at(-1);
   if (start !== undefined) lines = lines.slice(start);
 
+  // Python's scalar read: within the final block, the first line carrying a label wins.
   const fields = new Map<string, string>();
   for (const line of lines) {
     const match = line.match(

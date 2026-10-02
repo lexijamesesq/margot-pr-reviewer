@@ -267,6 +267,8 @@ for (const [id, severity, name, late, expected] of [
   ["ledger-minor", "MINOR", "safety", "new", 0],
   ["ledger-major", "MAJOR", "safety", "new", 1],
   ["ledger-late-major", "MAJOR", "house-style", "missed: absent in round 1", 0],
+  // Python's `_late_missed` reads the bare `late=missed` mark its golden cards carry.
+  ["ledger-late-bare", "MAJOR", "house-style", "missed", 0],
   ["ledger-late-blocking", "BLOCKING", "house-style", "missed: absent in round 1", 1],
   ["ledger-late-safety", "MAJOR", "safety", "missed: absent in round 1", 1],
   ["ledger-reach", "MAJOR", "house-style", "delta-reach: new caller", 1],
@@ -613,7 +615,7 @@ scenario(
       "safety",
     ),
   {
-    resolved: [{ key: "R1-F2", reason: "a.ts:3 validates input" }],
+    // Python never parsed `Resolved:`; the section is prose, and fixed-ness comes from absence.
     findings: [{ ledger: "R1-F1", late: "delta-reach: new caller" }],
   },
 );

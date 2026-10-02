@@ -97,21 +97,21 @@
   {
     "id": "card-findings",
     "name": "Card prose preserves a real mandatory finding",
-    "defect": "source mutation: mis-map the finding tag",
+    "defect": "source mutation: drop the consequence label from the finding detail",
     "sourceBreak": {
       "file": "src/adapters/prose.ts",
-      "from": "tag: match[1],",
-      "to": "tag: \"info\","
+      "from": "consequence ? `Consequence: ${consequence}` : \"\"",
+      "to": "consequence"
     }
   },
   {
-    "id": "card-missing-checked",
-    "name": "A card without its Checked block is not green",
-    "defect": "restore the Checked label"
+    "id": "card-headers-optional",
+    "name": "A card without its block labels still yields its tagged findings",
+    "defect": "remove the tagged finding the label-free block carries"
   },
   {
     "id": "card-incomplete",
-    "name": "An incomplete card cannot become empty success",
+    "name": "An incomplete card is recorded with its reason and summons the voice",
     "defect": "restore completed status"
   },
   {
@@ -121,8 +121,23 @@
   },
   {
     "id": "card-ambiguous",
-    "name": "Duplicate card completion labels are rejected",
-    "defect": "remove the duplicate label"
+    "name": "Repeated card labels take the first match",
+    "defect": "make the first completion label a skip"
+  },
+  {
+    "id": "card-tag-forms",
+    "name": "Tagged bullets tolerate emphasis, key order and unknown annotations",
+    "defect": "drop the brackets from the emphasised tag"
+  },
+  {
+    "id": "card-subfields",
+    "name": "Missing or repeated finding sub-fields are read, never refused",
+    "defect": "supply the consequence the expectation omits"
+  },
+  {
+    "id": "card-global-ids",
+    "name": "Finding ids are Python's global F1…Fn in card order",
+    "defect": "assemble the council in reverse card order"
   },
   {
     "id": "voice-accounting",
@@ -138,6 +153,11 @@
       "from": "/^((?:\\*\\*[\\w-]+\\*\\*|__[\\w-]+__|\\*[\\w-]+\\*|_[\\w-]+_|`[\\w-]+`|[\\w-]+))(?=\\s*(?:·|—|:|$))/",
       "to": "/^([\\w-]+) · (.+)$/"
     }
+  },
+  {
+    "id": "voice-error-outcome",
+    "name": "Margot's ERROR is a parsed ruling, not an exception",
+    "defect": "replace the ERROR outcome with CHANGES_REQUESTED"
   },
   {
     "id": "credential-isolation",

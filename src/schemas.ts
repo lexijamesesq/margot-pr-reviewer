@@ -134,7 +134,8 @@ export const riskSchema = z.strictObject({
   ),
 });
 export const findingSchema = z.strictObject({
-  id: text,
+  // Python's ids: `[issue]` findings are F1…Fn across the council; an `[info]` carries none.
+  id: text.optional(),
   tag: z.enum(["issue", "info"]),
   severity: z.enum(["MINOR", "MAJOR", "BLOCKING"]),
   confidence: z.enum(["LOW", "MEDIUM", "HIGH"]),
@@ -145,26 +146,23 @@ export const findingSchema = z.strictObject({
     .string()
     .regex(/^R[1-9]\d*-F[1-9]\d*$/)
     .optional(),
-  late: z
-    .string()
-    .regex(/^(new(?:: .+)?|missed: .+|delta-reach: .+)$/)
-    .optional(),
+  // Python keeps any `late=` value; only a `missed` prefix changes what the ledger does.
+  late: text.optional(),
   reopens: text.optional(),
   unconfirmed: z.boolean().optional(),
   advisory: z.enum(["minor-after-round-1", "late-non-blocking", "carried-dismissal"]).optional(),
 });
 export const cardSchema = z.strictObject({
   name: cardNameSchema,
-  completion: z.literal("completed"),
-  checked: z.array(text).min(1),
+  // Python's three completion tokens; anything but `completed` cannot affirmatively clear.
+  completion: z.enum(["completed", "incomplete", "skipped"]),
+  completionReason: text.optional(),
+  checked: z.array(text),
   notCovered: z.array(text),
   findings: z.array(findingSchema),
-  resolved: z
-    .array(z.strictObject({ key: z.string().regex(/^R[1-9]\d*-F[1-9]\d*$/), reason: text }))
-    .optional(),
 });
 export const voiceSchema = z.strictObject({
-  outcome: z.enum(["APPROVED", "CHANGES_REQUESTED", "CLARIFICATION_REQUESTED"]),
+  outcome: z.enum(["APPROVED", "CHANGES_REQUESTED", "CLARIFICATION_REQUESTED", "ERROR"]),
   band: bandSchema,
   rationale: text,
   summary: text,

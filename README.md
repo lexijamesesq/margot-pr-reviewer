@@ -238,8 +238,12 @@ contain no confidence field: routing confidence comes from the exposure Score,
 as in Python. Risk confidence comes directly from Jev's five Score answers. No Claude fallback
 can substitute for failed Jev evidence.
 
-The runner retains prose and validates completion, Checked blocks, finding fields,
-unique verdict fields and complete finding accounting. It does not depend on
+The runner retains prose and reads it as the Python reviewer did: labels at line
+start with the first match winning, tagged finding bullets anywhere in the card
+with or without emphasis, `completion: incomplete` or `skipped` recorded with its
+reason rather than refused, `[issue]` findings numbered `F1`…`Fn` across the
+council in card order, Margot's own `ERROR` outcome accepted as her ruling, and
+complete finding accounting under every other outcome. It does not depend on
 `--json-schema`; see [the earlier probe](docs/cli-compatibility.md) and
 [the slice 2 proof](docs/SLICE2.md). Transport references:
 [Claude CLI](https://code.claude.com/docs/en/cli-reference),
@@ -289,8 +293,10 @@ not infer finding identity or fixes from line-number arithmetic.
 
 From round two, MINOR findings become advisory. A missed finding blocks only at
 BLOCKING, or MAJOR for safety; a delta-reach regression keeps its honest severity.
-Nothing escalates or relaxes after round three. A silent MINOR counts as fixed;
-a silent MAJOR or BLOCKING requires Margot's confirmation. Dismissals retain their
+Nothing escalates or relaxes after round three. A silent MINOR or advisory entry
+counts as fixed; a silent MAJOR or BLOCKING requires Margot's confirmation. No
+`Resolved:` section is parsed: fixed-ness is inferred from a standing finding's
+absence, as Python inferred it. Dismissals retain their
 reasons until the delta changes the cited code. A new delta finding must state
 whether it is new, missed, or caused through delta reach; missing attribution fails
 closed. The displayed counts are New, Open, Closed, with each finding listed below.
