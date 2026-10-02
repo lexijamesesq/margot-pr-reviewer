@@ -4,7 +4,7 @@ import { copyFileSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const tarball = resolve(process.argv[2] ?? "margot-pr-reviewer-0.5.2.tgz");
+const tarball = resolve(process.argv[2] ?? "margot-pr-reviewer-0.5.3.tgz");
 const consumer = mkdtempSync(join(tmpdir(), "margot-slice4-consumer-"));
 const run = (file, args, options = {}) =>
   spawnSync(file, args, { cwd: consumer, encoding: "utf8", ...options });
@@ -22,9 +22,9 @@ const output = join(consumer, "output");
 writeFileSync(
   deployment,
   JSON.stringify({
-    version: "0.5.2",
+    version: "0.5.3",
     packageReference:
-      "https://github.com/example/margot-pr-reviewer/releases/download/v0.5.2/margot-pr-reviewer-0.5.2.tgz",
+      "https://github.com/example/margot-pr-reviewer/releases/download/v0.5.3/margot-pr-reviewer-0.5.3.tgz",
     packageIntegrity: `sha512-${"A".repeat(86)}==`,
     packageSha256: "0".repeat(64),
   }),
@@ -73,7 +73,7 @@ checkCli();
 assert.equal(smoke().status, 0);
 writeFileSync(
   new URL("../docs/package-smoke-receipt.md", import.meta.url),
-  `# Installed package receipt\n\nGenerated ${new Date().toISOString()}, Node ${process.version}.\n\nInstalled the tarball in an empty directory outside the source tree. The existing consumer smoke imported the public package, completed a recorded approval, introduced a mandatory finding, and observed CHANGES_REQUESTED in the same result and recorded publication. It passed before and after the CLI break.\n\nCLI smoke: invoking each npm-created executable link without arguments exits 1 through argument validation. The instance CLI also validates a deployment, enrolment, and authority selection through the installed binary and emits its two GitHub outputs. Replacing the review CLI's installed target with an empty executable changed its exit to 0 and failed exactly that assertion. Restoring the file restored the passing check. This proves installed entrypoint execution, not live service availability or a hosted Action run.\n\nReproduce: npm pack; node scripts/package-smoke.mjs ./margot-pr-reviewer-0.5.2.tgz.\n`,
+  `# Installed package receipt\n\nGenerated ${new Date().toISOString()}, Node ${process.version}.\n\nInstalled the tarball in an empty directory outside the source tree. The existing consumer smoke imported the public package, completed a recorded approval, introduced a mandatory finding, and observed CHANGES_REQUESTED in the same result and recorded publication. It passed before and after the CLI break.\n\nCLI smoke: invoking each npm-created executable link without arguments exits 1 through argument validation. The instance CLI also validates a deployment, enrolment, and authority selection through the installed binary and emits its two GitHub outputs. Replacing the review CLI's installed target with an empty executable changed its exit to 0 and failed exactly that assertion. Restoring the file restored the passing check. This proves installed entrypoint execution, not live service availability or a hosted Action run.\n\nReproduce: npm pack; node scripts/package-smoke.mjs ./margot-pr-reviewer-0.5.3.tgz.\n`,
 );
 console.log(
   JSON.stringify({

@@ -251,23 +251,43 @@
   },
   {
     "id": "comment-risk-limit",
-    "name": "A multiline risk concern refuses the comment",
-    "defect": "Replace the multiline concern with a valid line"
+    "name": "A long multiline risk concern renders as its bounded first line",
+    "defect": "Render the full concern",
+    "sourceBreak": {
+      "file": "src/render.ts",
+      "from": "${firstLine(decision.rating.rationale)}",
+      "to": "${decision.rating.rationale}"
+    }
   },
   {
     "id": "comment-rationale-limit",
-    "name": "A three-sentence rationale refuses the comment",
-    "defect": "Replace the rationale with one sentence"
+    "name": "A long rationale renders its first two sentences",
+    "defect": "Render the full rationale",
+    "sourceBreak": {
+      "file": "src/render.ts",
+      "from": "${firstSentences(rationale, 2)}",
+      "to": "${rationale}"
+    }
   },
   {
     "id": "comment-card-limit",
-    "name": "A card sentence over fifteen words refuses the comment",
-    "defect": "Shorten the card sentence to fifteen words"
+    "name": "A long finding renders bounded prose while the check keeps its full text",
+    "defect": "Render the full finding text",
+    "sourceBreak": {
+      "file": "src/render.ts",
+      "from": "${sentence(firstSentence(first.what))}",
+      "to": "${sentence(first.what)}"
+    }
   },
   {
     "id": "comment-skip-limit",
-    "name": "A multi-clause skip reason refuses the comment",
-    "defect": "Replace the skip reason with one clause"
+    "name": "A multi-clause skip reason renders its first clause",
+    "defect": "Render the full skip reason",
+    "sourceBreak": {
+      "file": "src/render.ts",
+      "from": "${firstClause(reason)}",
+      "to": "${reason}"
+    }
   },
   {
     "id": "comment-python-structure",

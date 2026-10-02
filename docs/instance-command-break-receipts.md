@@ -1,6 +1,6 @@
 # Instance command break receipts
 
-Generated 2026-10-02T03:11:06.741Z, Node v26.3.1. Baseline and restored suite: 303/303 passed. Each of 35 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-02T06:44:24.047Z, Node v26.3.1. Baseline and restored suite: 303/303 passed. Each of 35 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Instance command cases exercise exact release references, enrolment, authority selection, GitHub outputs, request admission, trusted policy binding, CLI flag mapping, and bound-file writes.
 
