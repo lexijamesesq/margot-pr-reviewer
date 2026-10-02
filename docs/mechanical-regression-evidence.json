@@ -5,7 +5,7 @@
   "jevHttpAttempts": 100,
   "claudeCalls": 1,
   "artifacts": {
-    "engine-request.json": "a5d408ef271dd20dd6b35b5ce9dbf3c86efd4a655715406a435d406d1154d346",
+    "margot-request.json": "a5d408ef271dd20dd6b35b5ce9dbf3c86efd4a655715406a435d406d1154d346",
     "p1-reconstructed-request.json": "e8213dcb8832624e59e7dd8cd7b01f03f5e6f4f83eeac62ffefc18db64caca14",
     "variants.json": "13ed8bf045268c67f37a9d4e33c413ec2cef9f197b69816cb4807c0555f9ffb7",
     "ablation.json": "470d9f49582f3dcb9fd0b6fcccf25ca2bc14f0475a601552c16fb27da93ee99b",
@@ -15,7 +15,7 @@
     "shadow.mjs": "141e61bbcd09fe7ef53a169f6499e1d71b5bae5d0f56d8adcc2cab35f4d267a0"
   },
   "ablations": {
-    "engine": [
+    "Margot": [
       {
         "functional": 0.57,
         "documentation": 0.23,

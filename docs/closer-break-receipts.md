@@ -1,6 +1,6 @@
 # Stranded-check closer break receipts
 
-Generated 2026-10-02T15:53:03.790Z, Node v26.3.1. Baseline and restored suite: 331/331 passed. Each of 22 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-02T17:10:31.643Z, Node v26.3.1. Baseline and restored suite: 331/331 passed. Each of 22 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 The closer cases use Octokit against a recorded GitHub transport. They cover the no-op decision, ordered commit and shared-head guards, both check names, open-state and run-ownership guards, all conclusions and titles, and fail-safe read/write errors.
 

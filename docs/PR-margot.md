@@ -2,7 +2,7 @@
 <!-- markdownlint-disable MD041 -->
 ## Intent
 
-Let an instance publish the engine's single decision to GitHub, and replace the
+Let an instance publish Margot's single decision to GitHub, and replace the
 old finding tally with New, Open, Closed that reconcile with the listed issues.
 
 ## What changed
@@ -58,7 +58,7 @@ Deliberately adding one to Closed fails tally reconciliation. The slice-three
 corpus replays with the same decisions, new reconciled tallies and identical
 no-model retries.
 
-Read-only live shadows cover all three engine classes and a HIGH hold at Python's
+Read-only live shadows cover all three review classes and a HIGH hold at Python's
 exact heads. A README review completes where Python's first attempt lost card
 reports. Restoring the complete measured P1 classification wording and excluding
 author prose fixes both missed hook bumps at the unchanged 0.60 threshold.

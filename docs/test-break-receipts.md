@@ -1,6 +1,6 @@
 # Test and deliberate-break receipts
 
-Run: 2026-10-02T15:26:15.119Z. Node v26.3.1.
+Run: 2026-10-02T16:45:25.101Z. Node v26.3.1.
 
 Baseline: 331/331 passed. Each scenario break changes the named scenario's service output/caller input, or its explicitly declared source mutation; expected assertions stay unchanged. Every run executes the complete legacy scenario suite; instance-command decisions have their own receipt. For each scenario break, the named test and any explicitly declared alsoFails tests failed, with all other tests passing. The two older prompt-rule mutations also fail the complete P1 wire contract. Each break was reverted before the next run. Restored baseline: 331/331 passed.
 

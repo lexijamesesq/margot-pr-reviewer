@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.6.0.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.6.1.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -110,7 +110,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.6.0.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.6.1.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
@@ -157,11 +157,11 @@ margot-instance validate-deployment \
 
 `bind-request` reads the PR through Octokit using `GH_TOKEN`. It rejects a closed,
 draft, forked, or moved request, then writes mode-0600 `request.json` and `config.json`
-under the absolute engine root. Required checks, protected paths, permitted skipped
+under the absolute Margot root. Required checks, protected paths, permitted skipped
 checks, and authority are explicit inputs. Authority selects GitHub publication;
 otherwise the configuration is a before-head shadow. Authority requires a nonempty,
 invocation-unique `--run-url` so the publisher can reject a superseded writer.
-`${ENGINE_ROOT}` in the Claude executable, plugin directory, and ticketing command is
+`${MARGOT_ROOT}` in the Claude executable, plugin directory, and ticketing command is
 replaced with the trusted root. A moved head keeps the `Margot: not reviewed: stale`
 refusal and exits 75 (`EX_TEMPFAIL`); the other refusals exit 1. This lets a
 shell caller set `stop_reason=stale` without reading the PR again.
@@ -169,7 +169,7 @@ shell caller set `stop_reason=stale` without reading the PR again.
 ```sh
 margot-instance bind-request \
   --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
-  --phase review --authority false --engine-root "$ENGINE_ROOT" \
+  --phase review --authority false --margot-root "$MARGOT_ROOT" \
   --config /trusted/config.json --required-checks '["ci / checks"]' \
   --protected-paths '[".github/**"]' --allowed-skipped-checks '[]' \
   --run-url "$RUN_URL"

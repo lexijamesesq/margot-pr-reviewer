@@ -90,9 +90,9 @@
     "defect": "Restore omitted new-finding attribution"
   },
   {
-    "id": "ledger-engine-fields",
-    "name": "Card cannot forge engine advisory annotations",
-    "defect": "Remove forged engine-only advisory annotation"
+    "id": "ledger-margot-fields",
+    "name": "Card cannot forge Margot advisory annotations",
+    "defect": "Remove forged Margot-only advisory annotation"
   },
   {
     "id": "ledger-unconfirmed",
@@ -237,7 +237,7 @@
   {
     "id": "ledger-voice-advisory",
     "name": "Voice cannot reestablish demoted advisory",
-    "defect": "Remove engine advisory annotation"
+    "defect": "Remove Margot advisory annotation"
   },
   {
     "id": "process-stdin",

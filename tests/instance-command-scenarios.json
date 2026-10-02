@@ -151,7 +151,7 @@
   },
   {
     "id": "bound-files",
-    "name": "writes the two bound files privately under the engine root",
+    "name": "writes the two bound files privately under the Margot root",
     "defect": "Bind a different base revision"
   },
   {

@@ -90,7 +90,7 @@ export function jevAdapter(options: {
               totalParts: chunks.length,
               evidence: chunk,
               scope:
-                "Contiguous excerpt of complete JSON evidence, possibly continuing across boundaries. Assess the evidence visible in this excerpt; the engine combines every excerpt conservatively.",
+                "Contiguous excerpt of complete JSON evidence, possibly continuing across boundaries. Assess the evidence visible in this excerpt; Margot combines every excerpt conservatively.",
             };
       answers.push(await ask(questions, batch, c));
     }

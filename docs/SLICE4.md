@@ -1,6 +1,6 @@
 # Slice 4: publication, instance adoption and retirement preparation
 
-The engine can publish the estate's existing check contract and a SHA-bound native
+The Margot can publish the estate's existing check contract and a SHA-bound native
 review. Its tally is New, Open, Closed, derived from the findings listed below it.
 The instance adopts an exact 0.4.0 registry or GitHub release-tag pin through a
 reversible shadow/authority switch. A separate local retirement branch removes
@@ -19,7 +19,7 @@ production adoption remain operator actions, not completed production proofs.
 | `src/ledger.ts` | Retain closed findings and open advisories, including later fix evidence. |
 | `src/render.ts` | Derive New/Open/Closed from the exact listed ledger entries and display each fate. |
 | Instance `.github/instance/` | Supply estate policy, release pins, enrolment and the authority switch. |
-| Instance `margot-engine.yml` | Install the exact artifact on the Pi and run it with `margot-ops`. |
+| Instance `margot.yml` | Install the exact artifact on the Pi and run it with `margot-ops`. |
 
 ## Publication contract
 
@@ -129,14 +129,14 @@ service/input counterexamples; they are not represented as source-removal proof.
 Every new named test has a break receipt.
 
 The instance's adoption and authority branches retain Python. The reverse patch
-of the authority commit is applied locally, the original engine/runtime/poster
+of the authority commit is applied locally, the original Margot/runtime/poster
 are compared byte for byte, and the Python suite is run before restoring the
 switch. Five instance routing tests each have a failing counterexample. Estate
 caller files and the three estate reader workflows are unchanged.
 
 ## Canary and remaining proof
 
-1. Merge/release the verified engine artifact, then merge shadow-only adoption;
+1. Merge/release the verified Margot artifact, then merge shadow-only adoption;
    watch no-write artifacts beside Python on every class and a hold.
 2. Merge the separate authority switch for only the controlled probe repository.
 3. Verify SHA-bound checks, approval, hold/disarm, tally, a fixing round, retry,
@@ -167,12 +167,12 @@ bump did not establish equivalence to P1. The threshold remains **0.60**.
 
 ### Exact request and provenance
 
-The captured engine request is `proof/slice4/mechanical.json`, `jev[0].request`,
+The captured Margot request is `proof/slice4/mechanical.json`, `jev[0].request`,
 recorded at `2026-09-30T19:07:18.381Z`, at source branch baseline `6a09edb`.
 PR head is `582f517acbd978e08621197517a66ed830b8448f`; base is
 `42e679205cc1813258124ca08523dc212202b038`. The complete pair, including every
 character of the original body and questions, is retained outside git:
-`proof/slice4/mechanical-regression/request-comparison.md`, `engine-request.json`
+`proof/slice4/mechanical-regression/request-comparison.md`, `margot-request.json`
 and `p1-reconstructed-request.json`. Artifact SHA-256s and all measured answers
 are in `docs/mechanical-regression-evidence.json`. Raw PR corpora remain outside
 the public repository and package.
@@ -191,10 +191,10 @@ reported below, never represented as historical evaluation results.
 Both use POST `https://api.typesafe.ai/v1/systemone`, `jev-1.13.0`, and three
 Noul questions named functional, documentation, mechanical in that order. No
 labels enter either request. P1 constructs `state` through `mechanical_state`
-(driver lines 282–296), not the routing `build_state`. The engine uses its facts
+(driver lines 282–296), not the routing `build_state`. The Margot uses its facts
 object after deleting history. Every state difference is listed here:
 
-| Element | Engine request | P1 builder on #131 |
+| Element | Margot request | P1 builder on #131 |
 | --- | --- | --- |
 | State format | JSON object, 2,765 UTF-16 units compact-serialized | Plain text with newline-separated fields and `Diff:` heading |
 | Repository and PR | `repository: lexijamesesq/core-skills`, numeric `pr: 131` | `Pull request #131 in lexijamesesq/core-skills.` |
@@ -216,7 +216,7 @@ object after deleting history. Every state difference is listed here:
 The diff changes only `rev: v2026.09.27-15` to `rev: v2026.09.27-16` in
 `.pre-commit-config.yaml`, retaining its unified headers and context. There is
 no diff cap, dropped hunk, changed diff byte, pagination, or per-question call.
-Both requests batch all three questions into **one call**. The engine's 16,000
+Both requests batch all three questions into **one call**. The Margot's 16,000
 unit paging threshold was not reached. The one-answer fast path returns Jev's
 answers unchanged: functional **0.58**, documentation **0.21**, mechanical
 **0.55**. All are below 0.60, hence functional fallback. For genuinely paged
@@ -244,7 +244,7 @@ exception; pin/digest/lockfile/lint scope; explicit external-release exception;
 and explicit uncertain-to-functional instruction. Precedence and treating content
 as evidence remain, with different phrasing. The endings changed as follows:
 
-| Question | Engine ending | P1 ending |
+| Question | Margot ending | P1 ending |
 | --- | --- | --- |
 | functional | Does any changed hunk affect functionality? | Is this functional? Return the probability that any changed hunk affects functionality under these definitions. |
 | documentation | Does any changed explanation need accuracy review? | Is this documentation? Return the probability that the change includes human-facing documentation or explanatory comments needing accuracy review, with no functional effect. |
@@ -252,7 +252,7 @@ as evidence remain, with different phrasing. The endings changed as follows:
 
 ### Controlled live replays
 
-Each row starts from the captured engine request and changes only the named
+Each row starts from the captured Margot request and changes only the named
 component(s). Three repeats, interleaved by variant, four HTTP workers; all
 87 attempts returned HTTP 200. Scores are mechanical probabilities, not class
 labels: another class reaching 0.60 still takes precedence. In particular,
@@ -262,7 +262,7 @@ rows restore the exact original wording, including every phrasing difference.
 
 | Reversion or control | Run 1 | Run 2 | Run 3 |
 | --- | --- | --- | --- |
-| Unchanged engine baseline | 0.55 | 0.54 | 0.52 |
+| Unchanged Margot baseline | 0.55 | 0.54 | 0.52 |
 | All three exact P1 questions | 0.94 | 0.94 | 0.95 |
 | Exact P1 functional question only | 0.57 | 0.55 | 0.51 |
 | Exact P1 documentation question only | 0.53 | 0.57 | 0.54 |
@@ -287,7 +287,7 @@ rows restore the exact original wording, including every phrasing difference.
 | Omit title, body and author together | 0.57 | 0.60 | 0.60 |
 | Add required_owned ownership | 0.53 | 0.51 | 0.51 |
 | Use string paths instead of path objects | 0.58 | 0.58 | 0.57 |
-| Plain-text state retaining all engine fields | 0.54 | 0.54 | 0.55 |
+| Plain-text state retaining all Margot fields | 0.54 | 0.54 | 0.55 |
 | Exact P1 state only (all state differences together) | 0.62 | 0.63 | 0.62 |
 | Exact P1 questions and state | 0.94 | 0.93 | 0.94 |
 | Python spacing, escaping and envelope order | 0.52 | 0.55 | 0.56 |

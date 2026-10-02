@@ -1,12 +1,12 @@
 # Convergence break receipts
 
-Generated 2026-10-02T15:40:37.610Z, Node v26.3.1. Baseline and restored suite: 331/331 passed. Each of 62 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-02T16:58:46.665Z, Node v26.3.1. Baseline and restored suite: 331/331 passed. Each of 62 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Convergence cases exercise authenticated history, scope, finding fates, severity, retry and complete evidence transport. The Jev tail-loss case deletes the final batch in adapter source; separate core source mutations remove author authentication, MINOR demotion and MAJOR verification.
 
 Most breaks are controlled service/input counterexamples selected by MARGOT_ADAPTER_BREAK; error cases repair their bad input. They do not claim exhaustive source mutation coverage or independence. Declared source mutations run without that variable and are identified in the manifest. No live service or paid model call occurs in the harness.
 
-Manifest SHA-256: e1e6abc7b964b15681fd692d1b0573afcb34c00105ecc5cd2e404cc3306a9628. Reproduce: npm run test:ledger-breaks.
+Manifest SHA-256: 333c7be64700b0bafc64d79bc22eb346d2d62f187baf347e7dca953637d357ef. Reproduce: npm run test:ledger-breaks.
 
 | Test | Deliberate break | Observed |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ Manifest SHA-256: e1e6abc7b964b15681fd692d1b0573afcb34c00105ecc5cd2e404cc3306a96
 | Changed dismissed code can receive a new ruling | Remove the delta reopening citation | 1 failed; 330 passed |
 | Card cannot attribute another ledger key | Repair the unknown ledger key | 1 failed; 330 passed |
 | New delta findings require scope attribution | Restore omitted new-finding attribution | 1 failed; 330 passed |
-| Card cannot forge engine advisory annotations | Remove forged engine-only advisory annotation | 1 failed; 330 passed |
+| Card cannot forge Margot advisory annotations | Remove forged Margot-only advisory annotation | 1 failed; 330 passed |
 | Silent MAJOR returns to voice for confirmation | Remove prior standing MAJOR | 1 failed; 330 passed |
 | Silent MINOR counts as fixed | Make the prior finding MAJOR and uphold it | 1 failed; 330 passed |
 | Voice-confirmed fix counts once | Establish the silent finding instead of confirming it fixed | 1 failed; 330 passed |
@@ -56,7 +56,7 @@ Manifest SHA-256: e1e6abc7b964b15681fd692d1b0573afcb34c00105ecc5cd2e404cc3306a96
 | Delta-reach regression blocks at honest severity | Lower delta-reach MAJOR to MINOR | 1 failed; 330 passed |
 | An info-tagged repeat cannot silently close a MAJOR | Change the repeat from info to an explicit issue | 1 failed; 330 passed |
 | Changed PR evidence invalidates saved approval | Leave PR body unchanged | 1 failed; 330 passed |
-| Voice cannot reestablish demoted advisory | Remove engine advisory annotation | 1 failed; 330 passed |
+| Voice cannot reestablish demoted advisory | Remove Margot advisory annotation | 1 failed; 330 passed |
 | Large CLI evidence arrives complete through stdin | Replace stdin with truncated evidence | 1 failed; 330 passed |
 | Jev batching retains every evidence byte | Delete the final Jev evidence batch in the adapter source | 1 failed; 330 passed |
 | Jev batch risk takes conservative maximum tails | Remove HIGH answer from last evidence batch | 1 failed; 330 passed |

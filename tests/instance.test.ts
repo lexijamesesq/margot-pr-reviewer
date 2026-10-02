@@ -13,13 +13,13 @@ import {
 import { instanceExitCode, runInstanceCommand } from "../src/instance-cli.js";
 
 const broken = process.env.MARGOT_INSTANCE_BREAK;
-const engineRootPlaceholder = `\${ENGINE_ROOT}`;
+const margotRootPlaceholder = `\${MARGOT_ROOT}`;
 const head = "a".repeat(40);
 const base = "b".repeat(40);
 const deployment = {
-  version: "0.6.0",
+  version: "0.6.1",
   packageReference:
-    "https://github.com/example/margot-pr-reviewer/releases/download/v0.6.0/margot-pr-reviewer-0.6.0.tgz",
+    "https://github.com/example/margot-pr-reviewer/releases/download/v0.6.1/margot-pr-reviewer-0.6.1.tgz",
   packageIntegrity: `sha512-${"A".repeat(86)}==`,
   packageSha256: "c".repeat(64),
 };
@@ -52,16 +52,16 @@ const config = {
   github: { freshShadow: false },
   jev: { model: "jev-test" },
   claude: {
-    executable: `${engineRootPlaceholder}/node_modules/.bin/claude`,
+    executable: `${margotRootPlaceholder}/node_modules/.bin/claude`,
     ticketing: {
       server: "tickets",
-      command: `${engineRootPlaceholder}/node_modules/.bin/tickets`,
+      command: `${margotRootPlaceholder}/node_modules/.bin/tickets`,
       args: [],
       env: ["TICKET_TOKEN"],
       tools: ["mcp__tickets__read"],
     },
     version: "1.2.3",
-    pluginDirectory: `${engineRootPlaceholder}/publish-skills`,
+    pluginDirectory: `${margotRootPlaceholder}/publish-skills`,
     reviewerModel: "reviewer",
   },
   publisher: {
@@ -87,7 +87,7 @@ const bindInput = (overrides: Partial<BindRequestInput> = {}): BindRequestInput 
   expectedHead: head,
   phase: "review",
   authority: true,
-  engineRoot: "/runtime/margot",
+  margotRoot: "/runtime/margot",
   config,
   requiredChecks: ["ci / checks"],
   protectedPaths: [".github/**"],
@@ -129,7 +129,7 @@ async function bindCommandFixture(authority: "true" | "false" = "false") {
       "review",
       "--authority",
       authority,
-      "--engine-root",
+      "--margot-root",
       directory,
       "--config",
       configFile,
@@ -229,7 +229,7 @@ it.each([
     {
       deployment: {
         ...deployment,
-        packageReference: deployment.packageReference.replaceAll("0.6.0", "0.6.1"),
+        packageReference: deployment.packageReference.replaceAll("0.6.1", "0.6.2"),
       },
     },
   ],
@@ -265,7 +265,7 @@ it.each([
     `${deployment.packageReference}#x`,
   ],
 ] as const)("%s: %s", (id, _name, replacement) => {
-  const packageReference = replacement.includes("margot-pr-reviewer-0.6.0.tgz")
+  const packageReference = replacement.includes("margot-pr-reviewer-0.6.1.tgz")
     ? replacement
     : deployment.packageReference.replace("https://github.com", replacement);
   expect(() =>
@@ -421,14 +421,14 @@ it("requires an absolute runtime root", async () => {
   expect(
     await captureError(() =>
       bindRequest(
-        bindInput({ engineRoot: broken === "absolute-root" ? "/runtime" : "relative" }),
+        bindInput({ margotRoot: broken === "absolute-root" ? "/runtime" : "relative" }),
         readPull(),
       ),
     ),
   ).toBeInstanceOf(Error);
 });
 
-it("writes the two bound files privately under the engine root", async () => {
+it("writes the two bound files privately under the Margot root", async () => {
   const directory = await mkdtemp(join(tmpdir(), "margot-bind-"));
   directories.push(directory);
   const configFile = join(directory, "trusted.json");
@@ -443,7 +443,7 @@ it("writes the two bound files privately under the engine root", async () => {
     },
   };
   const result = await bindRequestFiles(
-    { ...bindInput({ engineRoot: directory }), configFile },
+    { ...bindInput({ margotRoot: directory }), configFile },
     "read-token",
     github as never,
   );

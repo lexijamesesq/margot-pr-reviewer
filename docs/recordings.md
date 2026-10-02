@@ -2,7 +2,7 @@
 
 Seven historical captures were normalized into the service contract. The following
 SHA-256 digests identify the original captured emit files without publishing their
-repository names or metadata. Historical outputs predate this engine; no Jev or
+repository names or metadata. Historical outputs predate this Margot; no Jev or
 review-model calls were made to create these fixtures.
 
 | Recording | Source emit SHA-256 | Diff evidence |
@@ -25,7 +25,7 @@ policy instead.
 
 All cases have reconstructed three-way classifier responses and check receipts:
 the historical service captured an earlier question shape. These are explicitly
-recorded services for engine wiring, not evidence of current model judgment.
+recorded services for Margot wiring, not evidence of current model judgment.
 Selected card findings, numerical risk distributions and voice outcomes derive
 from the captures. Checked evidence retains each card's first captured probe when
 available. Voice dispositions are normalized by finding ID; the invalid-accounting

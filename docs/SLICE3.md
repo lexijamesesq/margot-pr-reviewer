@@ -1,6 +1,6 @@
 # Slice 3: the author fixes and Margot reviews again
 
-The engine now reviews later rounds, carries authenticated finding history, and
+The Margot now reviews later rounds, carries authenticated finding history, and
 keeps the same decision and counts when the same head is retried. All work is on
 `slice3-convergence`, with local commits only. Python remains the production
 reviewer. No GitHub object was created, edited or posted; no branch was pushed.
@@ -118,7 +118,7 @@ The additional two new entries in #403 R2 come from separate cards raising the
 permission failure and the edited PR description's contrary claim. Both original
 serious fixes and all minor fixes are accounted for. First-round and band
 comparisons have the same limitations described above. In particular, importing
-Python's earlier ledger does not pretend the engine itself raised those findings.
+Python's earlier ledger does not pretend Margot itself raised those findings.
 
 ## Recorded proof and tests
 

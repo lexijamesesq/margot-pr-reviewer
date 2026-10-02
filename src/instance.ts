@@ -83,7 +83,7 @@ export type BindRequestInput = {
   expectedHead: string;
   phase: "triage" | "review";
   authority: boolean;
-  engineRoot: string;
+  margotRoot: string;
   config: unknown;
   requiredChecks: string[];
   protectedPaths: string[];
@@ -97,15 +97,15 @@ export class StaleRequestError extends Error {
   }
 }
 
-function resolveEngineRoot(value: string, engineRoot: string) {
-  return value.replaceAll(`\${ENGINE_ROOT}`, engineRoot);
+function resolveMargotRoot(value: string, margotRoot: string) {
+  return value.replaceAll(`\${MARGOT_ROOT}`, margotRoot);
 }
 
 export async function bindRequest(input: BindRequestInput, readPull: PullReader) {
   const repository = repositorySchema.parse(input.repository);
   const expectedHead = shaSchema.parse(input.expectedHead);
   if (!Number.isSafeInteger(input.pr) || input.pr < 1) throw new Error("Invalid PR number");
-  if (!isAbsolute(input.engineRoot)) throw new Error("Engine root must be absolute");
+  if (!isAbsolute(input.margotRoot)) throw new Error("Margot root must be absolute");
 
   const suppliedConfig = liveConfigSchema.parse(input.config);
   const pull = pullSchema.parse(await readPull(repository, input.pr));
@@ -126,15 +126,15 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
   config.review.allowedSkippedChecks = input.allowedSkippedChecks;
   config.review.publication = input.authority ? "github" : "none";
   config.github.shadowBeforeHead = !input.authority;
-  config.claude.executable = resolveEngineRoot(config.claude.executable, input.engineRoot);
-  config.claude.pluginDirectory = resolveEngineRoot(
+  config.claude.executable = resolveMargotRoot(config.claude.executable, input.margotRoot);
+  config.claude.pluginDirectory = resolveMargotRoot(
     config.claude.pluginDirectory,
-    input.engineRoot,
+    input.margotRoot,
   );
   if (config.claude.ticketing)
-    config.claude.ticketing.command = resolveEngineRoot(
+    config.claude.ticketing.command = resolveMargotRoot(
       config.claude.ticketing.command,
-      input.engineRoot,
+      input.margotRoot,
     );
   const boundConfig = liveConfigSchema.parse(config);
   const request = requestSchema.parse({
@@ -160,10 +160,10 @@ export async function bindRequestFiles(
     return (await github.rest.pulls.get({ owner, repo, pull_number: pr })).data;
   });
   await Promise.all([
-    writeFile(join(input.engineRoot, "request.json"), `${JSON.stringify(bound.request)}\n`, {
+    writeFile(join(input.margotRoot, "request.json"), `${JSON.stringify(bound.request)}\n`, {
       mode: 0o600,
     }),
-    writeFile(join(input.engineRoot, "config.json"), `${JSON.stringify(bound.config)}\n`, {
+    writeFile(join(input.margotRoot, "config.json"), `${JSON.stringify(bound.config)}\n`, {
       mode: 0o600,
     }),
   ]);

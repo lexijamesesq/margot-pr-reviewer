@@ -18,18 +18,18 @@ jobs:
           node-version: 22
       - name: Bootstrap the exact release bytes
         env:
-          ENGINE_ROOT: ${{ runner.temp }}/margot
+          MARGOT_ROOT: ${{ runner.temp }}/margot
           DEPLOYMENT: /trusted/margot/deployment.json
         run: |
           set -euo pipefail
-          mkdir -p "$ENGINE_ROOT"
+          mkdir -p "$MARGOT_ROOT"
           package=$(jq -r .packageReference "$DEPLOYMENT")
           sha256=$(jq -r .packageSha256 "$DEPLOYMENT")
-          archive="$ENGINE_ROOT/margot-pr-reviewer.tgz"
+          archive="$MARGOT_ROOT/margot-pr-reviewer.tgz"
           curl --fail --location --silent --show-error "$package" --output "$archive"
           echo "$sha256  $archive" | sha256sum --check
-          npm install --prefix "$ENGINE_ROOT" --ignore-scripts --save-exact "$archive"
-          echo "ENGINE_ROOT=$ENGINE_ROOT" >> "$GITHUB_ENV"
+          npm install --prefix "$MARGOT_ROOT" --ignore-scripts --save-exact "$archive"
+          echo "MARGOT_ROOT=$MARGOT_ROOT" >> "$GITHUB_ENV"
       # Integrity is established before install by the SHA-256 check above.
       # This installed command is the post-install consistency check of the
       # pin's shape and target enrolment; it is not the byte-integrity control.
@@ -38,7 +38,7 @@ jobs:
         env:
           TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
         run: |
-          "$ENGINE_ROOT/node_modules/.bin/margot-instance" validate-deployment \
+          "$MARGOT_ROOT/node_modules/.bin/margot-instance" validate-deployment \
             --deployment /trusted/margot/deployment.json \
             --release-repository YOUR_ORG/margot-pr-reviewer \
             --repository "$TARGET_REPO" \
@@ -61,18 +61,18 @@ jobs:
           node-version: 22
       - name: Bootstrap the exact release bytes
         env:
-          ENGINE_ROOT: ${{ runner.temp }}/margot
+          MARGOT_ROOT: ${{ runner.temp }}/margot
           DEPLOYMENT: /trusted/margot/deployment.json
         run: |
           set -euo pipefail
-          mkdir -p "$ENGINE_ROOT"
+          mkdir -p "$MARGOT_ROOT"
           package=$(jq -r .packageReference "$DEPLOYMENT")
           sha256=$(jq -r .packageSha256 "$DEPLOYMENT")
-          archive="$ENGINE_ROOT/margot-pr-reviewer.tgz"
+          archive="$MARGOT_ROOT/margot-pr-reviewer.tgz"
           curl --fail --location --silent --show-error "$package" --output "$archive"
           echo "$sha256  $archive" | sha256sum --check
-          npm install --prefix "$ENGINE_ROOT" --ignore-scripts --save-exact "$archive"
-          echo "ENGINE_ROOT=$ENGINE_ROOT" >> "$GITHUB_ENV"
+          npm install --prefix "$MARGOT_ROOT" --ignore-scripts --save-exact "$archive"
+          echo "MARGOT_ROOT=$MARGOT_ROOT" >> "$GITHUB_ENV"
       - name: Bind trusted configuration to the requested PR
         id: bind
         env:
@@ -83,10 +83,10 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set +e
-          "$ENGINE_ROOT/node_modules/.bin/margot-instance" bind-request \
+          "$MARGOT_ROOT/node_modules/.bin/margot-instance" bind-request \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
             --phase review --authority "${{ needs.route.outputs.authority }}" \
-            --engine-root "$ENGINE_ROOT" --config /trusted/margot/config.json \
+            --margot-root "$MARGOT_ROOT" --config /trusted/margot/config.json \
             --required-checks '["YOUR_REQUIRED_CHECK"]' \
             --protected-paths '["YOUR_AUTHORITY_PATH/**"]' \
             --allowed-skipped-checks '[]' --run-url "$RUN_URL"
@@ -104,10 +104,10 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.EXAMPLE_CLAUDE_OAUTH_TOKEN }}
           YOUR_TICKETING_CREDENTIAL_ENV_VAR: ${{ secrets.EXAMPLE_TICKETING_CREDENTIAL }}
         run: |
-          "$ENGINE_ROOT/node_modules/.bin/margot-review" \
-            "$ENGINE_ROOT/request.json" "$ENGINE_ROOT/config.json" "$ENGINE_ROOT/result.json"
+          "$MARGOT_ROOT/node_modules/.bin/margot-review" \
+            "$MARGOT_ROOT/request.json" "$MARGOT_ROOT/config.json" "$MARGOT_ROOT/result.json"
           published=$(jq -r 'if .result.publication == null then "" else "true" end' \
-            "$ENGINE_ROOT/result.json")
+            "$MARGOT_ROOT/result.json")
           echo "published=$published" >> "$GITHUB_OUTPUT"
 
   close-stranded-check:
@@ -124,18 +124,18 @@ jobs:
           node-version: 22
       - name: Bootstrap the exact release bytes
         env:
-          ENGINE_ROOT: ${{ runner.temp }}/margot
+          MARGOT_ROOT: ${{ runner.temp }}/margot
           DEPLOYMENT_JSON: ${{ vars.YOUR_MARGOT_DEPLOYMENT_JSON }}
         run: |
           set -euo pipefail
-          mkdir -p "$ENGINE_ROOT"
+          mkdir -p "$MARGOT_ROOT"
           package=$(jq -r .packageReference <<< "$DEPLOYMENT_JSON")
           sha256=$(jq -r .packageSha256 <<< "$DEPLOYMENT_JSON")
-          archive="$ENGINE_ROOT/margot-pr-reviewer.tgz"
+          archive="$MARGOT_ROOT/margot-pr-reviewer.tgz"
           curl --fail --location --silent --show-error "$package" --output "$archive"
           echo "$sha256  $archive" | sha256sum --check
-          npm install --prefix "$ENGINE_ROOT" --ignore-scripts --save-exact "$archive"
-          echo "ENGINE_ROOT=$ENGINE_ROOT" >> "$GITHUB_ENV"
+          npm install --prefix "$MARGOT_ROOT" --ignore-scripts --save-exact "$archive"
+          echo "MARGOT_ROOT=$MARGOT_ROOT" >> "$GITHUB_ENV"
       - name: Close a review check left in progress
         env:
           GH_TOKEN: ${{ github.token }}
@@ -150,7 +150,7 @@ jobs:
           PUBLISHED: ${{ needs.review.outputs.published }}
           STOP_REASON: ${{ needs.review.outputs.stop_reason }}
         run: |
-          "$ENGINE_ROOT/node_modules/.bin/margot-instance" close-stranded-check \
+          "$MARGOT_ROOT/node_modules/.bin/margot-instance" close-stranded-check \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
             --app-id "$MARGOT_APP_ID" --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
             --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \

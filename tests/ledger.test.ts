@@ -344,7 +344,7 @@ scenario("ledger-attribution", (b) => {
   if (!b) delete f.late;
   return rejects(() => prepareFindings([card([f])], scope([])));
 });
-scenario("ledger-engine-fields", (b) =>
+scenario("ledger-margot-fields", (b) =>
   rejects(() =>
     prepareFindings(
       [card([finding("MAJOR", b ? {} : { advisory: "carried-dismissal" })])],
@@ -459,7 +459,7 @@ scenario(
 scenario("ledger-budget", (b) =>
   rejects(() => ledgerBlock(prior([{ ...entry(), what: "x".repeat(b ? 10 : 50000) }]))),
 );
-async function engine(b: boolean, classification = "mechanical", editorial = false) {
+async function margot(b: boolean, classification = "mechanical", editorial = false) {
   const r = structuredClone(source);
   r.config = { ...config, publication: "none" };
   r.facts = history();
@@ -494,7 +494,7 @@ async function engine(b: boolean, classification = "mechanical", editorial = fal
 scenario(
   "ledger-mechanical-recall",
   async (b) => {
-    const { result } = await engine(b);
+    const { result } = await margot(b);
     return result;
   },
   { kind: "reviewed", decision: { outcome: "CHANGES_REQUESTED" }, cards: [{ name: "safety" }] },
@@ -502,7 +502,7 @@ scenario(
 scenario(
   "ledger-editorial-recall",
   async (b) => {
-    const { result } = await engine(b, "documentation", true);
+    const { result } = await margot(b, "documentation", true);
     return result;
   },
   { kind: "reviewed", decision: { outcome: "CHANGES_REQUESTED" }, cards: [{ name: "safety" }] },
@@ -510,7 +510,7 @@ scenario(
 scenario(
   "ledger-card-isolation",
   async (b) => {
-    const { r } = await engine(false);
+    const { r } = await margot(false);
     const f = history(
       prior([entry(), { ...entry("MAJOR", "dismissed"), key: "R1-F2", card: "house-style" }]),
     );
@@ -535,7 +535,7 @@ scenario(
 scenario(
   "ledger-retry",
   async (b) => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed") throw new Error("baseline");
     const f = factsSchema.parse(r.facts);
     f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
@@ -553,7 +553,7 @@ scenario(
 scenario(
   "ledger-retry-040-receipt",
   async () => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed" || !result.ledger.receipt) throw new Error("baseline");
     const {
       routeAnswer: _routeAnswer,
@@ -586,7 +586,7 @@ scenario(
 scenario(
   "ledger-retry-checks",
   async (b) => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed") throw new Error("baseline");
     const f = factsSchema.parse(r.facts);
     f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
@@ -599,7 +599,7 @@ scenario(
 scenario(
   "ledger-retry-legacy",
   async (b) => {
-    const { r } = await engine(false);
+    const { r } = await margot(false);
     r.facts = history({ ...prior(), head: b ? oldHead : facts.head });
     return await review(r.request, r.config, recordedServices(r));
   },
@@ -723,7 +723,7 @@ scenario(
 scenario(
   "ledger-retry-evidence",
   async (b) => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed") throw new Error("baseline");
     const f = factsSchema.parse(r.facts);
     f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
@@ -923,7 +923,7 @@ scenario(
 scenario(
   "ledger-retry-provenance",
   async (b) => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed") throw new Error("baseline");
     const f = factsSchema.parse(r.facts);
     f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };

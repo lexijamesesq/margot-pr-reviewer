@@ -2,7 +2,7 @@
   "limitations": [
     "Historical code heads are exact. PR titles and bodies are the current GitHub values, since historical edited bodies are unavailable.",
     "Historical shadow checks were recorded separately; requiredChecks was explicitly empty and publication was none.",
-    "Migration rounds consume actual prior Python App reviews. Chained shadow rounds supply the preceding local engine report as a would-be App review; no GitHub review was posted.",
+    "Migration rounds consume actual prior Python App reviews. Chained shadow rounds supply the preceding local Margot report as a would-be App review; no GitHub review was posted.",
     "Same-head final check verifies the immutable historical commit exists, rather than asserting it remains the current PR tip. Production freshness stays covered by adapter tests."
   ],
   "receipts": [

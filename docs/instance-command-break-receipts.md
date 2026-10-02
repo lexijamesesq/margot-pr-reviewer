@@ -1,12 +1,12 @@
 # Instance command break receipts
 
-Generated 2026-10-02T15:50:25.181Z, Node v26.3.1. Baseline and restored suite: 331/331 passed. Each of 41 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-02T17:08:00.502Z, Node v26.3.1. Baseline and restored suite: 331/331 passed. Each of 41 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Instance command cases exercise exact release references, enrolment, authority selection, GitHub outputs, request admission, trusted policy binding, CLI flag mapping, and bound-file writes.
 
 Most breaks are controlled service/input counterexamples selected by MARGOT_INSTANCE_BREAK; error cases repair their bad input. They do not claim exhaustive source mutation coverage or independence. Declared source mutations run without that variable and are identified in the manifest. No live service or paid model call occurs in the harness.
 
-Manifest SHA-256: 06524d3f4f2c58377eb6adb559cf4230f09a99c7103473637bd14536c8f21cd3. Reproduce: npm run test:instance-command-breaks.
+Manifest SHA-256: b89adb386c823fcf867b3f9b8359860a28ba9d639ad92a59a2b5cbccff9fd00d. Reproduce: npm run test:instance-command-breaks.
 
 | Test | Deliberate break | Observed |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ Manifest SHA-256: 06524d3f4f2c58377eb6adb559cf4230f09a99c7103473637bd14536c8f21c
 | signals a superseded head to shell callers with EX_TEMPFAIL | Replace the moved head with a same-message fork refusal | 1 failed; 330 passed |
 | rejects an invalid trusted configuration before reading GitHub | Restore the valid trusted configuration | 1 failed; 330 passed |
 | requires an absolute runtime root | Restore the absolute runtime root | 1 failed; 330 passed |
-| writes the two bound files privately under the engine root | Bind a different base revision | 1 failed; 330 passed |
+| writes the two bound files privately under the Margot root | Bind a different base revision | 1 failed; 330 passed |
 | requires GH_TOKEN before reading configuration or GitHub | Supply a token and continue past the token guard | 1 failed; 330 passed |
 | rejects unknown deployment command arguments | Remove the unknown command argument | 1 failed; 330 passed |
 | rejects duplicate flags after parseArgs | Remove the duplicate repository flag | 1 failed; 330 passed |
