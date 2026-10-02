@@ -44,6 +44,7 @@ export const configSchema = z
     riskTailThreshold: probability,
     confidenceThreshold: probability,
     noCouncilConfidenceFloor: probability,
+    mechanicalDiffLineCap: z.number().int().positive().default(2000),
     timeoutMs: z.number().int().positive(),
     publication: z.enum(["record", "none", "github"]),
     calibration: z.boolean(),
@@ -136,6 +137,7 @@ export const findingSchema = z.strictObject({
   confidence: z.enum(["LOW", "MEDIUM", "HIGH"]),
   location: text,
   what: text,
+  detail: text.optional(),
   ledger: z
     .string()
     .regex(/^R[1-9]\d*-F[1-9]\d*$/)
@@ -246,6 +248,7 @@ export const decisionSchema = z.strictObject({
   rating: ratingSchema,
   mergeEligible: z.boolean(),
   holdReasons: z.array(text),
+  authorityPaths: z.array(text).optional(),
 });
 export const reviewCoreSchema = z.strictObject({
   request: requestSchema,

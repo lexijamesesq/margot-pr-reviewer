@@ -50,7 +50,8 @@ export function parseCard(raw: string, name: Card["name"]): Card {
       location: match[2],
       severity: match[3],
       confidence: match[4],
-      what: `${field(body, "what")} Consequence: ${field(body, "consequence")} ${match[1] === "issue" ? field(body, "action") : field(body, "note")}`,
+      what: field(body, "what"),
+      detail: `Consequence: ${field(body, "consequence")} ${match[1] === "issue" ? field(body, "action") : field(body, "note")}`,
     };
   });
   // A misplaced tagged finding is an error, not an empty clean card.

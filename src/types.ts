@@ -31,7 +31,20 @@ export type Decision = z.infer<typeof decisionSchema>;
 export type Ledger = z.infer<typeof ledgerSchema>;
 export type Convergence = z.infer<typeof convergenceSchema>;
 export type ReviewCore = z.infer<typeof reviewCoreSchema>;
-export type Review = ReviewCore & { ledger: Ledger; convergence: Convergence };
+export type ReviewPresentation = {
+  author: string;
+  costUsd: number | null;
+  durationMs: number;
+  files: number;
+  runUrl: string | null;
+  ticket: { label: string; url: string } | null;
+  skipReasons?: Partial<Record<Card["name"], string>>;
+};
+export type Review = ReviewCore & {
+  ledger: Ledger;
+  convergence: Convergence;
+  presentation?: ReviewPresentation;
+};
 export type RoundScope = {
   round: number;
   priorHead: string | null;
@@ -49,8 +62,16 @@ export type ReviewResult =
   | { kind: "classified"; request: ReviewRequest; classification: Classification }
   | { kind: "error"; stage: string; diagnostic: string; mergeEligible: false };
 export type CallContext = { signal: AbortSignal };
+export type ReviewPhaseTitle =
+  | "Margot: preflight complete — setting up the review runner"
+  | "Margot: council is reviewing the changes"
+  | "Margot: posting the verdict";
 export interface Services {
   readonly provenance: string;
+  /** Transient operator-facing run data; never part of the convergence receipt. */
+  reviewMetadata?(): { costUsd?: number; durationMs?: number; runUrl?: string };
+  /** Report a phase only after the review has actually entered it. */
+  progress?(title: ReviewPhaseTitle, context: CallContext): Promise<unknown>;
   facts(request: ReviewRequest, context: CallContext): Promise<unknown>;
   compare?(request: ReviewRequest, priorHead: string, context: CallContext): Promise<unknown>;
   classify(

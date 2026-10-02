@@ -96,6 +96,7 @@ for (const scenario of scenarios) {
                 provenance: result.provenance,
                 ledger: result.ledger,
                 convergence: result.convergence,
+                presentation: result.presentation,
               },
               report: result.report,
             }),

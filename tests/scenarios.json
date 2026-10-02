@@ -1816,7 +1816,7 @@
     "defect": "Repair approval with established findings."
   },
   {
-    "name": "BLOCKING info findings require voice accounting",
+    "name": "a BLOCKING info finding summons the voice, which need not dispose of it",
     "recording": "council-clear",
     "patches": [
       {
@@ -1876,8 +1876,8 @@
       }
     ],
     "expected": {
-      "kind": "error",
-      "stage": "voice"
+      "kind": "reviewed",
+      "eligible": false
     },
     "break": [
       {
@@ -1885,10 +1885,10 @@
         "value": "MINOR"
       }
     ],
-    "defect": "Reduce the informational finding below the blocking threshold."
+    "defect": "Reduce the informational finding below the blocking threshold, so nothing summons the voice."
   },
   {
-    "name": "objective questions require voice accounting",
+    "name": "an achieves-the-objective finding summons the voice, which need not dispose of it",
     "recording": "council-clear",
     "patches": [
       {
@@ -1960,8 +1960,8 @@
       }
     ],
     "expected": {
-      "kind": "error",
-      "stage": "voice"
+      "kind": "reviewed",
+      "eligible": false
     },
     "break": [
       {
@@ -1969,7 +1969,7 @@
         "value": []
       }
     ],
-    "defect": "Lose the objective question."
+    "defect": "Lose the objective question, so nothing summons the voice."
   },
   {
     "name": "functional authority paths hold",

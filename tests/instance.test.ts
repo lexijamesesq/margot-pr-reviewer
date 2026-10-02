@@ -17,9 +17,9 @@ const engineRootPlaceholder = `\${ENGINE_ROOT}`;
 const head = "a".repeat(40);
 const base = "b".repeat(40);
 const deployment = {
-  version: "0.5.0",
+  version: "0.5.2",
   packageReference:
-    "https://github.com/example/margot-pr-reviewer/releases/download/v0.5.0/margot-pr-reviewer-0.5.0.tgz",
+    "https://github.com/example/margot-pr-reviewer/releases/download/v0.5.2/margot-pr-reviewer-0.5.2.tgz",
   packageIntegrity: `sha512-${"A".repeat(86)}==`,
   packageSha256: "c".repeat(64),
 };
@@ -176,7 +176,7 @@ it.each([
     {
       deployment: {
         ...deployment,
-        packageReference: deployment.packageReference.replaceAll("0.5.0", "0.5.1"),
+        packageReference: deployment.packageReference.replaceAll("0.5.2", "0.5.3"),
       },
     },
   ],
@@ -212,7 +212,7 @@ it.each([
     `${deployment.packageReference}#x`,
   ],
 ] as const)("%s: %s", (id, _name, replacement) => {
-  const packageReference = replacement.includes("margot-pr-reviewer-0.5.0.tgz")
+  const packageReference = replacement.includes("margot-pr-reviewer-0.5.2.tgz")
     ? replacement
     : deployment.packageReference.replace("https://github.com", replacement);
   expect(() =>
@@ -318,19 +318,19 @@ it("resolves runtime placeholders in Claude and ticketing paths", async () => {
 });
 
 it.each([
-  ["closed", "rejects a closed PR", { state: "closed" }, "Pull request is not open"],
-  ["draft", "rejects a draft PR", { draft: true }, "Pull request is a draft"],
+  ["closed", "rejects a closed PR", { state: "closed" }, "Margot: not reviewed: closed"],
+  ["draft", "rejects a draft PR", { draft: true }, "Margot: not reviewed: draft"],
   [
     "fork",
     "rejects a fork PR",
     { head: { ...pull.head, repo: { full_name: "fork/project" } } },
-    "Stale or untrusted request",
+    "Margot: not reviewed: fork",
   ],
   [
     "moved",
     "rejects a moved head",
     { head: { ...pull.head, sha: "f".repeat(40) } },
-    "Stale or untrusted request",
+    "Margot: not reviewed: stale",
   ],
 ] as const)("%s: %s", async (id, _name, changed, reason) => {
   const candidate = broken === id ? pull : { ...pull, ...changed };

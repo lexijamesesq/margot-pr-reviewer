@@ -98,17 +98,23 @@ export function rate(
     voiceOverride: null,
   };
 }
+/** The findings the voice must rule on: this round's non-advisory `[issue]` findings — Python's
+ * rule. An `[info]` is never mandatory; a BLOCKING `[info]` or any achieves-the-objective
+ * finding summons the voice (see `needsVoice`) but is not an ID it must dispose of. */
 export function mandatory(cards: Card[]): string[] {
   return cards.flatMap((card) =>
-    card.findings
-      .filter(
-        (f) =>
-          !f.advisory &&
-          (f.tag === "issue" ||
-            f.severity === "BLOCKING" ||
-            card.name === "achieves-the-objective"),
-      )
-      .map((f) => f.id),
+    card.findings.filter((f) => !f.advisory && f.tag === "issue").map((f) => f.id),
+  );
+}
+/** Code cannot affirmatively clear the PR, so the voice rules: any mandatory finding, an
+ * achieves-the-objective finding (the clarification signal), a BLOCKING `[info]`, a band above
+ * LOW, or Jev's own doubt. */
+function summonsVoice(cards: Card[]): boolean {
+  return cards.some(
+    (card) =>
+      card.findings.some((f) => !f.advisory && f.tag === "issue") ||
+      (card.name === "achieves-the-objective" && card.findings.length > 0) ||
+      card.findings.some((f) => f.severity === "BLOCKING"),
   );
 }
 export function needsVoice(
@@ -117,7 +123,7 @@ export function needsVoice(
   routeConfidence: number,
   config: ReviewConfig,
 ): boolean {
-  if (mandatory(cards).length > 0 || rating.band !== "LOW") return true;
+  if (summonsVoice(cards) || rating.band !== "LOW") return true;
   if (cards.length === 0 && routeConfidence < config.confidenceThreshold) return true;
   return (
     rating.evidence !== null &&
@@ -162,6 +168,15 @@ export function decide(
     : rating;
   const holdReasons: string[] = [];
   const protectedPath = picomatch(config.protectedPaths, { dot: true });
+  const authorityPaths = [
+    ...new Set(
+      facts.files.flatMap((file) =>
+        [file.path, ...(file.previousPath ? [file.previousPath] : [])].filter((path) =>
+          protectedPath(path),
+        ),
+      ),
+    ),
+  ];
   const protectedRename = facts.files.some(
     (f) => f.previousPath && (protectedPath(f.path) || protectedPath(f.previousPath)),
   );
@@ -174,5 +189,11 @@ export function decide(
   if (config.calibration) holdReasons.push("calibration");
   const outcome = voice?.outcome ?? "APPROVED";
   if (outcome !== "APPROVED") holdReasons.push("author-action");
-  return { outcome, rating: finalRating, mergeEligible: holdReasons.length === 0, holdReasons };
+  return {
+    outcome,
+    rating: finalRating,
+    mergeEligible: holdReasons.length === 0,
+    holdReasons,
+    authorityPaths,
+  };
 }

@@ -33,6 +33,7 @@ export function recordedServices(
   };
   return {
     provenance: data.provenance,
+    reviewMetadata: () => ({ costUsd: 0, durationMs: 0 }),
     calls,
     publications,
     facts: (request) => read("facts", request, data.facts),

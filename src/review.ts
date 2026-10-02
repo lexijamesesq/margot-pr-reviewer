@@ -1,3 +1,4 @@
+import { changedLineCount } from "./diff.js";
 import {
   configHash,
   evidenceHash,
@@ -38,10 +39,16 @@ import type {
   Facts,
   Review,
   ReviewCore,
+  ReviewPhaseTitle,
   ReviewResult,
   Services,
   Voice,
 } from "./types.js";
+
+function ticket(body: string): { label: string; url: string } | null {
+  const match = body.match(/https:\/\/[^\s/)]+\/[^\s)]*\/issue\/([^\s/?#)]+)/i);
+  return match?.[0] && match[1] ? { label: match[1], url: match[0] } : null;
+}
 
 /** Validate all external data, including data returned by a typed adapter. */
 type CheckFact = Facts["checks"][number];
@@ -63,6 +70,7 @@ export async function review(
   configInput: unknown,
   services: Services,
 ): Promise<ReviewResult> {
+  const startedAt = Date.now();
   let stage = "input";
   let emergencyDisable: (() => Promise<boolean>) | undefined;
   try {
@@ -91,6 +99,11 @@ export async function review(
     };
     const disableAutoMerge = async (name: string): Promise<boolean> =>
       disableAutoMergeSchema.parse(await call(name, (c) => services.disableAutoMerge(request, c)));
+    const progress = async (title: ReviewPhaseTitle): Promise<void> => {
+      const reportProgress = services.progress;
+      if (reportProgress)
+        await call("publication-progress", (context) => reportProgress(title, context));
+    };
     const facts = factsSchema.parse(await call("facts", (c) => services.facts(request, c)));
     if (facts.autoMergeArmed)
       emergencyDisable = () => disableAutoMerge("disable-auto-merge-after-error");
@@ -127,16 +140,25 @@ export async function review(
         facts.triage.base !== request.base)
     )
       throw new Error("Untrusted triage receipt");
+    // A change larger than this cap is not a candidate for the mechanical
+    // short-circuit. Jev never sees it and the PR takes the full review path: a
+    // huge change is unlikely to be purely mechanical, and review is the safe miss.
+    const oversized = changedLineCount(facts.diff) > config.mechanicalDiffLineCap;
     const classification =
       cached?.review.classification ??
-      classify(
-        classificationSchema.parse(
-          await call("classification", (c) => services.classify(facts, classificationQuestions, c)),
-        ),
-        facts,
-        config,
-      );
+      (oversized
+        ? "functional"
+        : classify(
+            classificationSchema.parse(
+              await call("classification", (c) =>
+                services.classify(facts, classificationQuestions, c),
+              ),
+            ),
+            facts,
+            config,
+          ));
     if (request.phase === "triage") return { kind: "classified", request, classification };
+    await progress("Margot: preflight complete — setting up the review runner");
     stage = "checks";
     for (const name of config.requiredChecks) {
       // One name can carry several runs on one head: a workflow's concurrency cancels a
@@ -203,6 +225,7 @@ export async function review(
         );
         const path = reviewPath(classification, routeAnswer, config);
         if (path.council || recalled.length > 0) {
+          await progress("Margot: council is reviewing the changes");
           const selected = [
             ...new Set([
               ...(path.council ? selectCards(routeAnswer, classification, config) : []),
@@ -297,7 +320,22 @@ export async function review(
       };
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
+    const metadata = services.reviewMetadata?.() ?? {};
+    result = {
+      ...result,
+      presentation: {
+        author: facts.author,
+        costUsd: typeof metadata.costUsd === "number" ? metadata.costUsd : null,
+        durationMs:
+          typeof metadata.durationMs === "number" ? metadata.durationMs : Date.now() - startedAt,
+        files: facts.fileCount,
+        runUrl: metadata.runUrl ?? null,
+        ticket: ticket(facts.body),
+      },
+    };
+    stage = "render";
     const report = render(result);
+    await progress("Margot: posting the verdict");
     let publication = null;
     if (
       shaSchema.parse(await call("publication-head", (c) => services.head(request, c))) !==

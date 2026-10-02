@@ -4,6 +4,14 @@ import { checkText } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
 
+type RefusalReason = "draft" | "fork" | "closed" | "stale";
+
+class PublicationRefusal extends Error {
+  constructor(readonly reason: RefusalReason) {
+    super(`Margot: not reviewed: ${reason}`);
+  }
+}
+
 /** Adopt the caller check by App/name/head; its run URL fences superseded writers. */
 export function githubPublisher(client: Octokit, input: z.infer<typeof publisherSchema>) {
   const config = publisherSchema.parse(input);
@@ -31,16 +39,14 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     const { data } = await client.rest.pulls.get(params(r, c));
     await assertCurrentRun(r, c);
     const merged = allowMerged && data.merged;
-    if (
-      (!merged && (data.state !== "open" || data.base.sha !== r.base)) ||
-      data.draft ||
-      data.head.repo?.full_name !== r.repository ||
-      data.head.sha !== r.head
-    )
-      throw new Error("Publication refused: admission or revision changed");
+    if (!merged && data.state !== "open") throw new PublicationRefusal("closed");
+    if (data.draft) throw new PublicationRefusal("draft");
+    if (data.head.repo?.full_name !== r.repository) throw new PublicationRefusal("fork");
+    if (data.head.sha !== r.head || (!merged && data.base.sha !== r.base))
+      throw new PublicationRefusal("stale");
     return data;
   }
-  async function check(
+  async function writeCheck(
     r: ReviewRequest,
     name: string,
     conclusion: "success" | "neutral" | "action_required" | null,
@@ -49,7 +55,6 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     text: string | undefined,
     c: CallContext,
   ) {
-    await guard(r, c);
     const payload = {
       ...params(r, c),
       name,
@@ -93,6 +98,18 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     if (mismatches.length)
       throw new Error(`Invalid check write receipt for ${name}: ${mismatches.join(", ")}`);
   }
+  async function check(
+    r: ReviewRequest,
+    name: string,
+    conclusion: "success" | "neutral" | "action_required" | null,
+    title: string,
+    summary: string,
+    text: string | undefined,
+    c: CallContext,
+  ) {
+    await guard(r, c);
+    await writeCheck(r, name, conclusion, title, summary, text, c);
+  }
   async function confirmReviewCheck(r: ReviewRequest, conclusion: string, c: CallContext) {
     const id = ids.get(config.checks.review);
     if (!id) throw new Error("Review check was not completed before approval");
@@ -132,6 +149,19 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       c,
     );
   }
+  const progress: NonNullable<Services["progress"]> = async (title, c) => {
+    if (active?.phase !== "review")
+      throw new Error("Review progress requires an active review lifecycle");
+    await check(
+      active,
+      config.checks.review,
+      null,
+      title,
+      "Clearance has not been established.",
+      undefined,
+      c,
+    );
+  };
   const heldReason = (decision: { holdReasons: string[]; rating: { band: string } }) =>
     decision.holdReasons.includes("review-authority")
       ? "a change to Margot's own machinery"
@@ -154,7 +184,10 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       authorityHold
         ? "self-instrument: held for the operator's approval"
         : "self-instrument: clear",
-      `Class: ${review.classification}. ${authorityHold ? "Review authority requires operator approval." : "No review-authority hold."}`,
+      authorityHold
+        ? "This PR changes Margot's own config, the estate ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n" +
+            (decision.authorityPaths ?? []).map((path) => `- \`${path}\``).join("\n")
+        : `No functional change to a protected path (class: ${review.classification}).`,
       undefined,
       c,
     );
@@ -214,18 +247,56 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         r,
         r.phase === "triage" ? config.checks.triage : config.checks.review,
         null,
-        "Margot: reviewing",
+        r.phase === "review" ? "Margot: preflight — mechanical checks" : "Margot: reviewing",
         "Clearance has not been established.",
         undefined,
         context(),
       );
       const result = await evaluate();
-      if (result.kind === "error") throw new Error(`${result.stage}: ${result.diagnostic}`);
+      if (result.kind === "error") {
+        const refusal = result.diagnostic.match(
+          /Margot: not reviewed: (draft|fork|closed|stale)/,
+        )?.[1] as RefusalReason | undefined;
+        if (refusal) throw new PublicationRefusal(refusal);
+        throw new Error(`${result.stage}: ${result.diagnostic}`);
+      }
       if (result.kind === "classified") await triage(r, result.classification, context());
       else if (!result.publication || result.publication.recorded)
         throw new Error("Missing live publication receipt");
       return result;
     } catch (error) {
+      if (error instanceof PublicationRefusal) {
+        const refusalFailures: string[] = [];
+        try {
+          if (!(await disableAutoMerge(r, context())))
+            refusalFailures.push("disable auto-merge cleanup unconfirmed: disable unconfirmed");
+        } catch (disableError) {
+          refusalFailures.push(
+            `disable auto-merge cleanup unconfirmed: ${disableError instanceof Error ? disableError.message : String(disableError)}`,
+          );
+        }
+        try {
+          await writeCheck(
+            r,
+            r.phase === "triage" ? config.checks.triage : config.checks.review,
+            "neutral",
+            error.message,
+            "Clearance has not been established.",
+            undefined,
+            context(),
+          );
+        } catch (refusalError) {
+          refusalFailures.push(
+            `refusal check unconfirmed: ${refusalError instanceof Error ? refusalError.message : String(refusalError)}`,
+          );
+        }
+        return {
+          kind: "error",
+          stage: "publication",
+          mergeEligible: false,
+          diagnostic: `${error.message}${refusalFailures.length ? `; ${refusalFailures.join("; ")}` : ""}`,
+        };
+      }
       const failures: string[] = [];
       // Each cleanup is independent; inability to write can never become a successful result.
       const cleanups: [string, () => Promise<unknown>][] = [
@@ -269,5 +340,5 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       };
     }
   }
-  return { run, publish, disableAutoMerge };
+  return { run, publish, disableAutoMerge, progress };
 }

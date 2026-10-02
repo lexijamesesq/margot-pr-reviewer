@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.5.1.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.5.2.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -67,6 +67,8 @@ list is allowed; missing configuration is rejected. The recordings show every ke
 - `protectedPaths`: picomatch globs for review-authority paths, including dotfiles.
   Functional edits hold. Documentation and mechanical edits do not hold solely
   for a protected path; renames touching either protected endpoint always hold.
+- `mechanicalDiffLineCap`: maximum changed lines eligible for the mechanical
+  short-circuit. The default is 2000; larger changes take the full review path.
 - `requiredChecks`, `trustedCheckActors`, `trustedTriageActors`: caller-owned policy.
   Required checks need one trusted successful receipt on the reviewed head.
   `allowedSkippedChecks` explicitly permits named skipped jobs; its default is empty.
@@ -108,7 +110,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.5.1.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.5.2.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045

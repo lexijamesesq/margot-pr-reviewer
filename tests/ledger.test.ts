@@ -12,7 +12,7 @@ import {
   roundScope,
   selectLedger,
 } from "../src/ledger.js";
-import { mandatory } from "../src/policy.js";
+import { mandatory, validateVoice } from "../src/policy.js";
 import { review } from "../src/review.js";
 import { configSchema, factsSchema, requestSchema } from "../src/schemas.js";
 import type { Card, Ledger, ReviewCore, RoundScope, Voice } from "../src/types.js";
@@ -693,6 +693,32 @@ scenario(
     return { unconfirmed: cards[0]!.findings.filter((f) => f.unconfirmed).length };
   },
   { unconfirmed: 1 },
+);
+scenario(
+  "ledger-astra-unproven",
+  (b) => {
+    const dismissed = { ...entry("MAJOR", "dismissed"), key: "R1-F2" };
+    const cards = [card([])];
+    prepareFindings(cards, scope([entry(b ? "MINOR" : "MAJOR"), dismissed]));
+    const omitted = voice("dismissed", "R1-F2");
+    const accounted: Voice = {
+      ...voice("established"),
+      dispositions: [
+        { id: "verify-R1-F1", status: "established", reason: "Still unproven" },
+        { id: "R1-F2", status: "dismissed", reason: "Prior dismissal remains accepted" },
+      ],
+    };
+    return {
+      synthesized: cards[0]?.findings.map((finding) => finding.id),
+      omittedRejected: rejects(() => validateVoice(cards, omitted)).ok,
+      dismissedAlongsideAccepted: !rejects(() => validateVoice(cards, accounted)).ok,
+    };
+  },
+  {
+    synthesized: ["verify-R1-F1"],
+    omittedRejected: true,
+    dismissedAlongsideAccepted: true,
+  },
 );
 scenario(
   "ledger-retry-evidence",
