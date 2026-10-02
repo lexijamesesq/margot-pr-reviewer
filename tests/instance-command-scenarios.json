@@ -115,33 +115,48 @@
     "defect": "Expect paths under a different runtime root"
   },
   {
+    "id": "unresolved-placeholder",
+    "name": "rejects unresolved placeholders in executable paths at bind time",
+    "defect": "Replace unresolved placeholders with the supported install-root placeholder"
+  },
+  {
+    "id": "superseded",
+    "name": "superseded: classifies a superseded head and writes stop_reason",
+    "defect": "Restore the expected pull-request head"
+  },
+  {
+    "id": "merged",
+    "name": "merged: classifies a merged PR and writes stop_reason",
+    "defect": "Restore the open unmerged pull request"
+  },
+  {
     "id": "closed",
-    "name": "closed: rejects a closed PR",
+    "name": "closed: classifies a closed unmerged PR and writes stop_reason",
     "defect": "Restore the open pull request"
   },
   {
     "id": "draft",
-    "name": "draft: rejects a draft PR",
+    "name": "draft: classifies a draft PR and writes stop_reason",
     "defect": "Restore the non-draft pull request"
   },
   {
     "id": "fork",
-    "name": "fork: rejects a fork PR",
+    "name": "fork: classifies a fork-head PR and writes stop_reason",
     "defect": "Restore the same-repository pull request"
   },
   {
-    "id": "moved",
-    "name": "moved: rejects a moved head",
-    "defect": "Restore the expected pull-request head"
+    "id": "conflict",
+    "name": "conflict: classifies a merge conflict and writes stop_reason",
+    "defect": "Restore the mergeable pull request"
   },
   {
-    "id": "stale-signal",
-    "name": "signals a superseded head to shell callers with EX_TEMPFAIL",
-    "defect": "Replace the moved head with a same-message fork refusal"
+    "id": "empty",
+    "name": "empty: classifies an empty PR and writes stop_reason",
+    "defect": "Restore a changed file"
   },
   {
     "id": "trusted-config",
-    "name": "rejects an invalid trusted configuration before reading GitHub",
+    "name": "classifies the PR before rejecting invalid trusted configuration",
     "defect": "Restore the valid trusted configuration"
   },
   {
@@ -151,7 +166,7 @@
   },
   {
     "id": "bound-files",
-    "name": "writes the two bound files privately under the engine root",
+    "name": "writes the two bound files privately under the Margot root",
     "defect": "Bind a different base revision"
   },
   {

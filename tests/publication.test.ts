@@ -113,7 +113,7 @@ async function wire(mode = "clear", broken = false) {
       writes.push({ method, path, body });
       if (
         (defect("start-fail") && body.status === "in_progress") ||
-        ((defect("review-fail") || defect("final-fail")) && path.endsWith("/reviews")) ||
+        (defect("review-fail") && path.endsWith("/reviews")) ||
         (defect("final-fail") &&
           body.name === options.checks.review &&
           body.conclusion === "success")
@@ -152,10 +152,6 @@ async function wire(mode = "clear", broken = false) {
         };
         if (!defect("receipt")) reviews.push(data as Record<string, unknown>);
         if (mode === "head-after-approval") moved = true;
-        if (mode === "merged") {
-          merged = true;
-          armed = false;
-        }
       } else {
         const id = method === "POST" ? ++sequence : Number(path.split("/").at(-1));
         data = {
@@ -171,7 +167,19 @@ async function wire(mode = "clear", broken = false) {
           body.conclusion === "success"
         )
           stored.set(id, { ...(data as Record<string, unknown>), status: "in_progress" });
-        if (mode === "head" && body.name === options.checks.review && body.conclusion === "success")
+        if (
+          mode === "merged" &&
+          body.name === options.checks.review &&
+          body.conclusion === "success"
+        ) {
+          merged = true;
+          armed = false;
+        }
+        if (
+          mode === "head" &&
+          body.name === options.checks.authority &&
+          body.conclusion === "success"
+        )
           moved = true;
       }
     }
@@ -214,6 +222,13 @@ async function wire(mode = "clear", broken = false) {
       await publisher.progress("Margot: posting the verdict", context);
     }
     const value = structuredClone(baseReview);
+    if (defect("voice-error")) {
+      // Margot's own ERROR ruling, as Python posted it: a COMMENT review, the check
+      // `action_required`, titled `not reviewed (error)`.
+      value.decision.outcome = "ERROR";
+      value.decision.mergeEligible = false;
+      value.decision.holdReasons = ["error"];
+    }
     if (
       (["hold", "authority", "authority-summary", "calibration"].includes(mode) && !broken) ||
       mode === "disarm-fail"
@@ -258,7 +273,7 @@ scenario(
     );
     return {
       kind: x.result.kind,
-      successBeforeApprove: success >= 0 && approve > success,
+      successBeforeApprove: approve >= 0 && success > approve,
       head: x.writes.find((w) => w.body.event === "APPROVE")?.body.commit_id,
       finalStatus: x.final?.status,
       merged: x.writes.some(
@@ -282,11 +297,19 @@ scenario(
     const x = await wire("hold", b);
     return {
       armed: x.armed,
+      ordered: (() => {
+        const review = x.writes.findIndex((w) => w.path.endsWith("/reviews"));
+        const disable = x.writes.findIndex((w) => w.path === "/graphql");
+        const final = x.writes.findIndex(
+          (w) => w.body.name === options.checks.review && w.body.conclusion === "neutral",
+        );
+        return review >= 0 && disable > review && final > disable;
+      })(),
       conclusion: x.final?.conclusion,
       event: x.writes.find((w) => w.path.endsWith("/reviews"))?.body.event,
     };
   },
-  { armed: false, conclusion: "neutral", event: "COMMENT" },
+  { armed: false, ordered: true, conclusion: "neutral", event: "COMMENT" },
 );
 // Ollie's state script (dotty .github/scripts/ollie-state.py, parse_verdict) reads these
 // lines from the check text and requests the operator's review on a held PR. Without them
@@ -453,7 +476,9 @@ for (const mode of ["head", "confirm"])
         approvalAttempted: x.writes.some((w) => w.body.event === "APPROVE"),
       };
     },
-    { kind: "error", completedWrite: true, approvalAttempted: false },
+    mode === "head"
+      ? { kind: "error", completedWrite: false, approvalAttempted: false }
+      : { kind: "error", completedWrite: true, approvalAttempted: true },
   );
 scenario(
   "pub-head-after-approval",
@@ -674,6 +699,46 @@ scenario(
 );
 
 scenario(
+  "pub-voice-error",
+  async (b) => {
+    const x = await wire("voice-error", b);
+    const review = x.writes.find((w) => w.path.endsWith("/reviews"));
+    return {
+      conclusion: x.final?.conclusion,
+      title: (x.final?.output as { title?: string } | undefined)?.title,
+      event: review?.body.event,
+      notReviewed: String(review?.body.body).includes(
+        "Not reviewed: the review could not be completed. Held for the operator.",
+      ),
+      header: String(review?.body.body).startsWith("### 🚫 ERROR"),
+    };
+  },
+  {
+    conclusion: "action_required",
+    title: "not reviewed (error)",
+    event: "COMMENT",
+    notReviewed: true,
+    header: true,
+  },
+);
+scenario(
+  "comment-incomplete-card",
+  (b) => {
+    const value = structuredClone(commentReview);
+    const card = value.cards.find((c) => c.name === "safety");
+    if (!card) throw new Error("Invalid comment test source");
+    if (!b) {
+      card.completion = "incomplete";
+      card.completionReason = "the eval fixture is in another repository; nothing else";
+    }
+    const report = render(value);
+    return {
+      row: report.split("\n").find((line) => line.includes("`safety`")),
+    };
+  },
+  { row: "* ⏳ `safety` — incomplete: the eval fixture is in another repository" },
+);
+scenario(
   "tally-advisory-fix",
   (b) => {
     const value = tallyReview();
@@ -691,10 +756,18 @@ scenario(
       completion: "completed",
       checked: ["Verified the earlier advisory"],
       notCovered: [],
-      findings: [],
-      resolved: b
-        ? []
-        : advisory.map((e) => ({ key: e.key, reason: "a.ts:1 now validates input" })),
+      // Fixed-ness is inferred from absence: the card no longer raises the advisory entry.
+      findings: b
+        ? advisory.map((e) => ({
+            id: "F1",
+            tag: "issue" as const,
+            severity: "MINOR" as const,
+            confidence: "HIGH" as const,
+            location: e.location,
+            what: e.what,
+            ledger: e.key,
+          }))
+        : [],
     };
     prepareFindings([card], scope);
     const next = nextLedger(
@@ -834,7 +907,7 @@ scenario(
       reviewWrites: x.writes.filter((w) => w.path.endsWith("/reviews")).length,
     };
   },
-  { kind: "error", conclusion: "action_required", reviewWrites: 0 },
+  { kind: "error", conclusion: "action_required", reviewWrites: 1 },
 );
 
 scenario(
@@ -947,7 +1020,7 @@ scenario(
     const additions = Array.from({ length: 2001 }, (_, index) => `+line ${index}`).join("\n");
     (copy.facts as { diff: string }).diff =
       `diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -0,0 +1,2001 @@\n${additions}\n`;
-    if (b) (copy.config as { mechanicalDiffLineCap?: number }).mechanicalDiffLineCap = 2001;
+    if (b) (copy.config as { mechanicalDiffLineCap?: number }).mechanicalDiffLineCap = 2005;
     const services = recordedServices(copy);
     const result = await review(copy.request, copy.config, services);
     return {

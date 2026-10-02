@@ -6,6 +6,7 @@ const outcomeIcons = {
   APPROVED: "✅",
   CHANGES_REQUESTED: "❌",
   CLARIFICATION_REQUESTED: "❓",
+  ERROR: "🚫",
 } as const;
 const bandIcons = { LOW: "🟢", MEDIUM: "🟡", HIGH: "🔴" } as const;
 const maxVisibleChars = 160;
@@ -89,7 +90,7 @@ function cardRows(review: Review): { rows: string[]; findings: number } {
   const visible = new Map(
     review.cards.map((card) => [
       card.name,
-      card.findings.filter((finding) => !dismissed.has(finding.id)),
+      card.findings.filter((finding) => !finding.id || !dismissed.has(finding.id)),
     ]),
   );
   const owners = new Map<string, Card["name"][]>();
@@ -109,6 +110,12 @@ function cardRows(review: Review): { rows: string[]; findings: number } {
     }
     const findings = visible.get(name) ?? [];
     const first = findings[0];
+    // Python's roster: a card that did not complete shows its completion, never "clear".
+    if (!first && card.completion !== "completed") {
+      const icon = card.completion === "incomplete" ? "⏳" : "❓";
+      const reason = card.completionReason ? `: ${firstClause(card.completionReason)}` : "";
+      return `* ${icon} \`${name}\` — ${card.completion}${reason}`;
+    }
     if (!first) return `* ✅ \`${name}\` — clear`;
     const key = findingKey(first);
     const shared = owners.get(key) ?? [name];
@@ -156,6 +163,10 @@ export function render(review: Review): string {
     `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}** — ${firstLine(decision.rating.rationale)}`,
     `> ${firstSentences(rationale, 2)}`,
     ...(authority ? ["", `Above my authority: ${authority}. Yours to merge.`] : []),
+    // Python's line for Margot's own ERROR ruling: the review could not be completed.
+    ...(decision.outcome === "ERROR"
+      ? ["", "Not reviewed: the review could not be completed. Held for the operator."]
+      : []),
     "",
     "---",
     `Council reviewed ${presentation.files} file${presentation.files === 1 ? "" : "s"} • ${review.cards.length} of 6 cards • ${cards.findings} finding${cards.findings === 1 ? "" : "s"} • ${cost} • ${duration(presentation.durationMs)}`,
@@ -172,7 +183,7 @@ export function render(review: Review): string {
     "<!-- margot:v1 -->",
   ];
   const body = lines.join("\n").replaceAll("margot-ledger", "margot‑ledger");
-  return `${body}\n${ledgerBlock(review.ledger)}`;
+  return review.ledgerUnavailable ? body : `${body}\n${ledgerBlock(review.ledger)}`;
 }
 
 /**
@@ -192,7 +203,7 @@ export function checkText(review: Review): string {
         : "fast_path";
   const lines = [
     `outcome: ${review.decision.outcome} | band: ${review.decision.rating.band}`,
-    "decision_source: jev",
+    `decision_source: ${review.provenance.decision_source ?? "jev"}`,
     `verdict_source: ${verdictSource}`,
     `class: ${review.classification}`,
     `summoned: ${summoned.join(", ") || "none"}`,
@@ -201,11 +212,14 @@ export function checkText(review: Review): string {
     `band_reason: ${review.decision.rating.rationale}`,
     "pipeline_ok: true",
     `vector: ${JSON.stringify(review.riskAnswer?.dimensions ?? {})}`,
-    `owned tier: ${(review.decision.authorityPaths?.length ?? 0) > 0 ? "required_owned" : "none"}`,
+    `owned tier: ${review.decision.ownedPathTier ?? "unknown"}`,
     "summoned by ledger: none",
+    ...(review.ledgerWarnings ?? []).map((warning) => `warning: ${warning}`),
   ];
   const findingById = new Map(
-    review.cards.flatMap((card) => card.findings.map((finding) => [finding.id, finding] as const)),
+    review.cards.flatMap((card) =>
+      card.findings.flatMap((finding) => (finding.id ? [[finding.id, finding] as const] : [])),
+    ),
   );
   for (const status of ["established", "dismissed"] as const) {
     const dispositions = review.voice?.dispositions.filter((item) => item.status === status) ?? [];

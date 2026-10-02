@@ -24,6 +24,7 @@ export function cliServices(
     config,
     {
       jevKey,
+      ownedPathTier: environment.MARGOT_OWNED_TIER?.trim() || "unknown",
       ...(environment.GH_TOKEN ? { githubToken: environment.GH_TOKEN } : {}),
       ...(environment.MARGOT_WRITE_TOKEN ? { writeToken: environment.MARGOT_WRITE_TOKEN } : {}),
       ...(Object.keys(ticketingEnvironment).length ? { ticketingEnvironment } : {}),

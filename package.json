@@ -1,6 +1,6 @@
 {
   "name": "margot-pr-reviewer",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Margot, the PR reviewer: review, convergence and GitHub publication",
   "type": "module",
   "license": "MIT",
@@ -25,7 +25,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs && node scripts/ledger-breaks.mjs && node scripts/publication-breaks.mjs && node scripts/instance-breaks.mjs && node scripts/closer-breaks.mjs",
+    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs && node scripts/ledger-breaks.mjs && node scripts/publication-breaks.mjs && node scripts/instance-breaks.mjs && node scripts/closer-breaks.mjs && node scripts/round-six-breaks.mjs",
     "prepack": "npm run build",
     "audit:recordings": "node scripts/audit-recordings.mjs",
     "test:adapter-breaks": "node scripts/adapter-breaks.mjs",
@@ -33,7 +33,8 @@
     "test:publication-breaks": "node scripts/publication-breaks.mjs",
     "test:instance-command-breaks": "node scripts/instance-breaks.mjs",
     "test:mechanical-breaks": "node scripts/mechanical-breaks.mjs",
-    "test:closer-breaks": "node scripts/closer-breaks.mjs"
+    "test:closer-breaks": "node scripts/closer-breaks.mjs",
+    "test:round-six-breaks": "node scripts/round-six-breaks.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",

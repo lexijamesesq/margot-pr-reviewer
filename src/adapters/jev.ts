@@ -9,6 +9,7 @@ import {
   routeSchema,
 } from "../schemas.js";
 import type { CallContext, Services } from "../types.js";
+import { decisionFallback } from "./decision-fallback.js";
 
 const probability = z.number().min(0).max(1);
 const noul = z.object({ type: z.literal("noul"), noul: probability });
@@ -29,6 +30,8 @@ export function jevAdapter(options: {
   fetch?: typeof fetch;
   retries?: number;
   minTimeout?: number;
+  fallbackExecutable?: string;
+  fallback?: typeof decisionFallback;
 }) {
   const transport = options.fetch ?? fetch;
   async function ask(questions: object, state: unknown, c: CallContext) {
@@ -69,7 +72,7 @@ export function jevAdapter(options: {
       .parse(raw);
     return envelope.answers;
   }
-  async function decide(questions: object, input: unknown, c: CallContext) {
+  async function decide(questions: object, input: unknown, c: CallContext, fallback = false) {
     // History belongs to the convergence reducer, not Jev. Keep every byte of the diff.
     const state = structuredClone(input) as Record<string, unknown>;
     const facts = (state.facts ?? state) as Record<string, unknown>;
@@ -77,6 +80,7 @@ export function jevAdapter(options: {
     const evidence = JSON.stringify(state);
     const chunks = evidence.match(/[\s\S]{1,16000}/gu) ?? [evidence];
     const answers: Record<string, unknown>[] = [];
+    let source: "jev" | "fallback" = "jev";
     for (const [index, chunk] of chunks.entries()) {
       const batch =
         chunks.length === 1
@@ -90,39 +94,59 @@ export function jevAdapter(options: {
               totalParts: chunks.length,
               evidence: chunk,
               scope:
-                "Contiguous excerpt of complete JSON evidence, possibly continuing across boundaries. Assess the evidence visible in this excerpt; the engine combines every excerpt conservatively.",
+                "Contiguous excerpt of complete JSON evidence, possibly continuing across boundaries. Assess the evidence visible in this excerpt; Margot combines every excerpt conservatively.",
             };
-      answers.push(await ask(questions, batch, c));
-    }
-    if (answers.length === 1 && answers[0]) return answers[0];
-    return Object.fromEntries(
-      Object.keys(questions).map((name) => {
-        const values = answers.map((a) => a[name]);
-        if (noul.safeParse(values[0]).success)
-          return [name, { type: "noul", noul: Math.max(...values.map((v) => noul.parse(v).noul)) }];
-        const scores = values.map((v) => score.parse(v));
-        // Maximum tail at each level is a valid conservative distribution.
-        const tails = [0, 1, 2, 3].map((level) =>
-          Math.max(
-            ...scores.map((s) =>
-              Object.values(s.probabilities)
-                .slice(level)
-                .reduce((a, b) => a + b, 0),
-            ),
+      try {
+        answers.push(await ask(questions, batch, c));
+      } catch (error) {
+        if (!fallback || c.signal.aborted) throw error;
+        console.warn("Margot: Jev unavailable; falling back to the Haiku decider");
+        answers.push(
+          await (options.fallback ?? decisionFallback)(
+            questions,
+            batch,
+            c,
+            options.fallbackExecutable,
           ),
         );
-        return [
-          name,
-          {
-            type: "score",
-            confidence: Math.min(...scores.map((s) => s.confidence)),
-            probabilities: Object.fromEntries(
-              tails.map((tail, i) => [String(i), Math.max(0, tail - (tails[i + 1] ?? 0))]),
+        source = "fallback";
+      }
+    }
+    if (answers.length === 1 && answers[0]) return { answers: answers[0], source };
+    return {
+      source,
+      answers: Object.fromEntries(
+        Object.keys(questions).map((name) => {
+          const values = answers.map((a) => a[name]);
+          if (noul.safeParse(values[0]).success)
+            return [
+              name,
+              { type: "noul", noul: Math.max(...values.map((v) => noul.parse(v).noul)) },
+            ];
+          const scores = values.map((v) => score.parse(v));
+          // Maximum tail at each level is a valid conservative distribution.
+          const tails = [0, 1, 2, 3].map((level) =>
+            Math.max(
+              ...scores.map((s) =>
+                Object.values(s.probabilities)
+                  .slice(level)
+                  .reduce((a, b) => a + b, 0),
+              ),
             ),
-          },
-        ];
-      }),
-    );
+          );
+          return [
+            name,
+            {
+              type: "score",
+              confidence: Math.min(...scores.map((s) => s.confidence)),
+              probabilities: Object.fromEntries(
+                tails.map((tail, i) => [String(i), Math.max(0, tail - (tails[i + 1] ?? 0))]),
+              ),
+            },
+          ];
+        }),
+      ),
+    };
   }
   const nouls = (questions: Readonly<Record<string, string>>) =>
     Object.fromEntries(
@@ -135,17 +159,39 @@ export function jevAdapter(options: {
     // Match the measured classifier's code-only evidence. Release notes and author
     // claims describe external behavior and must not change the light-path decision.
     const { title: _title, body: _body, author: _author, ...evidence } = facts;
-    const a = await decide(nouls(questions), evidence, c);
+    let a: Record<string, unknown>;
+    try {
+      a = (await decide(nouls(questions), evidence, c)).answers;
+    } catch {
+      return { source: "jev_unreachable", functional: 1, documentation: 0, mechanical: 0 };
+    }
     return classificationSchema.parse({
       source: "jev",
       ...Object.fromEntries(Object.keys(questions).map((k) => [k, noul.parse(a[k]).noul])),
     });
   };
   const route: Services["route"] = async (facts, _classification, questions, c) => {
-    const a = await decide({ ...nouls(questions), exposure: routingExposureQuestion }, facts, c);
+    let response: Awaited<ReturnType<typeof decide>>;
+    try {
+      response = await decide(
+        { ...nouls(questions), exposure: routingExposureQuestion },
+        facts,
+        c,
+        _classification !== "documentation",
+      );
+    } catch (error) {
+      if (_classification !== "documentation") throw error;
+      return {
+        source: "jev_unreachable",
+        cards: Object.fromEntries(cardNames.map((name) => [name, 1])),
+        confidence: 0,
+        documentationSubstantive: 1,
+      };
+    }
+    const { answers: a, source } = response;
     const cards = Object.fromEntries(cardNames.map((k) => [k, noul.parse(a[k]).noul]));
     return routeSchema.parse({
-      source: "jev",
+      source,
       cards,
       confidence: score.parse(a.exposure).confidence,
       documentationSubstantive: questions.documentationSubstantive
@@ -154,7 +200,7 @@ export function jevAdapter(options: {
     });
   };
   const risk: Services["risk"] = async (facts, cards, questions, c) => {
-    const a = await decide(
+    const { answers: a, source } = await decide(
       Object.fromEntries(
         Object.entries(questions).map(([name, criteria]) => [
           name,
@@ -167,9 +213,10 @@ export function jevAdapter(options: {
       ),
       { facts, cards },
       c,
+      true,
     );
     return riskSchema.parse({
-      source: "jev",
+      source,
       dimensions: Object.fromEntries(
         dimensions.map((k) => {
           const s = score.parse(a[k]);

@@ -16,9 +16,12 @@ const deploymentSchema = z.object({
 });
 const pullSchema = z.object({
   state: z.string(),
+  merged: z.boolean(),
   draft: z.boolean(),
+  mergeable: z.boolean().nullable(),
+  changed_files: z.number().int().nonnegative(),
   base: z.object({ sha: shaSchema }),
-  head: z.object({ sha: shaSchema, repo: z.object({ full_name: repositorySchema }) }),
+  head: z.object({ sha: shaSchema, repo: z.object({ full_name: repositorySchema }).nullable() }),
 });
 
 export type DeploymentSelection = { authority: boolean; repositoryName: string };
@@ -83,7 +86,7 @@ export type BindRequestInput = {
   expectedHead: string;
   phase: "triage" | "review";
   authority: boolean;
-  engineRoot: string;
+  margotRoot: string;
   config: unknown;
   requiredChecks: string[];
   protectedPaths: string[];
@@ -91,30 +94,107 @@ export type BindRequestInput = {
   runUrl?: string;
 };
 
-export class StaleRequestError extends Error {
-  constructor() {
-    super("Margot: not reviewed: stale");
+export type BindStopReason =
+  | "superseded"
+  | "merged"
+  | "closed"
+  | "draft"
+  | "fork"
+  | "conflict"
+  | "empty";
+
+export type BindRequestStop = {
+  stopReason: BindStopReason;
+  liveSha?: string;
+  message: string;
+};
+
+export class StopRequestError extends Error {
+  constructor(readonly stop: BindRequestStop) {
+    super(stop.message);
   }
 }
 
-function resolveEngineRoot(value: string, engineRoot: string) {
-  return value.replaceAll(`\${ENGINE_ROOT}`, engineRoot);
+function classifyPull(
+  pull: z.infer<typeof pullSchema>,
+  repository: string,
+  pr: number,
+  expectedHead: string,
+): BindRequestStop | undefined {
+  if (pull.merged)
+    return {
+      stopReason: "merged",
+      message: `margot-review: PR #${pr} was merged before its review started — exiting without a review. Every later step is skipped.`,
+    };
+  if (pull.state !== "open")
+    return {
+      stopReason: "closed",
+      message: `margot-review: PR #${pr} was closed before its review started — exiting without a review. Every later step is skipped.`,
+    };
+  if (pull.head.sha !== expectedHead)
+    return {
+      stopReason: "superseded",
+      liveSha: pull.head.sha,
+      message: `margot-review: dispatched sha ${expectedHead} is superseded by current head ${pull.head.sha} — exiting; the newer dispatch owns this PR's verdict. Every later step is skipped.`,
+    };
+  if (pull.draft)
+    return { stopReason: "draft", message: "margot-review refused: not reviewed: draft" };
+  if (pull.head.repo?.full_name !== repository)
+    return {
+      stopReason: "fork",
+      message: `margot-review refused: PR head repository (${pull.head.repo?.full_name ?? "null"}) is not ${repository} (fork). Forks are operator-only; Margot never looks.`,
+    };
+  if (pull.mergeable === false)
+    return {
+      stopReason: "conflict",
+      message: "margot-review refused: not reviewed: merge conflict (resolve before review)",
+    };
+  if (pull.changed_files === 0)
+    return {
+      stopReason: "empty",
+      message: "margot-review refused: not reviewed: empty (no changed files)",
+    };
+  return undefined;
 }
 
-export async function bindRequest(input: BindRequestInput, readPull: PullReader) {
+function resolveMargotRoot(value: string, margotRoot: string, field: string) {
+  const resolved = value.replaceAll(`\${MARGOT_ROOT}`, margotRoot);
+  const unresolved = resolved.match(/\$\{[^{}]+\}/)?.[0];
+  if (unresolved)
+    throw new Error(
+      `Unresolved placeholder ${unresolved} in ${field}; the install root is \${MARGOT_ROOT}`,
+    );
+  return resolved;
+}
+
+type BindIdentityInput = Pick<
+  BindRequestInput,
+  "repository" | "expectedHead" | "pr" | "margotRoot"
+>;
+
+function validateBindIdentity(input: BindIdentityInput) {
   const repository = repositorySchema.parse(input.repository);
   const expectedHead = shaSchema.parse(input.expectedHead);
   if (!Number.isSafeInteger(input.pr) || input.pr < 1) throw new Error("Invalid PR number");
-  if (!isAbsolute(input.engineRoot)) throw new Error("Engine root must be absolute");
+  if (!isAbsolute(input.margotRoot)) throw new Error("Margot root must be absolute");
+  return { repository, expectedHead };
+}
 
+function prepareRequest(
+  input: BindIdentityInput,
+  value: unknown,
+  identity = validateBindIdentity(input),
+) {
+  const { expectedHead, repository } = identity;
+  const pull = pullSchema.parse(value);
+  const stop = classifyPull(pull, repository, input.pr, expectedHead);
+  if (stop) throw new StopRequestError(stop);
+  return { repository, pull };
+}
+
+function bindPrepared(input: BindRequestInput, prepared: ReturnType<typeof prepareRequest>) {
+  const { pull, repository } = prepared;
   const suppliedConfig = liveConfigSchema.parse(input.config);
-  const pull = pullSchema.parse(await readPull(repository, input.pr));
-  // Refusals name their reason; a closed or draft PR is a decision, not a schema error.
-  if (pull.state !== "open") throw new Error("Margot: not reviewed: closed");
-  if (pull.draft) throw new Error("Margot: not reviewed: draft");
-  if (pull.head.repo.full_name !== repository) throw new Error("Margot: not reviewed: fork");
-  if (pull.head.sha !== expectedHead) throw new StaleRequestError();
-
   const config = structuredClone(suppliedConfig);
   if (input.authority) {
     if (!config.publisher) throw new Error("Authority requires publisher configuration");
@@ -126,15 +206,21 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
   config.review.allowedSkippedChecks = input.allowedSkippedChecks;
   config.review.publication = input.authority ? "github" : "none";
   config.github.shadowBeforeHead = !input.authority;
-  config.claude.executable = resolveEngineRoot(config.claude.executable, input.engineRoot);
-  config.claude.pluginDirectory = resolveEngineRoot(
+  config.claude.executable = resolveMargotRoot(
+    config.claude.executable,
+    input.margotRoot,
+    "claude.executable",
+  );
+  config.claude.pluginDirectory = resolveMargotRoot(
     config.claude.pluginDirectory,
-    input.engineRoot,
+    input.margotRoot,
+    "claude.pluginDirectory",
   );
   if (config.claude.ticketing)
-    config.claude.ticketing.command = resolveEngineRoot(
+    config.claude.ticketing.command = resolveMargotRoot(
       config.claude.ticketing.command,
-      input.engineRoot,
+      input.margotRoot,
+      "claude.ticketing.command",
     );
   const boundConfig = liveConfigSchema.parse(config);
   const request = requestSchema.parse({
@@ -147,6 +233,12 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
   return { request, config: boundConfig };
 }
 
+export async function bindRequest(input: BindRequestInput, readPull: PullReader) {
+  const identity = validateBindIdentity(input);
+  const pull = await readPull(identity.repository, input.pr);
+  return bindPrepared(input, prepareRequest(input, pull, identity));
+}
+
 export async function bindRequestFiles(
   input: Omit<BindRequestInput, "config"> & { configFile: string },
   token: string | undefined,
@@ -154,16 +246,17 @@ export async function bindRequestFiles(
 ) {
   if (!token) throw new Error("GH_TOKEN is required");
   const github = client ?? githubClient({ token, retries: 0 });
+  const identity = validateBindIdentity(input);
+  const [owner = "", repo = ""] = identity.repository.split("/");
+  const pull = (await github.rest.pulls.get({ owner, repo, pull_number: input.pr })).data;
+  const prepared = prepareRequest(input, pull, identity);
   const config = JSON.parse(await readFile(input.configFile, "utf8"));
-  const bound = await bindRequest({ ...input, config }, async (repository, pr) => {
-    const [owner = "", repo = ""] = repository.split("/");
-    return (await github.rest.pulls.get({ owner, repo, pull_number: pr })).data;
-  });
+  const bound = bindPrepared({ ...input, config }, prepared);
   await Promise.all([
-    writeFile(join(input.engineRoot, "request.json"), `${JSON.stringify(bound.request)}\n`, {
+    writeFile(join(input.margotRoot, "request.json"), `${JSON.stringify(bound.request)}\n`, {
       mode: 0o600,
     }),
-    writeFile(join(input.engineRoot, "config.json"), `${JSON.stringify(bound.config)}\n`, {
+    writeFile(join(input.margotRoot, "config.json"), `${JSON.stringify(bound.config)}\n`, {
       mode: 0o600,
     }),
   ]);

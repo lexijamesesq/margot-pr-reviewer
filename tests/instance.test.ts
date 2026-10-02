@@ -13,13 +13,14 @@ import {
 import { instanceExitCode, runInstanceCommand } from "../src/instance-cli.js";
 
 const broken = process.env.MARGOT_INSTANCE_BREAK;
-const engineRootPlaceholder = `\${ENGINE_ROOT}`;
+const margotRootPlaceholder = `\${MARGOT_ROOT}`;
+const stalePlaceholder = `\${OLD_ROOT}`;
 const head = "a".repeat(40);
 const base = "b".repeat(40);
 const deployment = {
-  version: "0.6.0",
+  version: "0.6.1",
   packageReference:
-    "https://github.com/example/margot-pr-reviewer/releases/download/v0.6.0/margot-pr-reviewer-0.6.0.tgz",
+    "https://github.com/example/margot-pr-reviewer/releases/download/v0.6.1/margot-pr-reviewer-0.6.1.tgz",
   packageIntegrity: `sha512-${"A".repeat(86)}==`,
   packageSha256: "c".repeat(64),
 };
@@ -52,16 +53,16 @@ const config = {
   github: { freshShadow: false },
   jev: { model: "jev-test" },
   claude: {
-    executable: `${engineRootPlaceholder}/node_modules/.bin/claude`,
+    executable: `${margotRootPlaceholder}/node_modules/.bin/claude`,
     ticketing: {
       server: "tickets",
-      command: `${engineRootPlaceholder}/node_modules/.bin/tickets`,
+      command: `${margotRootPlaceholder}/node_modules/.bin/tickets`,
       args: [],
       env: ["TICKET_TOKEN"],
       tools: ["mcp__tickets__read"],
     },
     version: "1.2.3",
-    pluginDirectory: `${engineRootPlaceholder}/publish-skills`,
+    pluginDirectory: `${margotRootPlaceholder}/publish-skills`,
     reviewerModel: "reviewer",
   },
   publisher: {
@@ -77,7 +78,10 @@ const config = {
 };
 const pull = {
   state: "open",
+  merged: false,
   draft: false,
+  mergeable: true,
+  changed_files: 1,
   base: { sha: base },
   head: { sha: head, repo: { full_name: "example/project" } },
 };
@@ -87,7 +91,7 @@ const bindInput = (overrides: Partial<BindRequestInput> = {}): BindRequestInput 
   expectedHead: head,
   phase: "review",
   authority: true,
-  engineRoot: "/runtime/margot",
+  margotRoot: "/runtime/margot",
   config,
   requiredChecks: ["ci / checks"],
   protectedPaths: [".github/**"],
@@ -129,7 +133,7 @@ async function bindCommandFixture(authority: "true" | "false" = "false") {
       "review",
       "--authority",
       authority,
-      "--engine-root",
+      "--margot-root",
       directory,
       "--config",
       configFile,
@@ -229,7 +233,7 @@ it.each([
     {
       deployment: {
         ...deployment,
-        packageReference: deployment.packageReference.replaceAll("0.6.0", "0.6.1"),
+        packageReference: deployment.packageReference.replaceAll("0.6.1", "0.6.2"),
       },
     },
   ],
@@ -265,7 +269,7 @@ it.each([
     `${deployment.packageReference}#x`,
   ],
 ] as const)("%s: %s", (id, _name, replacement) => {
-  const packageReference = replacement.includes("margot-pr-reviewer-0.6.0.tgz")
+  const packageReference = replacement.includes("margot-pr-reviewer-0.6.1.tgz")
     ? replacement
     : deployment.packageReference.replace("https://github.com", replacement);
   expect(() =>
@@ -370,41 +374,101 @@ it("resolves runtime placeholders in Claude and ticketing paths", async () => {
   });
 });
 
+it("rejects unresolved placeholders in executable paths at bind time", async () => {
+  const cases = [
+    {
+      field: "claude.executable",
+      placeholder: stalePlaceholder,
+      config: {
+        ...config,
+        claude: {
+          ...config.claude,
+          executable: `${stalePlaceholder}/node_modules/.bin/claude`,
+        },
+      },
+    },
+    {
+      field: "claude.pluginDirectory",
+      placeholder: stalePlaceholder,
+      config: {
+        ...config,
+        claude: { ...config.claude, pluginDirectory: `${stalePlaceholder}/publish-skills` },
+      },
+    },
+    {
+      field: "claude.ticketing.command",
+      placeholder: stalePlaceholder,
+      config: {
+        ...config,
+        claude: {
+          ...config.claude,
+          ticketing: {
+            ...config.claude.ticketing,
+            command: `${stalePlaceholder}/node_modules/.bin/tickets`,
+          },
+        },
+      },
+    },
+    {
+      field: "claude.executable",
+      placeholder: `\${CUSTOM_ROOT}`,
+      config: {
+        ...config,
+        claude: { ...config.claude, executable: `\${CUSTOM_ROOT}/claude` },
+      },
+    },
+  ];
+
+  for (const candidate of cases) {
+    const error = await captureError(() =>
+      bindRequest(
+        bindInput({
+          config: broken === "unresolved-placeholder" ? config : candidate.config,
+        }),
+        readPull(),
+      ),
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe(
+      `Unresolved placeholder ${candidate.placeholder} in ${candidate.field}; the install root is \${MARGOT_ROOT}`,
+    );
+  }
+});
+
 it.each([
-  ["closed", "rejects a closed PR", { state: "closed" }, "Margot: not reviewed: closed"],
-  ["draft", "rejects a draft PR", { draft: true }, "Margot: not reviewed: draft"],
+  ["superseded", "classifies a superseded head", { head: { ...pull.head, sha: "f".repeat(40) } }],
+  ["merged", "classifies a merged PR", { state: "closed", merged: true }],
+  ["closed", "classifies a closed unmerged PR", { state: "closed" }],
+  ["draft", "classifies a draft PR", { draft: true }],
   [
     "fork",
-    "rejects a fork PR",
+    "classifies a fork-head PR",
     { head: { ...pull.head, repo: { full_name: "fork/project" } } },
-    "Margot: not reviewed: fork",
   ],
-  [
-    "moved",
-    "rejects a moved head",
-    { head: { ...pull.head, sha: "f".repeat(40) } },
-    "Margot: not reviewed: stale",
-  ],
-] as const)("%s: %s", async (id, _name, changed, reason) => {
+  ["conflict", "classifies a merge conflict", { mergeable: false }],
+  ["empty", "classifies an empty PR", { changed_files: 0 }],
+] as const)("%s: %s and writes stop_reason", async (id, _name, changed) => {
+  const fixture = await bindCommandFixture("true");
   const candidate = broken === id ? pull : { ...pull, ...changed };
-  const error = await captureError(() => bindRequest(bindInput(), readPull(candidate)));
-  // A refusal states its reason in plain words; a schema dump is not a refusal.
+  fixture.client.rest.pulls.get = async () => ({ data: candidate as typeof pull });
+  const configFile = fixture.args.indexOf("--config") + 1;
+  await writeFile(fixture.args[configFile] ?? "", "{");
+  const output = join(fixture.directory, "github-output");
+  const error = await captureError(() =>
+    runInstanceCommand(
+      fixture.args,
+      { GH_TOKEN: "read-token", GITHUB_OUTPUT: output },
+      fixture.client as never,
+    ),
+  );
   expect(error).toBeInstanceOf(Error);
-  expect((error as Error).message).toBe(reason);
-});
-
-it("signals a superseded head to shell callers with EX_TEMPFAIL", async () => {
-  const candidate =
-    broken === "stale-signal"
-      ? { ...pull, head: { ...pull.head, repo: { full_name: "fork/project" } } }
-      : { ...pull, head: { ...pull.head, sha: "f".repeat(40) } };
-  const error = await captureError(() => bindRequest(bindInput(), readPull(candidate)));
-  expect(error).toBeInstanceOf(Error);
-  expect((error as Error).message).toBe("Margot: not reviewed: stale");
   expect(instanceExitCode(error)).toBe(75);
+  const fields = await readFile(output, "utf8");
+  expect(fields).toContain(`stop_reason=${id}\n`);
+  if (id === "superseded") expect(fields).toContain(`live_sha=${"f".repeat(40)}\n`);
 });
 
-it("rejects an invalid trusted configuration before reading GitHub", async () => {
+it("classifies the PR before rejecting invalid trusted configuration", async () => {
   let reads = 0;
   const invalid = { ...config, claude: { ...config.claude, executable: "" } };
   const error = await captureError(() =>
@@ -414,21 +478,21 @@ it("rejects an invalid trusted configuration before reading GitHub", async () =>
     }),
   );
   expect(error).toBeInstanceOf(Error);
-  expect(reads).toBe(0);
+  expect(reads).toBe(1);
 });
 
 it("requires an absolute runtime root", async () => {
   expect(
     await captureError(() =>
       bindRequest(
-        bindInput({ engineRoot: broken === "absolute-root" ? "/runtime" : "relative" }),
+        bindInput({ margotRoot: broken === "absolute-root" ? "/runtime" : "relative" }),
         readPull(),
       ),
     ),
   ).toBeInstanceOf(Error);
 });
 
-it("writes the two bound files privately under the engine root", async () => {
+it("writes the two bound files privately under the Margot root", async () => {
   const directory = await mkdtemp(join(tmpdir(), "margot-bind-"));
   directories.push(directory);
   const configFile = join(directory, "trusted.json");
@@ -443,7 +507,7 @@ it("writes the two bound files privately under the engine root", async () => {
     },
   };
   const result = await bindRequestFiles(
-    { ...bindInput({ engineRoot: directory }), configFile },
+    { ...bindInput({ margotRoot: directory }), configFile },
     "read-token",
     github as never,
   );

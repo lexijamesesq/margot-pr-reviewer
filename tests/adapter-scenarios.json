@@ -36,7 +36,7 @@
   },
   {
     "id": "history-outage",
-    "name": "Unreadable GitHub history cannot establish first round",
+    "name": "Unreadable GitHub history degrades to unavailable",
     "defect": "restore the reviews endpoint"
   },
   {
@@ -76,7 +76,7 @@
   },
   {
     "id": "jev-outage",
-    "name": "Jev transport outage cannot approve a review",
+    "name": "Classifier outage requests functional review",
     "defect": "restore Jev availability"
   },
   {
@@ -97,21 +97,21 @@
   {
     "id": "card-findings",
     "name": "Card prose preserves a real mandatory finding",
-    "defect": "source mutation: mis-map the finding tag",
+    "defect": "source mutation: drop the consequence label from the finding detail",
     "sourceBreak": {
       "file": "src/adapters/prose.ts",
-      "from": "tag: match[1],",
-      "to": "tag: \"info\","
+      "from": "consequence ? `Consequence: ${consequence}` : \"\"",
+      "to": "consequence"
     }
   },
   {
-    "id": "card-missing-checked",
-    "name": "A card without its Checked block is not green",
-    "defect": "restore the Checked label"
+    "id": "card-headers-optional",
+    "name": "A card without its block labels still yields its tagged findings",
+    "defect": "remove the tagged finding the label-free block carries"
   },
   {
     "id": "card-incomplete",
-    "name": "An incomplete card cannot become empty success",
+    "name": "An incomplete card is recorded with its reason and summons the voice",
     "defect": "restore completed status"
   },
   {
@@ -121,23 +121,43 @@
   },
   {
     "id": "card-ambiguous",
-    "name": "Duplicate card completion labels are rejected",
-    "defect": "remove the duplicate label"
+    "name": "Repeated card labels take the first match",
+    "defect": "make the first completion label a skip"
+  },
+  {
+    "id": "card-tag-forms",
+    "name": "Tagged bullets tolerate emphasis, key order and unknown annotations",
+    "defect": "drop the brackets from the emphasised tag"
+  },
+  {
+    "id": "card-subfields",
+    "name": "Missing or repeated finding sub-fields are read, never refused",
+    "defect": "supply the consequence the expectation omits"
+  },
+  {
+    "id": "card-global-ids",
+    "name": "Finding ids are Python's global F1…Fn in card order",
+    "defect": "assemble the council in reverse card order"
   },
   {
     "id": "voice-accounting",
     "name": "Voice prose preserves finding IDs and dispositions",
-    "defect": "source mutation: mis-map disposition status",
+    "defect": "move an established finding into the dismissed section"
+  },
+  {
+    "id": "voice-python-tolerance",
+    "name": "Voice prose accepts Python's scalar, section, and disposition tolerance",
+    "defect": "source mutation: restore the strict disposition regex",
     "sourceBreak": {
       "file": "src/adapters/prose.ts",
-      "from": "return { id: match[1], status, reason: match[2] };",
-      "to": "return { id: match[1], status: \"dismissed\", reason: match[2] };"
+      "from": "/^((?:\\*\\*[\\w-]+\\*\\*|__[\\w-]+__|\\*[\\w-]+\\*|_[\\w-]+_|`[\\w-]+`|[\\w-]+))(?=\\s*(?:·|—|:|$))/",
+      "to": "/^([\\w-]+) · (.+)$/"
     }
   },
   {
-    "id": "voice-ambiguous",
-    "name": "Duplicate voice bands are rejected",
-    "defect": "remove the duplicate band"
+    "id": "voice-error-outcome",
+    "name": "Margot's ERROR is a parsed ruling, not an exception",
+    "defect": "replace the ERROR outcome with CHANGES_REQUESTED"
   },
   {
     "id": "credential-isolation",
@@ -360,8 +380,8 @@
     "defect": "Pass full PR facts, including release notes, to classification again",
     "sourceBreak": {
       "file": "src/adapters/jev.ts",
-      "from": "const a = await decide(nouls(questions), evidence, c);",
-      "to": "const a = await decide(nouls(questions), facts, c);"
+      "from": "a = (await decide(nouls(questions), evidence, c)).answers;",
+      "to": "a = (await decide(nouls(questions), facts, c)).answers;"
     }
   }
 ]

@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.6.0.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.6.1.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -110,7 +110,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.6.0.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.6.1.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
@@ -155,21 +155,23 @@ margot-instance validate-deployment \
   --authority-repositories '[]'
 ```
 
-`bind-request` reads the PR through Octokit using `GH_TOKEN`. It rejects a closed,
-draft, forked, or moved request, then writes mode-0600 `request.json` and `config.json`
-under the absolute engine root. Required checks, protected paths, permitted skipped
+`bind-request` reads the PR through Octokit using `GH_TOKEN`. Before binding any
+configuration, it classifies a superseded, merged, closed, draft, fork-head,
+conflicted, or empty request; otherwise it writes mode-0600 `request.json` and `config.json`
+under the absolute Margot root. Required checks, protected paths, permitted skipped
 checks, and authority are explicit inputs. Authority selects GitHub publication;
 otherwise the configuration is a before-head shadow. Authority requires a nonempty,
 invocation-unique `--run-url` so the publisher can reject a superseded writer.
-`${ENGINE_ROOT}` in the Claude executable, plugin directory, and ticketing command is
-replaced with the trusted root. A moved head keeps the `Margot: not reviewed: stale`
-refusal and exits 75 (`EX_TEMPFAIL`); the other refusals exit 1. This lets a
-shell caller set `stop_reason=stale` without reading the PR again.
+`${MARGOT_ROOT}` in the Claude executable, plugin directory, and ticketing command is
+replaced with the trusted root. Every classified stop exits 75 (`EX_TEMPFAIL`),
+prints `stop_reason=<reason>`, and appends that field to `GITHUB_OUTPUT` when set.
+A superseded stop also prints and appends `live_sha=<current head>`, so the caller
+does not need to read the PR again.
 
 ```sh
 margot-instance bind-request \
   --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
-  --phase review --authority false --engine-root "$ENGINE_ROOT" \
+  --phase review --authority false --margot-root "$MARGOT_ROOT" \
   --config /trusted/config.json --required-checks '["ci / checks"]' \
   --protected-paths '[".github/**"]' --allowed-skipped-checks '[]' \
   --run-url "$RUN_URL"
@@ -189,13 +191,14 @@ margot-instance close-stranded-check \
   --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
   --app-id "$MARGOT_APP_ID" --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
   --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
-  --published "$PUBLISHED" --stop-reason "$STOP_REASON"
+  --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"
 ```
 
-A superseded head (`--stop-reason stale`) closes `skipped` and names the current
-head's short SHA; a cancelled stopped job
-closes `cancelled`; every other close is `action_required`. A floor stop uses the
-preflight title. All other stops say Margot stopped before a verdict. The command
+A superseded head (`--stop-reason superseded --live-sha "$LIVE_SHA"`) and a merged
+PR close `skipped`; a closed PR and a cancelled run close `cancelled`; draft,
+fork-head, conflicted, and empty PRs close `failure`. A floor or other stop closes
+`action_required`. The stop table also supplies the Python-compatible title and
+summary for each classified reason. The command
 exits 0 after a close or when there is nothing safe to close, and 2 on a GitHub
 read/write failure.
 
@@ -235,10 +238,13 @@ contain no confidence field: routing confidence comes from the exposure Score,
 as in Python. Risk confidence comes directly from Jev's five Score answers. No Claude fallback
 can substitute for failed Jev evidence.
 
-The runner retains prose and validates completion, Checked blocks, finding fields,
-unique verdict fields and complete finding accounting. It does not depend on
-`--json-schema`; see [the earlier probe](docs/cli-compatibility.md) and
-[the slice 2 proof](docs/SLICE2.md). Transport references:
+The runner retains prose and reads it as the Python reviewer did: labels at line
+start with the first match winning, tagged finding bullets anywhere in the card
+with or without emphasis, `completion: incomplete` or `skipped` recorded with its
+reason rather than refused, `[issue]` findings numbered `F1`…`Fn` across the
+council in card order, Margot's own `ERROR` outcome accepted as her ruling, and
+complete finding accounting under every other outcome. It does not depend on
+`--json-schema`; see [the earlier probe](docs/cli-compatibility.md). Transport references:
 [Claude CLI](https://code.claude.com/docs/en/cli-reference),
 [TypeSafe API](https://docs.typesafe.ai/api),
 [Octokit](https://github.com/octokit/octokit.js),
@@ -286,8 +292,10 @@ not infer finding identity or fixes from line-number arithmetic.
 
 From round two, MINOR findings become advisory. A missed finding blocks only at
 BLOCKING, or MAJOR for safety; a delta-reach regression keeps its honest severity.
-Nothing escalates or relaxes after round three. A silent MINOR counts as fixed;
-a silent MAJOR or BLOCKING requires Margot's confirmation. Dismissals retain their
+Nothing escalates or relaxes after round three. A silent MINOR or advisory entry
+counts as fixed; a silent MAJOR or BLOCKING requires Margot's confirmation. No
+`Resolved:` section is parsed: fixed-ness is inferred from a standing finding's
+absence, as Python inferred it. Dismissals retain their
 reasons until the delta changes the cited code. A new delta finding must state
 whether it is new, missed, or caused through delta reach; missing attribution fails
 closed. The displayed counts are New, Open, Closed, with each finding listed below.
@@ -306,7 +314,6 @@ limits never authorize dropping the tail of the evidence. Cross-batch reasoning
 is a model-quality limitation; the live comparison records its observed effects.
 
 Run `npm run test:breaks` for all recorded, adapter and convergence break receipts.
-See [slice 3 proof](docs/SLICE3.md) for exact live heads, differences and limitations.
 
 ## GitHub publication
 
@@ -348,4 +355,27 @@ visible tally is derived from the listed entries. Oversize history fails closed.
 The self-hosted sample workflow installs the exact release asset and verifies its
 SHA-256 before installing. No hosted-runner
 sample is supplied. Publication remains subject to a consumer's reversible live
-canary; see `docs/SLICE4.md` for the local proof and its limits.
+canary.
+
+The review CLI accepts Python's dispatcher inputs `MARGOT_CLASSIFICATION`
+(`functional`, `documentation`, or `mechanical`) and the legacy
+`MARGOT_TRIAGE=mechanical`. The request JSON can also carry `classification`
+and `triage`; environment inputs take precedence. Missing or invalid dispatch
+classification requires functional review. Margot combines it conservatively
+with fresh classification and the latest completed `review / triage` check from
+her configured App on the requested head.
+
+Pass the workflow-computed ownership tier through `MARGOT_OWNED_TIER` (`none`,
+`owned`, or `required_owned`). An unset, blank, or invalid tier is uncomputed
+and independently holds clearance. Only an explicit `none` means no owned paths.
+The sample declares `owned_tier` (default `unknown`), `classification` and
+`triage` (both default empty) and passes all three to the review step. API callers
+supply `facts.ownedPathTier`; live service callers supply `credentials.ownedPathTier`.
+
+On a Jev outage, functional routing and risk use the tool-free
+`claude-haiku-4-5` fallback through the configured Claude executable. A fallback
+verdict posts with `decision_source: fallback` and cannot clear auto-merge.
+Classification outages require functional review. Documentation routing outages
+summon review without a fallback call or a risk hold. If both deciders fail,
+Margot reports an error. Unreadable review history starts round one without a
+ledger in the posted review, preserving the last readable ledger.

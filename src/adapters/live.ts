@@ -16,6 +16,7 @@ export function liveServices(
   configInput: LiveConfig,
   credentials: {
     jevKey: string;
+    ownedPathTier?: unknown;
     githubToken?: string;
     writeToken?: string;
     ticketingEnvironment?: Record<string, string>;
@@ -47,7 +48,11 @@ export function liveServices(
       ...(config.github.gh ? { gh: config.github.gh } : {}),
       ...(credentials.githubToken ? { token: credentials.githubToken } : {}),
     }),
-    config.github,
+    {
+      ...config.github,
+      ...(config.publisher ? { triageAppId: config.publisher.appId } : {}),
+      ownedPathTier: credentials.ownedPathTier,
+    },
   );
   const provenanceConfig = structuredClone(config);
   // A workflow invocation owns checks, but does not change the review policy.
@@ -56,7 +61,11 @@ export function liveServices(
   const services: Services = {
     provenance: `live:${authority ? "github" : "shadow"}:${createHash("sha256").update(JSON.stringify(provenanceConfig)).digest("hex")}`,
     ...github,
-    ...jevAdapter({ key: credentials.jevKey, model: config.jev.model }),
+    ...jevAdapter({
+      key: credentials.jevKey,
+      model: config.jev.model,
+      fallbackExecutable: config.claude.executable,
+    }),
     ...claudeAdapter({
       ...config.claude,
       ...(config.github.gh ? { gh: config.github.gh } : {}),

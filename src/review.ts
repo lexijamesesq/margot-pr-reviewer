@@ -9,6 +9,7 @@ import {
   standingCards,
 } from "./ledger.js";
 import {
+  assignFindingIds,
   classify,
   decide,
   needsVoice,
@@ -23,6 +24,7 @@ import {
   bundleSchema,
   cardSchema,
   classificationSchema,
+  classNames,
   configSchema,
   disableAutoMergeSchema,
   factsSchema,
@@ -101,8 +103,13 @@ export async function review(
       disableAutoMergeSchema.parse(await call(name, (c) => services.disableAutoMerge(request, c)));
     const progress = async (title: ReviewPhaseTitle): Promise<void> => {
       const reportProgress = services.progress;
-      if (reportProgress)
-        await call("publication-progress", (context) => reportProgress(title, context));
+      if (reportProgress) {
+        try {
+          await call("publication-progress", (context) => reportProgress(title, context));
+        } catch {
+          console.warn("Margot: phase-title update failed; continuing review");
+        }
+      }
     };
     const facts = factsSchema.parse(await call("facts", (c) => services.facts(request, c)));
     if (facts.autoMergeArmed)
@@ -121,43 +128,52 @@ export async function review(
     )
       throw new Error("Facts do not match requested revision");
     stage = "history";
-    const prior = selectLedger(facts, config);
-    const cached = prior?.head === request.head ? prior.receipt : undefined;
+    const historyUnavailable =
+      !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
+    const ledgerWarnings: string[] = [];
+    const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
+    let cached = prior?.head === request.head ? prior.receipt : undefined;
     if (
       prior?.head === request.head &&
-      (!cached ||
-        cached.configHash !== configHash(config) ||
+      cached &&
+      (cached.configHash !== configHash(config) ||
         cached.review.provenance.services !== services.provenance ||
         cached.evidenceHash !== evidenceHash(facts) ||
         cached.review.request.base !== request.base)
     )
       throw new Error("Same-head history has no compatible saved result");
     stage = "triage";
-    if (
-      facts.triage &&
-      (!config.trustedTriageActors.includes(facts.triage.actor) ||
-        facts.triage.head !== request.head ||
-        facts.triage.base !== request.base)
-    )
-      throw new Error("Untrusted triage receipt");
-    // A change larger than this cap is not a candidate for the mechanical
-    // short-circuit. Jev never sees it and the PR takes the full review path: a
-    // huge change is unlikely to be purely mechanical, and review is the safe miss.
     const oversized = changedLineCount(facts.diff) > config.mechanicalDiffLineCap;
-    const classification =
-      cached?.review.classification ??
-      (oversized
-        ? "functional"
-        : classify(
-            classificationSchema.parse(
-              await call("classification", (c) =>
-                services.classify(facts, classificationQuestions, c),
-              ),
-            ),
-            facts,
-            config,
-          ));
-    if (request.phase === "triage") return { kind: "classified", request, classification };
+    const answer = oversized
+      ? null
+      : classificationSchema.parse(
+          await call("classification", (c) => services.classify(facts, classificationQuestions, c)),
+        );
+    const fresh = answer ? classify(answer, { ...facts, triage: null }, config) : "functional";
+    let classification = fresh;
+    let classSource = answer?.source ?? "diff_too_large";
+    if (request.phase !== "triage") {
+      const trusted =
+        facts.triage &&
+        config.trustedTriageActors.includes(facts.triage.actor) &&
+        facts.triage.head === request.head;
+      classification = trusted && facts.triage ? facts.triage.classification : "functional";
+      classSource = trusted ? "jev" : "triage_unavailable";
+      if (classNames.indexOf(fresh) < classNames.indexOf(classification)) {
+        classification = fresh;
+        classSource = answer?.source ?? "diff_too_large";
+      }
+      const dispatched =
+        classNames.find((name) => name === request.classification) ??
+        (!request.classification && request.triage === "mechanical" ? "mechanical" : "functional");
+      if (classNames.indexOf(dispatched) < classNames.indexOf(classification)) {
+        classification = dispatched;
+        classSource = "dispatch";
+      }
+    }
+    if (cached && classification !== cached.review.classification) cached = undefined;
+    if (request.phase === "triage")
+      return { kind: "classified", request, classification, decision_source: classSource };
     await progress("Margot: preflight complete — setting up the review runner");
     stage = "checks";
     for (const name of config.requiredChecks) {
@@ -179,7 +195,7 @@ export async function review(
     }
     let comparison: unknown;
     const compare = services.compare;
-    if (prior && !cached && compare) {
+    if (prior && prior.head !== request.head && !cached && compare) {
       try {
         comparison = await call("compare", (c) => compare(request, prior.head, c));
       } catch {
@@ -189,7 +205,12 @@ export async function review(
     const scope = roundScope(facts, prior, comparison);
     let result: Review;
     if (cached && prior) {
-      result = { ...cached.review, ledger: prior, convergence: cached.counts };
+      result = {
+        ...cached.review,
+        provenance: { ...cached.review.provenance, classification: classSource },
+        ledger: prior,
+        convergence: cached.counts,
+      };
     } else {
       const cards: Card[] = [];
       let rating = rate(null, false, config);
@@ -209,7 +230,11 @@ export async function review(
         return bundle;
       };
       const recalled = standingCards(scope);
-      if (reviewPath(classification, null, config).routing || recalled.length > 0) {
+      if (
+        reviewPath(classification, null, config).routing ||
+        recalled.length > 0 ||
+        historyUnavailable
+      ) {
         const { documentationSubstantive: _documentationSubstantive, ...functionalRouteQuestions } =
           routeQuestions;
         const questions =
@@ -223,7 +248,9 @@ export async function review(
         routeAnswer = routeSchema.parse(
           await call("route", (c) => services.route(scopedFacts, classification, questions, c)),
         );
-        const path = reviewPath(classification, routeAnswer, config);
+        const path = historyUnavailable
+          ? { routing: true, council: true, risk: classification !== "documentation" }
+          : reviewPath(classification, routeAnswer, config);
         if (path.council || recalled.length > 0) {
           await progress("Margot: council is reviewing the changes");
           const selected = [
@@ -273,8 +300,9 @@ export async function review(
               cards.push(completion.value);
             }
             stage = "cards";
+            assignFindingIds(cards);
             prepareFindings(cards, scope);
-            const ids = cards.flatMap((c) => c.findings.map((f) => f.id));
+            const ids = cards.flatMap((c) => c.findings.flatMap((f) => (f.id ? [f.id] : [])));
             if (new Set(ids).size !== ids.length) throw new Error("Duplicate finding IDs");
           }
           if (path.risk) {
@@ -314,12 +342,24 @@ export async function review(
         decision: decide(classification, facts, config, rating, voice),
         provenance: {
           cardBundle: config.cardBundle.commit,
-          classification: "fresh-jev",
+          classification: classSource,
+          decision_source:
+            classification !== "documentation" &&
+            ((routeAnswer && routeAnswer.source !== "jev") ||
+              (riskAnswer && riskAnswer.source !== "jev"))
+              ? "fallback"
+              : "jev",
           services: services.provenance,
         },
       };
+      if (core.provenance.decision_source !== "jev") {
+        core.decision.mergeEligible = false;
+        core.decision.holdReasons.push("fallback");
+      }
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
+    if (historyUnavailable) result.ledgerUnavailable = true;
+    if (ledgerWarnings.length) result.ledgerWarnings = ledgerWarnings;
     const metadata = services.reviewMetadata?.() ?? {};
     result = {
       ...result,
@@ -344,6 +384,7 @@ export async function review(
       throw new Error("Head moved before publication");
     if (config.publication !== "none") {
       if (
+        config.publication !== "github" &&
         !result.decision.mergeEligible &&
         facts.autoMergeArmed &&
         !(await disableAutoMerge("disable-auto-merge"))

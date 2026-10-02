@@ -1,6 +1,6 @@
 # Slice 4 verification
 
-Verified engine branch head is recorded in the workspace hand-over. Verification
+Verified Margot branch head is recorded in the workspace hand-over. Verification
 documents are excluded from the npm package. Nothing was pushed, posted,
 dispatched or published. All GitHub publication tests use recorded HTTP targets.
 
@@ -106,7 +106,7 @@ The three instance workflows and changed CI workflow pass actionlint. The estate
 CI floor job matches main structurally, and the other estate-owned caller files
 are unchanged. Dotty has no edits; its active readers and rollback floor helper
 remain available. The separate retirement branch removes the instance Python
-engine, glue, image build and harness while retaining the original r32 manifest.
+Margot, glue, image build and harness while retaining the original r32 manifest.
 
 ## Security scans and remaining proof
 

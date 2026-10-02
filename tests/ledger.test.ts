@@ -138,8 +138,8 @@ function rejects(run: () => unknown) {
     return { ok: true };
   }
 }
-scenario("ledger-auth", (b) =>
-  rejects(() =>
+scenario("ledger-auth", (b) => ({
+  ok:
     selectLedger(
       {
         ...facts,
@@ -150,22 +150,22 @@ scenario("ledger-auth", (b) =>
         },
       },
       config,
-    ),
-  ),
-);
+    ) === null,
+}));
 scenario("ledger-binding", (b) => {
   const f = history();
   f.history.reviews[0]!.head = b ? oldHead : "f".repeat(40);
-  return rejects(() => selectLedger(f, config));
+  return { ok: selectLedger(f, config) === null };
 });
 scenario("ledger-corrupt", (b) => {
   const f = history();
   if (!b) f.history.reviews[0]!.body = "review\n<!-- margot-ledger:v1 garbage -->";
-  return rejects(() => selectLedger(f, config));
+  return { ok: selectLedger(f, config) === null };
 });
-scenario("ledger-unreadable", (b) =>
-  rejects(() => selectLedger({ ...facts, history: { complete: b, priorLedger: false } }, config)),
-);
+scenario("ledger-unreadable", (b) => ({
+  ok:
+    selectLedger({ ...history(), history: { ...history().history, complete: b } }, config) === null,
+}));
 scenario(
   "ledger-newest",
   (b) => {
@@ -185,7 +185,8 @@ scenario(
     const f = history();
     f.history.reviews.push({
       ...posted(prior([], 3), "human"),
-      actorType: "User",
+      actorType: broken ? "Bot" : "User",
+      actor: broken ? "reviewer[bot]" : "human",
       id: 2,
       submittedAt: "2026-09-02T00:00:00Z",
       body: broken
@@ -196,9 +197,9 @@ scenario(
   },
   { ledger: prior() },
 );
-scenario("ledger-duplicate", (b) =>
-  rejects(() => selectLedger(history(prior(b ? [entry()] : [entry(), entry()])), config)),
-);
+scenario("ledger-duplicate", (b) => ({
+  ok: selectLedger(history(prior(b ? [entry()] : [entry(), entry()])), config) === null,
+}));
 scenario("ledger-terminal", (b) => {
   const f = history();
   if (!b) f.history.reviews[0]!.body += "\nquoted text";
@@ -267,6 +268,8 @@ for (const [id, severity, name, late, expected] of [
   ["ledger-minor", "MINOR", "safety", "new", 0],
   ["ledger-major", "MAJOR", "safety", "new", 1],
   ["ledger-late-major", "MAJOR", "house-style", "missed: absent in round 1", 0],
+  // Python's `_late_missed` reads the bare `late=missed` mark its golden cards carry.
+  ["ledger-late-bare", "MAJOR", "house-style", "missed", 0],
   ["ledger-late-blocking", "BLOCKING", "house-style", "missed: absent in round 1", 1],
   ["ledger-late-safety", "MAJOR", "safety", "missed: absent in round 1", 1],
   ["ledger-reach", "MAJOR", "house-style", "delta-reach: new caller", 1],
@@ -344,7 +347,7 @@ scenario("ledger-attribution", (b) => {
   if (!b) delete f.late;
   return rejects(() => prepareFindings([card([f])], scope([])));
 });
-scenario("ledger-engine-fields", (b) =>
+scenario("ledger-margot-fields", (b) =>
   rejects(() =>
     prepareFindings(
       [card([finding("MAJOR", b ? {} : { advisory: "carried-dismissal" })])],
@@ -454,12 +457,12 @@ scenario(
       ).ledger.entries.map((e) => `${e.key}:${e.status}`),
     };
   },
-  { entries: ["R1-F1:fixed", "R1-F2:dismissed"] },
+  { entries: ["R1-F2:dismissed"] },
 );
-scenario("ledger-budget", (b) =>
-  rejects(() => ledgerBlock(prior([{ ...entry(), what: "x".repeat(b ? 10 : 50000) }]))),
-);
-async function engine(b: boolean, classification = "mechanical", editorial = false) {
+scenario("ledger-budget", (b) => ({
+  ok: ledgerBlock(prior([{ ...entry(), what: "x".repeat(b ? 10 : 50000) }])).length > 24000,
+}));
+async function margot(b: boolean, classification = "mechanical", editorial = false) {
   const r = structuredClone(source);
   r.config = { ...config, publication: "none" };
   r.facts = history();
@@ -494,7 +497,7 @@ async function engine(b: boolean, classification = "mechanical", editorial = fal
 scenario(
   "ledger-mechanical-recall",
   async (b) => {
-    const { result } = await engine(b);
+    const { result } = await margot(b);
     return result;
   },
   { kind: "reviewed", decision: { outcome: "CHANGES_REQUESTED" }, cards: [{ name: "safety" }] },
@@ -502,7 +505,7 @@ scenario(
 scenario(
   "ledger-editorial-recall",
   async (b) => {
-    const { result } = await engine(b, "documentation", true);
+    const { result } = await margot(b, "documentation", true);
     return result;
   },
   { kind: "reviewed", decision: { outcome: "CHANGES_REQUESTED" }, cards: [{ name: "safety" }] },
@@ -510,7 +513,7 @@ scenario(
 scenario(
   "ledger-card-isolation",
   async (b) => {
-    const { r } = await engine(false);
+    const { r } = await margot(false);
     const f = history(
       prior([entry(), { ...entry("MAJOR", "dismissed"), key: "R1-F2", card: "house-style" }]),
     );
@@ -535,7 +538,7 @@ scenario(
 scenario(
   "ledger-retry",
   async (b) => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed") throw new Error("baseline");
     const f = factsSchema.parse(r.facts);
     f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
@@ -548,12 +551,12 @@ scenario(
       calls: s.calls.map((c) => c.name),
     };
   },
-  { equal: true, calls: ["facts", "head"] },
+  { equal: true, calls: ["facts", "classification", "head"] },
 );
 scenario(
   "ledger-retry-040-receipt",
   async () => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed" || !result.ledger.receipt) throw new Error("baseline");
     const {
       routeAnswer: _routeAnswer,
@@ -581,12 +584,12 @@ scenario(
     r.facts = f;
     return await review(r.request, r.config, recordedServices(r));
   },
-  { kind: "reviewed", routeAnswer: null, riskAnswer: null },
+  { kind: "reviewed", routeAnswer: null, riskAnswer: null, convergence: { round: 2 } },
 );
 scenario(
   "ledger-retry-checks",
   async (b) => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed") throw new Error("baseline");
     const f = factsSchema.parse(r.facts);
     f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
@@ -599,11 +602,11 @@ scenario(
 scenario(
   "ledger-retry-legacy",
   async (b) => {
-    const { r } = await engine(false);
+    const { r } = await margot(false);
     r.facts = history({ ...prior(), head: b ? oldHead : facts.head });
     return await review(r.request, r.config, recordedServices(r));
   },
-  { kind: "error", stage: "history" },
+  { kind: "reviewed", convergence: { round: 1 } },
 );
 scenario(
   "ledger-prose",
@@ -613,7 +616,7 @@ scenario(
       "safety",
     ),
   {
-    resolved: [{ key: "R1-F2", reason: "a.ts:3 validates input" }],
+    // Python never parsed `Resolved:`; the section is prose, and fixed-ness comes from absence.
     findings: [{ ledger: "R1-F1", late: "delta-reach: new caller" }],
   },
 );
@@ -673,7 +676,7 @@ for (const id of ["ledger-pagination", "ledger-page-two-failure"])
             signal: AbortSignal.timeout(3000),
           }),
         );
-        if (id === "ledger-page-two-failure") return { failed: false };
+        if (id === "ledger-page-two-failure") return { failed: !f.history.complete };
         return {
           round: selectLedger(f, config)?.round,
           pages: pages.filter((p) => p.includes("/reviews")).length,
@@ -723,7 +726,7 @@ scenario(
 scenario(
   "ledger-retry-evidence",
   async (b) => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed") throw new Error("baseline");
     const f = factsSchema.parse(r.facts);
     f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
@@ -923,7 +926,7 @@ scenario(
 scenario(
   "ledger-retry-provenance",
   async (b) => {
-    const { result, r } = await engine(false);
+    const { result, r } = await margot(false);
     if (result.kind !== "reviewed") throw new Error("baseline");
     const f = factsSchema.parse(r.facts);
     f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };

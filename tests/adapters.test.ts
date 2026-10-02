@@ -12,6 +12,7 @@ import { execute } from "../src/adapters/process.js";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
 import { cliServices, configuredTicketingEnvironment } from "../src/cli-services.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
+import { assignFindingIds, mandatory, needsVoice, rate } from "../src/policy.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
 import {
   cardNames,
@@ -31,6 +32,7 @@ const recording = JSON.parse(
 ) as Recording;
 const request = requestSchema.parse(recording.request);
 const facts = factsSchema.parse(recording.facts);
+const config = configSchema.parse(recording.config);
 const context = () => ({ signal: AbortSignal.timeout(3000) });
 function scenario(
   id: string,
@@ -177,9 +179,10 @@ scenario("draft", (broken) =>
 scenario("fork", (broken) =>
   rejects(() => github({ fork: !broken }).adapter.facts(request, context())),
 );
-scenario("history-outage", (broken) =>
-  rejects(() => github({ historyFailure: !broken }).adapter.facts(request, context())),
-);
+scenario("history-outage", async (broken) => ({
+  ok: !(await github({ historyFailure: !broken }).adapter.facts(request, context())).history
+    .complete,
+}));
 scenario("ledger", async (broken) => ({
   ok: (await github({ ledger: !broken }).adapter.facts(request, context())).history.priorLedger,
 }));
@@ -279,15 +282,17 @@ scenario("jev-retry", async (broken) => {
 });
 scenario("jev-auth", async (broken) => {
   const j = jev(classes, { failures: 1, status: broken ? 503 : 401 });
-  const error = await rejects(() => j.adapter.classify(facts, classificationQuestions, context()));
-  return { ok: error.ok && j.attempts() === 1 };
+  const answer = (await j.adapter.classify(facts, classificationQuestions, context())) as {
+    source: string;
+  };
+  return { ok: answer.source === "jev_unreachable" && j.attempts() === 1 };
 });
 scenario("jev-outage", async (broken) => {
   const j = jev(classes, { failures: broken ? 0 : 3 });
   const services = { ...recordedServices(recording), classify: j.adapter.classify };
   const result = await review(request, recording.config, services);
   return {
-    ok: result.kind === "error" && result.stage === "classification" && !result.mergeEligible,
+    ok: result.kind === "reviewed" && result.classification === "functional",
   };
 });
 scenario("jev-risk", async (broken) => {
@@ -337,7 +342,6 @@ scenario(
   {
     findings: [
       {
-        id: "safety-F1",
         tag: "issue",
         severity: "MAJOR",
         confidence: "HIGH",
@@ -348,36 +352,143 @@ scenario(
     ],
   },
 );
-scenario("card-missing-checked", (broken) =>
-  rejects(async () =>
-    parseCard(broken ? cardText() : cardText().replace("Checked:", "Examined:"), "safety"),
-  ),
+// Python's parse_council reads the whole block for tagged bullets and never requires the
+// Checked, Not covered or Findings labels; a label mentioned again in free text is not an error.
+scenario(
+  "card-headers-optional",
+  async (broken) => {
+    const finding =
+      "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n    action: Restore the guard.\n";
+    const card = parseCard(
+      `card: safety\ncompletion: completed\n\nI reviewed the change; see Findings: below.\n${broken ? "" : finding}`,
+      "safety",
+    );
+    return { checked: card.checked, notCovered: card.notCovered, findings: card.findings.length };
+  },
+  { checked: [], notCovered: [], findings: 1 },
 );
-scenario("card-incomplete", (broken) =>
-  rejects(async () =>
-    parseCard(
+scenario(
+  "card-incomplete",
+  async (broken) => {
+    const card = parseCard(
       broken
         ? cardText()
-        : cardText().replace("completion: completed", "completion: incomplete: missing evidence"),
+        : cardText().replace(
+            "completion: completed",
+            "completion: incomplete: the eval fixture is in another repository",
+          ),
       "safety",
-    ),
-  ),
+    );
+    return {
+      completion: card.completion,
+      completionReason: card.completionReason ?? null,
+      voice: needsVoice([card], rate(null, false, config), 1, config),
+    };
+  },
+  {
+    completion: "incomplete",
+    completionReason: "the eval fixture is in another repository",
+    voice: true,
+  },
 );
 scenario("card-malformed", (broken) =>
   rejects(async () =>
     parseCard(cardText() + (broken ? "" : "- [issue] missing fields\n"), "safety"),
   ),
 );
-scenario("card-ambiguous", (broken) =>
-  rejects(async () =>
-    parseCard(cardText() + (broken ? "" : "\ncompletion: completed\n"), "safety"),
-  ),
+scenario(
+  "card-ambiguous",
+  async (broken) => {
+    const card = parseCard(
+      `card: safety\ncompletion: ${broken ? "skipped: no file matched" : "completed"}\n\nChecked:\n- Reviewed; completion: completed is restated here.\n\ncard: safety\ncompletion: incomplete: a draft line\n`,
+      "safety",
+    );
+    return { completion: card.completion, checked: card.checked.length };
+  },
+  { completion: "completed", checked: 1 },
+);
+// Python's _TAG_BULLET tolerates emphasis around the tag and numbered bullets; its
+// _finding_fields reads `k=v` in any order, ignores keys it does not know, and drops a
+// `ledger=` value that is not a ledger key. `(none)` under Findings is prose, not a finding.
+scenario(
+  "card-tag-forms",
+  async (broken) => {
+    const card = parseCard(
+      `card: safety\ncompletion: completed\nFindings:\n(none yet)\n- ${broken ? "**issue**" : "**[issue]**"} a.ts:1 · confidence=high · severity=**major** · owner=reviewer · ledger=not-a-key · late=missed\n    what: A guard is missing.\n1. *[ info ]* b.ts:2 · severity=MINOR · confidence=LOW\n    what: A note.\n    note: Optional.\n`,
+      "safety",
+    );
+    return { findings: card.findings };
+  },
+  {
+    findings: [
+      { tag: "issue", location: "a.ts:1", severity: "MAJOR", confidence: "HIGH", late: "missed" },
+      {
+        tag: "info",
+        location: "b.ts:2",
+        severity: "MINOR",
+        confidence: "LOW",
+        detail: "Optional.",
+      },
+    ],
+  },
+);
+// Python read only `what:`/`note:`; consequence and action are run-only fields that are never
+// a reason to refuse: missing is empty, a repeated label takes the last value.
+scenario(
+  "card-subfields",
+  async (broken) => {
+    const card = parseCard(
+      `card: safety\ncompletion: completed\nFindings:\n- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n${broken ? "    consequence: Writes escape.\n" : ""}    action: Draft fix.\n    action: Restore the guard.\n- [info] b.ts:2 · severity=MINOR · confidence=LOW\n    note: Only a note line.\n`,
+      "safety",
+    );
+    return { details: card.findings.map((f) => [f.what, f.detail ?? null]) };
+  },
+  {
+    details: [
+      ["A guard is missing.", "Restore the guard."],
+      ["Only a note line.", "Only a note line."],
+    ],
+  },
+);
+// Python's ids: `[issue]` findings are F1…Fn across the council in card order, assigned once
+// every card has parsed; an `[info]` carries none.
+scenario(
+  "card-global-ids",
+  async (broken) => {
+    const first = parseCard(
+      "card: safety\ncompletion: completed\nFindings:\n- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: One.\n- [info] a.ts:2 · severity=MINOR · confidence=LOW\n    what: Note.\n",
+      "safety",
+    );
+    const second = parseCard(
+      "card: works-and-proven\ncompletion: completed\nFindings:\n- [issue] b.ts:1 · severity=MAJOR · confidence=HIGH\n    what: Two.\n",
+      "works-and-proven",
+    );
+    const cards = broken ? [second, first] : [first, second];
+    assignFindingIds(cards);
+    return {
+      ids: [first, second].map((card) => card.findings.map((f) => f.id ?? null)),
+      mandatory: mandatory(cards),
+    };
+  },
+  { ids: [["F1", null], ["F2"]], mandatory: ["F1", "F2"] },
+);
+// Python's _OUTCOMES includes ERROR: Margot's own fail-closed ruling, with a finding she could
+// not resolve legitimately in neither list.
+scenario(
+  "voice-error-outcome",
+  async (broken) => {
+    const voice = parseVoice(
+      `I read the council's findings against the cited lines.\n\noutcome: ${broken ? "CHANGES_REQUESTED" : "ERROR"}\nband: MEDIUM\nband_reason: the change touches one bounded behavior with a revert as its recovery\nrisk: retry-loop exposure\nsummary: The retry wraps one call and is bounded; the findings below decide it.\nfinding: F1 could not be checked: the head's file could not be read\nclarification: \nestablished:\ndismissed:\n`,
+    );
+    return { outcome: voice.outcome, band: voice.band, dispositions: voice.dispositions.length };
+  },
+  { outcome: "ERROR", band: "MEDIUM", dispositions: 0 },
 );
 scenario(
   "voice-accounting",
-  async () => {
+  async (broken) => {
     return parseVoice(
-      "outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\nestablished:\n- safety-F1 · a.ts:1 · The guard is missing.\ndismissed:\n- safety-F2 · a.ts:2 · Existing check covers this.\n",
+      `outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\n${broken ? "dismissed" : "established"}:\n- safety-F1 · a.ts:1 · The guard is missing.\ndismissed:\n- safety-F2 · a.ts:2 · Existing check covers this.\n`,
     );
   },
   {
@@ -391,12 +502,55 @@ scenario(
     ],
   },
 );
-scenario("voice-ambiguous", (broken) =>
-  rejects(async () =>
-    parseVoice(
-      `outcome: APPROVED\nband: LOW\nband_reason: Bounded.\nsummary: Clear.\nestablished:\ndismissed:\n${broken ? "" : "band: HIGH\n"}`,
-    ),
-  ),
+scenario(
+  "voice-python-tolerance",
+  async () => {
+    const finalBlock = parseVoice(
+      "outcome: CHANGES_REQUESTED\nband: HIGH\nband_reason: Draft.\nsummary: Draft.\n\nI reconsidered.\n**outcome:** **approved**.\n**band:** **medium**!\nband_reason: Final reason.\nsummary: Final summary.\nEstablished:\nDismissed:\n",
+    );
+    const forms = parseVoice(
+      "outcome: approved.\nband: `low`\nband_reason: Bounded.\nsummary: Clear.\nEsTaBlIsHeD:\n- **alpha-F1** · dot reason\n- __beta_F2__ — dash reason\n- *gamma-F3*: colon reason\n- _delta_\n- `epsilon-5` · tick reason\n- (not an id) is ignored\n### Notes\n- after-heading · ignored\nESTABLISHED:\n- zeta-F6 · before rule\n---\n- after-rule · ignored\nestablished:\n- eta-F7 · before prose\nThese notes are optional.\n- **after-prose (MINOR):** ignored\nDISMISSED:\n- unknown-id: dismissed reason\n",
+    );
+    const liveFailure = parseVoice(
+      "I checked the one finding that could still block and dismissed it, so this is approved. It's banded HIGH, though, which means you merge it, not me.\n\noutcome: APPROVED\nband: HIGH\nband_reason: I'm keeping the model's HIGH, and for a stronger reason than its scoring. The model's blast_radius and verification_gap readings have zero confidence. But this repository is the package Margot runs as. The change alters how the stranded-check closer concludes required checks: superseded and merged now close as `skipped`, which GitHub treats as passing. It also changes how `bind-request` reports a stop: it exits 75 with `stop_reason`/`live_sha` in GITHUB_OUTPUT, and the sample drops its `set +e` wrapper. Changing what grades or gates a review is above my authority, so the operator decides. The safety card checked that `skipped` only happens for superseded or merged, and that the leave-the-live-head rule still holds. That makes the risk a matter of who decides, not a defect. A lower band is not justified.\nrisk: changes to the reviewer's own gate\nsummary: This change renames Margot's install-location setting so that nothing is called \"engine\". It also makes every early stop close Margot's status check with the same result the older Python version gave, and it puts back saved records of past reviews that the first round had wrongly edited. The only blocking problem left from round one, the edited records, is fixed: the files match the originals exactly. Because the change affects how Margot's own pass/fail check is closed, the operator decides whether to merge. Three small notes are optional.\nfinding: none\nestablished:\ndismissed:\n- verify-R1-F2 · docs/live/documentation.json:54 · Fixed. Line 54 at head is byte-for-byte the same as base 4437550, and nothing under docs/ is in this PR's changed-file list anymore, so the saved record shows what GitHub actually supplied again. The maintainable-no-slop card's own resolution of R1-F2 says the same.\n\nThese three notes don't block and the author can take or leave them:\n- **achieves-the-objective-F1 (MINOR):** the PR description's \"grep finds only principal-engineer\" claim is now false. The restored lines `docs/SLICE4.md:22` and `docs/SLICE4.md:175` still contain \"engine\".\n- **maintainable-no-slop-F1 (MINOR):** in `src/closer.ts`, the `cancelled` and `unknown` entries repeat the same title and summary text.\n- **house-style-F1 (info):** the draft, fork, conflict and empty check titles in `src/closer.ts` don't start with \"Margot:\" like the other titles do.\n",
+    );
+    return {
+      final: {
+        outcome: finalBlock.outcome,
+        band: finalBlock.band,
+        rationale: finalBlock.rationale,
+        summary: finalBlock.summary,
+      },
+      forms: forms.dispositions,
+      live: liveFailure.dispositions,
+    };
+  },
+  {
+    final: {
+      outcome: "APPROVED",
+      band: "MEDIUM",
+      rationale: "Final reason.",
+      summary: "Final summary.",
+    },
+    forms: [
+      { id: "alpha-F1", status: "established", reason: "dot reason" },
+      { id: "beta_F2", status: "established", reason: "dash reason" },
+      { id: "gamma-F3", status: "established", reason: "colon reason" },
+      { id: "delta", status: "established", reason: "" },
+      { id: "epsilon-5", status: "established", reason: "tick reason" },
+      { id: "zeta-F6", status: "established", reason: "before rule" },
+      { id: "eta-F7", status: "established", reason: "before prose" },
+      { id: "unknown-id", status: "dismissed", reason: "dismissed reason" },
+    ],
+    live: [
+      {
+        id: "verify-R1-F2",
+        status: "dismissed",
+        reason:
+          "docs/live/documentation.json:54 · Fixed. Line 54 at head is byte-for-byte the same as base 4437550, and nothing under docs/ is in this PR's changed-file list anymore, so the saved record shows what GitHub actually supplied again. The maintainable-no-slop card's own resolution of R1-F2 says the same.",
+      },
+    ],
+  },
 );
 scenario("credential-isolation", async (broken) => {
   const env = claudeEnvironment({

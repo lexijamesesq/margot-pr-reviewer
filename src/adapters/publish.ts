@@ -62,7 +62,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       details_url: config.runUrl,
       status: conclusion ? ("completed" as const) : ("in_progress" as const),
       ...(conclusion ? { conclusion } : {}),
-      output: { title, summary, ...(text ? { text } : {}) },
+      output: { title, summary, ...(text ? { text: capCheckText(text) } : {}) },
     };
     let id = ids.get(name);
     if (!id) {
@@ -112,7 +112,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
   }
   async function confirmReviewCheck(r: ReviewRequest, conclusion: string, c: CallContext) {
     const id = ids.get(config.checks.review);
-    if (!id) throw new Error("Review check was not completed before approval");
+    if (!id) throw new Error("Review check was not completed after publication");
     const { data } = await client.rest.checks.get({ ...params(r, c), check_run_id: id });
     if (
       data.status !== "completed" ||
@@ -120,7 +120,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       data.head_sha !== r.head ||
       data.app?.id !== config.appId
     )
-      throw new Error("Review check was not confirmed before approval");
+      throw new Error("Review check was not confirmed after publication");
   }
   const disableAutoMerge: Services["disableAutoMerge"] = async (r, c) => {
     const { data: pr } = await client.rest.pulls.get(params(r, c));
@@ -133,7 +133,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     await assertCurrentRun(r, c);
     return (await client.rest.pulls.get(params(r, c))).data.auto_merge === null;
   };
-  async function triage(r: ReviewRequest, classification: string, c: CallContext) {
+  async function triage(r: ReviewRequest, classification: string, c: CallContext, source = "jev") {
     await check(
       r,
       config.checks.triage,
@@ -141,7 +141,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       `Margot triage: ${classification}`,
       "Fresh classification for CI; no merge authority.",
       JSON.stringify({
-        decision_source: "jev",
+        decision_source: source,
         head_sha: r.head,
         classification,
         mechanical: classification === "mechanical",
@@ -165,17 +165,19 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
   const heldReason = (decision: { holdReasons: string[]; rating: { band: string } }) =>
     decision.holdReasons.includes("review-authority")
       ? "a change to Margot's own machinery"
-      : decision.holdReasons.includes("calibration")
-        ? "calibration mode"
-        : `risk is ${decision.rating.band}`;
+      : decision.holdReasons.includes("fallback")
+        ? "the risk was scored by the fallback (reduced confidence)"
+        : decision.holdReasons.includes("ownership-uncomputed")
+          ? "ownership could not be established"
+          : decision.holdReasons.includes("calibration")
+            ? "calibration mode"
+            : `risk is ${decision.rating.band}`;
   const publish: Services["publish"] = async ({ expectedHead, review, report }, c) => {
     const r = review.request;
     if (!active || JSON.stringify(active) !== JSON.stringify(r) || expectedHead !== r.head)
       throw new Error("Publication must run inside its check lifecycle");
     const { decision } = review;
-    if (!decision.mergeEligible && !(await disableAutoMerge(r, c)))
-      throw new Error("Auto-merge disable was not confirmed");
-    await triage(r, review.classification, c);
+    await triage(r, review.classification, c, review.provenance.classification);
     const authorityHold = decision.holdReasons.includes("review-authority");
     await check(
       r,
@@ -191,29 +193,6 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       undefined,
       c,
     );
-    // Complete all check writes before the approving review. The review-count rule
-    // must hold even when the review check is informational, not required.
-    const reviewConclusion = decision.holdReasons.includes("calibration")
-      ? "action_required"
-      : decision.mergeEligible
-        ? "success"
-        : "neutral";
-    await check(
-      r,
-      config.checks.review,
-      reviewConclusion,
-      // Titles the estate's readers already know: Ollie turns a held title into its ask,
-      // so the title names the reason the PR is actually held.
-      decision.mergeEligible
-        ? "Margot: approved"
-        : decision.outcome === "APPROVED"
-          ? `held for the operator: ${heldReason(decision)}`
-          : `Margot: ${decision.outcome}`,
-      `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
-      checkText(review),
-      c,
-    );
-    await confirmReviewCheck(r, reviewConclusion, c);
     // Margot never dismisses her own earlier approvals: a new head gets a new review, and
     // the estate's ruleset handles stale approvals, as it did for the Python reviewer.
     await guard(r, c);
@@ -232,6 +211,33 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       data.state !== (decision.mergeEligible ? "APPROVED" : "COMMENTED")
     )
       throw new Error("Invalid native review receipt");
+    if (!decision.mergeEligible && !(await disableAutoMerge(r, c)))
+      throw new Error("Auto-merge disable was not confirmed");
+    // Review first, then disarm held PRs, then conclude the required check.
+    const reviewConclusion =
+      decision.holdReasons.includes("calibration") || decision.outcome === "ERROR"
+        ? "action_required"
+        : decision.mergeEligible
+          ? "success"
+          : "neutral";
+    await check(
+      r,
+      config.checks.review,
+      reviewConclusion,
+      // Titles the estate's readers already know: Ollie turns a held title into its ask,
+      // so the title names the reason the PR is actually held.
+      decision.mergeEligible
+        ? "Margot: approved"
+        : decision.outcome === "APPROVED"
+          ? `held for the operator: ${heldReason(decision)}`
+          : decision.outcome === "ERROR"
+            ? "not reviewed (error)"
+            : `Margot: ${decision.outcome}`,
+      `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
+      checkText(review),
+      c,
+    );
+    await confirmReviewCheck(r, reviewConclusion, c);
     await guard(r, c, decision.mergeEligible);
     return { recorded: false, head: r.head, id: String(data.id) };
   };
@@ -260,7 +266,8 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         if (refusal) throw new PublicationRefusal(refusal);
         throw new Error(`${result.stage}: ${result.diagnostic}`);
       }
-      if (result.kind === "classified") await triage(r, result.classification, context());
+      if (result.kind === "classified")
+        await triage(r, result.classification, context(), result.decision_source);
       else if (!result.publication || result.publication.recorded)
         throw new Error("Missing live publication receipt");
       return result;
@@ -341,4 +348,12 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     }
   }
   return { run, publish, disableAutoMerge, progress };
+}
+
+export function capCheckText(text: string): string {
+  const note = "\n[Margot: check text truncated]";
+  const characters = Array.from(text);
+  return characters.length <= 60000
+    ? text
+    : characters.slice(0, 60000 - note.length).join("") + note;
 }
