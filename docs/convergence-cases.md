@@ -18,7 +18,7 @@ labels reconstructed identities. No case is marked TODO.
 | Silent MAJOR / silent MINOR | Synthesized verification for serious findings; fixed count for silent MINOR |
 | Dismissal carry-forward | Retained reason, explicit delta reopening, old fixes pruned, dismissals preserved |
 | Stable keys / conflicting rulings | Round-qualified keys; a standing ruling wins over a dismissal on the same key |
-| Round-two MINOR / late / safety / delta-reach | Separate severity tests, each with its own failing break |
+| Round-two MINOR / late / safety / delta-reach | Separate tests for severity, lateness and scope |
 | No escalation after three | Round-four MAJOR remains mandatory |
 | Counts and hidden ledger rendering | Live counts, exact result replay, schema validation and model-marker isolation |
 | Ledger budget | Fail closed without forgetting standing or dismissed entries; compressed saved-result round trip |
@@ -31,7 +31,7 @@ requires new delta findings to declare their scope. These changes are disclosed
 in the slice hand-over; they are stricter failure behavior, not postponed cases.
 
 The suite does not copy Python's subprocess transcripts, prompt-byte assertions,
-exception names or estate identities. `tests/ledger-scenarios.json` and the two
-other scenario manifests name each protected behavior and its break. Generated
-receipts record actual failures; `docs/live/slice3-replay.json` records the
-real-input convergence proofs.
+exception names or estate identities. Tests are grouped by behavior, with their
+intent named in Vitest. `tests/scenarios.json` retains review replay inputs and
+expected results; `docs/live/slice3-replay.json` records the real-input convergence
+proofs.

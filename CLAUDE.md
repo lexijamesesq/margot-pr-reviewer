@@ -7,7 +7,7 @@ locally; production authority remains outside this package.
 ## Setup and checks
 
 Use Node 22 or later. Run `npm ci`, `npm run build`, `npm run typecheck` and
-`npm test`. Run `npm run test:breaks` to reproduce every deliberate-break receipt.
+`npm test`. Run `pre-commit run --all-files` before committing.
 The README explains package installation, API configuration and live prerequisites.
 
 ## Boundaries

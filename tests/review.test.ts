@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { jevAdapter } from "../src/adapters/jev.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
+import { riskQuestions } from "../src/questions.js";
+import { checkText } from "../src/render.js";
+import { cardNames, configSchema, factsSchema, requestSchema } from "../src/schemas.js";
 
 interface Patch {
   path: string;
@@ -11,9 +15,10 @@ interface Scenario {
   recording: string;
   patches: Patch[];
   expected: Record<string, unknown>;
-  questionContract?: { key: string; rules: string[] };
-  break: Patch[];
-  defect: string;
+  questionContract?: {
+    key: string;
+    rules: string[];
+  };
 }
 const scenarios = JSON.parse(
   readFileSync(new URL("./scenarios.json", import.meta.url), "utf8"),
@@ -42,8 +47,11 @@ for (const scenario of scenarios) {
     };
     if (scenario.questionContract) {
       const classification = services.calls.find((c) => c.name === "classification");
-      const questions = (classification?.input as { questions?: Record<string, unknown> })
-        ?.questions;
+      const questions = (
+        classification?.input as {
+          questions?: Record<string, unknown>;
+        }
+      )?.questions;
       const question = questions?.[scenario.questionContract.key];
       observed.questionContract = scenario.questionContract.rules.every(
         (rule) => typeof question === "string" && question.includes(rule),
@@ -51,8 +59,13 @@ for (const scenario of scenarios) {
     }
     const routing = services.calls.find((c) => c.name === "route");
     observed.askedMeaning =
-      typeof (routing?.input as { questions?: Record<string, unknown> } | undefined)?.questions
-        ?.documentationSubstantive === "string";
+      typeof (
+        routing?.input as
+          | {
+              questions?: Record<string, unknown>;
+            }
+          | undefined
+      )?.questions?.documentationSubstantive === "string";
     if (result.kind === "error")
       Object.assign(observed, {
         stage: result.stage,
@@ -103,9 +116,170 @@ for (const scenario of scenarios) {
             }),
         cardPaths: services.calls
           .filter((c) => c.name.startsWith("card:"))
-          .map((c) => (c.input as { cardPath: string }).cardPath),
+          .map(
+            (c) =>
+              (
+                c.input as {
+                  cardPath: string;
+                }
+              ).cardPath,
+          ),
       });
     }
     expect(observed).toMatchObject(scenario.expected);
   });
 }
+describe("reviewer responses", () => {
+  const recording = JSON.parse(
+    readFileSync(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
+  ) as Recording;
+  const request = requestSchema.parse(recording.request);
+  it("A moved head cannot approve with publication disabled", async () => {
+    const copy = structuredClone(recording);
+    copy.config = { ...configSchema.parse(copy.config), publication: "none" };
+    copy.head = "f".repeat(40);
+    const result = await review(request, copy.config, recordedServices(copy));
+    expect(result.kind === "error" && !result.mergeEligible).toBe(true);
+  });
+});
+describe("classification and availability", () => {
+  const recording = () =>
+    JSON.parse(readFileSync("recordings/mechanical-bump.json", "utf8")) as Recording;
+  const seed = recording();
+  const facts = factsSchema.parse(seed.facts);
+  const request = requestSchema.parse(seed.request);
+  const context = () => ({ signal: AbortSignal.timeout(3000) });
+  it("uses the requested functional classification", async () => {
+    const r = recording();
+    r.request = { ...request, classification: "functional" };
+    expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
+      kind: "reviewed",
+      classification: "functional",
+      provenance: { classification: "dispatch" },
+    });
+  });
+  it("reviews as functional when trusted triage is unavailable", async () => {
+    const r = recording();
+    r.facts = { ...facts, triage: null };
+    expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
+      kind: "reviewed",
+      classification: "functional",
+      provenance: { classification: "triage_unavailable" },
+    });
+  });
+  it("reviews as functional when the requested classification is invalid", async () => {
+    const r = recording();
+    r.request = { ...request, classification: "garbage" };
+    expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
+      kind: "reviewed",
+      classification: "functional",
+    });
+  });
+  it("publishes the review even when progress updates fail", async () => {
+    const r = recording();
+    const services = recordedServices(r);
+    let attempts = 0;
+    const result = await review(r.request, r.config, {
+      ...services,
+      progress: async () => {
+        attempts++;
+        throw new Error("phase unavailable");
+      },
+    });
+    expect({ kind: result.kind, attempts, writes: services.publications.length }).toMatchObject({
+      kind: "reviewed",
+      attempts: 2,
+      writes: 1,
+    });
+  });
+  it("runs the council without posting a ledger when history is incomplete", async () => {
+    const r = recording();
+    r.facts = { ...facts, history: { complete: false, priorLedger: true, reviews: [] } };
+    const result = await review(r.request, r.config, recordedServices(r));
+    const documentation = structuredClone(r);
+    documentation.classification = {
+      source: "jev",
+      functional: 0,
+      documentation: 1,
+      mechanical: 0,
+    };
+    documentation.route = {
+      source: "jev",
+      confidence: 1,
+      documentationSubstantive: 0,
+      cards: Object.fromEntries(cardNames.map((name) => [name, 0])),
+    };
+    documentation.cards = {
+      "works-and-proven": {
+        name: "works-and-proven",
+        completion: "completed",
+        checked: [],
+        notCovered: [],
+        findings: [],
+      },
+    };
+    const doc = await review(
+      documentation.request,
+      documentation.config,
+      recordedServices(documentation),
+    );
+    expect({
+      documentationCouncil: doc.kind === "reviewed" && doc.cards.length === 1,
+      kind: result.kind,
+      noLedger: result.kind === "reviewed" && !result.report.includes("<!-- margot-ledger:"),
+      round: result.kind === "reviewed" && result.convergence.round,
+    }).toMatchObject({ kind: "reviewed", noLedger: true, round: 1, documentationCouncil: true });
+  });
+  const outage = (fallback: NonNullable<Parameters<typeof jevAdapter>[0]["fallback"]>) =>
+    jevAdapter({
+      key: "test",
+      model: "test",
+      retries: 0,
+      fetch: async () => new Response("{}", { status: 503 }),
+      fallback,
+    });
+  it("holds approval and records fallback provenance when risk uses the fallback", async () => {
+    const r = JSON.parse(readFileSync("recordings/council-clear.json", "utf8")) as Recording;
+    const adapter = outage(async (questions) =>
+      Object.fromEntries(
+        Object.keys(questions).map((key) => [
+          key,
+          { type: "score", confidence: 1, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+        ]),
+      ),
+    );
+    const risk = (await adapter.risk(facts, [], riskQuestions, context())) as {
+      source: string;
+    };
+    r.risk = risk;
+    const result = await review(r.request, r.config, recordedServices(r));
+    expect({
+      kind: result.kind,
+      eligible: result.kind === "reviewed" && result.decision.mergeEligible,
+      machine:
+        result.kind === "reviewed" && checkText(result).includes("decision_source: fallback"),
+    }).toMatchObject({ kind: "reviewed", eligible: false, machine: true });
+  });
+  it("allows clear documentation reviews after conservative outage routing", async () => {
+    const r = recording();
+    r.classification = { source: "jev", functional: 0, documentation: 1, mechanical: 0 };
+    r.route = {
+      source: "jev_unreachable",
+      documentationSubstantive: 1,
+      confidence: 0,
+      cards: Object.fromEntries(cardNames.map((name) => [name, 1])),
+    };
+    r.cards = Object.fromEntries(
+      cardNames.map((name) => [
+        name,
+        { name, completion: "completed", checked: [], notCovered: [], findings: [] },
+      ]),
+    );
+    const result = await review(r.request, r.config, recordedServices(r));
+    expect({
+      kind: result.kind,
+      eligible: result.kind === "reviewed" && result.decision.mergeEligible,
+      source: result.kind === "reviewed" && result.provenance.decision_source,
+    }).toMatchObject({ kind: "reviewed", eligible: true, source: "jev" });
+  });
+});
