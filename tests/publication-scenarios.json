@@ -111,7 +111,7 @@
   },
   {
     "id": "pub-error",
-    "name": "Evaluation error withdraws earlier approval and closes the gate",
+    "name": "Evaluation error closes the gate without touching earlier reviews",
     "defect": "Return the clean review"
   },
   {
@@ -121,18 +121,18 @@
   },
   {
     "id": "pub-receipt",
-    "name": "A mismatched native review receipt is compensated",
-    "defect": "Remove cleanup of an approval whose response is not yet list-visible",
-    "sourceBreak": {
-      "file": "src/adapters/publish.ts",
-      "from": ", ...(approvalId ? [approvalId] : [])",
-      "to": ""
-    }
+    "name": "A mismatched native review receipt is compensated by closing the gate",
+    "defect": "Return a matching native review receipt"
   },
   {
     "id": "pub-order",
-    "name": "A prior same-head approval is withdrawn before evaluating again",
-    "defect": "Remove prior approval"
+    "name": "A prior same-head approval is left alone; Margot never dismisses her own reviews",
+    "defect": "Dismiss the prior approval",
+    "sourceBreak": {
+      "file": "src/adapters/publish.ts",
+      "from": "    const { data } = await client.rest.pulls.createReview({",
+      "to": "    for (const prior of await client.paginate(client.rest.pulls.listReviews, { ...params(r, c), per_page: 100 }))\n      if (prior.state === \"APPROVED\" && prior.user?.login === config.actor)\n        await client.rest.pulls.dismissReview({ ...params(r, c), review_id: prior.id, message: \"stale\" });\n    const { data } = await client.rest.pulls.createReview({"
+    }
   },
   {
     "id": "pub-shadow",
@@ -211,12 +211,12 @@
   },
   {
     "id": "pub-head-after-approval",
-    "name": "Head movement after approval still dismisses approval and disarms auto-merge",
-    "defect": "Restore the admission guard before dismissing approvals",
+    "name": "Head movement after approval disarms auto-merge and leaves the approval, as Python did",
+    "defect": "Skip the disarm after the head moved",
     "sourceBreak": {
       "file": "src/adapters/publish.ts",
-      "from": "      await assertCurrentRun(r, c);\n      const { data } = await client.rest.pulls.dismissReview",
-      "to": "      await guard(r, c);\n      const { data } = await client.rest.pulls.dismissReview"
+      "from": "    const { data: pr } = await client.rest.pulls.get(params(r, c));\n    await assertCurrentRun(r, c);",
+      "to": "    const { data: pr } = await client.rest.pulls.get(params(r, c));\n    if (pr.head.sha !== r.head) return true;\n    await assertCurrentRun(r, c);"
     }
   },
   {

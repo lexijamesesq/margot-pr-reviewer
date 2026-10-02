@@ -389,10 +389,10 @@ scenario(
   {
     kind: "error",
     approved: true,
-    dismissed: true,
+    dismissed: false,
     disarmed: true,
     armed: false,
-    approvalRemains: false,
+    approvalRemains: true,
   },
 );
 scenario(
@@ -425,7 +425,7 @@ scenario(
   {
     kind: "error",
     diagnostic:
-      "Invalid native review receipt; disable auto-merge cleanup unconfirmed: Disarm denied; dismiss approvals cleanup unconfirmed: Dismissal denied; write error check cleanup unconfirmed: Check denied",
+      "Invalid native review receipt; disable auto-merge cleanup unconfirmed: Disarm denied; write error check cleanup unconfirmed: Check denied",
   },
 );
 scenario(
@@ -448,10 +448,10 @@ scenario(
       kind: x.result.kind,
       conclusion: x.final?.conclusion,
       dismissed: x.reviews.some((v) => v.state === "DISMISSED"),
-      approved: x.reviews.some((v) => v.state === "APPROVED"),
+      newApproval: x.writes.some((w) => w.body.event === "APPROVE"),
     };
   },
-  { kind: "error", conclusion: "action_required", dismissed: true, approved: false },
+  { kind: "error", conclusion: "action_required", dismissed: false, newApproval: false },
 );
 scenario(
   "pub-receipt",
@@ -463,15 +463,19 @@ scenario(
       dismissed: x.dismissedIds.length > 0,
     };
   },
-  { kind: "error", conclusion: "action_required", dismissed: true },
+  { kind: "error", conclusion: "action_required", dismissed: false },
 );
 scenario(
   "pub-order",
   async (b) => {
     const x = await wire("order", b);
-    return { dismissed: x.reviews.find((v) => v.id === 77)?.state };
+    return {
+      priorState: x.reviews.find((v) => v.id === 77)?.state,
+      dismissals: x.dismissedIds.length,
+      kind: x.result.kind,
+    };
   },
-  { dismissed: "DISMISSED" },
+  { priorState: "APPROVED", dismissals: 0, kind: "reviewed" },
 );
 scenario(
   "pub-shadow",

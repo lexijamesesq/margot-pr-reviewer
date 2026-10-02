@@ -1,12 +1,12 @@
 # Publication and tally break receipts
 
-Generated 2026-10-01T23:34:14.712Z, Node v26.3.1. Baseline and restored suite: 292/292 passed. Each of 36 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-02T00:51:59.329Z, Node v26.3.1. Baseline and restored suite: 292/292 passed. Each of 36 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Publication uses the real Octokit client against a recorded HTTP transport. No live GitHub writes occur. The tally source mutation deliberately adds one to Closed; reconciliation must fail.
 
 Most breaks are controlled service/input counterexamples selected by MARGOT_ADAPTER_BREAK; error cases repair their bad input. They do not claim exhaustive source mutation coverage or independence. Declared source mutations run without that variable and are identified in the manifest. No live service or paid model call occurs in the harness.
 
-Manifest SHA-256: 840c8182b240ff439f92b08a58f6b55f7bd3d0290efc3fb4cef41b8c57e08cc3. Reproduce: npm run test:publication-breaks.
+Manifest SHA-256: 9efd3c9581d0af72c14fe4941ead1a0cb1d6c5d34928743cc27ab15fbdd6ab9d. Reproduce: npm run test:publication-breaks.
 
 | Test | Deliberate break | Observed |
 | --- | --- | --- |
@@ -27,10 +27,10 @@ Manifest SHA-256: 840c8182b240ff439f92b08a58f6b55f7bd3d0290efc3fb4cef41b8c57e08c
 | Failed native review never completes a success check | Allow review write | 1 failed; 291 passed |
 | A failed final check cannot leave an approving review | Allow the final check write | 1 failed; 291 passed |
 | Unconfirmed auto-merge disable cannot publish a held verdict | Stop counting an unconfirmed cleanup disarm as a cleanup failure | 1 failed; 291 passed |
-| Evaluation error withdraws earlier approval and closes the gate | Return the clean review | 1 failed; 291 passed |
+| Evaluation error closes the gate without touching earlier reviews | Return the clean review | 1 failed; 291 passed |
 | A wrong-App check receipt cannot approve | Return the configured App identity | 1 failed; 291 passed |
-| A mismatched native review receipt is compensated | Remove cleanup of an approval whose response is not yet list-visible | 1 failed; 291 passed |
-| A prior same-head approval is withdrawn before evaluating again | Remove prior approval | 1 failed; 291 passed |
+| A mismatched native review receipt is compensated by closing the gate | Return a matching native review receipt | 1 failed; 291 passed |
+| A prior same-head approval is left alone; Margot never dismisses her own reviews | Dismiss the prior approval | 1 failed; 291 passed |
 | Shadow services record publication without any write credential | Select none instead of recorded publication | 1 failed; 291 passed |
 | New Open Closed reconcile with every listed finding including dismissals and advisories | Increment the displayed Closed tally | 1 failed; 291 passed |
 | Closed entries and late attribution survive later rounds | Discard an earlier closed entry | 1 failed; 291 passed |
@@ -43,6 +43,6 @@ Manifest SHA-256: 840c8182b240ff439f92b08a58f6b55f7bd3d0290efc3fb4cef41b8c57e08c
 | The posted ledger is readable by unchanged Python and retains the exact TypeScript receipt | Replace the terminal legacy marker with an incompatible compressed marker | 1 failed; 291 passed |
 | Recalling a late advisory cannot silently turn it into a blocker | Change its earlier fate from advisory to standing | 1 failed; 291 passed |
 | An in-progress review check readback prevents approval | Remove the completed review check confirmation | 1 failed; 291 passed |
-| Head movement after approval still dismisses approval and disarms auto-merge | Restore the admission guard before dismissing approvals | 1 failed; 291 passed |
+| Head movement after approval disarms auto-merge and leaves the approval, as Python did | Skip the disarm after the head moved | 1 failed; 291 passed |
 | A confirmed approval followed by auto-merge succeeds | Require the PR to remain open after the confirmed approval | 1 failed; 291 passed |
 | Cleanup diagnostics identify every failed operation and its cause | Discard cleanup labels and error messages | 1 failed; 291 passed |
