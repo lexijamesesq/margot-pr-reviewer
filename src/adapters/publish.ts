@@ -154,7 +154,10 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       authorityHold
         ? "self-instrument: held for the operator's approval"
         : "self-instrument: clear",
-      `Class: ${review.classification}. ${authorityHold ? "Review authority requires operator approval." : "No review-authority hold."}`,
+      authorityHold
+        ? "This PR changes Margot's own config, the estate ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n" +
+            (decision.authorityPaths ?? []).map((path) => `- \`${path}\``).join("\n")
+        : `No functional change to a protected path (class: ${review.classification}).`,
       undefined,
       c,
     );

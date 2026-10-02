@@ -17,3 +17,14 @@ export function diffIsComplete(diff: string, files = parseDiff(diff)): boolean {
     )
   );
 }
+
+/** Count changed content, excluding unified-diff file headers. */
+export function changedLineCount(diff: string): number {
+  return diff
+    .split("\n")
+    .filter(
+      (line) =>
+        (line.startsWith("+") && !line.startsWith("+++")) ||
+        (line.startsWith("-") && !line.startsWith("---")),
+    ).length;
+}

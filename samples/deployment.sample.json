@@ -1,6 +1,6 @@
 {
-  "version": "0.5.0",
-  "packageReference": "https://github.com/YOUR_ORG/margot-pr-reviewer/releases/download/v0.5.0/margot-pr-reviewer-0.5.0.tgz",
+  "version": "0.5.2",
+  "packageReference": "https://github.com/YOUR_ORG/margot-pr-reviewer/releases/download/v0.5.2/margot-pr-reviewer-0.5.2.tgz",
   "packageIntegrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
   "packageSha256": "0000000000000000000000000000000000000000000000000000000000000000"
 }

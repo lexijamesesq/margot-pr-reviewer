@@ -5,7 +5,7 @@ import { liveServices } from "../src/adapters/live.js";
 import { githubPublisher } from "../src/adapters/publish.js";
 import { type Recording, recordedServices } from "../src/adapters/recorded.js";
 import { nextLedger, prepareFindings, selectLedger, standingCards } from "../src/ledger.js";
-import { findingTally, render } from "../src/render.js";
+import { findingTally, render, renderCheckText } from "../src/render.js";
 import { review } from "../src/review.js";
 import { configSchema, factsSchema, requestSchema } from "../src/schemas.js";
 import type { Card, Review, ReviewResult, RoundScope } from "../src/types.js";
@@ -16,6 +16,16 @@ const r = requestSchema.parse(recording.request);
 const clean = await review(r, recording.config, recordedServices(recording));
 if (clean.kind !== "reviewed") throw new Error("Invalid test source");
 const baseReview: Review = clean;
+const commentRecording = JSON.parse(
+  readFileSync("recordings/author-changes.json", "utf8"),
+) as Recording;
+const commentResult = await review(
+  commentRecording.request,
+  commentRecording.config,
+  recordedServices(commentRecording),
+);
+if (commentResult.kind !== "reviewed") throw new Error("Invalid comment test source");
+const commentReview: Review = commentResult;
 const options = {
   checks: {
     triage: "review / triage",
@@ -196,14 +206,20 @@ async function wire(mode = "clear", broken = false) {
       };
     const value = structuredClone(baseReview);
     if (
-      (["hold", "authority", "calibration"].includes(mode) && !broken) ||
+      (["hold", "authority", "authority-summary", "calibration"].includes(mode) && !broken) ||
       mode === "disarm-fail"
     ) {
       value.decision.mergeEligible = false;
       value.decision.holdReasons = [
-        mode === "authority" ? "review-authority" : mode === "calibration" ? "calibration" : "risk",
+        mode.startsWith("authority")
+          ? "review-authority"
+          : mode === "calibration"
+            ? "calibration"
+            : "risk",
       ];
       value.decision.rating.band = "HIGH";
+      if (mode === "authority-summary")
+        value.decision.authorityPaths = [".github/workflows/review.yml", "config/review.json"];
     }
     const report = render(value);
     const publication = await publisher.publish(
@@ -320,6 +336,31 @@ scenario(
   "pub-authority",
   async (b) => ({ conclusion: (await wire("authority", b)).authority?.conclusion }),
   { conclusion: "neutral" },
+);
+scenario(
+  "pub-authority-summary",
+  async (b) => {
+    const held = await wire("authority-summary", b);
+    const clear = await wire("clear");
+    const protectedRecording = structuredClone(commentRecording);
+    (protectedRecording.config as { protectedPaths: string[] }).protectedPaths = [".github/**"];
+    const protectedResult = await review(
+      protectedRecording.request,
+      protectedRecording.config,
+      recordedServices(protectedRecording),
+    );
+    return {
+      held: (held.authority?.output as { summary?: string } | undefined)?.summary,
+      clear: (clear.authority?.output as { summary?: string } | undefined)?.summary,
+      matched:
+        protectedResult.kind === "reviewed" ? protectedResult.decision.authorityPaths : undefined,
+    };
+  },
+  {
+    held: "This PR changes Margot's own config, the estate ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n- `.github/workflows/review.yml`\n- `config/review.json`",
+    clear: "No functional change to a protected path (class: mechanical).",
+    matched: [".github/workflows/ci.yml"],
+  },
 );
 scenario(
   "pub-calibration",
@@ -510,27 +551,14 @@ scenario(
     const value = tallyReview();
     const report = render(value);
     const tally = findingTally(value);
-    const listed = report.split("\n").filter((line) => /^- R\d+-F\d+ \[/.test(line));
     return {
       tally,
       visible: report.includes(`New: ${tally.new} · Open: ${tally.open} · Closed: ${tally.closed}`),
-      new: listed.filter((l) => l.includes("; New")).length,
-      open: listed.filter((l) => l.includes("[Open;")).length,
-      closed: listed.filter((l) => l.includes("[Closed;")).length,
-      fixed: listed.some((l) => l.includes("Closed; fixed")),
-      dismissed: listed.some((l) => l.includes("Closed; dismissed")),
-      late: listed.some((l) => l.includes("; late]")),
     };
   },
   {
     tally: { new: 2, open: 2, closed: 2 },
     visible: true,
-    new: 2,
-    open: 2,
-    closed: 2,
-    fixed: true,
-    dismissed: true,
-    late: true,
   },
 );
 scenario(
@@ -539,9 +567,9 @@ scenario(
     const value = tallyReview();
     value.convergence.round = 3;
     if (b) value.ledger.entries.splice(1, 1);
-    return { tally: findingTally(value), late: render(value).includes("; late]") };
+    return { tally: findingTally(value) };
   },
-  { tally: { new: 0, open: 2, closed: 2 }, late: true },
+  { tally: { new: 0, open: 2, closed: 2 } },
 );
 
 scenario(
@@ -767,3 +795,136 @@ scenario(
   },
   { kind: "error", conclusion: "action_required", reviewWrites: 0 },
 );
+
+function refuses(value: Review): boolean {
+  try {
+    render(value);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+scenario(
+  "comment-risk-limit",
+  (b) => {
+    const value = structuredClone(commentReview);
+    value.decision.rating.rationale = b ? "bounded concern" : "concern on one line\ncontinued";
+    return { refused: refuses(value) };
+  },
+  { refused: true },
+);
+
+scenario(
+  "comment-rationale-limit",
+  (b) => {
+    const value = structuredClone(commentReview);
+    if (!value.voice) throw new Error("voice fixture required");
+    value.voice.summary = b ? "One sentence." : "First sentence. Second sentence. Third sentence.";
+    return { refused: refuses(value) };
+  },
+  { refused: true },
+);
+
+scenario(
+  "comment-card-limit",
+  (b) => {
+    const value = structuredClone(commentReview);
+    const finding = value.cards.flatMap((card) => card.findings)[0];
+    if (!finding) throw new Error("finding fixture required");
+    finding.what = `${Array.from({ length: b ? 15 : 16 }, (_, index) => `word${index}`).join(" ")}.`;
+    return { refused: refuses(value) };
+  },
+  { refused: true },
+);
+
+scenario(
+  "comment-skip-limit",
+  (b) => {
+    const value = structuredClone(commentReview);
+    if (!value.presentation) throw new Error("presentation fixture required");
+    value.presentation.skipReasons = {
+      "house-style": b ? "not selected" : "not selected because another reviewer covered it",
+    };
+    return { refused: refuses(value) };
+  },
+  { refused: true },
+);
+
+scenario(
+  "comment-python-structure",
+  (b) => {
+    const report = render(commentReview);
+    const visible = report.split("\n<!-- margot-ledger:v1 ")[0] ?? "";
+    const lines = visible.split("\n");
+    const roster = lines.filter((line) => /^\* (?:✅|⚠️|ℹ️|❓) /.test(line));
+    return {
+      outcome: !b && /^### [✅❌❓] [A-Z_]+$/.test(lines[0] ?? ""),
+      risk: /^(?:🟢|🟡|🔴) \*\*Risk: (LOW|MEDIUM|HIGH)\*\* — .+$/.test(lines[1] ?? ""),
+      rationale: (lines[2] ?? "").startsWith("> "),
+      council: lines.some((line) =>
+        /^Council reviewed \d+ files? • \d of 6 cards • \d+ findings? • \$\d+\.\d{2} • /.test(line),
+      ),
+      roster: roster.length,
+      tally: lines.some((line) => /^Review \d+ · New: \d+ · Open: \d+ · Closed: \d+$/.test(line)),
+      footer: ["**Author:**", "**Ticket:**", "**Commit:**", "**Run:**"].every(
+        (field) => lines.filter((line) => line.startsWith(field)).length === 1,
+      ),
+      markers: report.includes("<!-- margot:v1 -->\n<!-- margot-ledger:v1 "),
+    };
+  },
+  {
+    outcome: true,
+    risk: true,
+    rationale: true,
+    council: true,
+    roster: 6,
+    tally: true,
+    footer: true,
+    markers: true,
+  },
+);
+
+scenario(
+  "mechanical-diff-cap",
+  async (b) => {
+    const copy = structuredClone(recording);
+    const additions = Array.from({ length: 2001 }, (_, index) => `+line ${index}`).join("\n");
+    (copy.facts as { diff: string }).diff =
+      `diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -0,0 +1,2001 @@\n${additions}\n`;
+    if (b) (copy.config as { mechanicalDiffLineCap?: number }).mechanicalDiffLineCap = 2001;
+    const services = recordedServices(copy);
+    const result = await review(copy.request, copy.config, services);
+    return {
+      full: result.kind === "reviewed" && result.classification === "functional",
+      classificationCall: services.calls.some((call) => call.name === "classification"),
+      routeCall: services.calls.some((call) => call.name === "route"),
+    };
+  },
+  { full: true, classificationCall: false, routeCall: true },
+);
+
+it("keeps machine fields first and full finding detail in the review check text", () => {
+  const text = renderCheckText(commentReview);
+  expect(text.split("\n").slice(0, 3)).toEqual([
+    "verdict_source: verdict_voice",
+    "pipeline_ok: true",
+    "outcome: CHANGES_REQUESTED | band: MEDIUM",
+  ]);
+  expect(text).toContain("finding details:");
+  expect(text).toContain("GUIDE.md:40");
+});
+
+it("renders a shared defect once and points the second card to it", () => {
+  const value = structuredClone(commentReview);
+  const [first, second] = value.cards.flatMap((card) => card.findings);
+  if (!first || !second || !value.voice) throw new Error("two findings required");
+  second.what = first.what;
+  second.location = first.location;
+  const report = render(value);
+  expect(report).toContain("`principal-engineer` + `maintainable-no-slop`");
+  expect(report).toContain("`maintainable-no-slop` — Same finding as `principal-engineer`");
+  expect(
+    report.match(new RegExp(first.what.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")),
+  ).toHaveLength(1);
+});

@@ -182,7 +182,7 @@
           "severity": "MINOR",
           "confidence": "HIGH",
           "location": "GUIDE.md:40",
-          "what": "The repo's own guide still says the merge gate runs through the job this PR deletes, so anyone reading it gets the wrong picture of what protects the main branch."
+          "what": "The guide still names the deleted summary check as the merge gate."
         }
       ]
     },
@@ -202,7 +202,7 @@
           "severity": "MINOR",
           "confidence": "HIGH",
           "location": "GUIDE.md:40",
-          "what": "The repo's guide still says the protected branch is gated by the summary check this change deletes, so it now describes a setup that no longer exists."
+          "what": "The guide describes a summary check that this change deletes."
         }
       ]
     }
@@ -211,7 +211,7 @@
     "outcome": "CHANGES_REQUESTED",
     "band": "MEDIUM",
     "rationale": "outdated guidance",
-    "summary": "This change removes a summary check from the project's automated pipeline. Reviewers confirmed it was not actually protecting anything, so the pipeline itself is safe. The one problem is that the project's guide still says the main branch is protected through the removed check, which could mislead someone into adding a new check that nothing enforces. Updating that one line of the guide in this change would resolve it.",
+    "summary": "The removed summary check no longer gates merges. The guide still names it and must be corrected.",
     "dispositions": [
       {
         "id": "F1",

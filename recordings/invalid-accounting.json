@@ -160,7 +160,7 @@
           "severity": "MINOR",
           "confidence": "MEDIUM",
           "location": "biome.json:4",
-          "what": "The new rule that tells the code checker to skip build output and config files was checked by hand once, but no automated test would notice if it stopped working."
+          "what": "No automated test protects the new checker exclusions."
         }
       ]
     },
@@ -180,7 +180,7 @@
           "severity": "MINOR",
           "confidence": "MEDIUM",
           "location": "biome.json:7",
-          "what": "The new rule that skips build output matches any folder called \"dist\", \"build\" or \"coverage\" at any depth, so real source code kept in a folder with one of those names would quietly stop being checked in every repo."
+          "what": "The broad exclusions can hide source code in commonly named folders."
         }
       ]
     },
@@ -211,7 +211,7 @@
     "outcome": "CHANGES_REQUESTED",
     "band": "HIGH",
     "rationale": "organization-wide untested config",
-    "summary": "This change tells the code checker to skip build output and some file types, which fixes two real problems where the checker failed or rewrote files it shouldn't touch. The fix was checked by hand, but no automated test would notice if it stopped working. This file is copied to every repository, so a future tool upgrade or edit could quietly bring both problems back everywhere. Adding a small test that proves build folders and config files are skipped, plus a control case showing the test can fail, would clear this.",
+    "summary": "The exclusions fix unwanted checks but have no regression test. Add coverage before merging.",
     "dispositions": []
   },
   "head": "0000000000000000000000000000000000000004",

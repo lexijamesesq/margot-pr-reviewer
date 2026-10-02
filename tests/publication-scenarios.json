@@ -238,5 +238,40 @@
       "from": "          failures.push(\n            `${label} cleanup unconfirmed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,\n          );",
       "to": "          failures.push(\"cleanup unconfirmed\");"
     }
+  },
+  {
+    "id": "pub-authority-summary",
+    "name": "Self-instrument summaries name every matched file and use Python's clear wording",
+    "defect": "Remove the protected file matches"
+  },
+  {
+    "id": "comment-risk-limit",
+    "name": "A multiline risk concern refuses the comment",
+    "defect": "Replace the multiline concern with a valid line"
+  },
+  {
+    "id": "comment-rationale-limit",
+    "name": "A three-sentence rationale refuses the comment",
+    "defect": "Replace the rationale with one sentence"
+  },
+  {
+    "id": "comment-card-limit",
+    "name": "A card sentence over fifteen words refuses the comment",
+    "defect": "Shorten the card sentence to fifteen words"
+  },
+  {
+    "id": "comment-skip-limit",
+    "name": "A multi-clause skip reason refuses the comment",
+    "defect": "Replace the skip reason with one clause"
+  },
+  {
+    "id": "comment-python-structure",
+    "name": "The rendered comment keeps the Python operator-visible structure",
+    "defect": "Reject the outcome header shape"
+  },
+  {
+    "id": "mechanical-diff-cap",
+    "name": "A 2001-line mechanical candidate takes the full review path",
+    "defect": "Raise the configured cap to admit the oversized shortcut"
   }
 ]

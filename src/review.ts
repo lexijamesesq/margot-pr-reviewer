@@ -1,3 +1,4 @@
+import { changedLineCount } from "./diff.js";
 import {
   configHash,
   evidenceHash,
@@ -43,6 +44,11 @@ import type {
   Voice,
 } from "./types.js";
 
+function ticket(body: string): { label: string; url: string } | null {
+  const match = body.match(/https:\/\/linear\.app\/[^\s)]+\/issue\/([^\s/?#)]+)/i);
+  return match?.[0] && match[1] ? { label: match[1], url: match[0] } : null;
+}
+
 /** Validate all external data, including data returned by a typed adapter. */
 type CheckFact = Facts["checks"][number];
 function currentCheck(runs: CheckFact[]): CheckFact | undefined {
@@ -63,6 +69,7 @@ export async function review(
   configInput: unknown,
   services: Services,
 ): Promise<ReviewResult> {
+  const startedAt = Date.now();
   let stage = "input";
   let emergencyDisable: (() => Promise<boolean>) | undefined;
   try {
@@ -127,15 +134,23 @@ export async function review(
         facts.triage.base !== request.base)
     )
       throw new Error("Untrusted triage receipt");
+    // A change larger than this cap is not a candidate for the mechanical
+    // short-circuit. Jev never sees it and the PR takes the full review path: a
+    // huge change is unlikely to be purely mechanical, and review is the safe miss.
+    const oversized = changedLineCount(facts.diff) > config.mechanicalDiffLineCap;
     const classification =
       cached?.review.classification ??
-      classify(
-        classificationSchema.parse(
-          await call("classification", (c) => services.classify(facts, classificationQuestions, c)),
-        ),
-        facts,
-        config,
-      );
+      (oversized
+        ? "functional"
+        : classify(
+            classificationSchema.parse(
+              await call("classification", (c) =>
+                services.classify(facts, classificationQuestions, c),
+              ),
+            ),
+            facts,
+            config,
+          ));
     if (request.phase === "triage") return { kind: "classified", request, classification };
     stage = "checks";
     for (const name of config.requiredChecks) {
@@ -297,6 +312,20 @@ export async function review(
       };
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
+    const metadata = services.reviewMetadata?.() ?? {};
+    result = {
+      ...result,
+      presentation: {
+        author: facts.author,
+        costUsd: typeof metadata.costUsd === "number" ? metadata.costUsd : null,
+        durationMs:
+          typeof metadata.durationMs === "number" ? metadata.durationMs : Date.now() - startedAt,
+        files: facts.fileCount,
+        runUrl: metadata.runUrl ?? null,
+        ticket: ticket(facts.body),
+      },
+    };
+    stage = "render";
     const report = render(result);
     let publication = null;
     if (

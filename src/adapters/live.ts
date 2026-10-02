@@ -23,6 +23,7 @@ export function liveServices(
   onResponse?: ClaudeOptions["onResponse"],
 ) {
   const config = liveConfigSchema.parse(configInput);
+  let costUsd = 0;
   const authority = config.review.publication === "github";
   if (
     authority &&
@@ -63,7 +64,14 @@ export function liveServices(
       ...(credentials.ticketingEnvironment
         ? { ticketingEnvironment: credentials.ticketingEnvironment }
         : {}),
-      ...(onResponse ? { onResponse } : {}),
+      onResponse(response) {
+        costUsd += response.cost;
+        onResponse?.(response);
+      },
+    }),
+    reviewMetadata: () => ({
+      costUsd,
+      ...(config.publisher?.runUrl ? { runUrl: config.publisher.runUrl } : {}),
     }),
     bundle: (commit, context) => resolveBundle(config.claude.pluginDirectory, commit, context),
     async disableAutoMerge(request) {

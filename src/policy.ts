@@ -162,6 +162,15 @@ export function decide(
     : rating;
   const holdReasons: string[] = [];
   const protectedPath = picomatch(config.protectedPaths, { dot: true });
+  const authorityPaths = [
+    ...new Set(
+      facts.files.flatMap((file) =>
+        [file.path, ...(file.previousPath ? [file.previousPath] : [])].filter((path) =>
+          protectedPath(path),
+        ),
+      ),
+    ),
+  ];
   const protectedRename = facts.files.some(
     (f) => f.previousPath && (protectedPath(f.path) || protectedPath(f.previousPath)),
   );
@@ -174,5 +183,11 @@ export function decide(
   if (config.calibration) holdReasons.push("calibration");
   const outcome = voice?.outcome ?? "APPROVED";
   if (outcome !== "APPROVED") holdReasons.push("author-action");
-  return { outcome, rating: finalRating, mergeEligible: holdReasons.length === 0, holdReasons };
+  return {
+    outcome,
+    rating: finalRating,
+    mergeEligible: holdReasons.length === 0,
+    holdReasons,
+    authorityPaths,
+  };
 }

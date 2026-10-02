@@ -193,7 +193,7 @@
     "outcome": "APPROVED",
     "band": "MEDIUM",
     "rationale": "merge-gate change",
-    "summary": "This change removes an extra CI step that only summarised the other checks. Nothing requires it anymore, so every check that decides whether code can merge still runs and still blocks when it fails. The reviewers found no problems. Because it changes how merges are gated, the operator should merge it rather than let it merge on its own.",
+    "summary": "The removed summary step no longer gates merges, and all required checks remain. The operator should merge this gate-wiring change.",
     "dispositions": []
   },
   "head": "0000000000000000000000000000000000000003",
