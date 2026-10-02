@@ -78,7 +78,10 @@ const config = {
 };
 const pull = {
   state: "open",
+  merged: false,
   draft: false,
+  mergeable: true,
+  changed_files: 1,
   base: { sha: base },
   head: { sha: head, repo: { full_name: "example/project" } },
 };
@@ -433,40 +436,39 @@ it("rejects unresolved placeholders in executable paths at bind time", async () 
 });
 
 it.each([
-  ["closed", "rejects a closed PR", { state: "closed" }, "Margot: not reviewed: closed"],
-  ["draft", "rejects a draft PR", { draft: true }, "Margot: not reviewed: draft"],
+  ["superseded", "classifies a superseded head", { head: { ...pull.head, sha: "f".repeat(40) } }],
+  ["merged", "classifies a merged PR", { state: "closed", merged: true }],
+  ["closed", "classifies a closed unmerged PR", { state: "closed" }],
+  ["draft", "classifies a draft PR", { draft: true }],
   [
     "fork",
-    "rejects a fork PR",
+    "classifies a fork-head PR",
     { head: { ...pull.head, repo: { full_name: "fork/project" } } },
-    "Margot: not reviewed: fork",
   ],
-  [
-    "moved",
-    "rejects a moved head",
-    { head: { ...pull.head, sha: "f".repeat(40) } },
-    "Margot: not reviewed: stale",
-  ],
-] as const)("%s: %s", async (id, _name, changed, reason) => {
+  ["conflict", "classifies a merge conflict", { mergeable: false }],
+  ["empty", "classifies an empty PR", { changed_files: 0 }],
+] as const)("%s: %s and writes stop_reason", async (id, _name, changed) => {
+  const fixture = await bindCommandFixture("true");
   const candidate = broken === id ? pull : { ...pull, ...changed };
-  const error = await captureError(() => bindRequest(bindInput(), readPull(candidate)));
-  // A refusal states its reason in plain words; a schema dump is not a refusal.
+  fixture.client.rest.pulls.get = async () => ({ data: candidate as typeof pull });
+  const configFile = fixture.args.indexOf("--config") + 1;
+  await writeFile(fixture.args[configFile] ?? "", "{");
+  const output = join(fixture.directory, "github-output");
+  const error = await captureError(() =>
+    runInstanceCommand(
+      fixture.args,
+      { GH_TOKEN: "read-token", GITHUB_OUTPUT: output },
+      fixture.client as never,
+    ),
+  );
   expect(error).toBeInstanceOf(Error);
-  expect((error as Error).message).toBe(reason);
-});
-
-it("signals a superseded head to shell callers with EX_TEMPFAIL", async () => {
-  const candidate =
-    broken === "stale-signal"
-      ? { ...pull, head: { ...pull.head, repo: { full_name: "fork/project" } } }
-      : { ...pull, head: { ...pull.head, sha: "f".repeat(40) } };
-  const error = await captureError(() => bindRequest(bindInput(), readPull(candidate)));
-  expect(error).toBeInstanceOf(Error);
-  expect((error as Error).message).toBe("Margot: not reviewed: stale");
   expect(instanceExitCode(error)).toBe(75);
+  const fields = await readFile(output, "utf8");
+  expect(fields).toContain(`stop_reason=${id}\n`);
+  if (id === "superseded") expect(fields).toContain(`live_sha=${"f".repeat(40)}\n`);
 });
 
-it("rejects an invalid trusted configuration before reading GitHub", async () => {
+it("classifies the PR before rejecting invalid trusted configuration", async () => {
   let reads = 0;
   const invalid = { ...config, claude: { ...config.claude, executable: "" } };
   const error = await captureError(() =>
@@ -476,7 +478,7 @@ it("rejects an invalid trusted configuration before reading GitHub", async () =>
     }),
   );
   expect(error).toBeInstanceOf(Error);
-  expect(reads).toBe(0);
+  expect(reads).toBe(1);
 });
 
 it("requires an absolute runtime root", async () => {

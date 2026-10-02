@@ -155,16 +155,18 @@ margot-instance validate-deployment \
   --authority-repositories '[]'
 ```
 
-`bind-request` reads the PR through Octokit using `GH_TOKEN`. It rejects a closed,
-draft, forked, or moved request, then writes mode-0600 `request.json` and `config.json`
+`bind-request` reads the PR through Octokit using `GH_TOKEN`. Before binding any
+configuration, it classifies a superseded, merged, closed, draft, fork-head,
+conflicted, or empty request; otherwise it writes mode-0600 `request.json` and `config.json`
 under the absolute Margot root. Required checks, protected paths, permitted skipped
 checks, and authority are explicit inputs. Authority selects GitHub publication;
 otherwise the configuration is a before-head shadow. Authority requires a nonempty,
 invocation-unique `--run-url` so the publisher can reject a superseded writer.
 `${MARGOT_ROOT}` in the Claude executable, plugin directory, and ticketing command is
-replaced with the trusted root. A moved head keeps the `Margot: not reviewed: stale`
-refusal and exits 75 (`EX_TEMPFAIL`); the other refusals exit 1. This lets a
-shell caller set `stop_reason=stale` without reading the PR again.
+replaced with the trusted root. Every classified stop exits 75 (`EX_TEMPFAIL`),
+prints `stop_reason=<reason>`, and appends that field to `GITHUB_OUTPUT` when set.
+A superseded stop also prints and appends `live_sha=<current head>`, so the caller
+does not need to read the PR again.
 
 ```sh
 margot-instance bind-request \
@@ -189,13 +191,14 @@ margot-instance close-stranded-check \
   --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
   --app-id "$MARGOT_APP_ID" --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
   --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
-  --published "$PUBLISHED" --stop-reason "$STOP_REASON"
+  --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"
 ```
 
-A superseded head (`--stop-reason stale`) closes `skipped` and names the current
-head's short SHA; a cancelled stopped job
-closes `cancelled`; every other close is `action_required`. A floor stop uses the
-preflight title. All other stops say Margot stopped before a verdict. The command
+A superseded head (`--stop-reason superseded --live-sha "$LIVE_SHA"`) and a merged
+PR close `skipped`; a closed PR and a cancelled run close `cancelled`; draft,
+fork-head, conflicted, and empty PRs close `failure`. A floor or other stop closes
+`action_required`. The stop table also supplies the Python-compatible title and
+summary for each classified reason. The command
 exits 0 after a close or when there is nothing safe to close, and 2 on a GitHub
 read/write failure.
 

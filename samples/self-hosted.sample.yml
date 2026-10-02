@@ -55,6 +55,7 @@ jobs:
     outputs:
       published: ${{ steps.review.outputs.published }}
       stop_reason: ${{ steps.bind.outputs.stop_reason }}
+      live_sha: ${{ steps.bind.outputs.live_sha }}
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -82,7 +83,6 @@ jobs:
           HEAD_SHA: "0000000000000000000000000000000000000000"
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          set +e
           "$MARGOT_ROOT/node_modules/.bin/margot-instance" bind-request \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
             --phase review --authority "${{ needs.route.outputs.authority }}" \
@@ -90,12 +90,6 @@ jobs:
             --required-checks '["YOUR_REQUIRED_CHECK"]' \
             --protected-paths '["YOUR_AUTHORITY_PATH/**"]' \
             --allowed-skipped-checks '[]' --run-url "$RUN_URL"
-          status=$?
-          set -e
-          if [ "$status" -eq 75 ]; then
-            echo "stop_reason=stale" >> "$GITHUB_OUTPUT"
-          fi
-          exit "$status"
       - name: Review the bound request
         id: review
         env:
@@ -149,9 +143,10 @@ jobs:
           REVIEW_RESULT: ${{ needs.review.result }}
           PUBLISHED: ${{ needs.review.outputs.published }}
           STOP_REASON: ${{ needs.review.outputs.stop_reason }}
+          LIVE_SHA: ${{ needs.review.outputs.live_sha }}
         run: |
           "$MARGOT_ROOT/node_modules/.bin/margot-instance" close-stranded-check \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
             --app-id "$MARGOT_APP_ID" --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
             --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
-            --published "$PUBLISHED" --stop-reason "$STOP_REASON"
+            --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"

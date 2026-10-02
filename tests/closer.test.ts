@@ -52,7 +52,10 @@ async function wire(mode: string, broken = false) {
     input.reviewResult = "cancelled";
     if (broken) input.routeResult = "success";
   }
-  if (mode === "stale" || mode === "live-stale") input.stopReason = "stale";
+  if (["superseded", "merged", "closed", "draft", "fork", "conflict", "empty"].includes(mode))
+    input.stopReason = mode;
+  if (mode === "superseded") input.liveSha = "f".repeat(40);
+  if (mode === "live-superseded") input.stopReason = "superseded";
   if (mode === "floor" && !broken) input.stopReason = "floor";
   if (mode === "stopped" && broken) input.stopReason = "floor";
 
@@ -67,7 +70,8 @@ async function wire(mode: string, broken = false) {
         number: mode === "wrong-pr" && !broken ? 8 : 7,
         state: "open",
         head: {
-          sha: mode === "stale" || (mode === "live-stale" && broken) ? "f".repeat(40) : head,
+          sha:
+            mode === "superseded" || (mode === "live-superseded" && broken) ? "f".repeat(40) : head,
         },
       };
       const pulls = [own];
@@ -154,10 +158,14 @@ scenario("closer-wrong-pr", async (broken) => (await wire("wrong-pr", broken)).d
   action: "left",
   message: expect.stringContaining("not a commit of PR #7"),
 });
-scenario("closer-live-stale", async (broken) => (await wire("live-stale", broken)).decision, {
-  action: "left",
-  message: expect.stringContaining("live head of open PR #7"),
-});
+scenario(
+  "closer-live-superseded",
+  async (broken) => (await wire("live-superseded", broken)).decision,
+  {
+    action: "left",
+    message: expect.stringContaining("live head of open PR #7"),
+  },
+);
 scenario("closer-other-live", async (broken) => (await wire("other-live", broken)).decision, {
   action: "left",
   message: expect.stringContaining("open PR #9"),
@@ -200,24 +208,26 @@ scenario(
   },
   { action: "closed", writes: 1 },
 );
-scenario(
-  "closer-stale",
-  async (broken) => {
-    const result = await wire("stale", broken);
-    if (broken) (result.writes[0]?.output as Record<string, unknown>).title = "Margot: stopped";
-    return { action: result.decision.action, write: result.writes[0] };
-  },
-  {
-    action: "closed",
-    write: {
-      conclusion: "skipped",
-      output: {
-        title: `Margot: superseded by a newer push (${"f".repeat(7)})`,
-        summary: "A newer push re-dispatched Margot; that run owns this PR's verdict.",
-      },
+const stopCases = [
+  ["superseded", "skipped", `Margot: superseded by a newer push (${"f".repeat(7)})`],
+  ["merged", "skipped", "Margot: not reviewed — the PR was merged first"],
+  ["closed", "cancelled", "Margot: not reviewed — the PR was closed first"],
+  ["draft", "failure", "not reviewed: draft"],
+  ["fork", "failure", "not reviewed: fork head"],
+  ["conflict", "failure", "not reviewed: merge conflict (resolve before review)"],
+  ["empty", "failure", "not reviewed: empty (no changed files)"],
+] as const;
+
+for (const [reason, conclusion, title] of stopCases)
+  scenario(
+    `closer-${reason}`,
+    async (broken) => {
+      const result = await wire(reason, false);
+      if (broken && result.writes[0]) result.writes[0].conclusion = "action_required";
+      return { action: result.decision.action, write: result.writes[0] };
     },
-  },
-);
+    { action: "closed", write: { conclusion, output: { title } } },
+  );
 scenario(
   "closer-route-cancelled",
   async (broken) => ({ write: (await wire("route-cancelled", broken)).writes[0] }),

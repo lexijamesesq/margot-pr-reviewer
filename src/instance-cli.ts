@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import type { Octokit } from "octokit";
 import { githubClient } from "./adapters/github.js";
 import { closeStrandedCheck, shouldCloseStrandedCheck } from "./closer.js";
 import {
+  type BindRequestStop,
   bindRequestFiles,
-  StaleRequestError,
+  StopRequestError,
   validateDeployment,
   writeGitHubOutput,
 } from "./instance.js";
@@ -28,9 +29,13 @@ class CommandError extends Error {
 export function instanceExitCode(error: unknown) {
   return error instanceof CommandError
     ? error.exitCode
-    : error instanceof StaleRequestError
+    : error instanceof StopRequestError
       ? 75
       : 1;
+}
+
+function stopOutput(stop: BindRequestStop) {
+  return `stop_reason=${stop.stopReason}\n${stop.liveSha ? `live_sha=${stop.liveSha}\n` : ""}`;
 }
 
 function named(args: string[], names: string[]) {
@@ -123,23 +128,29 @@ export async function runInstanceCommand(
     const phase = required(input, "phase");
     if (phase !== "triage" && phase !== "review") throw new Error("--phase is invalid");
     if (input["run-url"] === "") throw new Error("--run-url must not be empty");
-    return bindRequestFiles(
-      {
-        repository: required(input, "repository"),
-        pr: Number(required(input, "pr")),
-        expectedHead: required(input, "head"),
-        phase,
-        authority: bool(input, "authority"),
-        margotRoot: required(input, "margot-root"),
-        configFile: required(input, "config"),
-        requiredChecks: list(input, "required-checks"),
-        protectedPaths: list(input, "protected-paths"),
-        allowedSkippedChecks: list(input, "allowed-skipped-checks"),
-        ...(input["run-url"] ? { runUrl: input["run-url"] } : {}),
-      },
-      environment.GH_TOKEN,
-      client,
-    );
+    try {
+      return await bindRequestFiles(
+        {
+          repository: required(input, "repository"),
+          pr: Number(required(input, "pr")),
+          expectedHead: required(input, "head"),
+          phase,
+          authority: bool(input, "authority"),
+          margotRoot: required(input, "margot-root"),
+          configFile: required(input, "config"),
+          requiredChecks: list(input, "required-checks"),
+          protectedPaths: list(input, "protected-paths"),
+          allowedSkippedChecks: list(input, "allowed-skipped-checks"),
+          ...(input["run-url"] ? { runUrl: input["run-url"] } : {}),
+        },
+        environment.GH_TOKEN,
+        client,
+      );
+    } catch (error) {
+      if (error instanceof StopRequestError && environment.GITHUB_OUTPUT)
+        await appendFile(environment.GITHUB_OUTPUT, stopOutput(error.stop));
+      throw error;
+    }
   }
   if (command === "close-stranded-check") {
     const input = named(rest, [
@@ -153,6 +164,7 @@ export async function runInstanceCommand(
       "review-result",
       "published",
       "stop-reason",
+      "live-sha",
     ]);
     const head = shaSchema.parse(required(input, "head"));
     const ownRuns = required(input, "own-runs");
@@ -171,6 +183,7 @@ export async function runInstanceCommand(
       reviewResult: required(input, "review-result"),
       published,
       stopReason: required(input, "stop-reason"),
+      ...(input["live-sha"] ? { liveSha: shaSchema.parse(input["live-sha"]) } : {}),
     };
     if (!shouldCloseStrandedCheck(closeInput))
       return { action: "left" as const, message: "nothing to close" };
@@ -193,6 +206,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
       if ("action" in result) process.stdout.write(`${result.message}\n`);
     })
     .catch((error: unknown) => {
+      if (error instanceof StopRequestError) process.stdout.write(stopOutput(error.stop));
       process.stderr.write(
         `${error instanceof Error ? error.message : "Instance command failed"}\n`,
       );
