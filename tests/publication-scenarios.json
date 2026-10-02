@@ -1,7 +1,7 @@
 [
   {
     "id": "pub-clear",
-    "name": "Clearance confirms all checks before the SHA-bound approval",
+    "name": "Clearance posts the SHA-bound approval before completing the check",
     "defect": "Replace the completed review check with an in-progress readback"
   },
   {
@@ -101,7 +101,7 @@
   },
   {
     "id": "pub-final-fail",
-    "name": "A failed final check cannot leave an approving review",
+    "name": "A failed final check blocks after review delivery",
     "defect": "Allow the final check write"
   },
   {
@@ -216,7 +216,7 @@
   },
   {
     "id": "pub-confirm",
-    "name": "An in-progress review check readback prevents approval",
+    "name": "An in-progress final check readback fails publication",
     "defect": "Remove the completed review check confirmation",
     "sourceBreak": {
       "file": "src/adapters/publish.ts",
@@ -306,7 +306,7 @@
   },
   {
     "id": "mechanical-diff-cap",
-    "name": "A 2001-line mechanical candidate takes the full review path",
+    "name": "A 2005-line mechanical candidate takes the full review path",
     "defect": "Raise the configured cap to admit the oversized shortcut"
   }
 ]

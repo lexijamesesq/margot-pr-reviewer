@@ -32,6 +32,8 @@ export const requestSchema = z.strictObject({
   base: shaSchema,
   head: shaSchema,
   phase: z.enum(["triage", "review"]),
+  classification: z.string().optional(),
+  triage: z.string().optional(),
 });
 export const configSchema = z
   .strictObject({
@@ -104,22 +106,23 @@ export const factsSchema = z.strictObject({
   triage: z
     .strictObject({ actor: text, base: shaSchema, head: shaSchema, classification: classSchema })
     .nullable(),
+  ownedPathTier: z.unknown().optional(),
   autoMergeArmed: z.boolean(),
 });
 export const classificationSchema = z.strictObject({
-  source: z.literal("jev"),
+  source: z.enum(["jev", "jev_unreachable"]),
   functional: probability,
   documentation: probability,
   mechanical: probability,
 });
 export const routeSchema = z.strictObject({
-  source: z.literal("jev"),
+  source: z.enum(["jev", "fallback", "jev_unreachable"]),
   cards: z.record(cardNameSchema, probability),
   confidence: probability,
   documentationSubstantive: probability.nullable(),
 });
 export const riskSchema = z.strictObject({
-  source: z.literal("jev"),
+  source: z.enum(["jev", "fallback"]),
   dimensions: z.record(
     z.enum(dimensions),
     z.strictObject({
@@ -250,6 +253,7 @@ export const decisionSchema = z.strictObject({
   mergeEligible: z.boolean(),
   holdReasons: z.array(text),
   authorityPaths: z.array(text).optional(),
+  ownedPathTier: z.string().optional(),
 });
 export const reviewCoreSchema = z.strictObject({
   request: requestSchema,
@@ -261,7 +265,8 @@ export const reviewCoreSchema = z.strictObject({
   decision: decisionSchema,
   provenance: z.strictObject({
     cardBundle: shaSchema,
-    classification: z.literal("fresh-jev"),
+    classification: z.string(),
+    decision_source: z.enum(["jev", "fallback"]).optional(),
     services: text,
   }),
 });

@@ -18,13 +18,7 @@ export function diffIsComplete(diff: string, files = parseDiff(diff)): boolean {
   );
 }
 
-/** Count changed content, excluding unified-diff file headers. */
+/** Python counts every newline, including headers and context. */
 export function changedLineCount(diff: string): number {
-  return diff
-    .split("\n")
-    .filter(
-      (line) =>
-        (line.startsWith("+") && !line.startsWith("+++")) ||
-        (line.startsWith("-") && !line.startsWith("---")),
-    ).length;
+  return diff.split("\n").length - 1;
 }

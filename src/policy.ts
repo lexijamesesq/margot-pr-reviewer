@@ -23,6 +23,7 @@ export function classify(
   facts: Facts,
   config: ReviewConfig,
 ): Classification {
+  if (answer.source !== "jev") return "functional";
   const fresh =
     classNames.find((name) => answer[name] >= config.classificationThreshold) ?? "functional";
   const earlier = facts.triage?.classification ?? fresh;
@@ -181,6 +182,11 @@ export function decide(
       }
     : rating;
   const holdReasons: string[] = [];
+  if (
+    typeof facts.ownedPathTier !== "string" ||
+    !["none", "owned", "required_owned"].includes(facts.ownedPathTier)
+  )
+    holdReasons.push("ownership-uncomputed");
   const protectedPath = picomatch(config.protectedPaths, { dot: true });
   const authorityPaths = [
     ...new Set(
@@ -212,5 +218,6 @@ export function decide(
     mergeEligible: holdReasons.length === 0,
     holdReasons,
     authorityPaths,
+    ownedPathTier: typeof facts.ownedPathTier === "string" ? facts.ownedPathTier : "unknown",
   };
 }

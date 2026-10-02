@@ -66,6 +66,7 @@ for (const scenario of scenarios) {
     if (result.kind === "reviewed") {
       Object.assign(observed, {
         convergence: result.convergence,
+        hasLedger: result.report.includes("<!-- margot-ledger:"),
         classification: result.classification,
         routeAnswer: result.routeAnswer,
         riskAnswer: result.riskAnswer,

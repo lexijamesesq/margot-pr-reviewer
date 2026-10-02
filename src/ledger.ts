@@ -33,58 +33,59 @@ export const evidenceHash = (facts: Facts): string =>
         diff: facts.diff,
         files: facts.files,
         triage: facts.triage,
+        ownedPathTier: facts.ownedPathTier,
       }),
     )
     .digest("hex");
 
 /** Only trailing blocks claim history; prose mentions cannot hide the App's ledger.
- * Explicit untrusted claims and corrupt payloads fail closed.
+ * Untrusted or undecodable blocks are skipped, preserving older App history.
  */
 export function selectLedger(facts: Facts, config: ReviewConfig): Ledger | null {
-  if (!facts.history.complete) throw new Error("History unavailable");
-  if (facts.history.priorLedger && !facts.history.reviews)
-    throw new Error("Ledger history missing");
+  if (!facts.history.complete) return null;
+  if (facts.history.priorLedger && !facts.history.reviews) return null;
   const reviews = [...(facts.history.reviews ?? [])].sort(
     (a, b) => b.submittedAt.localeCompare(a.submittedAt) || b.id - a.id,
   );
   for (const review of reviews) {
     const match = review.body.match(/(?:^|\n)<!-- margot-ledger:v([12]) ([A-Za-z0-9+/=]+) -->\s*$/);
     if (!match) continue;
-    if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor))
-      throw new Error("Untrusted ledger author");
-    let decoded = JSON.parse(
-      (match[1] === "2"
-        ? inflateSync(Buffer.from(match[2] ?? "", "base64"), { maxOutputLength: 1048576 })
-        : Buffer.from(match[2] ?? "", "base64")
-      ).toString("utf8"),
-    );
-    let version = Number(match[1]);
-    // The legacy reader ignores this extension and sees the same plain entries.
-    // Margot restores her saved receipt without maintaining a second ledger.
-    if (version === 1 && decoded && typeof decoded.receipt_v2 === "string") {
-      const { receipt_v2, ...legacy } = decoded;
-      if (legacy.v !== 1 || "receipt" in legacy) throw new Error("Invalid rollback ledger");
-      decoded = {
-        ...legacy,
-        v: 2,
-        receipt: JSON.parse(
-          inflateSync(Buffer.from(receipt_v2, "base64"), { maxOutputLength: 1048576 }).toString(
-            "utf8",
+    if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor)) continue;
+    try {
+      let decoded = JSON.parse(
+        (match[1] === "2"
+          ? inflateSync(Buffer.from(match[2] ?? "", "base64"), { maxOutputLength: 1048576 })
+          : Buffer.from(match[2] ?? "", "base64")
+        ).toString("utf8"),
+      );
+      let version = Number(match[1]);
+      // The legacy reader ignores this extension and sees the same plain entries.
+      // Margot restores her saved receipt without maintaining a second ledger.
+      if (version === 1 && decoded && typeof decoded.receipt_v2 === "string") {
+        const { receipt_v2, ...legacy } = decoded;
+        if (legacy.v !== 1 || "receipt" in legacy) throw new Error("Invalid rollback ledger");
+        decoded = {
+          ...legacy,
+          v: 2,
+          receipt: JSON.parse(
+            inflateSync(Buffer.from(receipt_v2, "base64"), { maxOutputLength: 1048576 }).toString(
+              "utf8",
+            ),
           ),
-        ),
-      };
-      version = 2;
-    }
-    const ledger = ledgerSchema.parse(decoded);
-    if (ledger.v !== version || ledger.head !== review.head)
-      throw new Error("Ledger revision mismatch");
-    if (
-      ledger.receipt &&
-      (ledger.receipt.review.request.repository !== facts.repository ||
-        ledger.receipt.review.request.pr !== facts.pr)
-    )
-      throw new Error("Ledger belongs to another PR");
-    return ledger;
+        };
+        version = 2;
+      }
+      const ledger = ledgerSchema.parse(decoded);
+      if (ledger.v !== version || ledger.head !== review.head)
+        throw new Error("Ledger revision mismatch");
+      if (
+        ledger.receipt &&
+        (ledger.receipt.review.request.repository !== facts.repository ||
+          ledger.receipt.review.request.pr !== facts.pr)
+      )
+        throw new Error("Ledger belongs to another PR");
+      return ledger;
+    } catch {}
   }
   return null;
 }
@@ -100,6 +101,10 @@ export function roundScope(facts: Facts, prior: Ledger | null, comparison?: unkn
     entries: prior?.entries ?? [],
   };
   if (!prior) return full;
+  if (prior.head === facts.head) {
+    if (prior.round < 2) return { ...full, round: 1, priorHead: null, entries: [] };
+    return { ...full, round: prior.round, full: false, diff: "", files: [] };
+  }
   const parsed = comparisonSchema.safeParse(comparison);
   if (!parsed.success) return full;
   const delta = parsed.data;
@@ -211,7 +216,12 @@ export function nextLedger(
     unconfirmed: 0,
   };
   const dispositions = new Map(voice?.dispositions.map((d) => [d.id, d]) ?? []);
-  let index = 0;
+  let index = Math.max(
+    0,
+    ...scope.entries
+      .filter((e) => e.key.startsWith(`R${scope.round}-F`))
+      .map((e) => Number(e.key.split("-F")[1])),
+  );
   const upheld = new Set(
     cards.flatMap((c) =>
       c.findings
@@ -308,7 +318,19 @@ export function nextLedger(
     v: 2,
     head: core.request.head,
     round: scope.round,
-    entries: [...entries.values()],
+    entries: [...entries.values()]
+      .filter(
+        (e) =>
+          ["standing", "dismissed"].includes(e.status) ||
+          e.fixed_round === scope.round ||
+          e.advisory_round === scope.round,
+      )
+      .map((e) => ({
+        ...e,
+        location: e.location.slice(0, 240),
+        what: e.what.slice(0, 240),
+        ...(e.reason ? { reason: e.reason.slice(0, 300) } : {}),
+      })),
     receipt: {
       configHash: configHash(config),
       evidenceHash: evidenceHash(facts),
@@ -318,9 +340,8 @@ export function nextLedger(
   });
   return { ledger, convergence: counts };
 }
-export function ledgerBlock(ledger: Ledger): string {
+function encodeLedger(ledger: Ledger): string {
   const raw = Buffer.from(JSON.stringify(ledger));
-  if (raw.length > 1048576) throw new Error("Ledger exceeds decoded budget");
   const { receipt, ...fields } = ledger;
   const transport =
     ledger.v === 2
@@ -335,7 +356,28 @@ export function ledgerBlock(ledger: Ledger): string {
         )
       : raw;
   const encoded = transport.toString("base64");
-  // Never discard an open finding or a dismissal to make a result fit.
-  if (encoded.length > 48000) throw new Error("Ledger exceeds review body budget");
+
   return `<!-- margot-ledger:v1 ${encoded} -->`;
+}
+
+/** Drop oldest dismissals, then current fixed/advisory entries; never standing. */
+export function ledgerBlock(ledger: Ledger): string {
+  const trimmed = structuredClone(ledger);
+  const droppable = trimmed.entries
+    .filter((e) => e.status !== "standing")
+    .sort(
+      (a, b) =>
+        Number(a.status !== "dismissed") - Number(b.status !== "dismissed") ||
+        a.round_raised - b.round_raised,
+    );
+  while ((encodeLedger(trimmed).split(" ")[2]?.length ?? 0) > 24000 && droppable.length) {
+    const gone = droppable.shift();
+    trimmed.entries = trimmed.entries.filter((e) => e !== gone);
+  }
+  // The optional replay receipt must not consume Python's standing-entry budget.
+  if ((encodeLedger(trimmed).split(" ")[2]?.length ?? 0) > 24000 && trimmed.receipt) {
+    delete trimmed.receipt;
+    trimmed.v = 1;
+  }
+  return encodeLedger(trimmed);
 }

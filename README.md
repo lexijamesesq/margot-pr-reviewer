@@ -358,3 +358,24 @@ The self-hosted sample workflow installs the exact release asset and verifies it
 SHA-256 before installing. No hosted-runner
 sample is supplied. Publication remains subject to a consumer's reversible live
 canary; see `docs/SLICE4.md` for the local proof and its limits.
+
+The review CLI accepts Python's dispatcher inputs `MARGOT_CLASSIFICATION`
+(`functional`, `documentation`, or `mechanical`) and the legacy
+`MARGOT_TRIAGE=mechanical`. The request JSON can also carry `classification`
+and `triage`; environment inputs take precedence. Missing or invalid dispatch
+classification requires functional review. Margot combines it conservatively
+with fresh classification and the latest completed `review / triage` check from
+her configured App on the requested head.
+
+Pass the workflow-computed ownership tier through `MARGOT_OWNED_TIER` (`none`,
+`owned`, or `required_owned`). Missing or invalid ownership independently holds
+clearance. API callers supply `facts.ownedPathTier`; live service callers supply
+`credentials.ownedPathTier`.
+
+On a Jev outage, functional routing and risk use the tool-free
+`claude-haiku-4-5` fallback through the configured Claude executable. A fallback
+verdict posts with `decision_source: fallback` and cannot clear auto-merge.
+Classification outages require functional review. Documentation routing outages
+summon review without a fallback call or a risk hold. If both deciders fail,
+Margot reports an error. Unreadable review history starts round one without a
+ledger in the posted review, preserving the last readable ledger.

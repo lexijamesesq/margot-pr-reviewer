@@ -11,12 +11,12 @@
   },
   {
     "id": "ledger-corrupt",
-    "name": "Corrupt trusted ledger fails closed",
+    "name": "Corrupt trusted ledger is ignored",
     "defect": "Replace corrupt block with readable ledger"
   },
   {
     "id": "ledger-unreadable",
-    "name": "Unreadable review history fails closed",
+    "name": "Unreadable review history starts fresh",
     "defect": "Change history completeness to true"
   },
   {
@@ -131,7 +131,7 @@
   },
   {
     "id": "ledger-budget",
-    "name": "Oversize ledger fails rather than forgetting findings",
+    "name": "Standing ledger entries survive an exceeded budget",
     "defect": "Shorten the oversized ledger to fit the budget"
   },
   {
@@ -151,7 +151,7 @@
   },
   {
     "id": "ledger-retry",
-    "name": "Same head reuses identical result without paid calls",
+    "name": "Same head rechecks classification and reuses the council result",
     "defect": "Strip the Jev answers from the written receipt",
     "sourceBreak": {
       "file": "src/ledger.ts",
@@ -166,7 +166,7 @@
   },
   {
     "id": "ledger-retry-legacy",
-    "name": "Legacy same-head ledger cannot pretend to be a cached result",
+    "name": "Legacy same-head round one retries fresh",
     "defect": "Move legacy history to a previous head"
   },
   {
@@ -317,7 +317,7 @@
   {
     "id": "ledger-human-quote",
     "name": "Newer human marker quote does not hide the trusted App ledger",
-    "defect": "Replace the harmless quote with an untrusted trailing ledger block"
+    "defect": "Replace the human quote with a trusted App ledger"
   },
   {
     "id": "ledger-retry-040-receipt",

@@ -5,7 +5,8 @@
     "pr": 6,
     "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "0000000000000000000000000000000000000006",
-    "phase": "review"
+    "phase": "review",
+    "classification": "mechanical"
   },
   "config": {
     "protectedPaths": [],
@@ -74,8 +75,14 @@
         }
       ]
     },
-    "triage": null,
-    "autoMergeArmed": true
+    "triage": {
+      "actor": "triage-app",
+      "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "head": "0000000000000000000000000000000000000006",
+      "classification": "mechanical"
+    },
+    "autoMergeArmed": true,
+    "ownedPathTier": "none"
   },
   "classification": {
     "source": "jev",

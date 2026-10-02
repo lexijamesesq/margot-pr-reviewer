@@ -2,7 +2,7 @@ import { Octokit } from "octokit";
 import parseDiff from "parse-diff";
 import { z } from "zod";
 import { diffIsComplete } from "../diff.js";
-import { factsSchema, requestSchema } from "../schemas.js";
+import { classNames, factsSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
 
@@ -43,7 +43,12 @@ export function ghFetch(executable: string): typeof fetch {
 
 export function githubAdapter(
   client: Octokit,
-  options: { freshShadow?: boolean; shadowBeforeHead?: boolean } = {},
+  options: {
+    freshShadow?: boolean;
+    shadowBeforeHead?: boolean;
+    triageAppId?: number;
+    ownedPathTier?: unknown;
+  } = {},
 ) {
   const params = (r: ReviewRequest, c: CallContext) => {
     requestSchema.parse(r);
@@ -88,6 +93,7 @@ export function githubAdapter(
         throw new Error("Draft or fork PR is not admitted");
       if (before.base.sha !== r.base || before.head.sha !== r.head)
         throw new Error("PR revision moved");
+      let historyComplete = true;
       const [files, diff, checks, reviews] = await Promise.all([
         client.paginate(client.rest.pulls.listFiles, { ...p, per_page: 100 }),
         client.request("GET /repos/{owner}/{repo}/pulls/{pull_number}", {
@@ -100,7 +106,10 @@ export function githubAdapter(
           per_page: 100,
           filter: "latest",
         }),
-        client.paginate(client.rest.pulls.listReviews, { ...p, per_page: 100 }),
+        client.paginate(client.rest.pulls.listReviews, { ...p, per_page: 100 }).catch(() => {
+          historyComplete = false;
+          return [];
+        }),
       ]);
       const after = await pull(r, c);
       if (
@@ -136,6 +145,42 @@ export function githubAdapter(
       const historyReviews = options.shadowBeforeHead
         ? reviews.filter((v) => v.commit_id !== r.head)
         : reviews;
+      let triage = null;
+      const latest = checks
+        .filter(
+          (check) =>
+            check.name === "review / triage" &&
+            check.status === "completed" &&
+            check.head_sha === r.head &&
+            check.app?.id === (options.triageAppId ?? 4862659),
+        )
+        .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id)[0];
+      if (latest?.started_at && Number.isInteger(latest.id)) {
+        try {
+          const machine = JSON.parse(latest.output?.text ?? "");
+          const classification =
+            "classification" in machine
+              ? machine.classification
+              : typeof machine.mechanical === "boolean"
+                ? machine.mechanical
+                  ? "mechanical"
+                  : "functional"
+                : null;
+          if (
+            machine.head_sha === r.head &&
+            machine.decision_source === "jev" &&
+            classNames.includes(classification)
+          )
+            triage = {
+              actor: latest.app?.slug ?? "unknown",
+              base: r.base,
+              head: r.head,
+              classification,
+            };
+        } catch {
+          /* Unreadable triage conservatively requires functional review. */
+        }
+      }
       return factsSchema.parse({
         repository: r.repository,
         pr: r.pr,
@@ -167,7 +212,7 @@ export function githubAdapter(
                   : "failure",
         })),
         history: {
-          complete: true,
+          complete: historyComplete,
           priorLedger:
             !options.freshShadow && historyReviews.some((r) => r.body.includes("margot-ledger:")),
           ...(!options.freshShadow
@@ -185,7 +230,8 @@ export function githubAdapter(
               }
             : {}),
         },
-        triage: null,
+        triage,
+        ownedPathTier: options.ownedPathTier,
         autoMergeArmed: before.auto_merge !== null,
       });
     },

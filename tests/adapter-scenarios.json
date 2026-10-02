@@ -36,7 +36,7 @@
   },
   {
     "id": "history-outage",
-    "name": "Unreadable GitHub history cannot establish first round",
+    "name": "Unreadable GitHub history degrades to unavailable",
     "defect": "restore the reviews endpoint"
   },
   {
@@ -76,7 +76,7 @@
   },
   {
     "id": "jev-outage",
-    "name": "Jev transport outage cannot approve a review",
+    "name": "Classifier outage requests functional review",
     "defect": "restore Jev availability"
   },
   {
@@ -380,8 +380,8 @@
     "defect": "Pass full PR facts, including release notes, to classification again",
     "sourceBreak": {
       "file": "src/adapters/jev.ts",
-      "from": "const a = await decide(nouls(questions), evidence, c);",
-      "to": "const a = await decide(nouls(questions), facts, c);"
+      "from": "a = (await decide(nouls(questions), evidence, c)).answers;",
+      "to": "a = (await decide(nouls(questions), facts, c)).answers;"
     }
   }
 ]

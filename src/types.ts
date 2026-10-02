@@ -42,6 +42,7 @@ export type ReviewPresentation = {
 };
 export type Review = ReviewCore & {
   ledger: Ledger;
+  ledgerUnavailable?: boolean;
   convergence: Convergence;
   presentation?: ReviewPresentation;
 };
@@ -59,7 +60,12 @@ export type ReviewResult =
       report: string;
       publication: z.infer<typeof publicationSchema> | null;
     } & Review)
-  | { kind: "classified"; request: ReviewRequest; classification: Classification }
+  | {
+      kind: "classified";
+      request: ReviewRequest;
+      classification: Classification;
+      decision_source?: string;
+    }
   | { kind: "error"; stage: string; diagnostic: string; mergeEligible: false };
 export type CallContext = { signal: AbortSignal };
 export type ReviewPhaseTitle =

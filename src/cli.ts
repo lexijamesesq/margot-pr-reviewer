@@ -8,7 +8,13 @@ async function main(args: string[]) {
   const [requestFile, configFile, outputFile] = args;
   if (!requestFile || !configFile || !outputFile || args.length !== 3)
     throw new Error("Usage: margot-review REQUEST.json CONFIG.json OUTPUT.json");
-  const request = requestSchema.parse(JSON.parse(await readFile(requestFile, "utf8")));
+  const request = requestSchema.parse({
+    ...JSON.parse(await readFile(requestFile, "utf8")),
+    ...(process.env.MARGOT_CLASSIFICATION !== undefined
+      ? { classification: process.env.MARGOT_CLASSIFICATION }
+      : {}),
+    ...(process.env.MARGOT_TRIAGE !== undefined ? { triage: process.env.MARGOT_TRIAGE } : {}),
+  });
   const config = liveConfigSchema.parse(JSON.parse(await readFile(configFile, "utf8")));
   const responses: unknown[] = [];
   const { run, actions } = cliServices(config, process.env, (r) => responses.push(r));

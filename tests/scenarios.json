@@ -2360,7 +2360,7 @@
     "defect": "Repair only the wrong repository facts response."
   },
   {
-    "name": "unreadable history cannot approve",
+    "name": "unreadable history reviews without replacing the ledger",
     "recording": "council-clear",
     "patches": [
       {
@@ -2369,9 +2369,8 @@
       }
     ],
     "expected": {
-      "kind": "error",
-      "stage": "history",
-      "eligible": false
+      "kind": "reviewed",
+      "hasLedger": false
     },
     "break": [
       {
@@ -2457,9 +2456,11 @@
       }
     ],
     "expected": {
-      "kind": "error",
-      "stage": "risk",
-      "eligible": false
+      "kind": "reviewed",
+      "eligible": false,
+      "holds": [
+        "fallback"
+      ]
     },
     "break": [
       {
@@ -2859,11 +2860,20 @@
           "head": "0000000000000000000000000000000000000002",
           "classification": "mechanical"
         }
+      },
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 0,
+          "mechanical": 1
+        }
       }
     ],
     "expected": {
-      "kind": "error",
-      "stage": "triage"
+      "kind": "reviewed",
+      "classification": "functional"
     },
     "break": [
       {
@@ -2885,11 +2895,20 @@
           "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "classification": "mechanical"
         }
+      },
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 0,
+          "mechanical": 1
+        }
       }
     ],
     "expected": {
-      "kind": "error",
-      "stage": "triage"
+      "kind": "reviewed",
+      "classification": "functional"
     },
     "break": [
       {
@@ -2900,7 +2919,7 @@
     "defect": "Repair the triage head binding."
   },
   {
-    "name": "untrusted triage base cannot lower review",
+    "name": "triage is bound to the head rather than the base",
     "recording": "council-clear",
     "patches": [
       {
@@ -2911,16 +2930,25 @@
           "head": "0000000000000000000000000000000000000002",
           "classification": "mechanical"
         }
+      },
+      {
+        "path": "classification",
+        "value": {
+          "source": "jev",
+          "functional": 0,
+          "documentation": 0,
+          "mechanical": 1
+        }
       }
     ],
     "expected": {
-      "kind": "error",
-      "stage": "triage"
+      "kind": "reviewed",
+      "classification": "mechanical"
     },
     "break": [
       {
-        "path": "facts.triage.base",
-        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "path": "facts.triage.classification",
+        "value": "functional"
       }
     ],
     "defect": "Repair the triage base binding."
@@ -3703,7 +3731,7 @@
     "recording": "council-clear",
     "patches": [
       {
-        "path": "facts.history.complete",
+        "path": "facts.complete",
         "value": false
       },
       {
@@ -3713,8 +3741,8 @@
     ],
     "expected": {
       "kind": "error",
-      "stage": "history",
-      "diagnostic": "History unavailable; auto-merge disable failed",
+      "stage": "facts",
+      "diagnostic": "Incomplete facts; auto-merge disable failed",
       "eligible": false,
       "writes": 0,
       "calls": [
@@ -3763,7 +3791,7 @@
     "recording": "council-clear",
     "patches": [
       {
-        "path": "facts.history.complete",
+        "path": "facts.complete",
         "value": false
       },
       {
@@ -3773,8 +3801,8 @@
     ],
     "expected": {
       "kind": "error",
-      "stage": "history",
-      "diagnostic": "History unavailable; auto-merge disable failed",
+      "stage": "facts",
+      "diagnostic": "Incomplete facts; auto-merge disable failed",
       "eligible": false,
       "writes": 0,
       "calls": [
@@ -3825,7 +3853,7 @@
     "recording": "council-clear",
     "patches": [
       {
-        "path": "facts.history.complete",
+        "path": "facts.complete",
         "value": false
       },
       {
@@ -3837,8 +3865,8 @@
     ],
     "expected": {
       "kind": "error",
-      "stage": "history",
-      "diagnostic": "History unavailable; auto-merge disable failed",
+      "stage": "facts",
+      "diagnostic": "Incomplete facts; auto-merge disable failed",
       "eligible": false,
       "writes": 0,
       "calls": [
@@ -3859,7 +3887,7 @@
     "recording": "council-clear",
     "patches": [
       {
-        "path": "facts.history.complete",
+        "path": "facts.complete",
         "value": false
       },
       {
@@ -3869,8 +3897,8 @@
     ],
     "expected": {
       "kind": "error",
-      "stage": "history",
-      "diagnostic": "History unavailable; auto-merge disable not confirmed",
+      "stage": "facts",
+      "diagnostic": "Incomplete facts; auto-merge disable not confirmed",
       "eligible": false,
       "writes": 0
     },

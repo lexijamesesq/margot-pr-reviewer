@@ -113,7 +113,7 @@ async function wire(mode = "clear", broken = false) {
       writes.push({ method, path, body });
       if (
         (defect("start-fail") && body.status === "in_progress") ||
-        ((defect("review-fail") || defect("final-fail")) && path.endsWith("/reviews")) ||
+        (defect("review-fail") && path.endsWith("/reviews")) ||
         (defect("final-fail") &&
           body.name === options.checks.review &&
           body.conclusion === "success")
@@ -152,10 +152,6 @@ async function wire(mode = "clear", broken = false) {
         };
         if (!defect("receipt")) reviews.push(data as Record<string, unknown>);
         if (mode === "head-after-approval") moved = true;
-        if (mode === "merged") {
-          merged = true;
-          armed = false;
-        }
       } else {
         const id = method === "POST" ? ++sequence : Number(path.split("/").at(-1));
         data = {
@@ -171,7 +167,19 @@ async function wire(mode = "clear", broken = false) {
           body.conclusion === "success"
         )
           stored.set(id, { ...(data as Record<string, unknown>), status: "in_progress" });
-        if (mode === "head" && body.name === options.checks.review && body.conclusion === "success")
+        if (
+          mode === "merged" &&
+          body.name === options.checks.review &&
+          body.conclusion === "success"
+        ) {
+          merged = true;
+          armed = false;
+        }
+        if (
+          mode === "head" &&
+          body.name === options.checks.authority &&
+          body.conclusion === "success"
+        )
           moved = true;
       }
     }
@@ -265,7 +273,7 @@ scenario(
     );
     return {
       kind: x.result.kind,
-      successBeforeApprove: success >= 0 && approve > success,
+      successBeforeApprove: approve >= 0 && success > approve,
       head: x.writes.find((w) => w.body.event === "APPROVE")?.body.commit_id,
       finalStatus: x.final?.status,
       merged: x.writes.some(
@@ -289,11 +297,19 @@ scenario(
     const x = await wire("hold", b);
     return {
       armed: x.armed,
+      ordered: (() => {
+        const review = x.writes.findIndex((w) => w.path.endsWith("/reviews"));
+        const disable = x.writes.findIndex((w) => w.path === "/graphql");
+        const final = x.writes.findIndex(
+          (w) => w.body.name === options.checks.review && w.body.conclusion === "neutral",
+        );
+        return review >= 0 && disable > review && final > disable;
+      })(),
       conclusion: x.final?.conclusion,
       event: x.writes.find((w) => w.path.endsWith("/reviews"))?.body.event,
     };
   },
-  { armed: false, conclusion: "neutral", event: "COMMENT" },
+  { armed: false, ordered: true, conclusion: "neutral", event: "COMMENT" },
 );
 // Ollie's state script (dotty .github/scripts/ollie-state.py, parse_verdict) reads these
 // lines from the check text and requests the operator's review on a held PR. Without them
@@ -460,7 +476,9 @@ for (const mode of ["head", "confirm"])
         approvalAttempted: x.writes.some((w) => w.body.event === "APPROVE"),
       };
     },
-    { kind: "error", completedWrite: true, approvalAttempted: false },
+    mode === "head"
+      ? { kind: "error", completedWrite: false, approvalAttempted: false }
+      : { kind: "error", completedWrite: true, approvalAttempted: true },
   );
 scenario(
   "pub-head-after-approval",
@@ -889,7 +907,7 @@ scenario(
       reviewWrites: x.writes.filter((w) => w.path.endsWith("/reviews")).length,
     };
   },
-  { kind: "error", conclusion: "action_required", reviewWrites: 0 },
+  { kind: "error", conclusion: "action_required", reviewWrites: 1 },
 );
 
 scenario(
@@ -1002,7 +1020,7 @@ scenario(
     const additions = Array.from({ length: 2001 }, (_, index) => `+line ${index}`).join("\n");
     (copy.facts as { diff: string }).diff =
       `diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -0,0 +1,2001 @@\n${additions}\n`;
-    if (b) (copy.config as { mechanicalDiffLineCap?: number }).mechanicalDiffLineCap = 2001;
+    if (b) (copy.config as { mechanicalDiffLineCap?: number }).mechanicalDiffLineCap = 2005;
     const services = recordedServices(copy);
     const result = await review(copy.request, copy.config, services);
     return {

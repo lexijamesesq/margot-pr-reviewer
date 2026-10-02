@@ -138,8 +138,8 @@ function rejects(run: () => unknown) {
     return { ok: true };
   }
 }
-scenario("ledger-auth", (b) =>
-  rejects(() =>
+scenario("ledger-auth", (b) => ({
+  ok:
     selectLedger(
       {
         ...facts,
@@ -150,22 +150,22 @@ scenario("ledger-auth", (b) =>
         },
       },
       config,
-    ),
-  ),
-);
+    ) === null,
+}));
 scenario("ledger-binding", (b) => {
   const f = history();
   f.history.reviews[0]!.head = b ? oldHead : "f".repeat(40);
-  return rejects(() => selectLedger(f, config));
+  return { ok: selectLedger(f, config) === null };
 });
 scenario("ledger-corrupt", (b) => {
   const f = history();
   if (!b) f.history.reviews[0]!.body = "review\n<!-- margot-ledger:v1 garbage -->";
-  return rejects(() => selectLedger(f, config));
+  return { ok: selectLedger(f, config) === null };
 });
-scenario("ledger-unreadable", (b) =>
-  rejects(() => selectLedger({ ...facts, history: { complete: b, priorLedger: false } }, config)),
-);
+scenario("ledger-unreadable", (b) => ({
+  ok:
+    selectLedger({ ...history(), history: { ...history().history, complete: b } }, config) === null,
+}));
 scenario(
   "ledger-newest",
   (b) => {
@@ -185,7 +185,8 @@ scenario(
     const f = history();
     f.history.reviews.push({
       ...posted(prior([], 3), "human"),
-      actorType: "User",
+      actorType: broken ? "Bot" : "User",
+      actor: broken ? "reviewer[bot]" : "human",
       id: 2,
       submittedAt: "2026-09-02T00:00:00Z",
       body: broken
@@ -196,9 +197,9 @@ scenario(
   },
   { ledger: prior() },
 );
-scenario("ledger-duplicate", (b) =>
-  rejects(() => selectLedger(history(prior(b ? [entry()] : [entry(), entry()])), config)),
-);
+scenario("ledger-duplicate", (b) => ({
+  ok: selectLedger(history(prior(b ? [entry()] : [entry(), entry()])), config) === null,
+}));
 scenario("ledger-terminal", (b) => {
   const f = history();
   if (!b) f.history.reviews[0]!.body += "\nquoted text";
@@ -456,11 +457,11 @@ scenario(
       ).ledger.entries.map((e) => `${e.key}:${e.status}`),
     };
   },
-  { entries: ["R1-F1:fixed", "R1-F2:dismissed"] },
+  { entries: ["R1-F2:dismissed"] },
 );
-scenario("ledger-budget", (b) =>
-  rejects(() => ledgerBlock(prior([{ ...entry(), what: "x".repeat(b ? 10 : 50000) }]))),
-);
+scenario("ledger-budget", (b) => ({
+  ok: ledgerBlock(prior([{ ...entry(), what: "x".repeat(b ? 10 : 50000) }])).length > 24000,
+}));
 async function margot(b: boolean, classification = "mechanical", editorial = false) {
   const r = structuredClone(source);
   r.config = { ...config, publication: "none" };
@@ -550,7 +551,7 @@ scenario(
       calls: s.calls.map((c) => c.name),
     };
   },
-  { equal: true, calls: ["facts", "head"] },
+  { equal: true, calls: ["facts", "classification", "head"] },
 );
 scenario(
   "ledger-retry-040-receipt",
@@ -583,7 +584,7 @@ scenario(
     r.facts = f;
     return await review(r.request, r.config, recordedServices(r));
   },
-  { kind: "reviewed", routeAnswer: null, riskAnswer: null },
+  { kind: "reviewed", routeAnswer: null, riskAnswer: null, convergence: { round: 2 } },
 );
 scenario(
   "ledger-retry-checks",
@@ -605,7 +606,7 @@ scenario(
     r.facts = history({ ...prior(), head: b ? oldHead : facts.head });
     return await review(r.request, r.config, recordedServices(r));
   },
-  { kind: "error", stage: "history" },
+  { kind: "reviewed", convergence: { round: 1 } },
 );
 scenario(
   "ledger-prose",
@@ -675,7 +676,7 @@ for (const id of ["ledger-pagination", "ledger-page-two-failure"])
             signal: AbortSignal.timeout(3000),
           }),
         );
-        if (id === "ledger-page-two-failure") return { failed: false };
+        if (id === "ledger-page-two-failure") return { failed: !f.history.complete };
         return {
           round: selectLedger(f, config)?.round,
           pages: pages.filter((p) => p.includes("/reviews")).length,

@@ -183,7 +183,7 @@ export function render(review: Review): string {
     "<!-- margot:v1 -->",
   ];
   const body = lines.join("\n").replaceAll("margot-ledger", "margot‑ledger");
-  return `${body}\n${ledgerBlock(review.ledger)}`;
+  return review.ledgerUnavailable ? body : `${body}\n${ledgerBlock(review.ledger)}`;
 }
 
 /**
@@ -203,7 +203,7 @@ export function checkText(review: Review): string {
         : "fast_path";
   const lines = [
     `outcome: ${review.decision.outcome} | band: ${review.decision.rating.band}`,
-    "decision_source: jev",
+    `decision_source: ${review.provenance.decision_source ?? "jev"}`,
     `verdict_source: ${verdictSource}`,
     `class: ${review.classification}`,
     `summoned: ${summoned.join(", ") || "none"}`,
@@ -212,7 +212,7 @@ export function checkText(review: Review): string {
     `band_reason: ${review.decision.rating.rationale}`,
     "pipeline_ok: true",
     `vector: ${JSON.stringify(review.riskAnswer?.dimensions ?? {})}`,
-    `owned tier: ${(review.decision.authorityPaths?.length ?? 0) > 0 ? "required_owned" : "none"}`,
+    `owned tier: ${review.decision.ownedPathTier ?? "unknown"}`,
     "summoned by ledger: none",
   ];
   const findingById = new Map(

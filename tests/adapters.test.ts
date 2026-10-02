@@ -179,9 +179,10 @@ scenario("draft", (broken) =>
 scenario("fork", (broken) =>
   rejects(() => github({ fork: !broken }).adapter.facts(request, context())),
 );
-scenario("history-outage", (broken) =>
-  rejects(() => github({ historyFailure: !broken }).adapter.facts(request, context())),
-);
+scenario("history-outage", async (broken) => ({
+  ok: !(await github({ historyFailure: !broken }).adapter.facts(request, context())).history
+    .complete,
+}));
 scenario("ledger", async (broken) => ({
   ok: (await github({ ledger: !broken }).adapter.facts(request, context())).history.priorLedger,
 }));
@@ -281,15 +282,17 @@ scenario("jev-retry", async (broken) => {
 });
 scenario("jev-auth", async (broken) => {
   const j = jev(classes, { failures: 1, status: broken ? 503 : 401 });
-  const error = await rejects(() => j.adapter.classify(facts, classificationQuestions, context()));
-  return { ok: error.ok && j.attempts() === 1 };
+  const answer = (await j.adapter.classify(facts, classificationQuestions, context())) as {
+    source: string;
+  };
+  return { ok: answer.source === "jev_unreachable" && j.attempts() === 1 };
 });
 scenario("jev-outage", async (broken) => {
   const j = jev(classes, { failures: broken ? 0 : 3 });
   const services = { ...recordedServices(recording), classify: j.adapter.classify };
   const result = await review(request, recording.config, services);
   return {
-    ok: result.kind === "error" && result.stage === "classification" && !result.mergeEligible,
+    ok: result.kind === "reviewed" && result.classification === "functional",
   };
 });
 scenario("jev-risk", async (broken) => {
