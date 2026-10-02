@@ -3,9 +3,8 @@ import { isAbsolute, join } from "node:path";
 import type { Octokit } from "octokit";
 import { z } from "zod";
 import { githubClient } from "./adapters/github.js";
-import { liveConfigSchema, requestSchema, shaSchema } from "./schemas.js";
+import { liveConfigSchema, repositorySchema, requestSchema, shaSchema } from "./schemas.js";
 
-const repositorySchema = z.string().regex(/^[\w.-]+\/[\w.-]+$/);
 const versionSchema = z
   .string()
   .regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/);

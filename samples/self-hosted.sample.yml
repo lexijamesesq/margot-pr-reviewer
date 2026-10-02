@@ -1,14 +1,17 @@
-# Store these trusted files outside the pull-request checkout. Provision the pinned
+# Store trusted runner files outside the pull-request checkout. Configure the same
+# deployment JSON as a GitHub variable for the hosted closer. Provision the pinned
 # Claude CLI, ticketing server, and publish-skills at the configured runtime paths.
-name: Margot shadow
+name: Margot review
 on: workflow_dispatch
 permissions:
   contents: read
   pull-requests: read
   checks: read
 jobs:
-  shadow:
+  route:
     runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
+    outputs:
+      authority: ${{ steps.route.outputs.authority }}
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -40,8 +43,38 @@ jobs:
             --release-repository YOUR_ORG/margot-pr-reviewer \
             --repository "$TARGET_REPO" \
             --enrolled-repositories '["YOUR_ORG/YOUR_REPOSITORY"]' \
-            --authority-repositories '[]'
+            --authority-repositories '["YOUR_ORG/YOUR_REPOSITORY"]'
+
+  review:
+    needs: route
+    runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    outputs:
+      published: ${{ steps.review.outputs.published }}
+      stop_reason: ${{ steps.bind.outputs.stop_reason }}
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Bootstrap the exact release bytes
+        env:
+          ENGINE_ROOT: ${{ runner.temp }}/margot
+          DEPLOYMENT: /trusted/margot/deployment.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$ENGINE_ROOT"
+          package=$(jq -r .packageReference "$DEPLOYMENT")
+          sha256=$(jq -r .packageSha256 "$DEPLOYMENT")
+          archive="$ENGINE_ROOT/margot-pr-reviewer.tgz"
+          curl --fail --location --silent --show-error "$package" --output "$archive"
+          echo "$sha256  $archive" | sha256sum --check
+          npm install --prefix "$ENGINE_ROOT" --ignore-scripts --save-exact "$archive"
+          echo "ENGINE_ROOT=$ENGINE_ROOT" >> "$GITHUB_ENV"
       - name: Bind trusted configuration to the requested PR
+        id: bind
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
@@ -49,14 +82,22 @@ jobs:
           HEAD_SHA: "0000000000000000000000000000000000000000"
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          set +e
           "$ENGINE_ROOT/node_modules/.bin/margot-instance" bind-request \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
-            --phase review --authority "${{ steps.route.outputs.authority }}" \
+            --phase review --authority "${{ needs.route.outputs.authority }}" \
             --engine-root "$ENGINE_ROOT" --config /trusted/margot/config.json \
             --required-checks '["YOUR_REQUIRED_CHECK"]' \
             --protected-paths '["YOUR_AUTHORITY_PATH/**"]' \
             --allowed-skipped-checks '[]' --run-url "$RUN_URL"
+          status=$?
+          set -e
+          if [ "$status" -eq 75 ]; then
+            echo "stop_reason=stale" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
       - name: Review the bound request
+        id: review
         env:
           GH_TOKEN: ${{ github.token }}
           JEV_KEY: ${{ secrets.EXAMPLE_JEV_KEY }}
@@ -65,3 +106,52 @@ jobs:
         run: |
           "$ENGINE_ROOT/node_modules/.bin/margot-review" \
             "$ENGINE_ROOT/request.json" "$ENGINE_ROOT/config.json" "$ENGINE_ROOT/result.json"
+          published=$(jq -r 'if .result.publication == null then "" else "true" end' \
+            "$ENGINE_ROOT/result.json")
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+
+  close-stranded-check:
+    needs: [route, review]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Bootstrap the exact release bytes
+        env:
+          ENGINE_ROOT: ${{ runner.temp }}/margot
+          DEPLOYMENT_JSON: ${{ vars.YOUR_MARGOT_DEPLOYMENT_JSON }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$ENGINE_ROOT"
+          package=$(jq -r .packageReference <<< "$DEPLOYMENT_JSON")
+          sha256=$(jq -r .packageSha256 <<< "$DEPLOYMENT_JSON")
+          archive="$ENGINE_ROOT/margot-pr-reviewer.tgz"
+          curl --fail --location --silent --show-error "$package" --output "$archive"
+          echo "$sha256  $archive" | sha256sum --check
+          npm install --prefix "$ENGINE_ROOT" --ignore-scripts --save-exact "$archive"
+          echo "ENGINE_ROOT=$ENGINE_ROOT" >> "$GITHUB_ENV"
+      - name: Close a review check left in progress
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
+          PR_NUMBER: "1"
+          HEAD_SHA: "0000000000000000000000000000000000000000"
+          MARGOT_APP_ID: "123456"
+          RUNS_URL_PREFIX: ${{ github.server_url }}/${{ github.repository }}/actions/runs/
+          RUN_ID: ${{ github.run_id }}
+          ROUTE_RESULT: ${{ needs.route.result }}
+          REVIEW_RESULT: ${{ needs.review.result }}
+          PUBLISHED: ${{ needs.review.outputs.published }}
+          STOP_REASON: ${{ needs.review.outputs.stop_reason }}
+        run: |
+          "$ENGINE_ROOT/node_modules/.bin/margot-instance" close-stranded-check \
+            --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
+            --app-id "$MARGOT_APP_ID" --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
+            --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
+            --published "$PUBLISHED" --stop-reason "$STOP_REASON"

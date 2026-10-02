@@ -146,6 +146,59 @@ async function bindCommandFixture(authority: "true" | "false" = "false") {
   };
 }
 
+function closeCommandArgs(overrides: Record<string, string> = {}) {
+  const values = {
+    repository: "example/project",
+    pr: "7",
+    head,
+    "app-id": "42",
+    "own-runs": "https://github.com/example/control/actions/runs/",
+    "own-run-id": "1",
+    "route-result": "success",
+    "review-result": "success",
+    published: "false",
+    "stop-reason": "floor",
+    ...overrides,
+  };
+  return [
+    "close-stranded-check",
+    ...Object.entries(values).flatMap(([name, value]) => [`--${name}`, value]),
+  ];
+}
+
+function closeCommandClient(options: { failPulls?: boolean; calls?: string[] } = {}) {
+  const writes: Record<string, unknown>[] = [];
+  const client = {
+    rest: {
+      repos: {
+        listPullRequestsAssociatedWithCommit: async () => {
+          options.calls?.push("pulls");
+          if (options.failPulls) throw new Error("Recorded pull read failure");
+          return { data: [{ number: 7, state: "open", head: { sha: head } }] };
+        },
+      },
+      checks: {
+        listForRef: async () => ({
+          data: {
+            check_runs: [
+              {
+                id: 88,
+                status: "in_progress",
+                details_url: "https://github.com/example/control/actions/runs/1",
+              },
+            ],
+          },
+        }),
+        update: async (input: Record<string, unknown>) => {
+          writes.push(input);
+          return { data: input };
+        },
+      },
+    },
+  };
+  return { client: client as never, writes };
+}
+
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true })));
 });
@@ -489,63 +542,51 @@ it("rejects duplicate flags after parseArgs", async () => {
 });
 
 it("maps the close-stranded-check command into the guarded closer", async () => {
-  const writes: Record<string, unknown>[] = [];
-  const client = {
-    rest: {
-      repos: {
-        listPullRequestsAssociatedWithCommit: async () => ({
-          data: [{ number: 7, state: "open", head: { sha: head } }],
-        }),
-      },
-      checks: {
-        listForRef: async () => ({
-          data: {
-            check_runs: [
-              {
-                id: 88,
-                status: "in_progress",
-                details_url: "https://github.com/example/control/actions/runs/1",
-              },
-            ],
-          },
-        }),
-        update: async (input: Record<string, unknown>) => {
-          writes.push(input);
-          return { data: input };
-        },
-      },
-    },
-  };
+  const { client, writes } = closeCommandClient();
   const result = await runInstanceCommand(
-    [
-      "close-stranded-check",
-      "--repository",
-      "example/project",
-      "--pr",
-      "7",
-      "--head",
-      head,
-      "--app-id",
-      "42",
-      "--own-runs",
-      "https://github.com/example/control/actions/runs/",
-      "--own-run-id",
-      "1",
-      "--route-result",
-      "success",
-      "--review-result",
-      "success",
-      "--published",
-      broken === "command-closer" ? "true" : "false",
-      "--stop-reason",
-      "floor",
-    ],
+    closeCommandArgs({ published: broken === "command-closer" ? "true" : "false" }),
     { GH_TOKEN: "write-token" },
-    client as never,
+    client,
   );
   expect(result).toMatchObject({ action: "closed" });
   expect(writes).toHaveLength(1);
   expect(writes[0]).toMatchObject({ conclusion: "action_required" });
+});
+
+it("maps a closer GitHub failure to exit 2", async () => {
+  const { client } = closeCommandClient({ failPulls: true });
+  const error = await captureError(() =>
+    runInstanceCommand(closeCommandArgs(), { GH_TOKEN: "write-token" }, client),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain("could not read the pull requests");
+  expect(instanceExitCode(error)).toBe(2);
+});
+
+it("rejects a run URL prefix without its trailing slash", async () => {
+  const ownRuns =
+    broken === "command-closer-own-runs"
+      ? "https://github.com/example/control/actions/runs/"
+      : "https://github.com/example/control/actions/runs";
+  const error = await captureError(() =>
+    runInstanceCommand(closeCommandArgs({ "own-runs": ownRuns }), {}),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toBe("--own-runs must be a run URL prefix ending in /");
+  expect(instanceExitCode(error)).toBe(1);
+});
+
+it("rejects a malformed closer repository before GitHub", async () => {
+  const calls: string[] = [];
+  const { client } = closeCommandClient({ calls });
+  const repository = broken === "command-closer-repository" ? "example/project" : "example";
+  const error = await captureError(() =>
+    runInstanceCommand(closeCommandArgs({ repository }), { GH_TOKEN: "write-token" }, client),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain("Repository must be owner/name");
+  expect(instanceExitCode(error)).toBe(1);
+  expect(calls).toHaveLength(0);
 });
 
 it("maps every bind-request CLI flag into the bound files", async () => {

@@ -12,6 +12,7 @@ import {
   validateDeployment,
   writeGitHubOutput,
 } from "./instance.js";
+import { shaSchema } from "./schemas.js";
 
 type Options = Record<string, string | undefined>;
 
@@ -153,8 +154,9 @@ export async function runInstanceCommand(
       "published",
       "stop-reason",
     ]);
-    const head = required(input, "head");
-    if (!/^[a-f0-9]{40}$/.test(head)) throw new Error("--head is invalid");
+    const head = shaSchema.parse(required(input, "head"));
+    const ownRuns = required(input, "own-runs");
+    if (!ownRuns.endsWith("/")) throw new Error("--own-runs must be a run URL prefix ending in /");
     const published = required(input, "published");
     if (published !== "" && published !== "true" && published !== "false")
       throw new Error("--published must be true, false, or empty");
@@ -163,7 +165,7 @@ export async function runInstanceCommand(
       pr: positiveInteger(input, "pr"),
       head,
       appId: positiveInteger(input, "app-id"),
-      ownRuns: required(input, "own-runs"),
+      ownRuns,
       ownRunId: required(input, "own-run-id"),
       routeResult: required(input, "route-result"),
       reviewResult: required(input, "review-result"),

@@ -17,6 +17,7 @@
   { "id": "closer-review-cancelled", "name": "A cancelled review closes cancelled", "defect": "Replace cancellation with failure" },
   { "id": "closer-review-failed", "name": "A failed review names the stopped job", "defect": "Replace the stopped-job title" },
   { "id": "closer-selected", "name": "A selected package that did not publish is closed", "defect": "Claim the package published" },
+  { "id": "closer-package-cancelled", "name": "A cancelled package stop closes cancelled", "defect": "Replace the cancellation stop reason" },
   { "id": "closer-floor", "name": "A floor stop uses the preflight title", "defect": "Remove the floor stop reason" },
   { "id": "closer-stopped", "name": "Other failures say Margot stopped before a verdict", "defect": "Replace the stopped title with the floor title" },
   { "id": "closer-patch-error", "name": "A failed close is an error rather than a false receipt", "defect": "Restore the check write" }

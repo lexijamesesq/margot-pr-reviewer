@@ -175,6 +175,26 @@
     "defect": "Claim the selected package published"
   },
   {
+    "id": "command-closer-error-exit",
+    "name": "maps a closer GitHub failure to exit 2",
+    "defect": "Return the error decision instead of throwing",
+    "sourceBreak": {
+      "file": "src/instance-cli.ts",
+      "from": "if (decision.action === \"error\") throw new CommandError(decision.message, 2);",
+      "to": "if (decision.action === \"error\") return decision;"
+    }
+  },
+  {
+    "id": "command-closer-own-runs",
+    "name": "rejects a run URL prefix without its trailing slash",
+    "defect": "Restore the trailing slash"
+  },
+  {
+    "id": "command-closer-repository",
+    "name": "rejects a malformed closer repository before GitHub",
+    "defect": "Restore the owner/name repository"
+  },
+  {
     "id": "command-bind-lists",
     "name": "maps every bind-request CLI flag into the bound files",
     "defect": "Swap the required-check and protected-path list values"

@@ -181,6 +181,8 @@ when routing failed, review failed, or a selected package reports
 checks commit-to-PR membership, shared live-head ownership, the open
 `review / margot` (then legacy `margot`) check, and run ownership before PATCHing.
 The token is read from `GH_TOKEN`.
+`--own-runs` is the Actions runs URL prefix and must end in `/`, for example
+`https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/`.
 
 ```sh
 margot-instance close-stranded-check \

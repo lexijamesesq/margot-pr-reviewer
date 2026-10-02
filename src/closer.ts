@@ -1,4 +1,5 @@
 import type { Octokit } from "octokit";
+import { repositorySchema, shaSchema } from "./schemas.js";
 
 const openStates = new Set(["queued", "in_progress"]);
 
@@ -45,8 +46,10 @@ export async function closeStrandedCheck(
   input: CloseStrandedCheckInput,
   client: CheckClient,
 ): Promise<CloseStrandedCheckDecision> {
-  const [owner = "", repo = ""] = input.repository.split("/");
-  const short = input.head.slice(0, 7);
+  const repository = repositorySchema.parse(input.repository);
+  const head = shaSchema.parse(input.head);
+  const [owner, repo] = repository.split("/") as [string, string];
+  const short = head.slice(0, 7);
   if (!shouldCloseStrandedCheck(input)) return { action: "left", message: "nothing to close" };
 
   let pulls: Pulls;
@@ -55,7 +58,7 @@ export async function closeStrandedCheck(
       await client.rest.repos.listPullRequestsAssociatedWithCommit({
         owner,
         repo,
-        commit_sha: input.head,
+        commit_sha: head,
       })
     ).data;
   } catch (error) {
@@ -73,7 +76,7 @@ export async function closeStrandedCheck(
 
   const stale = input.stopReason === "stale";
   for (const pull of pulls) {
-    if (pull.state === "open" && pull.head.sha === input.head) {
+    if (pull.state === "open" && pull.head.sha === head) {
       if (stale || pull.number !== input.pr)
         return {
           action: "left",
@@ -92,7 +95,7 @@ export async function closeStrandedCheck(
         await client.rest.checks.listForRef({
           owner,
           repo,
-          ref: input.head,
+          ref: head,
           check_name: name,
           app_id: input.appId,
           filter: "latest",

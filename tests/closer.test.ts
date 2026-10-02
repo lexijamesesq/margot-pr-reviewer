@@ -42,6 +42,11 @@ async function wire(mode: string, broken = false) {
     input.routeResult = "success";
     input.published = broken ? "true" : "false";
   }
+  if (mode === "package-cancelled") {
+    input.routeResult = "success";
+    input.published = "false";
+    input.stopReason = broken ? "failure" : "cancelled";
+  }
   if (mode === "route-cancelled") input.routeResult = broken ? "failure" : "cancelled";
   if (mode === "route-failed-review-cancelled") {
     input.reviewResult = "cancelled";
@@ -247,6 +252,11 @@ scenario(
     action: "closed",
     write: { output: { title: expect.stringContaining("package job did not publish") } },
   },
+);
+scenario(
+  "closer-package-cancelled",
+  async (broken) => ({ write: (await wire("package-cancelled", broken)).writes[0] }),
+  { write: { conclusion: "cancelled" } },
 );
 scenario("closer-floor", async (broken) => ({ write: (await wire("floor", broken)).writes[0] }), {
   write: {
