@@ -97,8 +97,14 @@ export class StaleRequestError extends Error {
   }
 }
 
-function resolveMargotRoot(value: string, margotRoot: string) {
-  return value.replaceAll(`\${MARGOT_ROOT}`, margotRoot);
+function resolveMargotRoot(value: string, margotRoot: string, field: string) {
+  const resolved = value.replaceAll(`\${MARGOT_ROOT}`, margotRoot);
+  const unresolved = resolved.match(/\$\{[^{}]+\}/)?.[0];
+  if (unresolved)
+    throw new Error(
+      `Unresolved placeholder ${unresolved} in ${field}; the install root is \${MARGOT_ROOT}`,
+    );
+  return resolved;
 }
 
 export async function bindRequest(input: BindRequestInput, readPull: PullReader) {
@@ -126,15 +132,21 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
   config.review.allowedSkippedChecks = input.allowedSkippedChecks;
   config.review.publication = input.authority ? "github" : "none";
   config.github.shadowBeforeHead = !input.authority;
-  config.claude.executable = resolveMargotRoot(config.claude.executable, input.margotRoot);
+  config.claude.executable = resolveMargotRoot(
+    config.claude.executable,
+    input.margotRoot,
+    "claude.executable",
+  );
   config.claude.pluginDirectory = resolveMargotRoot(
     config.claude.pluginDirectory,
     input.margotRoot,
+    "claude.pluginDirectory",
   );
   if (config.claude.ticketing)
     config.claude.ticketing.command = resolveMargotRoot(
       config.claude.ticketing.command,
       input.margotRoot,
+      "claude.ticketing.command",
     );
   const boundConfig = liveConfigSchema.parse(config);
   const request = requestSchema.parse({

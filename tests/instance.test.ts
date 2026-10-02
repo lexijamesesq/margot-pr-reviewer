@@ -14,6 +14,7 @@ import { instanceExitCode, runInstanceCommand } from "../src/instance-cli.js";
 
 const broken = process.env.MARGOT_INSTANCE_BREAK;
 const margotRootPlaceholder = `\${MARGOT_ROOT}`;
+const engineRootPlaceholder = `\${ENGINE_ROOT}`;
 const head = "a".repeat(40);
 const base = "b".repeat(40);
 const deployment = {
@@ -368,6 +369,67 @@ it("resolves runtime placeholders in Claude and ticketing paths", async () => {
     pluginDirectory: `${root}/publish-skills`,
     ticketing: { command: `${root}/node_modules/.bin/tickets` },
   });
+});
+
+it("rejects unresolved placeholders in executable paths at bind time", async () => {
+  const cases = [
+    {
+      field: "claude.executable",
+      placeholder: engineRootPlaceholder,
+      config: {
+        ...config,
+        claude: {
+          ...config.claude,
+          executable: `${engineRootPlaceholder}/node_modules/.bin/claude`,
+        },
+      },
+    },
+    {
+      field: "claude.pluginDirectory",
+      placeholder: engineRootPlaceholder,
+      config: {
+        ...config,
+        claude: { ...config.claude, pluginDirectory: `${engineRootPlaceholder}/publish-skills` },
+      },
+    },
+    {
+      field: "claude.ticketing.command",
+      placeholder: engineRootPlaceholder,
+      config: {
+        ...config,
+        claude: {
+          ...config.claude,
+          ticketing: {
+            ...config.claude.ticketing,
+            command: `${engineRootPlaceholder}/node_modules/.bin/tickets`,
+          },
+        },
+      },
+    },
+    {
+      field: "claude.executable",
+      placeholder: `\${CUSTOM_ROOT}`,
+      config: {
+        ...config,
+        claude: { ...config.claude, executable: `\${CUSTOM_ROOT}/claude` },
+      },
+    },
+  ];
+
+  for (const candidate of cases) {
+    const error = await captureError(() =>
+      bindRequest(
+        bindInput({
+          config: broken === "unresolved-placeholder" ? config : candidate.config,
+        }),
+        readPull(),
+      ),
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe(
+      `Unresolved placeholder ${candidate.placeholder} in ${candidate.field}; the install root is \${MARGOT_ROOT}`,
+    );
+  }
 });
 
 it.each([

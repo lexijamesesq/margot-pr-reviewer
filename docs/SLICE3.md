@@ -1,6 +1,6 @@
 # Slice 3: the author fixes and Margot reviews again
 
-The Margot now reviews later rounds, carries authenticated finding history, and
+Margot now reviews later rounds, carries authenticated finding history, and
 keeps the same decision and counts when the same head is retried. All work is on
 `slice3-convergence`, with local commits only. Python remains the production
 reviewer. No GitHub object was created, edited or posted; no branch was pushed.

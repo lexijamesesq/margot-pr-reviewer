@@ -4,7 +4,7 @@
 
 When an author fixes a PR, Margot reviews the delta and confirms her earlier
 findings. This slice carries authenticated history, standing-card recall,
-dismissals, severity rules and convergence counts into the TypeScript Margot.
+dismissals, severity rules and convergence counts into Margot's TypeScript implementation.
 Python remains the production reviewer. Nothing was pushed or posted.
 
 ## What changed

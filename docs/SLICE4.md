@@ -1,6 +1,6 @@
 # Slice 4: publication, instance adoption and retirement preparation
 
-The Margot can publish the estate's existing check contract and a SHA-bound native
+Margot can publish the estate's existing check contract and a SHA-bound native
 review. Its tally is New, Open, Closed, derived from the findings listed below it.
 The instance adopts an exact 0.4.0 registry or GitHub release-tag pin through a
 reversible shadow/authority switch. A separate local retirement branch removes
@@ -19,7 +19,7 @@ production adoption remain operator actions, not completed production proofs.
 | `src/ledger.ts` | Retain closed findings and open advisories, including later fix evidence. |
 | `src/render.ts` | Derive New/Open/Closed from the exact listed ledger entries and display each fate. |
 | Instance `.github/instance/` | Supply estate policy, release pins, enrolment and the authority switch. |
-| Instance `margot.yml` | Install the exact artifact on the Pi and run it with `margot-ops`. |
+| Instance `margot-engine.yml` | Install the exact artifact on the Pi and run it with `margot-ops`. |
 
 ## Publication contract
 
@@ -172,7 +172,7 @@ recorded at `2026-09-30T19:07:18.381Z`, at source branch baseline `6a09edb`.
 PR head is `582f517acbd978e08621197517a66ed830b8448f`; base is
 `42e679205cc1813258124ca08523dc212202b038`. The complete pair, including every
 character of the original body and questions, is retained outside git:
-`proof/slice4/mechanical-regression/request-comparison.md`, `margot-request.json`
+`proof/slice4/mechanical-regression/request-comparison.md`, `engine-request.json`
 and `p1-reconstructed-request.json`. Artifact SHA-256s and all measured answers
 are in `docs/mechanical-regression-evidence.json`. Raw PR corpora remain outside
 the public repository and package.
@@ -191,7 +191,7 @@ reported below, never represented as historical evaluation results.
 Both use POST `https://api.typesafe.ai/v1/systemone`, `jev-1.13.0`, and three
 Noul questions named functional, documentation, mechanical in that order. No
 labels enter either request. P1 constructs `state` through `mechanical_state`
-(driver lines 282–296), not the routing `build_state`. The Margot uses its facts
+(driver lines 282–296), not the routing `build_state`. Margot uses its facts
 object after deleting history. Every state difference is listed here:
 
 | Element | Margot request | P1 builder on #131 |
@@ -216,7 +216,7 @@ object after deleting history. Every state difference is listed here:
 The diff changes only `rev: v2026.09.27-15` to `rev: v2026.09.27-16` in
 `.pre-commit-config.yaml`, retaining its unified headers and context. There is
 no diff cap, dropped hunk, changed diff byte, pagination, or per-question call.
-Both requests batch all three questions into **one call**. The Margot's 16,000
+Both requests batch all three questions into **one call**. Margot's 16,000
 unit paging threshold was not reached. The one-answer fast path returns Jev's
 answers unchanged: functional **0.58**, documentation **0.21**, mechanical
 **0.55**. All are below 0.60, hence functional fallback. For genuinely paged

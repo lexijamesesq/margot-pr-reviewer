@@ -115,6 +115,11 @@
     "defect": "Expect paths under a different runtime root"
   },
   {
+    "id": "unresolved-placeholder",
+    "name": "rejects unresolved placeholders in executable paths at bind time",
+    "defect": "Replace unresolved placeholders with the supported install-root placeholder"
+  },
+  {
     "id": "closed",
     "name": "closed: rejects a closed PR",
     "defect": "Restore the open pull request"

@@ -2,7 +2,7 @@
 
 Seven historical captures were normalized into the service contract. The following
 SHA-256 digests identify the original captured emit files without publishing their
-repository names or metadata. Historical outputs predate this Margot; no Jev or
+repository names or metadata. Historical outputs predate Margot; no Jev or
 review-model calls were made to create these fixtures.
 
 | Recording | Source emit SHA-256 | Diff evidence |
