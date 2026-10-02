@@ -2,6 +2,9 @@ import { z } from "zod";
 
 const text = z.string().min(1);
 const probability = z.number().min(0).max(1);
+export const repositorySchema = z
+  .string()
+  .regex(/^[\w.-]+\/[\w.-]+$/, "Repository must be owner/name");
 export const shaSchema = z.string().regex(/^[a-f0-9]{40}$/);
 export const disableAutoMergeSchema = z.boolean();
 export const cardNames = [
@@ -24,7 +27,7 @@ export const classSchema = z.enum(classNames);
 export const cardNameSchema = z.enum(cardNames);
 export const bandSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 export const requestSchema = z.strictObject({
-  repository: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
+  repository: repositorySchema,
   pr: z.number().int().positive(),
   base: shaSchema,
   head: shaSchema,

@@ -3,9 +3,8 @@ import { isAbsolute, join } from "node:path";
 import type { Octokit } from "octokit";
 import { z } from "zod";
 import { githubClient } from "./adapters/github.js";
-import { liveConfigSchema, requestSchema, shaSchema } from "./schemas.js";
+import { liveConfigSchema, repositorySchema, requestSchema, shaSchema } from "./schemas.js";
 
-const repositorySchema = z.string().regex(/^[\w.-]+\/[\w.-]+$/);
 const versionSchema = z
   .string()
   .regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/);
@@ -92,6 +91,12 @@ export type BindRequestInput = {
   runUrl?: string;
 };
 
+export class StaleRequestError extends Error {
+  constructor() {
+    super("Margot: not reviewed: stale");
+  }
+}
+
 function resolveEngineRoot(value: string, engineRoot: string) {
   return value.replaceAll(`\${ENGINE_ROOT}`, engineRoot);
 }
@@ -108,7 +113,7 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
   if (pull.state !== "open") throw new Error("Margot: not reviewed: closed");
   if (pull.draft) throw new Error("Margot: not reviewed: draft");
   if (pull.head.repo.full_name !== repository) throw new Error("Margot: not reviewed: fork");
-  if (pull.head.sha !== expectedHead) throw new Error("Margot: not reviewed: stale");
+  if (pull.head.sha !== expectedHead) throw new StaleRequestError();
 
   const config = structuredClone(suppliedConfig);
   if (input.authority) {

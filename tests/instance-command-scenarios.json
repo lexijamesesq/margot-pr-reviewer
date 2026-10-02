@@ -135,6 +135,11 @@
     "defect": "Restore the expected pull-request head"
   },
   {
+    "id": "stale-signal",
+    "name": "signals a superseded head to shell callers with EX_TEMPFAIL",
+    "defect": "Replace the moved head with a same-message fork refusal"
+  },
+  {
     "id": "trusted-config",
     "name": "rejects an invalid trusted configuration before reading GitHub",
     "defect": "Restore the valid trusted configuration"
@@ -158,6 +163,36 @@
     "id": "command-arguments",
     "name": "rejects unknown deployment command arguments",
     "defect": "Remove the unknown command argument"
+  },
+  {
+    "id": "command-duplicate",
+    "name": "rejects duplicate flags after parseArgs",
+    "defect": "Remove the duplicate repository flag"
+  },
+  {
+    "id": "command-closer",
+    "name": "maps the close-stranded-check command into the guarded closer",
+    "defect": "Claim the selected package published"
+  },
+  {
+    "id": "command-closer-error-exit",
+    "name": "maps a closer GitHub failure to exit 2",
+    "defect": "Return the error decision instead of throwing",
+    "sourceBreak": {
+      "file": "src/instance-cli.ts",
+      "from": "if (decision.action === \"error\") throw new CommandError(decision.message, 2);",
+      "to": "if (decision.action === \"error\") return decision;"
+    }
+  },
+  {
+    "id": "command-closer-own-runs",
+    "name": "rejects a run URL prefix without its trailing slash",
+    "defect": "Restore the trailing slash"
+  },
+  {
+    "id": "command-closer-repository",
+    "name": "rejects a malformed closer repository before GitHub",
+    "defect": "Restore the owner/name repository"
   },
   {
     "id": "command-bind-lists",

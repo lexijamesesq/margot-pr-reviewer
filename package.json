@@ -1,6 +1,6 @@
 {
   "name": "margot-pr-reviewer",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "Margot, the PR reviewer: review, convergence and GitHub publication",
   "type": "module",
   "license": "MIT",
@@ -19,21 +19,21 @@
     "recordings",
     "README.md",
     "LICENSE",
-    "action.yml",
     "samples"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs && node scripts/ledger-breaks.mjs && node scripts/publication-breaks.mjs && node scripts/instance-breaks.mjs",
+    "test:breaks": "node scripts/breaks.mjs && node scripts/adapter-breaks.mjs && node scripts/ledger-breaks.mjs && node scripts/publication-breaks.mjs && node scripts/instance-breaks.mjs && node scripts/closer-breaks.mjs",
     "prepack": "npm run build",
     "audit:recordings": "node scripts/audit-recordings.mjs",
     "test:adapter-breaks": "node scripts/adapter-breaks.mjs",
     "test:ledger-breaks": "node scripts/ledger-breaks.mjs",
     "test:publication-breaks": "node scripts/publication-breaks.mjs",
     "test:instance-command-breaks": "node scripts/instance-breaks.mjs",
-    "test:mechanical-breaks": "node scripts/mechanical-breaks.mjs"
+    "test:mechanical-breaks": "node scripts/mechanical-breaks.mjs",
+    "test:closer-breaks": "node scripts/closer-breaks.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",
