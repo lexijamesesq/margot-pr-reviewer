@@ -74,19 +74,90 @@ export function parseCard(raw: string, name: Card["name"]): Card {
       : {}),
   });
 }
-export function parseVoice(raw: string) {
-  const dispositions = ["established", "dismissed"].flatMap((status) =>
-    bullets(section(raw, status)).map((line) => {
-      const match = line.match(/^([\w-]+) · (.+)$/);
-      if (!match) throw new Error("Unreadable disposition");
-      return { id: match[1], status, reason: match[2] };
-    }),
+
+const voiceOutcomes = ["APPROVED", "CHANGES_REQUESTED", "CLARIFICATION_REQUESTED"] as const;
+const voiceBands = ["LOW", "MEDIUM", "HIGH"] as const;
+
+function undecorateKey(line: string): string {
+  return line.replace(/^(\s*)[*_`]+([A-Za-z][A-Za-z_]*?)[*_`]*:[*_`]*/, "$1$2:");
+}
+
+function voiceToken(value: string | undefined, vocabulary: readonly string[]): string {
+  const raw = value?.trim() ?? "";
+  const stripped = raw
+    .replace(/^[*_`]+|[*_`]+$/g, "")
+    .replace(/[.!]+$/, "")
+    .replace(/^[*_`]+|[*_`]+$/g, "")
+    .trim();
+  return vocabulary.includes(stripped.toUpperCase()) ? stripped.toUpperCase() : raw;
+}
+
+function voiceDisposition(line: string, status: "established" | "dismissed") {
+  const match = line.match(
+    /^((?:\*\*[\w-]+\*\*|__[\w-]+__|\*[\w-]+\*|_[\w-]+_|`[\w-]+`|[\w-]+))(?=\s*(?:·|—|:|$))/,
   );
+  if (!match) return null;
+  const id = (match[1] ?? "").replace(/^(?:\*\*|__|\*|_|`)|(?:\*\*|__|\*|_|`)$/g, "");
+  const reason = line
+    .slice((match[1] ?? "").length)
+    .trim()
+    .replace(/^(?:·|—|:)\s*/, "");
+  return { id, status, reason };
+}
+
+export function parseVoice(raw: string) {
+  let lines = raw.split(/\r?\n/).map(undecorateKey);
+  const bareOutcome = new RegExp(
+    `^\\s*outcome:\\s*[*_\`]*(?:${voiceOutcomes.join("|")})[*_\`]*[.!]?\\s*$`,
+    "i",
+  );
+  const strict = lines.flatMap((line, index) => (bareOutcome.test(line) ? [index] : []));
+  const loose = lines.flatMap((line, index) => (/^\s*outcome:/i.test(line) ? [index] : []));
+  const start = strict.at(-1) ?? loose.at(-1);
+  if (start !== undefined) lines = lines.slice(start);
+
+  const fields = new Map<string, string>();
+  for (const line of lines) {
+    const match = line.match(
+      /^\s*(outcome|band_reason|band|risk|summary|finding|clarification):\s*(.*)$/i,
+    );
+    const key = match?.[1]?.toLowerCase();
+    if (key && !fields.has(key)) fields.set(key, match?.[2]?.trim() ?? "");
+  }
+
+  const dispositions: Array<{
+    id: string;
+    status: "established" | "dismissed";
+    reason: string;
+  }> = [];
+  let status: "established" | "dismissed" | null = null;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^established:/i.test(trimmed)) {
+      status = "established";
+      continue;
+    }
+    if (/^dismissed:/i.test(trimmed)) {
+      status = "dismissed";
+      continue;
+    }
+    if (status && (/^(?:-{3,}|\*{3,}|_{3,})$/.test(trimmed) || /^#{1,6}(?:\s|$)/.test(trimmed))) {
+      status = null;
+      continue;
+    }
+    if (status && trimmed.startsWith("-")) {
+      const disposition = voiceDisposition(trimmed.replace(/^-\s+/, ""), status);
+      if (disposition) dispositions.push(disposition);
+    } else if (status && trimmed) {
+      status = null;
+    }
+  }
+
   return voiceSchema.parse({
-    outcome: field(raw, "outcome"),
-    band: field(raw, "band"),
-    rationale: field(raw, "band_reason"),
-    summary: field(raw, "summary"),
+    outcome: voiceToken(fields.get("outcome"), voiceOutcomes),
+    band: voiceToken(fields.get("band"), voiceBands),
+    rationale: fields.get("band_reason"),
+    summary: fields.get("summary"),
     dispositions,
   });
 }

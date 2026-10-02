@@ -375,9 +375,9 @@ scenario("card-ambiguous", (broken) =>
 );
 scenario(
   "voice-accounting",
-  async () => {
+  async (broken) => {
     return parseVoice(
-      "outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\nestablished:\n- safety-F1 · a.ts:1 · The guard is missing.\ndismissed:\n- safety-F2 · a.ts:2 · Existing check covers this.\n",
+      `outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\n${broken ? "dismissed" : "established"}:\n- safety-F1 · a.ts:1 · The guard is missing.\ndismissed:\n- safety-F2 · a.ts:2 · Existing check covers this.\n`,
     );
   },
   {
@@ -391,12 +391,55 @@ scenario(
     ],
   },
 );
-scenario("voice-ambiguous", (broken) =>
-  rejects(async () =>
-    parseVoice(
-      `outcome: APPROVED\nband: LOW\nband_reason: Bounded.\nsummary: Clear.\nestablished:\ndismissed:\n${broken ? "" : "band: HIGH\n"}`,
-    ),
-  ),
+scenario(
+  "voice-python-tolerance",
+  async () => {
+    const finalBlock = parseVoice(
+      "outcome: CHANGES_REQUESTED\nband: HIGH\nband_reason: Draft.\nsummary: Draft.\n\nI reconsidered.\n**outcome:** **approved**.\n**band:** **medium**!\nband_reason: Final reason.\nsummary: Final summary.\nEstablished:\nDismissed:\n",
+    );
+    const forms = parseVoice(
+      "outcome: approved.\nband: `low`\nband_reason: Bounded.\nsummary: Clear.\nEsTaBlIsHeD:\n- **alpha-F1** · dot reason\n- __beta_F2__ — dash reason\n- *gamma-F3*: colon reason\n- _delta_\n- `epsilon-5` · tick reason\n- (not an id) is ignored\n### Notes\n- after-heading · ignored\nESTABLISHED:\n- zeta-F6 · before rule\n---\n- after-rule · ignored\nestablished:\n- eta-F7 · before prose\nThese notes are optional.\n- **after-prose (MINOR):** ignored\nDISMISSED:\n- unknown-id: dismissed reason\n",
+    );
+    const liveFailure = parseVoice(
+      "I checked the one finding that could still block and dismissed it, so this is approved. It's banded HIGH, though, which means you merge it, not me.\n\noutcome: APPROVED\nband: HIGH\nband_reason: I'm keeping the model's HIGH, and for a stronger reason than its scoring. The model's blast_radius and verification_gap readings have zero confidence. But this repository is the package Margot runs as. The change alters how the stranded-check closer concludes required checks: superseded and merged now close as `skipped`, which GitHub treats as passing. It also changes how `bind-request` reports a stop: it exits 75 with `stop_reason`/`live_sha` in GITHUB_OUTPUT, and the sample drops its `set +e` wrapper. Changing what grades or gates a review is above my authority, so the operator decides. The safety card checked that `skipped` only happens for superseded or merged, and that the leave-the-live-head rule still holds. That makes the risk a matter of who decides, not a defect. A lower band is not justified.\nrisk: changes to the reviewer's own gate\nsummary: This change renames Margot's install-location setting so that nothing is called \"engine\". It also makes every early stop close Margot's status check with the same result the older Python version gave, and it puts back saved records of past reviews that the first round had wrongly edited. The only blocking problem left from round one, the edited records, is fixed: the files match the originals exactly. Because the change affects how Margot's own pass/fail check is closed, the operator decides whether to merge. Three small notes are optional.\nfinding: none\nestablished:\ndismissed:\n- verify-R1-F2 · docs/live/documentation.json:54 · Fixed. Line 54 at head is byte-for-byte the same as base 4437550, and nothing under docs/ is in this PR's changed-file list anymore, so the saved record shows what GitHub actually supplied again. The maintainable-no-slop card's own resolution of R1-F2 says the same.\n\nThese three notes don't block and the author can take or leave them:\n- **achieves-the-objective-F1 (MINOR):** the PR description's \"grep finds only principal-engineer\" claim is now false. The restored lines `docs/SLICE4.md:22` and `docs/SLICE4.md:175` still contain \"engine\".\n- **maintainable-no-slop-F1 (MINOR):** in `src/closer.ts`, the `cancelled` and `unknown` entries repeat the same title and summary text.\n- **house-style-F1 (info):** the draft, fork, conflict and empty check titles in `src/closer.ts` don't start with \"Margot:\" like the other titles do.\n",
+    );
+    return {
+      final: {
+        outcome: finalBlock.outcome,
+        band: finalBlock.band,
+        rationale: finalBlock.rationale,
+        summary: finalBlock.summary,
+      },
+      forms: forms.dispositions,
+      live: liveFailure.dispositions,
+    };
+  },
+  {
+    final: {
+      outcome: "APPROVED",
+      band: "MEDIUM",
+      rationale: "Final reason.",
+      summary: "Final summary.",
+    },
+    forms: [
+      { id: "alpha-F1", status: "established", reason: "dot reason" },
+      { id: "beta_F2", status: "established", reason: "dash reason" },
+      { id: "gamma-F3", status: "established", reason: "colon reason" },
+      { id: "delta", status: "established", reason: "" },
+      { id: "epsilon-5", status: "established", reason: "tick reason" },
+      { id: "zeta-F6", status: "established", reason: "before rule" },
+      { id: "eta-F7", status: "established", reason: "before prose" },
+      { id: "unknown-id", status: "dismissed", reason: "dismissed reason" },
+    ],
+    live: [
+      {
+        id: "verify-R1-F2",
+        status: "dismissed",
+        reason:
+          "docs/live/documentation.json:54 · Fixed. Line 54 at head is byte-for-byte the same as base 4437550, and nothing under docs/ is in this PR's changed-file list anymore, so the saved record shows what GitHub actually supplied again. The maintainable-no-slop card's own resolution of R1-F2 says the same.",
+      },
+    ],
+  },
 );
 scenario("credential-isolation", async (broken) => {
   const env = claudeEnvironment({

@@ -1,6 +1,6 @@
 # Convergence break receipts
 
-Generated 2026-10-02T19:02:53.957Z, Node v26.3.1. Baseline and restored suite: 340/340 passed. Each of 62 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-02T20:21:37.536Z, Node v26.3.1. Baseline and restored suite: 340/340 passed. Each of 62 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Convergence cases exercise authenticated history, scope, finding fates, severity, retry and complete evidence transport. The Jev tail-loss case deletes the final batch in adapter source; separate core source mutations remove author authentication, MINOR demotion and MAJOR verification.
 

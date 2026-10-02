@@ -76,7 +76,7 @@
   {
     "name": "mis-mapped voice outcome",
     "file": "src/adapters/prose.ts",
-    "from": "outcome: field(raw, \"outcome\"),",
+    "from": "outcome: voiceToken(fields.get(\"outcome\"), voiceOutcomes),",
     "to": "outcome: \"APPROVED\",",
     "tests": [
       "Voice prose preserves finding IDs and dispositions"
@@ -85,7 +85,7 @@
   {
     "name": "mis-mapped voice band",
     "file": "src/adapters/prose.ts",
-    "from": "band: field(raw, \"band\"),",
+    "from": "band: voiceToken(fields.get(\"band\"), voiceBands),",
     "to": "band: \"HIGH\",",
     "tests": [
       "Voice prose preserves finding IDs and dispositions"

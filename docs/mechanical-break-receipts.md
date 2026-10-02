@@ -1,6 +1,6 @@
 # Mechanical regression break receipts
 
-2026-10-02T19:17:16.116Z, Node v26.3.1. Baseline and restored suite: 340/340 passed. Each mutation ran the complete suite and produced assertion failures in exactly the declared tests. No model or credential calls. Reproduce: npm run test:mechanical-breaks.
+2026-10-02T20:35:03.668Z, Node v26.3.1. Baseline and restored suite: 340/340 passed. Each mutation ran the complete suite and produced assertion failures in exactly the declared tests. No model or credential calls. Reproduce: npm run test:mechanical-breaks.
 
 The two old prompt-rule breaks now also fail the independent full P1 wire contract. Their declarations retain that overlap explicitly. The new state break passes facts, including release notes, directly to classification again. The new wording break deletes the external-release exception from the production definition.
 

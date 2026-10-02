@@ -172,7 +172,7 @@ export const voiceSchema = z.strictObject({
     z.strictObject({
       id: text,
       status: z.enum(["established", "dismissed", "question"]),
-      reason: text,
+      reason: z.string(),
     }),
   ),
 });

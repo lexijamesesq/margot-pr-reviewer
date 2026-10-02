@@ -127,17 +127,17 @@
   {
     "id": "voice-accounting",
     "name": "Voice prose preserves finding IDs and dispositions",
-    "defect": "source mutation: mis-map disposition status",
-    "sourceBreak": {
-      "file": "src/adapters/prose.ts",
-      "from": "return { id: match[1], status, reason: match[2] };",
-      "to": "return { id: match[1], status: \"dismissed\", reason: match[2] };"
-    }
+    "defect": "move an established finding into the dismissed section"
   },
   {
-    "id": "voice-ambiguous",
-    "name": "Duplicate voice bands are rejected",
-    "defect": "remove the duplicate band"
+    "id": "voice-python-tolerance",
+    "name": "Voice prose accepts Python's scalar, section, and disposition tolerance",
+    "defect": "source mutation: restore the strict disposition regex",
+    "sourceBreak": {
+      "file": "src/adapters/prose.ts",
+      "from": "/^((?:\\*\\*[\\w-]+\\*\\*|__[\\w-]+__|\\*[\\w-]+\\*|_[\\w-]+_|`[\\w-]+`|[\\w-]+))(?=\\s*(?:·|—|:|$))/",
+      "to": "/^([\\w-]+) · (.+)$/"
+    }
   },
   {
     "id": "credential-isolation",

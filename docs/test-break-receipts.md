@@ -1,6 +1,6 @@
 # Test and deliberate-break receipts
 
-Run: 2026-10-02T18:48:33.755Z. Node v26.3.1.
+Run: 2026-10-02T20:08:11.161Z. Node v26.3.1.
 
 Baseline: 340/340 passed. Each scenario break changes the named scenario's service output/caller input, or its explicitly declared source mutation; expected assertions stay unchanged. Every run executes the complete legacy scenario suite; instance-command decisions have their own receipt. For each scenario break, the named test and any explicitly declared alsoFails tests failed, with all other tests passing. The two older prompt-rule mutations also fail the complete P1 wire contract. Each break was reverted before the next run. Restored baseline: 340/340 passed.
 
@@ -10,7 +10,7 @@ Separate source-level checks caught 16 mutations: reversed classification preced
 
 Scenario SHA-256: c81fb623a27157c17de15c36fdba26ca0c990ac6b666f6b044cd07a4b06c5bd4.
 
-Source mutation SHA-256: 6f1a36d29361bcb1b8772f9350a47ab341b8bece821edf5121ba7f14a130dbae.
+Source mutation SHA-256: c39c08a452a2a392bf9997df5c0a3708fe076d354a91ec769df1fffc2d59f710.
 
 | # | Single failing test | Deliberate break | Observed |
 | --- | --- | --- | --- |
@@ -128,7 +128,7 @@ Source mutation SHA-256: 6f1a36d29361bcb1b8772f9350a47ab341b8bece821edf5121ba7f1
 | mis-mapped finding confidence | Card prose preserves a real mandatory finding | 1 failed, 339 passed; assertion mismatches |
 | mis-mapped finding location | Card prose preserves a real mandatory finding | 1 failed, 339 passed; assertion mismatches |
 | mis-mapped voice outcome | Voice prose preserves finding IDs and dispositions | 1 failed, 339 passed; assertion mismatches |
-| mis-mapped voice band | Voice prose preserves finding IDs and dispositions; Duplicate voice bands are rejected | 2 failed, 338 passed; assertion mismatches |
+| mis-mapped voice band | Voice prose preserves finding IDs and dispositions; Voice prose accepts Python's scalar, section, and disposition tolerance | 2 failed, 338 passed; assertion mismatches |
 | disabled ledger author authentication | Forged author cannot supply ledger history | 1 failed, 339 passed; assertion mismatches |
 | removed round-two MINOR demotion | Round two MINOR is advisory | 1 failed, 339 passed; assertion mismatches |
 | silently dropped MAJOR verification | Silent MAJOR returns to voice for confirmation; Voice-confirmed fix counts once; Standing card defeats mechanical shortcut; Standing card defeats editorial shortcut; Same head reuses identical result without paid calls; A receipt written by Margot 0.4.0 remains readable; Same-head retry revalidates required checks; An info-tagged repeat cannot silently close a MAJOR; Astra must account for a synthesized prior MAJOR while a dismissed key is accepted alongside it; Changed PR evidence invalidates saved approval; Changed live service configuration invalidates retry | 11 failed, 329 passed; assertion mismatches |

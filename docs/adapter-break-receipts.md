@@ -1,12 +1,12 @@
 # Live adapter break receipts
 
-Generated 2026-10-02T18:55:45.375Z, Node v26.3.1. Baseline and restored suite: 340/340 passed. Each of 60 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-02T20:43:49.266Z, Node v26.3.1. Baseline and restored suite: 340/340 passed. Each of 60 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Adapter cases exercise CLI grants, version and envelope guards, prose mapping, hunk completeness, pagination, stdin prompts, round delta binding and subprocess redaction. Credential isolation inserts a forbidden credential into the filtered environment. Live confinement and model quality remain separate proofs.
 
 Most breaks are controlled service/input counterexamples selected by MARGOT_ADAPTER_BREAK; error cases repair their bad input. They do not claim exhaustive source mutation coverage or independence. Declared source mutations run without that variable and are identified in the manifest. No live service or paid model call occurs in the harness.
 
-Manifest SHA-256: 44378a45a3c5cbe2074a12b814ac9a4c20c24c5456ad6837729143a4951cc59c. Reproduce: npm run test:adapter-breaks.
+Manifest SHA-256: b10aa0659714cc5f90a47a55e12206707a56d18b56c55452052d06c4d86c4656. Reproduce: npm run test:adapter-breaks.
 
 | Test | Deliberate break | Observed |
 | --- | --- | --- |
@@ -34,8 +34,8 @@ Manifest SHA-256: 44378a45a3c5cbe2074a12b814ac9a4c20c24c5456ad6837729143a4951cc5
 | An incomplete card cannot become empty success | restore completed status | 1 failed; 339 passed |
 | Malformed tagged findings cannot silently disappear | remove the malformed finding | 1 failed; 339 passed |
 | Duplicate card completion labels are rejected | remove the duplicate label | 1 failed; 339 passed |
-| Voice prose preserves finding IDs and dispositions | source mutation: mis-map disposition status | 1 failed; 339 passed |
-| Duplicate voice bands are rejected | remove the duplicate band | 1 failed; 339 passed |
+| Voice prose preserves finding IDs and dispositions | move an established finding into the dismissed section | 1 failed; 339 passed |
+| Voice prose accepts Python's scalar, section, and disposition tolerance | source mutation: restore the strict disposition regex | 1 failed; 339 passed |
 | Claude inherits only its explicit credential allowlist | insert a GitHub credential into the filtered environment | 1 failed; 339 passed |
 | A failed subprocess cannot return success | make the subprocess exit zero | 1 failed; 339 passed |
 | A timed out subprocess cannot return success | let the child exit before its deadline | 1 failed; 339 passed |
