@@ -40,6 +40,16 @@ function scenario(
 async function wire(mode = "clear", broken = false) {
   const writes: { method: string; path: string; body: Record<string, unknown> }[] = [];
   const stored = new Map<number, Record<string, unknown>>();
+  if (mode === "retry")
+    stored.set(89, {
+      id: 89,
+      name: options.checks.review,
+      head_sha: r.head,
+      app: { id: options.appId },
+      status: "completed",
+      conclusion: "action_required",
+      details_url: "https://github.com/example/caller/actions/runs/1",
+    });
   if (mode === "adopt" && !broken)
     stored.set(88, {
       id: 88,
@@ -253,6 +263,59 @@ scenario(
   },
   { armed: false, conclusion: "neutral", event: "COMMENT" },
 );
+// Ollie's state script (dotty .github/scripts/ollie-state.py, parse_verdict) reads these
+// lines from the check text and requests the operator's review on a held PR. Without them
+// a hold is invisible to her; this is the live defect found on margot #94.
+function parseVerdictLikeOllie(text: string | undefined) {
+  const out = { outcome: "", band: "", source: "" };
+  for (const line of (text ?? "").split("\n")) {
+    if (line.startsWith("outcome:")) {
+      const parts = line
+        .slice("outcome:".length)
+        .split("|")
+        .map((p) => p.trim());
+      out.outcome = parts[0] ?? "";
+      for (const p of parts.slice(1)) if (p.startsWith("band:")) out.band = p.slice(5).trim();
+    } else if (line.startsWith("decision_source:")) out.source = line.slice(16).trim();
+  }
+  return out;
+}
+scenario(
+  "pub-ollie-verdict",
+  async (b) => {
+    const x = await wire("hold", b);
+    const output = (x.final?.output ?? {}) as { text?: string; title?: string };
+    const parsed = parseVerdictLikeOllie(output.text);
+    return { ...parsed, title: output.title };
+  },
+  {
+    outcome: "APPROVED",
+    band: "HIGH",
+    source: "jev",
+    title: "held for the operator: risk is HIGH",
+  },
+);
+scenario(
+  "pub-held-reason",
+  async () => {
+    const x = await wire("authority", false);
+    return { title: ((x.final?.output ?? {}) as { title?: string }).title };
+  },
+  { title: "held for the operator: a change to Margot's own machinery" },
+);
+scenario(
+  "pub-error-text",
+  async () => {
+    const x = await wire("review-fail", false);
+    const output = (x.final?.output ?? {}) as { text?: string };
+    return {
+      kind: x.result.kind,
+      staleApproval: parseVerdictLikeOllie(output.text).outcome,
+      hasText: typeof output.text === "string" && output.text.length > 0,
+    };
+  },
+  { kind: "error", staleApproval: "", hasText: true },
+);
 scenario(
   "pub-authority",
   async (b) => ({ conclusion: (await wire("authority", b)).authority?.conclusion }),
@@ -326,10 +389,10 @@ scenario(
   {
     kind: "error",
     approved: true,
-    dismissed: true,
+    dismissed: false,
     disarmed: true,
     armed: false,
-    approvalRemains: false,
+    approvalRemains: true,
   },
 );
 scenario(
@@ -362,7 +425,7 @@ scenario(
   {
     kind: "error",
     diagnostic:
-      "Invalid native review receipt; disable auto-merge cleanup unconfirmed: Disarm denied; dismiss approvals cleanup unconfirmed: Dismissal denied; write error check cleanup unconfirmed: Check denied",
+      "Invalid native review receipt; disable auto-merge cleanup unconfirmed: Disarm denied; write error check cleanup unconfirmed: Check denied",
   },
 );
 scenario(
@@ -385,10 +448,10 @@ scenario(
       kind: x.result.kind,
       conclusion: x.final?.conclusion,
       dismissed: x.reviews.some((v) => v.state === "DISMISSED"),
-      approved: x.reviews.some((v) => v.state === "APPROVED"),
+      newApproval: x.writes.some((w) => w.body.event === "APPROVE"),
     };
   },
-  { kind: "error", conclusion: "action_required", dismissed: true, approved: false },
+  { kind: "error", conclusion: "action_required", dismissed: false, newApproval: false },
 );
 scenario(
   "pub-receipt",
@@ -400,15 +463,19 @@ scenario(
       dismissed: x.dismissedIds.length > 0,
     };
   },
-  { kind: "error", conclusion: "action_required", dismissed: true },
+  { kind: "error", conclusion: "action_required", dismissed: false },
 );
 scenario(
   "pub-order",
   async (b) => {
     const x = await wire("order", b);
-    return { dismissed: x.reviews.find((v) => v.id === 77)?.state };
+    return {
+      priorState: x.reviews.find((v) => v.id === 77)?.state,
+      dismissals: x.dismissedIds.length,
+      kind: x.result.kind,
+    };
   },
-  { dismissed: "DISMISSED" },
+  { priorState: "APPROVED", dismissals: 0, kind: "reviewed" },
 );
 scenario(
   "pub-shadow",
@@ -489,6 +556,21 @@ scenario(
     };
   },
   { adopted: true, duplicates: 0 },
+);
+scenario(
+  "pub-retry",
+  async (b) => {
+    const x = await wire("retry", b);
+    return {
+      kind: x.result.kind,
+      reopenedCompleted: x.writes.some(
+        (w) => w.path.endsWith("/check-runs/89") && w.body.status === "in_progress",
+      ),
+      opened: x.writes.filter((w) => w.method === "POST" && w.body.name === options.checks.review)
+        .length,
+    };
+  },
+  { kind: "reviewed", reopenedCompleted: false, opened: 1 },
 );
 scenario(
   "pub-superseded",

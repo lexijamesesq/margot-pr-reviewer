@@ -32,9 +32,32 @@ import {
   shaSchema,
   voiceSchema,
 } from "./schemas.js";
-import type { Bundle, Card, Review, ReviewCore, ReviewResult, Services, Voice } from "./types.js";
+import type {
+  Bundle,
+  Card,
+  Facts,
+  Review,
+  ReviewCore,
+  ReviewResult,
+  Services,
+  Voice,
+} from "./types.js";
 
 /** Validate all external data, including data returned by a typed adapter. */
+type CheckFact = Facts["checks"][number];
+function currentCheck(runs: CheckFact[]): CheckFact | undefined {
+  let current: CheckFact | undefined;
+  for (const run of runs) {
+    if (!current) current = run;
+    else if ((run.startedAt ?? "") > (current.startedAt ?? "")) current = run;
+    else if (
+      (run.startedAt ?? "") === (current.startedAt ?? "") &&
+      (run.id ?? 0) > (current.id ?? 0)
+    )
+      current = run;
+  }
+  return current;
+}
 export async function review(
   requestInput: unknown,
   configInput: unknown,
@@ -116,16 +139,19 @@ export async function review(
     if (request.phase === "triage") return { kind: "classified", request, classification };
     stage = "checks";
     for (const name of config.requiredChecks) {
-      const checks = facts.checks.filter((check) => check.name === name);
+      // One name can carry several runs on one head: a workflow's concurrency cancels a
+      // superseded run and the cancelled one stays in the list beside the current one.
+      // The current run decides (most recent start, then id), as the estate's floor
+      // gate does; with no recency recorded, the first listed wins.
+      const check = currentCheck(facts.checks.filter((c) => c.name === name));
       if (
-        checks.length !== 1 ||
-        !checks.every(
-          (check) =>
-            check.head === request.head &&
-            (check.conclusion === "success" ||
-              (check.conclusion === "skipped" && config.allowedSkippedChecks.includes(name))) &&
-            config.trustedCheckActors.includes(check.actor),
-        )
+        !check ||
+        check.head !== request.head ||
+        !(
+          check.conclusion === "success" ||
+          (check.conclusion === "skipped" && config.allowedSkippedChecks.includes(name))
+        ) ||
+        !config.trustedCheckActors.includes(check.actor)
       )
         throw new Error(`Required check not trusted and green: ${name}`);
     }

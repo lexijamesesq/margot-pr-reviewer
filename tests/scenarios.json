@@ -1649,7 +1649,7 @@
     "defect": "Remove the duplicate disposition."
   },
   {
-    "name": "unknown disposition IDs are rejected",
+    "name": "a disposition for an ID outside this round is ignored; every mandatory finding still must be accounted for",
     "recording": "council-clear",
     "patches": [
       {
@@ -1720,22 +1720,22 @@
       }
     ],
     "expected": {
-      "kind": "error",
-      "stage": "voice"
+      "kind": "reviewed",
+      "eligible": false
     },
     "break": [
       {
         "path": "voice.dispositions",
         "value": [
           {
-            "id": "one",
-            "status": "established",
-            "reason": "The command and its effect disagree."
+            "id": "unknown",
+            "status": "dismissed",
+            "reason": "No matching finding."
           }
         ]
       }
     ],
-    "defect": "Remove the unknown finding disposition."
+    "defect": "Drop the mandatory finding's disposition, leaving only the unknown ID."
   },
   {
     "name": "contradictory approval is rejected",
@@ -2715,7 +2715,7 @@
     "defect": "Repair only the failed required check response."
   },
   {
-    "name": "duplicate required check cannot approve",
+    "name": "a superseded run of a required check does not block the current one",
     "recording": "council-clear",
     "patches": [
       {
@@ -2725,13 +2725,72 @@
             "name": "ci",
             "actor": "checks-app",
             "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success"
+            "conclusion": "failure",
+            "startedAt": "2026-10-01T21:35:42Z",
+            "id": 1
           },
           {
             "name": "ci",
             "actor": "checks-app",
             "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success"
+            "conclusion": "success",
+            "startedAt": "2026-10-01T21:36:01Z",
+            "id": 2
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "kind": "reviewed",
+      "eligible": true
+    },
+    "break": [
+      {
+        "path": "facts.checks",
+        "value": [
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "failure",
+            "startedAt": "2026-10-01T21:36:01Z",
+            "id": 2
+          },
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "success",
+            "startedAt": "2026-10-01T21:35:42Z",
+            "id": 1
+          }
+        ]
+      }
+    ],
+    "defect": "Make the failed run the current one."
+  },
+  {
+    "name": "the current run of a required check decides when an older one succeeded",
+    "recording": "council-clear",
+    "patches": [
+      {
+        "path": "facts.checks",
+        "value": [
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "success",
+            "startedAt": "2026-10-01T21:35:42Z",
+            "id": 1
+          },
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "failure",
+            "startedAt": "2026-10-01T21:36:01Z",
+            "id": 2
           }
         ]
       }
@@ -2749,12 +2808,22 @@
             "name": "ci",
             "actor": "checks-app",
             "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success"
+            "conclusion": "success",
+            "startedAt": "2026-10-01T21:36:01Z",
+            "id": 2
+          },
+          {
+            "name": "ci",
+            "actor": "checks-app",
+            "head": "0000000000000000000000000000000000000002",
+            "conclusion": "failure",
+            "startedAt": "2026-10-01T21:35:42Z",
+            "id": 1
           }
         ]
       }
     ],
-    "defect": "Repair only the duplicate required check response."
+    "defect": "Make the successful run the current one."
   },
   {
     "name": "head movement before publication cannot approve",

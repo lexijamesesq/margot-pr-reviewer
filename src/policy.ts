@@ -133,13 +133,11 @@ export function validateVoice(cards: Card[], voice: Voice): void {
   if (voice.dispositions.some((d) => advisory.includes(d.id) && d.status !== "dismissed"))
     throw new Error("Voice cannot reestablish advisory findings");
   const required = mandatory(cards);
-  const all = cards.flatMap((c) => c.findings.map((f) => f.id));
   const ids = voice.dispositions.map((d) => d.id);
-  if (
-    new Set(ids).size !== ids.length ||
-    ids.some((id) => !all.includes(id)) ||
-    required.some((id) => !ids.includes(id))
-  )
+  // Python's completeness rule: every mandatory finding of this round lands in exactly one
+  // bucket. IDs outside this round's findings (a prior round's ledger key the voice reports
+  // as fixed) are not an error; the ledger, not the voice, settles those.
+  if (new Set(ids).size !== ids.length || required.some((id) => !ids.includes(id)))
     throw new Error("Voice must account for every mandatory finding exactly once");
   if (
     voice.outcome === "APPROVED" &&

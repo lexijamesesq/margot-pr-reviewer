@@ -1,5 +1,6 @@
 import type { Octokit } from "octokit";
 import type { z } from "zod";
+import { checkText } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
 
@@ -8,7 +9,6 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
   const config = publisherSchema.parse(input);
   const ids = new Map<string, number>();
   let active: ReviewRequest | undefined;
-  let approvalId: number | undefined;
   const params = (r: ReviewRequest, c: CallContext) => {
     requestSchema.parse(r);
     const [owner = "", repo = ""] = r.repository.split("/");
@@ -68,46 +68,30 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         filter: "latest",
         app_id: config.appId,
       });
-      id = checks
+      const existing = checks
         .filter((v) => v.name === name && v.head_sha === r.head && v.app?.id === config.appId)
-        .sort((a, b) => b.id - a.id)[0]?.id;
+        .sort((a, b) => b.id - a.id)[0];
+      // A same-head retry finds the previous run's check already completed. GitHub does
+      // not reopen a completed check-run, so a retry opens a new one rather than
+      // failing on the readback of a PATCH that could not take.
+      if (existing && !(payload.status === "in_progress" && existing.status === "completed"))
+        id = existing.id;
     }
     const { data } = id
       ? await client.rest.checks.update({ ...payload, check_run_id: id })
       : await client.rest.checks.create(payload);
     // Save a valid ID even if other response fields are wrong, for error cleanup.
     if (Number.isSafeInteger(data.id)) ids.set(name, data.id);
-    if (
-      !Number.isSafeInteger(data.id) ||
-      data.id <= 0 ||
-      data.head_sha !== r.head ||
-      data.name !== name ||
-      data.app?.id !== config.appId ||
-      data.status !== payload.status ||
-      (conclusion && data.conclusion !== conclusion)
-    )
-      throw new Error("Invalid check write receipt");
-  }
-  async function withdraw(r: ReviewRequest, c: CallContext) {
-    const reviews = await client.paginate(client.rest.pulls.listReviews, {
-      ...params(r, c),
-      per_page: 100,
-    });
-    const owned = reviews.filter(
-      (v) => v.user?.login === config.actor && v.user.type === "Bot" && v.state === "APPROVED",
-    );
-    // An ambiguous approval response is also compensated when its ID was received.
-    const reviewIds = new Set([...owned.map((v) => v.id), ...(approvalId ? [approvalId] : [])]);
-    for (const review_id of reviewIds) {
-      await assertCurrentRun(r, c);
-      const { data } = await client.rest.pulls.dismissReview({
-        ...params(r, c),
-        review_id,
-        message: "A new review must establish clearance for this head.",
-      });
-      if (data.state !== "DISMISSED") throw new Error("Approval dismissal was not confirmed");
-    }
-    approvalId = undefined;
+    const mismatches = [
+      !Number.isSafeInteger(data.id) || data.id <= 0 ? "id" : "",
+      data.head_sha !== r.head ? `head_sha=${data.head_sha}` : "",
+      data.name !== name ? `name=${data.name}` : "",
+      data.app?.id !== config.appId ? `app=${data.app?.id}` : "",
+      data.status !== payload.status ? `status=${data.status}` : "",
+      conclusion && data.conclusion !== conclusion ? `conclusion=${data.conclusion}` : "",
+    ].filter(Boolean);
+    if (mismatches.length)
+      throw new Error(`Invalid check write receipt for ${name}: ${mismatches.join(", ")}`);
   }
   async function confirmReviewCheck(r: ReviewRequest, conclusion: string, c: CallContext) {
     const id = ids.get(config.checks.review);
@@ -148,6 +132,12 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       c,
     );
   }
+  const heldReason = (decision: { holdReasons: string[]; rating: { band: string } }) =>
+    decision.holdReasons.includes("review-authority")
+      ? "a change to Margot's own machinery"
+      : decision.holdReasons.includes("calibration")
+        ? "calibration mode"
+        : `risk is ${decision.rating.band}`;
   const publish: Services["publish"] = async ({ expectedHead, review, report }, c) => {
     const r = review.request;
     if (!active || JSON.stringify(active) !== JSON.stringify(r) || expectedHead !== r.head)
@@ -179,12 +169,20 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       r,
       config.checks.review,
       reviewConclusion,
-      decision.mergeEligible ? "Margot: approved" : `Margot: ${decision.outcome} — held`,
+      // Titles the estate's readers already know: Ollie turns a held title into its ask,
+      // so the title names the reason the PR is actually held.
+      decision.mergeEligible
+        ? "Margot: approved"
+        : decision.outcome === "APPROVED"
+          ? `held for the operator: ${heldReason(decision)}`
+          : `Margot: ${decision.outcome}`,
       `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
-      undefined,
+      checkText(review),
       c,
     );
     await confirmReviewCheck(r, reviewConclusion, c);
+    // Margot never dismisses her own earlier approvals: a new head gets a new review, and
+    // the estate's ruleset handles stale approvals, as it did for the Python reviewer.
     await guard(r, c);
     const { data } = await client.rest.pulls.createReview({
       ...params(r, c),
@@ -192,7 +190,6 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       event: decision.mergeEligible ? "APPROVE" : "COMMENT",
       body: report,
     });
-    if (decision.mergeEligible && Number.isSafeInteger(data.id)) approvalId = data.id;
     if (
       !Number.isSafeInteger(data.id) ||
       data.id <= 0 ||
@@ -222,7 +219,6 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         undefined,
         context(),
       );
-      if (r.phase === "review") await withdraw(r, context());
       const result = await evaluate();
       if (result.kind === "error") throw new Error(`${result.stage}: ${result.diagnostic}`);
       if (result.kind === "classified") await triage(r, result.classification, context());
@@ -240,7 +236,6 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
               if (!ok) throw new Error("disable unconfirmed");
             }),
         ],
-        ["dismiss approvals", () => withdraw(r, context())],
         [
           "write error check",
           () =>
@@ -250,7 +245,9 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
               "action_required",
               "Margot: not reviewed (error)",
               "Publication or evaluation failed; no clearance.",
-              undefined,
+              // Overwrite any verdict text already written for this head: with no
+              // `outcome:` line Ollie reads "held without a verdict", never "approved".
+              "no verdict: publication or evaluation failed after the check was opened",
               context(),
             ),
         ],
