@@ -1,6 +1,6 @@
 # Test and deliberate-break receipts
 
-Run: 2026-10-02T02:47:12.547Z. Node v26.3.1.
+Run: 2026-10-02T03:37:38.264Z. Node v26.3.1.
 
 Baseline: 303/303 passed. Each scenario break changes the named scenario's service output/caller input, or its explicitly declared source mutation; expected assertions stay unchanged. Every run executes the complete legacy scenario suite; instance-command decisions have their own receipt. For each scenario break, the named test and any explicitly declared alsoFails tests failed, with all other tests passing. The two older prompt-rule mutations also fail the complete P1 wire contract. Each break was reverted before the next run. Restored baseline: 303/303 passed.
 
@@ -8,7 +8,7 @@ Most breaks mutate only their own scenario input. For those breaks, the harness 
 
 Separate source-level checks caught 16 mutations: reversed classification precedence, forced documentation band, always-true routing, dropped old-path rename check, disabled LOW-band confidence escalation, mis-mapped finding severity, mis-mapped finding confidence, mis-mapped finding location, mis-mapped voice outcome, mis-mapped voice band, disabled ledger author authentication, removed round-two MINOR demotion, silently dropped MAJOR verification, removed shared diff hunk validation, dropped Claude stdin prompt, replaced Claude round delta with full PR diff. Each mutation failed its intended tests; all observed failures are listed below.
 
-Scenario SHA-256: 58acfe339ede3463cccc3bec8e1cf579267770c8f905dc101dcee455e8a0d1ea.
+Scenario SHA-256: c81fb623a27157c17de15c36fdba26ca0c990ac6b666f6b044cd07a4b06c5bd4.
 
 Source mutation SHA-256: 6f1a36d29361bcb1b8772f9350a47ab341b8bece821edf5121ba7f14a130dbae.
 
@@ -49,8 +49,8 @@ Source mutation SHA-256: 6f1a36d29361bcb1b8772f9350a47ab341b8bece821edf5121ba7f1
 | 33 | duplicate dispositions are rejected | Remove the duplicate disposition. | 1 failed, 302 passed; assertion mismatch |
 | 34 | a disposition for an ID outside this round is ignored; every mandatory finding still must be accounted for | Drop the mandatory finding's disposition, leaving only the unknown ID. | 1 failed, 302 passed; assertion mismatch |
 | 35 | contradictory approval is rejected | Repair approval with established findings. | 1 failed, 302 passed; assertion mismatch |
-| 36 | BLOCKING info findings require voice accounting | Reduce the informational finding below the blocking threshold. | 1 failed, 302 passed; assertion mismatch |
-| 37 | objective questions require voice accounting | Lose the objective question. | 1 failed, 302 passed; assertion mismatch |
+| 36 | a BLOCKING info finding summons the voice, which need not dispose of it | Reduce the informational finding below the blocking threshold, so nothing summons the voice. | 1 failed, 302 passed; assertion mismatch |
+| 37 | an achieves-the-objective finding summons the voice, which need not dispose of it | Lose the objective question, so nothing summons the voice. | 1 failed, 302 passed; assertion mismatch |
 | 38 | functional authority paths hold | Remove configured authority protection. | 1 failed, 302 passed; assertion mismatch |
 | 39 | ordinary documentation on a protected path stays author-owned | Turn a protected edit into a rename. | 1 failed, 302 passed; assertion mismatch |
 | 40 | protected old rename path always holds | Remove the protected old rename endpoint. | 1 failed, 302 passed; assertion mismatch |
