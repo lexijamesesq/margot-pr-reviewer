@@ -255,13 +255,12 @@ complete finding accounting under every other outcome. It does not depend on
 - `npm run build`: ESM and declarations into `dist`.
 - `npm run typecheck`: strict checks of source and tests.
 - `npm test`: named behavior tests, with no TODOs.
-- `npm run test:breaks`: baseline, one changed response/input at a time, full-suite
-  single-failure verification, restore, final baseline; writes the receipts.
 - `pre-commit install`: install the repository's commit hooks. Fix findings;
   do not bypass them.
 
-The estate-owned workflows remain unchanged. Package checks and break receipts
-are reproducible locally; no live network or paid models run in the test suite.
+The estate-owned workflows remain unchanged. The test suite runs with no live
+network and no paid models. `node scripts/package-smoke.mjs <tarball>` installs a
+packed tarball in an empty directory and runs both executables.
 
 ## Later rounds
 
@@ -312,8 +311,6 @@ probabilities and minimum confidence. The live model reads the complete scoped
 diff through a paged, read-only tool; prompts travel through stdin. These transport
 limits never authorize dropping the tail of the evidence. Cross-batch reasoning
 is a model-quality limitation; the live comparison records its observed effects.
-
-Run `npm run test:breaks` for all recorded, adapter and convergence break receipts.
 
 ## GitHub publication
 

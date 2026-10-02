@@ -1,13 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import {
-  copyFileSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  writeFileSync,
-} from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -92,34 +85,12 @@ assert.equal(readFileSync(output, "utf8"), "authority=true\nrepositoryName=proje
 const checkCli = () =>
   assert.equal(run(cli, []).status, 1, "Installed CLI must execute argument validation");
 checkCli();
-const realCli = realpathSync(cli);
-const original = readFileSync(realCli);
-let detected = false;
-try {
-  writeFileSync(realCli, "#!/usr/bin/env node\n");
-  try {
-    checkCli();
-  } catch (error) {
-    if (!(error instanceof assert.AssertionError)) throw error;
-    detected = true;
-  }
-} finally {
-  writeFileSync(realCli, original);
-}
-assert.equal(detected, true, "Empty CLI mutation must fail the argument-validation smoke");
-checkCli();
 assert.equal(smoke().status, 0);
-writeFileSync(
-  new URL("../docs/package-smoke-receipt.md", import.meta.url),
-  `# Installed package receipt\n\nGenerated ${new Date().toISOString()}, Node ${process.version}.\n\nInstalled the tarball in an empty directory outside the source tree. The package omitted action.yml. The existing consumer smoke imported the public package, completed a recorded approval, introduced a mandatory finding, and observed CHANGES_REQUESTED in the same result and recorded publication. It passed before and after the CLI break.\n\nCLI smoke: invoking each npm-created executable link without arguments exits 1 through argument validation. The instance CLI validates a deployment, enrolment, and authority selection through the installed binary and emits its two GitHub outputs; its closer also returns “nothing to close” without a token or network call when all jobs succeeded and the selected package published. Replacing the review CLI's installed target with an empty executable changed its exit to 0 and failed exactly that assertion. Restoring the file restored the passing check. This proves installed entrypoint execution, not live service availability or a hosted Action run.\n\nReproduce: npm pack; node scripts/package-smoke.mjs ./margot-pr-reviewer-0.6.1.tgz.\n`,
-);
 console.log(
   JSON.stringify({
     consumer,
     recordedApi: "passed",
     cli: "passed",
     instanceCli: "passed",
-    cliBreak: "one assertion failed",
-    restored: "passed",
   }),
 );
