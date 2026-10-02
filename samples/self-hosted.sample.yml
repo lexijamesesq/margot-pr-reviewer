@@ -2,7 +2,24 @@
 # deployment JSON as a GitHub variable for the hosted closer. Provision the pinned
 # Claude CLI, ticketing server, and publish-skills at the configured runtime paths.
 name: Margot review
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      owned_tier:
+        description: protected-path scrutiny tier
+        type: string
+        required: false
+        default: unknown
+      classification:
+        description: mechanical, documentation, or functional
+        type: string
+        required: false
+        default: ""
+      triage:
+        description: triage answer for this head
+        type: string
+        required: false
+        default: ""
 permissions:
   contents: read
   pull-requests: read
@@ -94,6 +111,9 @@ jobs:
         id: review
         env:
           GH_TOKEN: ${{ github.token }}
+          MARGOT_OWNED_TIER: ${{ inputs.owned_tier }}
+          MARGOT_CLASSIFICATION: ${{ inputs.classification }}
+          MARGOT_TRIAGE: ${{ inputs.triage }}
           JEV_KEY: ${{ secrets.EXAMPLE_JEV_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.EXAMPLE_CLAUDE_OAUTH_TOKEN }}
           YOUR_TICKETING_CREDENTIAL_ENV_VAR: ${{ secrets.EXAMPLE_TICKETING_CREDENTIAL }}

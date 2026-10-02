@@ -130,7 +130,8 @@ export async function review(
     stage = "history";
     const historyUnavailable =
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
-    const prior = selectLedger(facts, config);
+    const ledgerWarnings: string[] = [];
+    const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
     let cached = prior?.head === request.head ? prior.receipt : undefined;
     if (
       prior?.head === request.head &&
@@ -358,6 +359,7 @@ export async function review(
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
     if (historyUnavailable) result.ledgerUnavailable = true;
+    if (ledgerWarnings.length) result.ledgerWarnings = ledgerWarnings;
     const metadata = services.reviewMetadata?.() ?? {};
     result = {
       ...result,

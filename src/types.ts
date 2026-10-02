@@ -43,6 +43,7 @@ export type ReviewPresentation = {
 export type Review = ReviewCore & {
   ledger: Ledger;
   ledgerUnavailable?: boolean;
+  ledgerWarnings?: string[];
   convergence: Convergence;
   presentation?: ReviewPresentation;
 };

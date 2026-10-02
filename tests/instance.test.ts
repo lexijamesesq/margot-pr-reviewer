@@ -14,7 +14,7 @@ import { instanceExitCode, runInstanceCommand } from "../src/instance-cli.js";
 
 const broken = process.env.MARGOT_INSTANCE_BREAK;
 const margotRootPlaceholder = `\${MARGOT_ROOT}`;
-const engineRootPlaceholder = `\${ENGINE_ROOT}`;
+const stalePlaceholder = `\${OLD_ROOT}`;
 const head = "a".repeat(40);
 const base = "b".repeat(40);
 const deployment = {
@@ -378,33 +378,33 @@ it("rejects unresolved placeholders in executable paths at bind time", async () 
   const cases = [
     {
       field: "claude.executable",
-      placeholder: engineRootPlaceholder,
+      placeholder: stalePlaceholder,
       config: {
         ...config,
         claude: {
           ...config.claude,
-          executable: `${engineRootPlaceholder}/node_modules/.bin/claude`,
+          executable: `${stalePlaceholder}/node_modules/.bin/claude`,
         },
       },
     },
     {
       field: "claude.pluginDirectory",
-      placeholder: engineRootPlaceholder,
+      placeholder: stalePlaceholder,
       config: {
         ...config,
-        claude: { ...config.claude, pluginDirectory: `${engineRootPlaceholder}/publish-skills` },
+        claude: { ...config.claude, pluginDirectory: `${stalePlaceholder}/publish-skills` },
       },
     },
     {
       field: "claude.ticketing.command",
-      placeholder: engineRootPlaceholder,
+      placeholder: stalePlaceholder,
       config: {
         ...config,
         claude: {
           ...config.claude,
           ticketing: {
             ...config.claude.ticketing,
-            command: `${engineRootPlaceholder}/node_modules/.bin/tickets`,
+            command: `${stalePlaceholder}/node_modules/.bin/tickets`,
           },
         },
       },

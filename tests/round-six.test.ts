@@ -326,8 +326,7 @@ scenario(
 scenario(
   "r6-check-cap",
   (b) => {
-    const text =
-      "outcome: APPROVED | band: LOW\ndecision_source: fallback\n" + "🦉".repeat(b ? 10 : 61000);
+    const text = `outcome: APPROVED | band: LOW\ndecision_source: fallback\n${"🦉".repeat(b ? 10 : 61000)}`;
     const capped = capCheckText(text);
     return {
       length: Array.from(capped).length,

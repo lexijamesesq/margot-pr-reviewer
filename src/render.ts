@@ -214,6 +214,7 @@ export function checkText(review: Review): string {
     `vector: ${JSON.stringify(review.riskAnswer?.dimensions ?? {})}`,
     `owned tier: ${review.decision.ownedPathTier ?? "unknown"}`,
     "summoned by ledger: none",
+    ...(review.ledgerWarnings ?? []).map((warning) => `warning: ${warning}`),
   ];
   const findingById = new Map(
     review.cards.flatMap((card) =>

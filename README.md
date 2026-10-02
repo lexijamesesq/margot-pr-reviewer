@@ -244,8 +244,7 @@ with or without emphasis, `completion: incomplete` or `skipped` recorded with it
 reason rather than refused, `[issue]` findings numbered `F1`…`Fn` across the
 council in card order, Margot's own `ERROR` outcome accepted as her ruling, and
 complete finding accounting under every other outcome. It does not depend on
-`--json-schema`; see [the earlier probe](docs/cli-compatibility.md) and
-[the slice 2 proof](docs/SLICE2.md). Transport references:
+`--json-schema`; see [the earlier probe](docs/cli-compatibility.md). Transport references:
 [Claude CLI](https://code.claude.com/docs/en/cli-reference),
 [TypeSafe API](https://docs.typesafe.ai/api),
 [Octokit](https://github.com/octokit/octokit.js),
@@ -315,7 +314,6 @@ limits never authorize dropping the tail of the evidence. Cross-batch reasoning
 is a model-quality limitation; the live comparison records its observed effects.
 
 Run `npm run test:breaks` for all recorded, adapter and convergence break receipts.
-See [slice 3 proof](docs/SLICE3.md) for exact live heads, differences and limitations.
 
 ## GitHub publication
 
@@ -357,7 +355,7 @@ visible tally is derived from the listed entries. Oversize history fails closed.
 The self-hosted sample workflow installs the exact release asset and verifies its
 SHA-256 before installing. No hosted-runner
 sample is supplied. Publication remains subject to a consumer's reversible live
-canary; see `docs/SLICE4.md` for the local proof and its limits.
+canary.
 
 The review CLI accepts Python's dispatcher inputs `MARGOT_CLASSIFICATION`
 (`functional`, `documentation`, or `mechanical`) and the legacy
@@ -368,9 +366,11 @@ with fresh classification and the latest completed `review / triage` check from
 her configured App on the requested head.
 
 Pass the workflow-computed ownership tier through `MARGOT_OWNED_TIER` (`none`,
-`owned`, or `required_owned`). Missing or invalid ownership independently holds
-clearance. API callers supply `facts.ownedPathTier`; live service callers supply
-`credentials.ownedPathTier`.
+`owned`, or `required_owned`). An unset, blank, or invalid tier is uncomputed
+and independently holds clearance. Only an explicit `none` means no owned paths.
+The sample declares `owned_tier` (default `unknown`), `classification` and
+`triage` (both default empty) and passes all three to the review step. API callers
+supply `facts.ownedPathTier`; live service callers supply `credentials.ownedPathTier`.
 
 On a Jev outage, functional routing and risk use the tool-free
 `claude-haiku-4-5` fallback through the configured Claude executable. A fallback

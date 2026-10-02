@@ -41,7 +41,11 @@ export const evidenceHash = (facts: Facts): string =>
 /** Only trailing blocks claim history; prose mentions cannot hide the App's ledger.
  * Untrusted or undecodable blocks are skipped, preserving older App history.
  */
-export function selectLedger(facts: Facts, config: ReviewConfig): Ledger | null {
+export function selectLedger(
+  facts: Facts,
+  config: ReviewConfig,
+  onWarning?: (warning: string) => void,
+): Ledger | null {
   if (!facts.history.complete) return null;
   if (facts.history.priorLedger && !facts.history.reviews) return null;
   const reviews = [...(facts.history.reviews ?? [])].sort(
@@ -85,7 +89,12 @@ export function selectLedger(facts: Facts, config: ReviewConfig): Ledger | null 
       )
         throw new Error("Ledger belongs to another PR");
       return ledger;
-    } catch {}
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      const warning = `Skipped ledger from review ${review.id}: ${reason.replace(/\s+/g, " ").trim()}`;
+      console.warn(warning);
+      onWarning?.(warning);
+    }
   }
   return null;
 }
