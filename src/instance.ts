@@ -105,10 +105,10 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
   const suppliedConfig = liveConfigSchema.parse(input.config);
   const pull = pullSchema.parse(await readPull(repository, input.pr));
   // Refusals name their reason; a closed or draft PR is a decision, not a schema error.
-  if (pull.state !== "open") throw new Error("Pull request is not open");
-  if (pull.draft) throw new Error("Pull request is a draft");
-  if (pull.head.repo.full_name !== repository || pull.head.sha !== expectedHead)
-    throw new Error("Stale or untrusted request");
+  if (pull.state !== "open") throw new Error("Margot: not reviewed: closed");
+  if (pull.draft) throw new Error("Margot: not reviewed: draft");
+  if (pull.head.repo.full_name !== repository) throw new Error("Margot: not reviewed: fork");
+  if (pull.head.sha !== expectedHead) throw new Error("Margot: not reviewed: stale");
 
   const config = structuredClone(suppliedConfig);
   if (input.authority) {

@@ -62,10 +62,16 @@ export type ReviewResult =
   | { kind: "classified"; request: ReviewRequest; classification: Classification }
   | { kind: "error"; stage: string; diagnostic: string; mergeEligible: false };
 export type CallContext = { signal: AbortSignal };
+export type ReviewPhaseTitle =
+  | "Margot: preflight complete — setting up the review runner"
+  | "Margot: council is reviewing the changes"
+  | "Margot: posting the verdict";
 export interface Services {
   readonly provenance: string;
   /** Transient operator-facing run data; never part of the convergence receipt. */
   reviewMetadata?(): { costUsd?: number; durationMs?: number; runUrl?: string };
+  /** Report a phase only after the review has actually entered it. */
+  progress?(title: ReviewPhaseTitle, context: CallContext): Promise<unknown>;
   facts(request: ReviewRequest, context: CallContext): Promise<unknown>;
   compare?(request: ReviewRequest, priorHead: string, context: CallContext): Promise<unknown>;
   classify(

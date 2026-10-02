@@ -318,19 +318,19 @@ it("resolves runtime placeholders in Claude and ticketing paths", async () => {
 });
 
 it.each([
-  ["closed", "rejects a closed PR", { state: "closed" }, "Pull request is not open"],
-  ["draft", "rejects a draft PR", { draft: true }, "Pull request is a draft"],
+  ["closed", "rejects a closed PR", { state: "closed" }, "Margot: not reviewed: closed"],
+  ["draft", "rejects a draft PR", { draft: true }, "Margot: not reviewed: draft"],
   [
     "fork",
     "rejects a fork PR",
     { head: { ...pull.head, repo: { full_name: "fork/project" } } },
-    "Stale or untrusted request",
+    "Margot: not reviewed: fork",
   ],
   [
     "moved",
     "rejects a moved head",
     { head: { ...pull.head, sha: "f".repeat(40) } },
-    "Stale or untrusted request",
+    "Margot: not reviewed: stale",
   ],
 ] as const)("%s: %s", async (id, _name, changed, reason) => {
   const candidate = broken === id ? pull : { ...pull, ...changed };

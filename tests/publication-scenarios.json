@@ -55,23 +55,28 @@
     "defect": "Change classification to functional"
   },
   {
+    "id": "pub-phase-titles",
+    "name": "The review check posts each Python phase title as the run enters it",
+    "defect": "Skip the council-reviewing phase"
+  },
+  {
     "id": "pub-closed",
-    "name": "Closed PR cannot receive a publication",
+    "name": "Closed PR posts Python's not-reviewed title",
     "defect": "Reopen the PR"
   },
   {
     "id": "pub-fork",
-    "name": "Fork PR cannot receive a publication",
+    "name": "Fork PR posts Python's not-reviewed title",
     "defect": "Restore same-repository head"
   },
   {
     "id": "pub-draft",
-    "name": "Draft PR cannot receive a publication",
+    "name": "Draft PR posts Python's not-reviewed title",
     "defect": "Mark ready for review"
   },
   {
     "id": "pub-base",
-    "name": "Base movement cannot receive a publication",
+    "name": "Stale request posts Python's not-reviewed title",
     "defect": "Restore requested base"
   },
   {

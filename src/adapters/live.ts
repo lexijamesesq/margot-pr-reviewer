@@ -89,6 +89,7 @@ export function liveServices(
   if (publisher) {
     services.publish = publisher.publish;
     services.disableAutoMerge = publisher.disableAutoMerge;
+    services.progress = publisher.progress;
   }
   return {
     services,

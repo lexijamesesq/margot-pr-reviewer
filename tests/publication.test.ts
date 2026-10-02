@@ -204,6 +204,15 @@ async function wire(mode = "clear", broken = false) {
         request,
         classification: broken ? "functional" : "documentation",
       };
+    if (mode === "phase-titles") {
+      const context = { signal: AbortSignal.timeout(3000) };
+      await publisher.progress(
+        "Margot: preflight complete — setting up the review runner",
+        context,
+      );
+      if (!broken) await publisher.progress("Margot: council is reviewing the changes", context);
+      await publisher.progress("Margot: posting the verdict", context);
+    }
     const value = structuredClone(baseReview);
     if (
       (["hold", "authority", "authority-summary", "calibration"].includes(mode) && !broken) ||
@@ -381,14 +390,46 @@ scenario(
     reviews: 0,
   },
 );
+scenario(
+  "pub-phase-titles",
+  async (b) => {
+    const x = await wire("phase-titles", b);
+    return {
+      titles: x.writes
+        .filter(
+          (write) =>
+            write.body.name === options.checks.review && write.body.status === "in_progress",
+        )
+        .map((write) => (write.body.output as { title?: string }).title),
+    };
+  },
+  {
+    titles: [
+      "Margot: preflight — mechanical checks",
+      "Margot: preflight complete — setting up the review runner",
+      "Margot: council is reviewing the changes",
+      "Margot: posting the verdict",
+    ],
+  },
+);
 for (const mode of ["closed", "fork", "draft", "base"])
   scenario(
     `pub-${mode}`,
     async (b) => {
       const x = await wire(mode, b);
-      return { kind: x.result.kind, evaluated: x.evaluated, writes: x.writes.length };
+      return {
+        kind: x.result.kind,
+        evaluated: x.evaluated,
+        writes: x.writes.length,
+        title: ((x.final?.output ?? {}) as { title?: string }).title,
+      };
     },
-    { kind: "error", evaluated: false, writes: 0 },
+    {
+      kind: "error",
+      evaluated: false,
+      writes: 1,
+      title: `Margot: not reviewed: ${mode === "base" ? "stale" : mode}`,
+    },
   );
 for (const mode of ["start-fail", "review-fail", "identity"])
   scenario(
@@ -907,9 +948,9 @@ scenario(
 it("keeps machine fields first and full finding detail in the review check text", () => {
   const text = renderCheckText(commentReview);
   expect(text.split("\n").slice(0, 3)).toEqual([
-    "verdict_source: verdict_voice",
-    "pipeline_ok: true",
     "outcome: CHANGES_REQUESTED | band: MEDIUM",
+    "decision_source: jev",
+    "verdict_source: verdict_voice",
   ]);
   expect(text).toContain("finding details:");
   expect(text).toContain("GUIDE.md:40");
