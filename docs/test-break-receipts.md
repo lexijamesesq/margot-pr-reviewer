@@ -1,6 +1,6 @@
 # Test and deliberate-break receipts
 
-Run: 2026-10-02T00:34:04.039Z. Node v26.3.1.
+Run: 2026-10-02T01:28:46.136Z. Node v26.3.1.
 
 Baseline: 292/292 passed. Each scenario break changes the named scenario's service output/caller input, or its explicitly declared source mutation; expected assertions stay unchanged. Every run executes the complete legacy scenario suite; instance-command decisions have their own receipt. For each scenario break, the named test and any explicitly declared alsoFails tests failed, with all other tests passing. The two older prompt-rule mutations also fail the complete P1 wire contract. Each break was reverted before the next run. Restored baseline: 292/292 passed.
 
@@ -8,7 +8,7 @@ Most breaks mutate only their own scenario input. For those breaks, the harness 
 
 Separate source-level checks caught 16 mutations: reversed classification precedence, forced documentation band, always-true routing, dropped old-path rename check, disabled LOW-band confidence escalation, mis-mapped finding severity, mis-mapped finding confidence, mis-mapped finding location, mis-mapped voice outcome, mis-mapped voice band, disabled ledger author authentication, removed round-two MINOR demotion, silently dropped MAJOR verification, removed shared diff hunk validation, dropped Claude stdin prompt, replaced Claude round delta with full PR diff. Each mutation failed its intended tests; all observed failures are listed below.
 
-Scenario SHA-256: 1b85c7541bb7a4b43f8167a66f30107fecf8f548bb496ee70787da0e568db2be.
+Scenario SHA-256: 58acfe339ede3463cccc3bec8e1cf579267770c8f905dc101dcee455e8a0d1ea.
 
 Source mutation SHA-256: 6f1a36d29361bcb1b8772f9350a47ab341b8bece821edf5121ba7f14a130dbae.
 
@@ -47,7 +47,7 @@ Source mutation SHA-256: 6f1a36d29361bcb1b8772f9350a47ab341b8bece821edf5121ba7f1
 | 31 | voice can lower functional risk for both display and merge | Raise the final voice rating. | 1 failed, 291 passed; assertion mismatch |
 | 32 | dismissed mandatory findings permit approval | Turn a dismissal into an established unresolved finding. | 1 failed, 291 passed; assertion mismatch |
 | 33 | duplicate dispositions are rejected | Remove the duplicate disposition. | 1 failed, 291 passed; assertion mismatch |
-| 34 | unknown disposition IDs are rejected | Remove the unknown finding disposition. | 1 failed, 291 passed; assertion mismatch |
+| 34 | a disposition for an ID outside this round is ignored; every mandatory finding still must be accounted for | Drop the mandatory finding's disposition, leaving only the unknown ID. | 1 failed, 291 passed; assertion mismatch |
 | 35 | contradictory approval is rejected | Repair approval with established findings. | 1 failed, 291 passed; assertion mismatch |
 | 36 | BLOCKING info findings require voice accounting | Reduce the informational finding below the blocking threshold. | 1 failed, 291 passed; assertion mismatch |
 | 37 | objective questions require voice accounting | Lose the objective question. | 1 failed, 291 passed; assertion mismatch |
