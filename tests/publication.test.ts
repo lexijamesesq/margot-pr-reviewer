@@ -837,59 +837,73 @@ scenario(
   { kind: "error", conclusion: "action_required", reviewWrites: 0 },
 );
 
-function refuses(value: Review): boolean {
-  try {
-    render(value);
-    return false;
-  } catch {
-    return true;
-  }
-}
-
 scenario(
   "comment-risk-limit",
-  (b) => {
+  () => {
     const value = structuredClone(commentReview);
-    value.decision.rating.rationale = b ? "bounded concern" : "concern on one line\ncontinued";
-    return { refused: refuses(value) };
+    value.decision.rating.rationale = `${Array.from({ length: 40 }, () => "concern").join(" ")}\ncontinued on another line`;
+    const line = render(value).split("\n")[1];
+    return {
+      line,
+      continued: line?.includes("continued") ?? false,
+    };
   },
-  { refused: true },
+  {
+    line: `🟡 **Risk: MEDIUM** — ${Array.from({ length: 20 }, () => "concern").join(" ")}…`,
+    continued: false,
+  },
 );
 
 scenario(
   "comment-rationale-limit",
-  (b) => {
+  () => {
     const value = structuredClone(commentReview);
     if (!value.voice) throw new Error("voice fixture required");
-    value.voice.summary = b ? "One sentence." : "First sentence. Second sentence. Third sentence.";
-    return { refused: refuses(value) };
+    value.voice.summary = "First sentence. Second sentence. Third sentence.";
+    return { rationale: render(value).split("\n")[2] };
   },
-  { refused: true },
+  { rationale: "> First sentence. Second sentence." },
 );
 
 scenario(
   "comment-card-limit",
-  (b) => {
+  () => {
     const value = structuredClone(commentReview);
     const finding = value.cards.flatMap((card) => card.findings)[0];
     if (!finding) throw new Error("finding fixture required");
-    finding.what = `${Array.from({ length: b ? 15 : 16 }, (_, index) => `word${index}`).join(" ")}.`;
-    return { refused: refuses(value) };
+    const first = Array.from({ length: 60 }, () => "word").join(" ");
+    finding.what = `${first}. This second sentence belongs only in the check details.`;
+    const report = render(value);
+    const row = report.split("\n").find((line) => line.includes("`principal-engineer`"));
+    const check = renderCheckText(value);
+    return {
+      row,
+      fullFindingInComment: report.includes(finding.what),
+      fullFindingInCheck: check.includes(finding.what),
+    };
   },
-  { refused: true },
+  {
+    row: `* ⚠️ \`principal-engineer\` — ${Array.from({ length: 32 }, () => "word").join(" ")}… \`GUIDE.md:40\``,
+    fullFindingInComment: false,
+    fullFindingInCheck: true,
+  },
 );
 
 scenario(
   "comment-skip-limit",
-  (b) => {
+  () => {
     const value = structuredClone(commentReview);
     if (!value.presentation) throw new Error("presentation fixture required");
     value.presentation.skipReasons = {
-      "house-style": b ? "not selected" : "not selected because another reviewer covered it",
+      "house-style": "not selected; another reviewer covered it — no additional pass needed.",
     };
-    return { refused: refuses(value) };
+    return {
+      row: render(value)
+        .split("\n")
+        .find((line) => line.includes("`house-style`")),
+    };
   },
-  { refused: true },
+  { row: "* ❓ `house-style` — skipped: not selected" },
 );
 
 scenario(

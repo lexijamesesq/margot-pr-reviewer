@@ -1,12 +1,12 @@
 # Publication and tally break receipts
 
-Generated 2026-10-02T03:07:03.651Z, Node v26.3.1. Baseline and restored suite: 303/303 passed. Each of 44 isolated breaks ran the complete suite and failed exactly its named assertion.
+Generated 2026-10-02T06:40:32.512Z, Node v26.3.1. Baseline and restored suite: 303/303 passed. Each of 44 isolated breaks ran the complete suite and failed exactly its named assertion.
 
 Publication uses the real Octokit client against a recorded HTTP transport. No live GitHub writes occur. The tally source mutation deliberately adds one to Closed; reconciliation must fail.
 
 Most breaks are controlled service/input counterexamples selected by MARGOT_ADAPTER_BREAK; error cases repair their bad input. They do not claim exhaustive source mutation coverage or independence. Declared source mutations run without that variable and are identified in the manifest. No live service or paid model call occurs in the harness.
 
-Manifest SHA-256: 9422b95f0075294303f3a4b7290759c1a6d5b73ec818a86130ee3f258e6c97f3. Reproduce: npm run test:publication-breaks.
+Manifest SHA-256: 6c21fbdd7b335dadfc3c1ac0997c05b91278b45516b136cd961636630f8fb79b. Reproduce: npm run test:publication-breaks.
 
 | Test | Deliberate break | Observed |
 | --- | --- | --- |
@@ -48,9 +48,9 @@ Manifest SHA-256: 9422b95f0075294303f3a4b7290759c1a6d5b73ec818a86130ee3f258e6c97
 | A confirmed approval followed by auto-merge succeeds | Require the PR to remain open after the confirmed approval | 1 failed; 302 passed |
 | Cleanup diagnostics identify every failed operation and its cause | Discard cleanup labels and error messages | 1 failed; 302 passed |
 | Self-instrument summaries name every matched file and use Python's clear wording | Remove the protected file matches | 1 failed; 302 passed |
-| A multiline risk concern refuses the comment | Replace the multiline concern with a valid line | 1 failed; 302 passed |
-| A three-sentence rationale refuses the comment | Replace the rationale with one sentence | 1 failed; 302 passed |
-| A card sentence over fifteen words refuses the comment | Shorten the card sentence to fifteen words | 1 failed; 302 passed |
-| A multi-clause skip reason refuses the comment | Replace the skip reason with one clause | 1 failed; 302 passed |
+| A long multiline risk concern renders as its bounded first line | Render the full concern | 1 failed; 302 passed |
+| A long rationale renders its first two sentences | Render the full rationale | 1 failed; 302 passed |
+| A long finding renders bounded prose while the check keeps its full text | Render the full finding text | 1 failed; 302 passed |
+| A multi-clause skip reason renders its first clause | Render the full skip reason | 1 failed; 302 passed |
 | The rendered comment keeps the Python operator-visible structure | Reject the outcome header shape | 1 failed; 302 passed |
 | A 2001-line mechanical candidate takes the full review path | Raise the configured cap to admit the oversized shortcut | 1 failed; 302 passed |

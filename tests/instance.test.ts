@@ -17,9 +17,9 @@ const engineRootPlaceholder = `\${ENGINE_ROOT}`;
 const head = "a".repeat(40);
 const base = "b".repeat(40);
 const deployment = {
-  version: "0.5.2",
+  version: "0.5.3",
   packageReference:
-    "https://github.com/example/margot-pr-reviewer/releases/download/v0.5.2/margot-pr-reviewer-0.5.2.tgz",
+    "https://github.com/example/margot-pr-reviewer/releases/download/v0.5.3/margot-pr-reviewer-0.5.3.tgz",
   packageIntegrity: `sha512-${"A".repeat(86)}==`,
   packageSha256: "c".repeat(64),
 };
@@ -176,7 +176,7 @@ it.each([
     {
       deployment: {
         ...deployment,
-        packageReference: deployment.packageReference.replaceAll("0.5.2", "0.5.3"),
+        packageReference: deployment.packageReference.replaceAll("0.5.3", "0.5.4"),
       },
     },
   ],
@@ -212,7 +212,7 @@ it.each([
     `${deployment.packageReference}#x`,
   ],
 ] as const)("%s: %s", (id, _name, replacement) => {
-  const packageReference = replacement.includes("margot-pr-reviewer-0.5.2.tgz")
+  const packageReference = replacement.includes("margot-pr-reviewer-0.5.3.tgz")
     ? replacement
     : deployment.packageReference.replace("https://github.com", replacement);
   expect(() =>

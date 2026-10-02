@@ -8,8 +8,7 @@ const outcomeIcons = {
   CLARIFICATION_REQUESTED: "❓",
 } as const;
 const bandIcons = { LOW: "🟢", MEDIUM: "🟡", HIGH: "🔴" } as const;
-const maxCardWords = 15;
-const maxSkipWords = 12;
+const maxVisibleChars = 160;
 
 /** Every listed issue has exactly one fate; advisory issues remain open. */
 export function findingTally(review: Review) {
@@ -21,44 +20,30 @@ export function findingTally(review: Review) {
   };
 }
 
-const words = (value: string) => value.trim().split(/\s+/).filter(Boolean).length;
-const sentences = (value: string) =>
-  value
-    .trim()
-    .split(/(?<=[.!?])\s+/)
-    .filter(Boolean).length;
-const oneLine = (value: string) => !/[\r\n]/.test(value);
-const sentence = (value: string) => `${value.trim().replace(/[.!?]+$/, "")}.`;
+const normalized = (value: string) => value.trim().replace(/\s+/gu, " ");
 
-function validateCommentProse(review: Review, rationale: string): void {
-  const concern = review.decision.rating.rationale.trim();
-  if (!concern || !oneLine(concern)) throw new Error("Comment risk concern must be one line");
-  const count = sentences(rationale);
-  if (!oneLine(rationale) || count < 1 || count > 2)
-    throw new Error("Comment rationale must be one or two sentences");
-  const dismissed = new Set(
-    review.voice?.dispositions.filter((d) => d.status === "dismissed").map((d) => d.id) ?? [],
-  );
-  for (const card of review.cards) {
-    for (const finding of card.findings.filter((item) => !dismissed.has(item.id))) {
-      if (
-        !oneLine(finding.what) ||
-        sentences(finding.what) !== 1 ||
-        words(finding.what) > maxCardWords ||
-        /^Resolved by Margot\b/i.test(finding.what)
-      )
-        throw new Error(`Comment finding for ${card.name} exceeds its one-sentence limit`);
-    }
-  }
-  for (const [card, reason] of Object.entries(review.presentation?.skipReasons ?? {})) {
-    if (
-      !oneLine(reason) ||
-      words(reason) > maxSkipWords ||
-      /[.!?;:]/.test(reason) ||
-      /\b(?:and|but|because|although|while)\b/i.test(reason)
-    )
-      throw new Error(`Comment skip reason for ${card} must be one clause`);
-  }
+function cutAtWord(value: string): string {
+  const text = normalized(value);
+  if (text.length <= maxVisibleChars) return text;
+  const boundary = text.slice(0, maxVisibleChars).lastIndexOf(" ");
+  return `${text.slice(0, boundary > 0 ? boundary : maxVisibleChars).trimEnd()}…`;
+}
+
+function firstSentences(value: string, count: number): string {
+  return normalized(value)
+    .split(/(?<=[.!?]) +/u)
+    .slice(0, count)
+    .join(" ");
+}
+
+const firstSentence = (value: string) => cutAtWord(firstSentences(value, 1));
+const firstLine = (value: string) => cutAtWord(value.trim().split(/\r?\n/u, 1)[0] ?? "");
+const sentence = (value: string) => (/[.!?…]$/u.test(value) ? value : `${value}.`);
+
+function firstClause(value: string): string {
+  const text = normalized(value);
+  const boundary = text.search(/;| — |[.!?](?: |$)/u);
+  return boundary < 0 ? text : text.slice(0, boundary);
 }
 
 function fallbackRationale(review: Review): string {
@@ -120,7 +105,7 @@ function cardRows(review: Review): { rows: string[]; findings: number } {
     const card = cards.get(name);
     if (!card) {
       const reason = review.presentation?.skipReasons?.[name] ?? "not selected";
-      return `* ❓ \`${name}\` — skipped: ${reason}`;
+      return `* ❓ \`${name}\` — skipped: ${firstClause(reason)}`;
     }
     const findings = visible.get(name) ?? [];
     const first = findings[0];
@@ -135,7 +120,7 @@ function cardRows(review: Review): { rows: string[]; findings: number } {
     const labels = shared.map((owner) => `\`${owner}\``).join(" + ");
     const icon = findings.some((finding) => finding.tag === "issue") ? "⚠️" : "ℹ️";
     const count = findings.length > 1 ? ` (${findings.length})` : "";
-    return `* ${icon} ${labels}${count} — ${sentence(first.what)} \`${first.location}\``;
+    return `* ${icon} ${labels}${count} — ${sentence(firstSentence(first.what))} \`${first.location}\``;
   });
   return { rows, findings: owners.size };
 }
@@ -155,7 +140,6 @@ function defaultPresentation(review: Review): ReviewPresentation {
 export function render(review: Review): string {
   const { decision, request } = review;
   const rationale = review.voice?.summary.trim() || fallbackRationale(review);
-  validateCommentProse(review, rationale);
   const tally = findingTally(review);
   const presentation = defaultPresentation(review);
   const cards = cardRows(review);
@@ -169,8 +153,8 @@ export function render(review: Review): string {
     : "none";
   const lines = [
     `### ${outcomeIcons[decision.outcome]} ${decision.outcome}`,
-    `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}** — ${decision.rating.rationale.trim()}`,
-    `> ${rationale}`,
+    `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}** — ${firstLine(decision.rating.rationale)}`,
+    `> ${firstSentences(rationale, 2)}`,
     ...(authority ? ["", `Above my authority: ${authority}. Yours to merge.`] : []),
     "",
     "---",
@@ -188,12 +172,7 @@ export function render(review: Review): string {
     "<!-- margot:v1 -->",
   ];
   const body = lines.join("\n").replaceAll("margot-ledger", "margot‑ledger");
-  const report = `${body}\n${ledgerBlock(review.ledger)}`;
-  if (report.length > 65536)
-    throw new Error(
-      `Review exceeds GitHub body limit (${report.length} characters, ${body.length} visible)`,
-    );
-  return report;
+  return `${body}\n${ledgerBlock(review.ledger)}`;
 }
 
 /**
