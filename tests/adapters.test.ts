@@ -636,6 +636,53 @@ it("A file GitHub lists without its own patch is complete when the whole diff ca
   }).adapter.facts(request, context());
   expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
 });
+it("Deleted, added, renamed and oddly named files are named from the diff's own header lines", async () => {
+  // Real diffs carry `---`/`+++`/`rename` lines; the `diff --git a/X b/Y` header is never split,
+  // so a path containing " b/" or spaces survives, as Python's reader guaranteed.
+  const diff = [
+    "diff --git a/dir b/x.ts b/dir b/x.ts",
+    "deleted file mode 100644",
+    "--- a/dir b/x.ts",
+    "+++ /dev/null",
+    "@@ -1 +0,0 @@",
+    "-old",
+    "diff --git a/new.ts b/new.ts",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/new.ts",
+    "@@ -0,0 +1 @@",
+    "+new",
+    "diff --git a/old.ts b/renamed.ts",
+    "similarity index 100%",
+    "rename from old.ts",
+    "rename to renamed.ts",
+    'diff --git "a/sp ace.ts" "b/sp ace.ts"',
+    '--- "a/sp ace.ts"',
+    '+++ "b/sp ace.ts"',
+    "@@ -1 +1 @@",
+    "-a",
+    "+b",
+    "",
+  ].join("\n");
+  const result = await github({ diff, patch: null, additions: 0, deletions: 0 }).adapter.facts(
+    request,
+    context(),
+  );
+  expect(result.files).toEqual([
+    { path: "dir b/x.ts" },
+    { path: "new.ts" },
+    { path: "renamed.ts", previousPath: "old.ts" },
+    { path: "sp ace.ts" },
+    { path: "a.ts" },
+  ]);
+});
+it("A diff path GitHub's complete listing does not know is refused", async () => {
+  await expect(
+    github({
+      diff: "diff --git a/zzz.ts b/zzz.ts\n--- a/zzz.ts\n+++ b/zzz.ts\n@@ -1 +1 @@\n-old\n+new\n",
+    }).adapter.facts(request, context()),
+  ).rejects.toThrow("Diff and file listing disagree");
+});
 it("A partial final hunk cannot claim complete facts", async () => {
   await expect(
     github({

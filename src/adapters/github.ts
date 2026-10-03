@@ -130,11 +130,18 @@ export function githubAdapter(
       // counts are cross-checked only where it supplied the content.
       const parsed = parseDiff(diffText);
       if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
+      // parse-diff names each section from its `---`/`+++`/`rename` lines, one path per line,
+      // never by splitting the `diff --git a/X b/Y` header (a path can contain " b/"), which
+      // is the rule Python's changed_files_from_diff followed. Where GitHub's listing is as
+      // long as the diff it is complete, and every diff path must appear in it; a shorter
+      // listing is GitHub's cap, and the diff's names stand on their own.
       const listed = new Map(files.map((f) => [f.filename, f]));
+      const listingComplete = files.length >= parsed.length;
       const diffFiles = parsed.map((file) => {
         const path = file.to && file.to !== "/dev/null" ? file.to : (file.from ?? "");
         const from = file.from && file.from !== "/dev/null" ? file.from : undefined;
         const entry = listed.get(path);
+        if (!entry && listingComplete) throw new Error("Diff and file listing disagree");
         if (
           entry &&
           typeof entry.patch === "string" &&
@@ -145,6 +152,14 @@ export function githubAdapter(
         return { path, ...(previous ? { previousPath: previous } : {}) };
       });
       if (diffFiles.some((f) => !f.path)) throw new Error("Diff hunks are incomplete");
+      // Over-inclusion is the safe direction for the protected-path gate: a file GitHub lists
+      // that the diff did not name is still a changed file.
+      for (const f of files)
+        if (!diffFiles.some((d) => d.path === f.filename))
+          diffFiles.push({
+            path: f.filename,
+            ...(f.previous_filename ? { previousPath: f.previous_filename } : {}),
+          });
       const historyReviews = options.shadowBeforeHead
         ? reviews.filter((v) => v.commit_id !== r.head)
         : reviews;
