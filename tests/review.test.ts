@@ -212,6 +212,8 @@ describe("classification and availability", () => {
       kind: "held",
       request: r.request,
       reason: "Review history unavailable",
+      recovery:
+        "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.",
       mergeEligible: false,
     });
     expect(services.calls.map((call) => call.name)).toEqual(["facts", "head", "disableAutoMerge"]);
@@ -225,6 +227,8 @@ describe("classification and availability", () => {
       kind: "held",
       request: r.request,
       reason: "Review history unavailable",
+      recovery:
+        "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.",
       mergeEligible: false,
     });
     expect(services.publications).toEqual([]);

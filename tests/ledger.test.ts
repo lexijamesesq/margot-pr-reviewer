@@ -139,6 +139,7 @@ it("holds for the operator when the trusted ledger is corrupt", async () => {
     kind: "held",
     request: source.request,
     reason: expect.stringMatching(/Review history corrupt:.*review 1/),
+    recovery: expect.stringContaining("review and merge this PR yourself"),
     mergeEligible: false,
   });
   expect(services.publications).toEqual([]);
@@ -152,6 +153,8 @@ it("holds unreadable history without inventing a verdict or risk band", async ()
     kind: "held",
     request: source.request,
     reason: "Review history unavailable",
+    recovery:
+      "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.",
     mergeEligible: false,
   });
   expect(services.publications).toEqual([]);
@@ -423,6 +426,7 @@ it("holds for the operator when a trusted ledger marker has malformed encoding",
     kind: "held",
     request: source.request,
     reason: expect.stringMatching(/Review history corrupt:.*review 1/),
+    recovery: expect.stringContaining("review and merge this PR yourself"),
     mergeEligible: false,
   });
   expect(services.publications).toEqual([]);
@@ -837,6 +841,7 @@ describe("history warnings", () => {
           kind: "held",
           request: recording.request,
           reason: expect.stringMatching(/Review history corrupt:.*review 42/),
+          recovery: expect.stringContaining("review and merge this PR yourself"),
           mergeEligible: false,
         });
         expect(warn).toHaveBeenCalledExactlyOnceWith(

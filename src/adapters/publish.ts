@@ -275,8 +275,8 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           r.phase === "triage" ? config.checks.triage : config.checks.review,
           "action_required",
           `held for the operator: ${result.reason}`.slice(0, 255),
-          capCheckText(result.reason),
-          result.reason,
+          capCheckText(result.recovery ? `${result.reason}\n\n${result.recovery}` : result.reason),
+          result.recovery ? `${result.reason}. ${result.recovery}` : result.reason,
           context(),
         );
         return result;

@@ -132,6 +132,11 @@ export async function review(
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
     const ledgerWarnings: string[] = [];
     const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
+    // Python could approve over unreadable history; the port holds instead (the charter's
+    // recorded divergence). The reason names the way out, because the hold recurs on every
+    // run until the history is fixed or the operator merges.
+    const recovery =
+      "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.";
     const historyReason = historyUnavailable
       ? "Review history unavailable"
       : ledgerWarnings.length
@@ -148,7 +153,7 @@ export async function review(
         !(await disableAutoMerge("disable-auto-merge"))
       )
         throw new Error("Auto-merge disable was not confirmed");
-      return { kind: "held", request, reason: historyReason, mergeEligible: false };
+      return { kind: "held", request, reason: historyReason, recovery, mergeEligible: false };
     }
     let cached = prior?.head === request.head ? prior.receipt : undefined;
     if (

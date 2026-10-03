@@ -207,7 +207,7 @@ export function render(review: Review): string {
     "<!-- margot:v1 -->",
   ];
   const body = lines.join("\n").replaceAll("margot-ledger", "margot‑ledger");
-  return review.ledgerUnavailable ? body : `${body}\n${ledgerBlock(review.ledger)}`;
+  return `${body}\n${ledgerBlock(review.ledger)}`;
 }
 
 /**
@@ -237,7 +237,6 @@ export function checkText(review: Review): string {
     `vector: ${JSON.stringify(review.riskAnswer?.dimensions ?? {})}`,
     `owned tier: ${review.decision.ownedPathTier ?? "unknown"}`,
     `summoned by ledger: ${review.provenance.summonedByLedger?.join(", ") || "none"}`,
-    ...(review.ledgerWarnings ?? []).map((warning) => `warning: ${warning}`),
   ];
   const findingById = new Map(
     review.cards.flatMap((card) =>

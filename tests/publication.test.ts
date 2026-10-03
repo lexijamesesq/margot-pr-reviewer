@@ -350,6 +350,8 @@ it("Unreadable history disarms auto-merge before holding the check without a rat
     kind: "held",
     request: r,
     reason: "Review history unavailable",
+    recovery:
+      "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.",
     mergeEligible: false,
   }));
   const output = stored?.output as { title?: string; summary?: string; text?: string };
