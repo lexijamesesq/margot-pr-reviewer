@@ -62,6 +62,12 @@ export type ReviewResult =
       publication: z.infer<typeof publicationSchema> | null;
     } & Review)
   | {
+      kind: "held";
+      request: ReviewRequest;
+      reason: string;
+      mergeEligible: false;
+    }
+  | {
       kind: "classified";
       request: ReviewRequest;
       classification: Classification;

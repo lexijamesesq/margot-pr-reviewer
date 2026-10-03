@@ -52,10 +52,11 @@ export function selectLedger(
     (a, b) => b.submittedAt.localeCompare(a.submittedAt) || b.id - a.id,
   );
   for (const review of reviews) {
+    if (!/(?:^|\n)<!-- margot-ledger:[^\n]*$/.test(review.body.trimEnd())) continue;
     const match = review.body.match(/(?:^|\n)<!-- margot-ledger:v([12]) ([A-Za-z0-9+/=]+) -->\s*$/);
-    if (!match) continue;
     if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor)) continue;
     try {
+      if (!match) throw new Error("Malformed ledger encoding");
       let decoded = JSON.parse(
         (match[1] === "2"
           ? inflateSync(Buffer.from(match[2] ?? "", "base64"), { maxOutputLength: 1048576 })

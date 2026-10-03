@@ -50,7 +50,12 @@ export function liveServices(
     }),
     {
       ...config.github,
-      ...(config.publisher ? { triageAppId: config.publisher.appId } : {}),
+      ...(config.publisher
+        ? {
+            triageAppId: config.publisher.appId,
+            triageCheckName: config.publisher.checks.triage,
+          }
+        : {}),
       ownedPathTier: credentials.ownedPathTier,
     },
   );

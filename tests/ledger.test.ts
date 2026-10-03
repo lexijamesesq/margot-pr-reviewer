@@ -12,7 +12,6 @@ import {
   selectLedger,
 } from "../src/ledger.js";
 import { mandatory, validateVoice } from "../src/policy.js";
-import { checkText } from "../src/render.js";
 import { review } from "../src/review.js";
 import { configSchema, factsSchema, requestSchema } from "../src/schemas.js";
 import type { Card, Ledger, ReviewCore, RoundScope, Voice } from "../src/types.js";
@@ -132,16 +131,30 @@ it("Ledger head must match GitHub review commit", () => {
   f.history.reviews[0]!.head = "f".repeat(40);
   expect(selectLedger(f, config) === null).toBe(true);
 });
-it("Corrupt trusted ledger is ignored", () => {
+it("holds for the operator when the trusted ledger is corrupt", async () => {
   const f = history();
   f.history.reviews[0]!.body = "review\n<!-- margot-ledger:v1 garbage -->";
-  expect(selectLedger(f, config) === null).toBe(true);
+  const services = recordedServices({ ...source, facts: f });
+  expect(await review(source.request, config, services)).toEqual({
+    kind: "held",
+    request: source.request,
+    reason: expect.stringMatching(/Review history corrupt:.*review 1/),
+    mergeEligible: false,
+  });
+  expect(services.publications).toEqual([]);
 });
-it("Unreadable review history starts fresh", () => {
-  expect(
-    selectLedger({ ...history(), history: { ...history().history, complete: false } }, config) ===
-      null,
-  ).toBe(true);
+it("holds unreadable history without inventing a verdict or risk band", async () => {
+  const services = recordedServices({
+    ...source,
+    facts: { ...history(), history: { ...history().history, complete: false } },
+  });
+  expect(await review(source.request, config, services)).toEqual({
+    kind: "held",
+    request: source.request,
+    reason: "Review history unavailable",
+    mergeEligible: false,
+  });
+  expect(services.publications).toEqual([]);
 });
 it("Newest submitted ledger wins", () => {
   const f = history();
@@ -398,7 +411,21 @@ it("Standing card defeats mechanical shortcut", async () => {
     kind: "reviewed",
     decision: { outcome: "CHANGES_REQUESTED" },
     cards: [{ name: "safety" }],
+    provenance: { summonedByLedger: ["safety"] },
+    ledger: { receipt: { review: { provenance: { summonedByLedger: ["safety"] } } } },
   });
+});
+it("holds for the operator when a trusted ledger marker has malformed encoding", async () => {
+  const f = history();
+  f.history.reviews[0]!.body = "review\n<!-- margot-ledger:v1 !!! -->";
+  const services = recordedServices({ ...source, facts: f });
+  expect(await review(source.request, config, services)).toEqual({
+    kind: "held",
+    request: source.request,
+    reason: expect.stringMatching(/Review history corrupt:.*review 1/),
+    mergeEligible: false,
+  });
+  expect(services.publications).toEqual([]);
 });
 it("Standing card defeats editorial shortcut", async () => {
   const { result } = await margot("documentation", true);
@@ -773,7 +800,7 @@ describe("history retention and retries", () => {
 });
 describe("history warnings", () => {
   it.each(["corrupt", "revision"])(
-    "warns in the console and check details when a %s ledger precedes valid history",
+    "holds for the operator when a newer %s ledger obscures valid history",
     async (defect) => {
       const recording = JSON.parse(
         readFileSync("recordings/mechanical-bump.json", "utf8"),
@@ -806,14 +833,15 @@ describe("history warnings", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
         const result = await review(recording.request, config, recordedServices(recording));
-        expect(result.kind).toBe("reviewed");
-        if (result.kind !== "reviewed") throw new Error("Expected review");
-        expect(result.convergence.round).toBe(2);
-        const warning = result.ledgerWarnings?.[0];
-        expect(warning).toMatch(/^Skipped ledger from review 42: .+/);
-        expect(warning).toMatch(defect === "corrupt" ? /JSON/i : /revision mismatch/);
-        expect(warn).toHaveBeenCalledExactlyOnceWith(warning);
-        expect(checkText(result)).toContain(`warning: ${warning}`);
+        expect(result).toEqual({
+          kind: "held",
+          request: recording.request,
+          reason: expect.stringMatching(/Review history corrupt:.*review 42/),
+          mergeEligible: false,
+        });
+        expect(warn).toHaveBeenCalledExactlyOnceWith(
+          expect.stringMatching(defect === "corrupt" ? /JSON/i : /revision mismatch/),
+        );
       } finally {
         warn.mockRestore();
       }

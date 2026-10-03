@@ -145,9 +145,25 @@ export function needsVoice(
   );
 }
 export function validateVoice(cards: Card[], voice: Voice): void {
+  const synthesis = [voice.summary, voice.rationale, voice.risk, voice.finding, voice.clarification]
+    .join(" ")
+    .toLowerCase();
+  const attribution = [
+    "co-authored-by",
+    "generated with",
+    "🤖",
+    "as an ai",
+    "i am claude",
+    "i'm claude",
+    "powered by claude",
+    "claude-session",
+  ].find((pattern) => synthesis.includes(pattern));
+  if (attribution) throw new Error(`Attribution leak in review prose (matched ${attribution})`);
   // Python's rule: an honest ERROR is Margot's own fail-closed ruling, never an incomplete
   // verdict; a finding she could not resolve legitimately lands in neither list.
   if (voice.outcome === "ERROR") return;
+  if (voice.outcome === "APPROVED" && voice.clarification?.trim())
+    throw new Error("Approval contradicts an open clarification");
   const advisory = cards.flatMap((c) =>
     c.findings.flatMap((f) => (f.advisory && f.id ? [f.id] : [])),
   );
@@ -160,10 +176,7 @@ export function validateVoice(cards: Card[], voice: Voice): void {
   // as fixed) are not an error; the ledger, not the voice, settles those.
   if (new Set(ids).size !== ids.length || required.some((id) => !ids.includes(id)))
     throw new Error("Voice must account for every mandatory finding exactly once");
-  if (
-    voice.outcome === "APPROVED" &&
-    voice.dispositions.some((d) => required.includes(d.id) && d.status !== "dismissed")
-  )
+  if (voice.outcome === "APPROVED" && voice.dispositions.some((d) => d.status !== "dismissed"))
     throw new Error("Approval contradicts unresolved findings");
 }
 export function decide(

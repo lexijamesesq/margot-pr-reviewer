@@ -266,6 +266,21 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         if (refusal) throw new PublicationRefusal(refusal);
         throw new Error(`${result.stage}: ${result.diagnostic}`);
       }
+      if (result.kind === "held") {
+        await guard(r, context());
+        if (!(await disableAutoMerge(r, context())))
+          throw new Error("Auto-merge disable was not confirmed");
+        await check(
+          r,
+          r.phase === "triage" ? config.checks.triage : config.checks.review,
+          "action_required",
+          `held for the operator: ${result.reason}`.slice(0, 255),
+          capCheckText(result.reason),
+          result.reason,
+          context(),
+        );
+        return result;
+      }
       if (result.kind === "classified")
         await triage(r, result.classification, context(), result.decision_source);
       else if (!result.publication || result.publication.recorded)

@@ -205,6 +205,9 @@ export function parseVoice(raw: string) {
     band: voiceToken(fields.get("band"), voiceBands),
     rationale: fields.get("band_reason"),
     summary: fields.get("summary"),
+    ...(fields.has("risk") ? { risk: fields.get("risk") } : {}),
+    ...(fields.has("clarification") ? { clarification: fields.get("clarification") } : {}),
+    ...(fields.has("finding") ? { finding: fields.get("finding") } : {}),
     dispositions,
   });
 }

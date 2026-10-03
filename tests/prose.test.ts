@@ -3,6 +3,18 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
 
+it("preserves the voice's risk statement, clarification and setting finding", () => {
+  expect(
+    parseVoice(
+      "outcome: CLARIFICATION_REQUESTED\nband: LOW\nband_reason: Bounded change\nrisk: caller-visible behavior\nsummary: One choice remains\nfinding: The default changed\nclarification: Which default should callers receive?\nestablished:\ndismissed:\n",
+    ),
+  ).toMatchObject({
+    risk: "caller-visible behavior",
+    finding: "The default changed",
+    clarification: "Which default should callers receive?",
+  });
+});
+
 function cardText() {
   return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
 }

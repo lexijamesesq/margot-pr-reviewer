@@ -3,9 +3,10 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Octokit } from "octokit";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { resolveBundle } from "../src/adapters/bundle.js";
 import { claudeAdapter, claudeEnvironment } from "../src/adapters/claude.js";
+import * as githubModule from "../src/adapters/github.js";
 import { ghFetch, githubAdapter } from "../src/adapters/github.js";
 import { liveServices } from "../src/adapters/live.js";
 import { execute } from "../src/adapters/process.js";
@@ -939,13 +940,13 @@ describe("GitHub triage and diff size", () => {
   const seed = recording();
   const request = requestSchema.parse(seed.request);
   const context = () => ({ signal: AbortSignal.timeout(3000) });
-  it("uses the newest triage check from the trusted App", async () => {
+  it("uses only the newest triage check matching the configured App and check name", async () => {
     const files = Symbol("files"),
       checks = Symbol("checks"),
       reviews = Symbol("reviews");
-    const check = (id: number, app: number, classification: string) => ({
+    const check = (id: number, app: number, name: string, classification: string) => ({
       id,
-      name: "review / triage",
+      name,
       status: "completed",
       head_sha: request.head,
       app: { id: app, slug: "triage-app" },
@@ -981,16 +982,36 @@ describe("GitHub triage and diff size", () => {
           ? [{ filename: "a", additions: 1, deletions: 1, patch: diff }]
           : method === checks
             ? [
-                check(1, 4862659, "mechanical"),
-                check(2, 4862659, "documentation"),
-                check(3, 123, "mechanical"),
+                check(1, 321, "custom / triage", "mechanical"),
+                check(2, 321, "custom / triage", "documentation"),
+                check(3, 123, "custom / triage", "mechanical"),
+                check(4, 321, "other / triage", "mechanical"),
+                check(5, 4862659, "review / triage", "mechanical"),
               ]
             : [],
     } as unknown as Octokit;
-    const result = await githubAdapter(client).facts(request, context());
-    expect({ triage: result.triage }).toMatchObject({
-      triage: { actor: "triage-app", head: request.head, classification: "documentation" },
-    });
+    const config = JSON.parse(
+      readFileSync(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
+    );
+    config.publisher = {
+      checks: { triage: "custom / triage", review: "custom / review", authority: "authority" },
+      actor: "custom[bot]",
+      appId: 321,
+      runUrl: "https://example.invalid/run/1",
+    };
+    const clientSpy = vi.spyOn(githubModule, "githubClient").mockReturnValue(client);
+    try {
+      const result = factsSchema.parse(
+        await liveServices(config, { jevKey: "unused" }).services.facts(request, context()),
+      );
+      const unconfigured = await githubAdapter(client).facts(request, context());
+      expect({ triage: result.triage, unconfigured: unconfigured.triage }).toMatchObject({
+        triage: { actor: "triage-app", head: request.head, classification: "documentation" },
+        unconfigured: null,
+      });
+    } finally {
+      clientSpy.mockRestore();
+    }
   });
   it("counts diff headers and context toward the review size limit", () => {
     expect({

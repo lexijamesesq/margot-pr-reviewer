@@ -132,6 +132,24 @@ export async function review(
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
     const ledgerWarnings: string[] = [];
     const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
+    const historyReason = historyUnavailable
+      ? "Review history unavailable"
+      : ledgerWarnings.length
+        ? `Review history corrupt: ${ledgerWarnings.join("; ")}`
+        : null;
+    if (historyReason) {
+      if (
+        shaSchema.parse(await call("hold-head", (c) => services.head(request, c))) !== request.head
+      )
+        throw new Error("Head moved before holding review");
+      if (
+        config.publication !== "none" &&
+        facts.autoMergeArmed &&
+        !(await disableAutoMerge("disable-auto-merge"))
+      )
+        throw new Error("Auto-merge disable was not confirmed");
+      return { kind: "held", request, reason: historyReason, mergeEligible: false };
+    }
     let cached = prior?.head === request.head ? prior.receipt : undefined;
     if (
       prior?.head === request.head &&
@@ -230,11 +248,7 @@ export async function review(
         return bundle;
       };
       const recalled = standingCards(scope);
-      if (
-        reviewPath(classification, null, config).routing ||
-        recalled.length > 0 ||
-        historyUnavailable
-      ) {
+      if (reviewPath(classification, null, config).routing || recalled.length > 0) {
         const { documentationSubstantive: _documentationSubstantive, ...functionalRouteQuestions } =
           routeQuestions;
         const questions =
@@ -248,9 +262,7 @@ export async function review(
         routeAnswer = routeSchema.parse(
           await call("route", (c) => services.route(scopedFacts, classification, questions, c)),
         );
-        const path = historyUnavailable
-          ? { routing: true, council: true, risk: classification !== "documentation" }
-          : reviewPath(classification, routeAnswer, config);
+        const path = reviewPath(classification, routeAnswer, config);
         if (path.council || recalled.length > 0) {
           await progress("Margot: council is reviewing the changes");
           const selected = [
@@ -343,6 +355,13 @@ export async function review(
         provenance: {
           cardBundle: config.cardBundle.commit,
           classification: classSource,
+          mechanicalProbability: answer?.source === "jev" ? answer.mechanical : null,
+          summonedByLedger: recalled.filter(
+            (name) =>
+              !routeAnswer ||
+              !reviewPath(classification, routeAnswer, config).council ||
+              !selectCards(routeAnswer, classification, config).includes(name),
+          ),
           decision_source:
             classification !== "documentation" &&
             ((routeAnswer && routeAnswer.source !== "jev") ||
@@ -358,8 +377,6 @@ export async function review(
       }
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
-    if (historyUnavailable) result.ledgerUnavailable = true;
-    if (ledgerWarnings.length) result.ledgerWarnings = ledgerWarnings;
     const metadata = services.reviewMetadata?.() ?? {};
     result = {
       ...result,
@@ -374,6 +391,7 @@ export async function review(
       },
     };
     stage = "render";
+    if (result.voice) validateVoice(result.cards, result.voice);
     const report = render(result);
     await progress("Margot: posting the verdict");
     let publication = null;

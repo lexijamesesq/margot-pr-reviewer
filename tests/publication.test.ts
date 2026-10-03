@@ -299,6 +299,76 @@ it("Held review disarms auto-merge and comments with neutral checks", async () =
     event: x.writes.find((w) => w.path.endsWith("/reviews"))?.body.event,
   }).toMatchObject({ armed: false, ordered: true, conclusion: "neutral", event: "COMMENT" });
 });
+it("Unreadable history disarms auto-merge before holding the check without a rating or native review", async () => {
+  const writes: { path: string; body: Record<string, unknown> }[] = [];
+  let stored: Record<string, unknown> | undefined;
+  let armed = true;
+  const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(url)).pathname;
+    const method = init?.method ?? "GET";
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    let data: unknown;
+    if (method === "GET") {
+      if (path.endsWith("/check-runs"))
+        data = { check_runs: stored ? [stored] : [], total_count: stored ? 1 : 0 };
+      else if (/\/check-runs\/\d+$/.test(path)) data = stored;
+      else
+        data = {
+          node_id: "PR_1",
+          state: "open",
+          merged: false,
+          draft: false,
+          head: { sha: r.head, repo: { full_name: r.repository } },
+          base: { sha: r.base },
+          auto_merge: armed ? {} : null,
+        };
+    } else {
+      writes.push({ path, body });
+      if (path === "/graphql") {
+        armed = false;
+        data = { data: { disablePullRequestAutoMerge: { pullRequest: { id: "PR_1" } } } };
+      } else {
+        stored = { ...stored, ...body, id: 1, app: { id: options.appId } };
+        data = stored;
+      }
+    }
+    const response = new Response(JSON.stringify(data), {
+      headers: { "content-type": "application/json" },
+    });
+    Object.defineProperty(response, "url", { value: String(url) });
+    return response;
+  }) as typeof fetch;
+  const publisher = githubPublisher(
+    new Octokit({
+      request: { fetch: fetcher },
+      retry: { enabled: false },
+      throttle: { enabled: false },
+    }),
+    options,
+  );
+  const result = await publisher.run(r, async () => ({
+    kind: "held",
+    request: r,
+    reason: "Review history unavailable",
+    mergeEligible: false,
+  }));
+  const output = stored?.output as { title?: string; summary?: string; text?: string };
+  const disable = writes.findIndex((write) => write.path === "/graphql");
+  const closed = writes.findIndex(
+    (write) =>
+      write.body.name === options.checks.review && write.body.conclusion === "action_required",
+  );
+  expect(result.kind).toBe("held");
+  expect(armed).toBe(false);
+  expect(disable).toBeGreaterThanOrEqual(0);
+  expect(closed).toBeGreaterThan(disable);
+  expect(writes.filter((write) => write.path.endsWith("/reviews"))).toEqual([]);
+  expect(stored?.conclusion).toBe("action_required");
+  expect(output.title).toBe("held for the operator: Review history unavailable");
+  expect(output.summary).toContain("Review history unavailable");
+  expect(output.text).toContain("Review history unavailable");
+  expect(output.text).not.toMatch(/outcome:|band:/u);
+});
 // Ollie's state script (dotty .github/scripts/ollie-state.py, parse_verdict) reads these
 // lines from the check text and requests the operator's review on a held PR. Without them
 // a hold is invisible to her; this is the live defect found on margot #94.
@@ -839,17 +909,71 @@ it("A failed final check blocks after review delivery", async () => {
     reviewWrites: x.writes.filter((w) => w.path.endsWith("/reviews")).length,
   }).toMatchObject({ kind: "error", conclusion: "action_required", reviewWrites: 1 });
 });
-it("A long multiline risk concern renders as its bounded first line", () => {
+it("The risk line displays the voice's short risk statement rather than the band rationale", () => {
   const value = structuredClone(commentReview);
-  value.decision.rating.rationale = `${Array.from({ length: 40 }, () => "concern").join(" ")}\ncontinued on another line`;
-  const line = render(value).split("\n")[1];
-  expect({
-    line,
-    continued: line?.includes("continued") ?? false,
-  }).toMatchObject({
-    line: `🟡 **Risk: MEDIUM** — ${Array.from({ length: 20 }, () => "concern").join(" ")}…`,
-    continued: false,
-  });
+  if (!value.voice) throw new Error("voice fixture required");
+  value.voice.risk = "  operator\nworkflow   disruption  ";
+  value.decision.rating.rationale = "The band comes from a separate risk assessment.";
+  expect(render(value).split("\n")[1]).toBe("🟡 **Risk: MEDIUM** — operator workflow disruption");
+});
+it("A risk line without a voice risk statement omits the explanatory suffix", () => {
+  const value = structuredClone(commentReview);
+  if (!value.voice) throw new Error("voice fixture required");
+  delete value.voice.risk;
+  expect(render(value).split("\n")[1]).toBe("🟡 **Risk: MEDIUM**");
+});
+it("A mechanical review posts confidence, files, cost and runtime without a council roster", () => {
+  const value = structuredClone(baseReview);
+  value.provenance.mechanicalProbability = 0.987;
+  value.presentation = {
+    author: "contributor",
+    costUsd: 0.12,
+    durationMs: 61000,
+    files: 2,
+    runUrl: null,
+    ticket: null,
+  };
+  const body = render(value);
+  expect(body).toContain("Mechanical change (confidence 99%) • 2 files • $0.12 • 1m 1s");
+  expect(body).not.toContain("Council reviewed");
+  expect(body.split("\n").filter((line) => line.startsWith("* "))).toEqual([]);
+});
+it("A mechanical review without a probability omits the confidence annotation", () => {
+  const value = structuredClone(baseReview);
+  delete value.provenance.mechanicalProbability;
+  expect(render(value)).toContain("Mechanical change • ");
+  expect(render(value)).not.toContain("confidence");
+});
+it("A clarification tells the pull request author which decision is needed", () => {
+  const value = structuredClone(commentReview);
+  if (!value.voice || !value.presentation) throw new Error("voice and presentation required");
+  value.decision.outcome = "CLARIFICATION_REQUESTED";
+  value.voice.clarification = "Should this setting apply to existing installations?";
+  value.presentation.author = "contributor";
+  expect(render(value)).toContain(
+    "@contributor, your call: Should this setting apply to existing installations?",
+  );
+});
+it("A fallback-scored review warns that confidence is reduced and nothing was auto-merged", () => {
+  const value = structuredClone(commentReview);
+  value.provenance.decision_source = "fallback";
+  expect(render(value)).toContain(
+    "> ⚠️ _The risk model was unavailable — this risk was scored by a fallback at reduced confidence, so nothing was auto-merged._",
+  );
+});
+it("The check text preserves convergence as machine-readable JSON", () => {
+  const value = structuredClone(commentReview);
+  value.convergence.round = 3;
+  expect(
+    renderCheckText(value)
+      .split("\n")
+      .find((line) => line.startsWith("convergence: ")),
+  ).toBe(`convergence: ${JSON.stringify(value.convergence)}`);
+});
+it("The check text names cards summoned by the prior ledger", () => {
+  const value = structuredClone(commentReview);
+  value.provenance.summonedByLedger = ["safety", "principal-engineer"];
+  expect(renderCheckText(value)).toContain("summoned by ledger: safety, principal-engineer");
 });
 it("A long rationale renders its first two sentences", () => {
   const value = structuredClone(commentReview);
@@ -897,7 +1021,7 @@ it("renders the verdict, risk, council roster and finding tally in the review co
   const roster = lines.filter((line) => /^\* (?:✅|⚠️|ℹ️|❓) /.test(line));
   return expect({
     outcome: /^### [✅❌❓] [A-Z_]+$/.test(lines[0] ?? ""),
-    risk: /^(?:🟢|🟡|🔴) \*\*Risk: (LOW|MEDIUM|HIGH)\*\* — .+$/.test(lines[1] ?? ""),
+    risk: /^(?:🟢|🟡|🔴) \*\*Risk: (LOW|MEDIUM|HIGH)\*\*(?: — .+)?$/.test(lines[1] ?? ""),
     rationale: (lines[2] ?? "").startsWith("> "),
     council: lines.some((line) =>
       /^Council reviewed \d+ files? • \d of 6 cards • \d+ findings? • \$\d+\.\d{2} • /.test(line),

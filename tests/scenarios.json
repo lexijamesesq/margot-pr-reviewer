@@ -1951,20 +1951,6 @@
     }
   },
   {
-    "name": "unreadable history reviews without replacing the ledger",
-    "recording": "council-clear",
-    "patches": [
-      {
-        "path": "facts.history.complete",
-        "value": false
-      }
-    ],
-    "expected": {
-      "kind": "reviewed",
-      "hasLedger": false
-    }
-  },
-  {
     "name": "degraded classification cannot approve",
     "recording": "council-clear",
     "patches": [

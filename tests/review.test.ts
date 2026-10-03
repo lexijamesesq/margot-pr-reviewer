@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { jevAdapter } from "../src/adapters/jev.js";
+import { parseVoice } from "../src/adapters/prose.js";
 import { type Recording, recordedServices, review } from "../src/index.js";
 import { riskQuestions } from "../src/questions.js";
 import { checkText } from "../src/render.js";
@@ -149,6 +150,17 @@ describe("classification and availability", () => {
   const facts = factsSchema.parse(seed.facts);
   const request = requestSchema.parse(seed.request);
   const context = () => ({ signal: AbortSignal.timeout(3000) });
+  it("carries measured mechanical confidence into the comment and saved result", async () => {
+    const r = recording();
+    r.classification = { source: "jev", functional: 0, documentation: 0, mechanical: 0.87 };
+    const result = await review(r.request, r.config, recordedServices(r));
+    expect(result).toMatchObject({
+      kind: "reviewed",
+      provenance: { mechanicalProbability: 0.87 },
+      ledger: { receipt: { review: { provenance: { mechanicalProbability: 0.87 } } } },
+      report: expect.stringContaining("Mechanical change (confidence 87%)"),
+    });
+  });
   it("uses the requested functional classification", async () => {
     const r = recording();
     r.request = { ...request, classification: "functional" };
@@ -192,43 +204,30 @@ describe("classification and availability", () => {
       writes: 1,
     });
   });
-  it("runs the council without posting a ledger when history is incomplete", async () => {
+  it("holds incomplete history for the operator and disarms auto-merge before model calls", async () => {
     const r = recording();
     r.facts = { ...facts, history: { complete: false, priorLedger: true, reviews: [] } };
-    const result = await review(r.request, r.config, recordedServices(r));
-    const documentation = structuredClone(r);
-    documentation.classification = {
-      source: "jev",
-      functional: 0,
-      documentation: 1,
-      mechanical: 0,
-    };
-    documentation.route = {
-      source: "jev",
-      confidence: 1,
-      documentationSubstantive: 0,
-      cards: Object.fromEntries(cardNames.map((name) => [name, 0])),
-    };
-    documentation.cards = {
-      "works-and-proven": {
-        name: "works-and-proven",
-        completion: "completed",
-        checked: [],
-        notCovered: [],
-        findings: [],
-      },
-    };
-    const doc = await review(
-      documentation.request,
-      documentation.config,
-      recordedServices(documentation),
-    );
-    expect({
-      documentationCouncil: doc.kind === "reviewed" && doc.cards.length === 1,
-      kind: result.kind,
-      noLedger: result.kind === "reviewed" && !result.report.includes("<!-- margot-ledger:"),
-      round: result.kind === "reviewed" && result.convergence.round,
-    }).toMatchObject({ kind: "reviewed", noLedger: true, round: 1, documentationCouncil: true });
+    const services = recordedServices(r);
+    expect(await review(r.request, r.config, services)).toEqual({
+      kind: "held",
+      request: r.request,
+      reason: "Review history unavailable",
+      mergeEligible: false,
+    });
+    expect(services.calls.map((call) => call.name)).toEqual(["facts", "head", "disableAutoMerge"]);
+    expect(services.publications).toEqual([]);
+  });
+  it("holds functional reviews with unreadable history even when the council would clear", async () => {
+    const r = JSON.parse(readFileSync("recordings/council-clear.json", "utf8")) as Recording;
+    r.facts = { ...factsSchema.parse(r.facts), history: { complete: false, priorLedger: false } };
+    const services = recordedServices(r);
+    expect(await review(r.request, r.config, services)).toEqual({
+      kind: "held",
+      request: r.request,
+      reason: "Review history unavailable",
+      mergeEligible: false,
+    });
+    expect(services.publications).toEqual([]);
   });
   const outage = (fallback: NonNullable<Parameters<typeof jevAdapter>[0]["fallback"]>) =>
     jevAdapter({
@@ -282,4 +281,75 @@ describe("classification and availability", () => {
       source: result.kind === "reviewed" && result.provenance.decision_source,
     }).toMatchObject({ kind: "reviewed", eligible: true, source: "jev" });
   });
+});
+
+describe("voice publication safeguards", () => {
+  function voiceRecording(prose: string): Recording {
+    const recording = JSON.parse(
+      readFileSync("recordings/mechanical-bump.json", "utf8"),
+    ) as Recording;
+    recording.request = { ...requestSchema.parse(recording.request), classification: "functional" };
+    recording.route = {
+      source: "jev",
+      cards: Object.fromEntries(cardNames.map((name) => [name, 0])),
+      confidence: 0,
+      documentationSubstantive: null,
+    };
+    recording.voice = parseVoice(prose);
+    return recording;
+  }
+
+  it("refuses approval with an open clarification before publication", async () => {
+    const recording = voiceRecording(
+      "outcome: APPROVED\nband: LOW\nband_reason: Bounded change\nrisk: configuration change\nsummary: Reviewed\nclarification: Which behavior should callers receive?\nestablished:\ndismissed:\n",
+    );
+    const services = recordedServices(recording);
+    expect(await review(recording.request, recording.config, services)).toMatchObject({
+      kind: "error",
+      mergeEligible: false,
+      diagnostic: "Approval contradicts an open clarification",
+    });
+    expect(services.publications).toEqual([]);
+  });
+
+  it("refuses approval with an established finding outside the mandatory set", async () => {
+    const recording = voiceRecording(
+      "outcome: APPROVED\nband: LOW\nband_reason: Bounded change\nsummary: Reviewed\nestablished:\n- F999 · The guard is missing\ndismissed:\n",
+    );
+    const services = recordedServices(recording);
+    expect(await review(recording.request, recording.config, services)).toMatchObject({
+      kind: "error",
+      mergeEligible: false,
+      diagnostic: "Approval contradicts unresolved findings",
+    });
+    expect(services.publications).toEqual([]);
+  });
+
+  it.each(["summary", "risk", "band_reason", "finding", "clarification"])(
+    "refuses self-attribution in the voice's %s before publication",
+    async (field) => {
+      const fields = {
+        outcome: "CHANGES_REQUESTED",
+        band: "LOW",
+        band_reason: "Bounded change",
+        risk: "configuration change",
+        summary: "Reviewed",
+        finding: "",
+        clarification: "",
+        [field]: "Generated with Claude Code",
+      };
+      const recording = voiceRecording(
+        Object.entries(fields)
+          .map(([name, value]) => `${name}: ${value}`)
+          .join("\n"),
+      );
+      const services = recordedServices(recording);
+      expect(await review(recording.request, recording.config, services)).toMatchObject({
+        kind: "error",
+        mergeEligible: false,
+        diagnostic: expect.stringContaining("Attribution leak in review prose"),
+      });
+      expect(services.publications).toEqual([]);
+    },
+  );
 });
