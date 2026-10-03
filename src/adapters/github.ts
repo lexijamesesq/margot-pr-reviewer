@@ -47,6 +47,7 @@ export function githubAdapter(
     freshShadow?: boolean;
     shadowBeforeHead?: boolean;
     triageAppId?: number;
+    triageCheckName?: string;
     ownedPathTier?: unknown;
   } = {},
 ) {
@@ -149,10 +150,12 @@ export function githubAdapter(
       const latest = checks
         .filter(
           (check) =>
-            check.name === "review / triage" &&
+            options.triageAppId !== undefined &&
+            options.triageCheckName !== undefined &&
+            check.name === options.triageCheckName &&
             check.status === "completed" &&
             check.head_sha === r.head &&
-            check.app?.id === (options.triageAppId ?? 4862659),
+            check.app?.id === options.triageAppId,
         )
         .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id)[0];
       if (latest?.started_at && Number.isInteger(latest.id)) {

@@ -42,8 +42,6 @@ export type ReviewPresentation = {
 };
 export type Review = ReviewCore & {
   ledger: Ledger;
-  ledgerUnavailable?: boolean;
-  ledgerWarnings?: string[];
   convergence: Convergence;
   presentation?: ReviewPresentation;
 };
@@ -61,6 +59,14 @@ export type ReviewResult =
       report: string;
       publication: z.infer<typeof publicationSchema> | null;
     } & Review)
+  | {
+      kind: "held";
+      request: ReviewRequest;
+      reason: string;
+      /** How the operator clears the hold; shown in the check's summary, not its title. */
+      recovery?: string;
+      mergeEligible: false;
+    }
   | {
       kind: "classified";
       request: ReviewRequest;

@@ -169,6 +169,9 @@ export const voiceSchema = z.strictObject({
   band: bandSchema,
   rationale: text,
   summary: text,
+  risk: z.string().optional(),
+  clarification: z.string().optional(),
+  finding: z.string().optional(),
   dispositions: z.array(
     z.strictObject({
       id: text,
@@ -266,6 +269,8 @@ export const reviewCoreSchema = z.strictObject({
   provenance: z.strictObject({
     cardBundle: shaSchema,
     classification: z.string(),
+    mechanicalProbability: probability.nullable().optional(),
+    summonedByLedger: z.array(cardNameSchema).optional(),
     decision_source: z.enum(["jev", "fallback"]).optional(),
     services: text,
   }),

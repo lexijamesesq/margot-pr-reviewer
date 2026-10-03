@@ -111,6 +111,7 @@ jobs:
         id: review
         env:
           GH_TOKEN: ${{ github.token }}
+          MARGOT_WRITE_TOKEN: ${{ secrets.EXAMPLE_MARGOT_WRITE_TOKEN }}
           MARGOT_OWNED_TIER: ${{ inputs.owned_tier }}
           MARGOT_CLASSIFICATION: ${{ inputs.classification }}
           MARGOT_TRIAGE: ${{ inputs.triage }}

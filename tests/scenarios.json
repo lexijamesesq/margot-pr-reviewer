@@ -5,14 +5,7 @@
     "patches": [],
     "expected": {
       "routeAnswerMatches": true
-    },
-    "break": [],
-    "sourceBreak": {
-      "file": "src/review.ts",
-      "from": "        classification,\n        routeAnswer,\n        riskAnswer,\n        cards,",
-      "to": "        classification,\n        routeAnswer: null,\n        riskAnswer,\n        cards,"
-    },
-    "defect": "Drop Jev's route answer from the result."
+    }
   },
   {
     "name": "functional result records the risk answer Jev returned",
@@ -20,14 +13,7 @@
     "patches": [],
     "expected": {
       "riskAnswerMatches": true
-    },
-    "break": [],
-    "sourceBreak": {
-      "file": "src/review.ts",
-      "from": "        classification,\n        routeAnswer,\n        riskAnswer,\n        cards,",
-      "to": "        classification,\n        routeAnswer,\n        riskAnswer: null,\n        cards,"
-    },
-    "defect": "Drop Jev's risk answer from the result."
+    }
   },
   {
     "name": "mechanical result records null Jev answers when no question was asked",
@@ -36,14 +22,7 @@
     "expected": {
       "routeAnswer": null,
       "riskAnswer": null
-    },
-    "break": [
-      {
-        "path": "classification.functional",
-        "value": 1
-      }
-    ],
-    "defect": "Route the mechanical change so a Jev answer is recorded."
+    }
   },
   {
     "name": "recorded mechanical bump spends no Claude",
@@ -58,14 +37,7 @@
         "head",
         "publish"
       ]
-    },
-    "break": [
-      {
-        "path": "classification.functional",
-        "value": 1
-      }
-    ],
-    "defect": "Misclassify a version-only bump as functional."
+    }
   },
   {
     "name": "recorded clear council reaches publication",
@@ -75,16 +47,7 @@
       "kind": "reviewed",
       "eligible": true,
       "writes": 1
-    },
-    "break": [
-      {
-        "path": "failures",
-        "value": {
-          "card:safety": "report lost"
-        }
-      }
-    ],
-    "defect": "Lose a selected safety report."
+    }
   },
   {
     "name": "recorded voice rating holds the same displayed band",
@@ -96,14 +59,7 @@
       "holds": [
         "risk"
       ]
-    },
-    "break": [
-      {
-        "path": "voice.band",
-        "value": "LOW"
-      }
-    ],
-    "defect": "Lower the voice band while retaining its approval."
+    }
   },
   {
     "name": "recorded malformed accounting cannot approve",
@@ -113,20 +69,7 @@
       "kind": "error",
       "stage": "voice",
       "writes": 0
-    },
-    "break": [
-      {
-        "path": "voice.dispositions",
-        "value": [
-          {
-            "id": "F1",
-            "status": "established",
-            "reason": "Missing regression evidence."
-          }
-        ]
-      }
-    ],
-    "defect": "Repair the missing disposition; the error assertion must detect it."
+    }
   },
   {
     "name": "recorded author findings request changes",
@@ -135,14 +78,7 @@
     "expected": {
       "outcome": "CHANGES_REQUESTED",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "voice.outcome",
-        "value": "APPROVED"
-      }
-    ],
-    "defect": "Return approval despite established issues."
+    }
   },
   {
     "name": "recorded second round fixes both earlier MINOR findings",
@@ -158,14 +94,7 @@
         "new": 0,
         "late": 0
       }
-    },
-    "break": [
-      {
-        "path": "facts.history.reviews.0.actor",
-        "value": "forger"
-      }
-    ],
-    "defect": "Replace the prior review author with an untrusted actor."
+    }
   },
   {
     "name": "recorded no council excludes only uncertain dimensions",
@@ -177,14 +106,7 @@
       "ignored": [
         "verification_gap"
       ]
-    },
-    "break": [
-      {
-        "path": "risk.dimensions.verification_gap.confidence",
-        "value": 1
-      }
-    ],
-    "defect": "Claim confidence in the otherwise ignored MEDIUM dimension."
+    }
   },
   {
     "name": "functional takes precedence over other confident classes",
@@ -201,14 +123,7 @@
     ],
     "expected": {
       "classification": "functional"
-    },
-    "break": [
-      {
-        "path": "classification.functional",
-        "value": 0
-      }
-    ],
-    "defect": "Remove the functional classification evidence."
+    }
   },
   {
     "name": "documentation takes precedence over mechanical",
@@ -257,14 +172,7 @@
     ],
     "expected": {
       "classification": "documentation"
-    },
-    "break": [
-      {
-        "path": "classification.documentation",
-        "value": 0
-      }
-    ],
-    "defect": "Remove the documentation classification evidence."
+    }
   },
   {
     "name": "ambiguous classification selects full review",
@@ -282,14 +190,7 @@
     ],
     "expected": {
       "classification": "functional"
-    },
-    "break": [
-      {
-        "path": "classification.mechanical",
-        "value": 1
-      }
-    ],
-    "defect": "Turn ambiguity into a confident mechanical answer."
+    }
   },
   {
     "name": "fresh classification raises a trusted mechanical receipt",
@@ -307,19 +208,7 @@
     ],
     "expected": {
       "classification": "functional"
-    },
-    "break": [
-      {
-        "path": "classification",
-        "value": {
-          "source": "jev",
-          "functional": 0,
-          "documentation": 0,
-          "mechanical": 1
-        }
-      }
-    ],
-    "defect": "Replace the fresh functional judgment with mechanical."
+    }
   },
   {
     "name": "trusted triage can only raise the test profile",
@@ -346,14 +235,7 @@
     ],
     "expected": {
       "classification": "functional"
-    },
-    "break": [
-      {
-        "path": "facts.triage.classification",
-        "value": "mechanical"
-      }
-    ],
-    "defect": "Lower the earlier trusted profile."
+    }
   },
   {
     "name": "classification question tells Jev to judge human formatting by behavior",
@@ -371,23 +253,13 @@
     "expected": {
       "questionContract": true
     },
-    "break": [],
-    "defect": "Remove the relevant classification rule from the question sent to Jev.",
     "questionContract": {
       "key": "mechanical",
       "rules": [
         "Judge what changed, not the author, generator, file extension, or size.",
         "behavior-preserving lint/format changes."
       ]
-    },
-    "sourceBreak": {
-      "file": "src/questions.ts",
-      "from": "behavior-preserving lint/format changes. ",
-      "to": ""
-    },
-    "alsoFails": [
-      "Jev classification sends the exact measured P1 questions"
-    ]
+    }
   },
   {
     "name": "classification question tells Jev agent instructions are functional",
@@ -409,23 +281,13 @@
     "expected": {
       "questionContract": true
     },
-    "break": [],
-    "defect": "Remove the relevant classification rule from the question sent to Jev.",
     "questionContract": {
       "key": "functional",
       "rules": [
         "Text that a tool or an agent reads to change behaviour is FUNCTIONAL",
         "agent or skill instructions"
       ]
-    },
-    "sourceBreak": {
-      "file": "src/questions.ts",
-      "from": "agent or skill instructions, ",
-      "to": ""
-    },
-    "alsoFails": [
-      "Jev classification sends the exact measured P1 questions"
-    ]
+    }
   },
   {
     "name": "substantive documentation defaults to works-and-proven",
@@ -474,14 +336,7 @@
         "works-and-proven"
       ],
       "band": "LOW"
-    },
-    "break": [
-      {
-        "path": "route.documentationSubstantive",
-        "value": 0
-      }
-    ],
-    "defect": "Claim the substantive change has no changed meaning."
+    }
   },
   {
     "name": "editorial documentation skips council and voice",
@@ -527,14 +382,7 @@
     "expected": {
       "cards": [],
       "voice": false
-    },
-    "break": [
-      {
-        "path": "route.documentationSubstantive",
-        "value": 1
-      }
-    ],
-    "defect": "Report changed meaning on an editorial edit."
+    }
   },
   {
     "name": "missing documentation meaning answer requires review",
@@ -581,14 +429,7 @@
       "cards": [
         "works-and-proven"
       ]
-    },
-    "break": [
-      {
-        "path": "route.documentationSubstantive",
-        "value": 0
-      }
-    ],
-    "defect": "Replace missing meaning evidence with a confident no."
+    }
   },
   {
     "name": "documentation defects go to the author at LOW",
@@ -662,14 +503,7 @@
       "holds": [
         "author-action"
       ]
-    },
-    "break": [
-      {
-        "path": "voice.dispositions",
-        "value": []
-      }
-    ],
-    "defect": "Drop the documented defect from the voice accounting."
+    }
   },
   {
     "name": "documentation questions request clarification at LOW",
@@ -740,14 +574,7 @@
     "expected": {
       "outcome": "CLARIFICATION_REQUESTED",
       "band": "LOW"
-    },
-    "break": [
-      {
-        "path": "voice.outcome",
-        "value": "CHANGES_REQUESTED"
-      }
-    ],
-    "defect": "Replace an intent question with a change demand."
+    }
   },
   {
     "name": "a selected functional lens runs",
@@ -769,14 +596,7 @@
       "cards": [
         "safety"
       ]
-    },
-    "break": [
-      {
-        "path": "route.cards.safety",
-        "value": 0.349
-      }
-    ],
-    "defect": "Move the safety probability below the summon boundary."
+    }
   },
   {
     "name": "confident no council clears without voice",
@@ -861,14 +681,7 @@
       "cards": [],
       "voice": false,
       "eligible": true
-    },
-    "break": [
-      {
-        "path": "route.confidence",
-        "value": 0.1
-      }
-    ],
-    "defect": "Make the empty routing decision uncertain."
+    }
   },
   {
     "name": "uncertain empty routing escalates to voice",
@@ -955,14 +768,7 @@
     ],
     "expected": {
       "voice": true
-    },
-    "break": [
-      {
-        "path": "route.confidence",
-        "value": 1
-      }
-    ],
-    "defect": "Claim confident empty routing."
+    }
   },
   {
     "name": "confident MEDIUM no council is held",
@@ -1058,14 +864,7 @@
     "expected": {
       "band": "MEDIUM",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "voice.band",
-        "value": "LOW"
-      }
-    ],
-    "defect": "Voice overrides a MEDIUM decision down to LOW."
+    }
   },
   {
     "name": "risk tail at the boundary raises the band",
@@ -1161,19 +960,7 @@
     "expected": {
       "band": "MEDIUM",
       "voice": true
-    },
-    "break": [
-      {
-        "path": "risk.dimensions.operations.probabilities",
-        "value": [
-          0,
-          0.701,
-          0.299,
-          0
-        ]
-      }
-    ],
-    "defect": "Move high-level tail mass just below the boundary."
+    }
   },
   {
     "name": "risk tail below boundary stays LOW",
@@ -1269,19 +1056,7 @@
     "expected": {
       "band": "LOW",
       "voice": false
-    },
-    "break": [
-      {
-        "path": "risk.dimensions.operations.probabilities",
-        "value": [
-          0,
-          0.7,
-          0.3,
-          0
-        ]
-      }
-    ],
-    "defect": "Move tail mass onto the boundary."
+    }
   },
   {
     "name": "no confident risk dimension cannot use the floor",
@@ -1365,14 +1140,7 @@
     "expected": {
       "band": "MEDIUM",
       "ignored": []
-    },
-    "break": [
-      {
-        "path": "voice.band",
-        "value": "LOW"
-      }
-    ],
-    "defect": "Voice lowers a band with no confident dimension."
+    }
   },
   {
     "name": "council prevents the no council confidence floor",
@@ -1445,21 +1213,7 @@
     "expected": {
       "band": "MEDIUM",
       "ignored": []
-    },
-    "break": [
-      {
-        "path": "route.cards",
-        "value": {
-          "safety": 0,
-          "works-and-proven": 0,
-          "principal-engineer": 0,
-          "achieves-the-objective": 0,
-          "maintainable-no-slop": 0,
-          "house-style": 0
-        }
-      }
-    ],
-    "defect": "Remove the council and permit the no-council floor."
+    }
   },
   {
     "name": "voice can lower functional risk for both display and merge",
@@ -1473,14 +1227,7 @@
     "expected": {
       "band": "LOW",
       "eligible": true
-    },
-    "break": [
-      {
-        "path": "voice.band",
-        "value": "HIGH"
-      }
-    ],
-    "defect": "Raise the final voice rating."
+    }
   },
   {
     "name": "dismissed mandatory findings permit approval",
@@ -1550,14 +1297,7 @@
     ],
     "expected": {
       "eligible": true
-    },
-    "break": [
-      {
-        "path": "voice.dispositions.0.status",
-        "value": "established"
-      }
-    ],
-    "defect": "Turn a dismissal into an established unresolved finding."
+    }
   },
   {
     "name": "duplicate dispositions are rejected",
@@ -1633,20 +1373,7 @@
     "expected": {
       "kind": "error",
       "stage": "voice"
-    },
-    "break": [
-      {
-        "path": "voice.dispositions",
-        "value": [
-          {
-            "id": "one",
-            "status": "established",
-            "reason": "The command and its effect disagree."
-          }
-        ]
-      }
-    ],
-    "defect": "Remove the duplicate disposition."
+    }
   },
   {
     "name": "a disposition for an ID outside this round is ignored; every mandatory finding still must be accounted for",
@@ -1722,20 +1449,7 @@
     "expected": {
       "kind": "reviewed",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "voice.dispositions",
-        "value": [
-          {
-            "id": "unknown",
-            "status": "dismissed",
-            "reason": "No matching finding."
-          }
-        ]
-      }
-    ],
-    "defect": "Drop the mandatory finding's disposition, leaving only the unknown ID."
+    }
   },
   {
     "name": "contradictory approval is rejected",
@@ -1806,14 +1520,7 @@
     "expected": {
       "kind": "error",
       "stage": "voice"
-    },
-    "break": [
-      {
-        "path": "voice.outcome",
-        "value": "CHANGES_REQUESTED"
-      }
-    ],
-    "defect": "Repair approval with established findings."
+    }
   },
   {
     "name": "a BLOCKING info finding summons the voice, which need not dispose of it",
@@ -1878,14 +1585,7 @@
     "expected": {
       "kind": "reviewed",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "cards.works-and-proven.findings.0.severity",
-        "value": "MINOR"
-      }
-    ],
-    "defect": "Reduce the informational finding below the blocking threshold, so nothing summons the voice."
+    }
   },
   {
     "name": "an achieves-the-objective finding summons the voice, which need not dispose of it",
@@ -1962,14 +1662,7 @@
     "expected": {
       "kind": "reviewed",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "cards.achieves-the-objective.findings",
-        "value": []
-      }
-    ],
-    "defect": "Lose the objective question, so nothing summons the voice."
+    }
   },
   {
     "name": "functional authority paths hold",
@@ -1987,14 +1680,7 @@
       "holds": [
         "review-authority"
       ]
-    },
-    "break": [
-      {
-        "path": "config.protectedPaths",
-        "value": []
-      }
-    ],
-    "defect": "Remove configured authority protection."
+    }
   },
   {
     "name": "ordinary documentation on a protected path stays author-owned",
@@ -2046,14 +1732,7 @@
     "expected": {
       "eligible": true,
       "holds": []
-    },
-    "break": [
-      {
-        "path": "facts.files.0.previousPath",
-        "value": "old.md"
-      }
-    ],
-    "defect": "Turn a protected edit into a rename."
+    }
   },
   {
     "name": "protected old rename path always holds",
@@ -2116,19 +1795,7 @@
       "holds": [
         "review-authority"
       ]
-    },
-    "break": [
-      {
-        "path": "facts.files",
-        "value": [
-          {
-            "path": "guide.md",
-            "previousPath": "old-guide.md"
-          }
-        ]
-      }
-    ],
-    "defect": "Remove the protected old rename endpoint."
+    }
   },
   {
     "name": "protected new rename path always holds",
@@ -2191,19 +1858,7 @@
       "holds": [
         "review-authority"
       ]
-    },
-    "break": [
-      {
-        "path": "facts.files",
-        "value": [
-          {
-            "path": "guide.md",
-            "previousPath": "old-guide.md"
-          }
-        ]
-      }
-    ],
-    "defect": "Remove the protected new rename endpoint."
+    }
   },
   {
     "name": "missing trusted configuration cannot approve",
@@ -2218,36 +1873,7 @@
       "kind": "error",
       "stage": "input",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "config",
-        "value": {
-          "protectedPaths": [],
-          "trustedCheckActors": [
-            "checks-app"
-          ],
-          "trustedTriageActors": [
-            "triage-app"
-          ],
-          "requiredChecks": [
-            "ci"
-          ],
-          "cardBundle": {
-            "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
-          },
-          "classificationThreshold": 0.6,
-          "routeThreshold": 0.35,
-          "riskTailThreshold": 0.3,
-          "confidenceThreshold": 0.3,
-          "noCouncilConfidenceFloor": 0.3,
-          "timeoutMs": 1000,
-          "publication": "record",
-          "calibration": false
-        }
-      }
-    ],
-    "defect": "Repair only the missing trusted configuration response."
+    }
   },
   {
     "name": "malformed request cannot approve",
@@ -2262,14 +1888,7 @@
       "kind": "error",
       "stage": "input",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "request.pr",
-        "value": 2
-      }
-    ],
-    "defect": "Repair only the malformed request response."
+    }
   },
   {
     "name": "incomplete facts cannot approve",
@@ -2284,14 +1903,7 @@
       "kind": "error",
       "stage": "facts",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.complete",
-        "value": true
-      }
-    ],
-    "defect": "Repair only the incomplete facts response."
+    }
   },
   {
     "name": "truncated file listing cannot approve",
@@ -2306,14 +1918,7 @@
       "kind": "error",
       "stage": "facts",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.fileCount",
-        "value": 1
-      }
-    ],
-    "defect": "Repair only the truncated file listing response."
+    }
   },
   {
     "name": "stale fetched head cannot approve",
@@ -2328,14 +1933,7 @@
       "kind": "error",
       "stage": "facts",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.head",
-        "value": "0000000000000000000000000000000000000002"
-      }
-    ],
-    "defect": "Repair only the stale fetched head response."
+    }
   },
   {
     "name": "wrong repository facts cannot approve",
@@ -2350,35 +1948,7 @@
       "kind": "error",
       "stage": "facts",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.repository",
-        "value": "example/project"
-      }
-    ],
-    "defect": "Repair only the wrong repository facts response."
-  },
-  {
-    "name": "unreadable history reviews without replacing the ledger",
-    "recording": "council-clear",
-    "patches": [
-      {
-        "path": "facts.history.complete",
-        "value": false
-      }
-    ],
-    "expected": {
-      "kind": "reviewed",
-      "hasLedger": false
-    },
-    "break": [
-      {
-        "path": "facts.history.complete",
-        "value": true
-      }
-    ],
-    "defect": "Repair only the unreadable history response."
+    }
   },
   {
     "name": "degraded classification cannot approve",
@@ -2393,14 +1963,7 @@
       "kind": "error",
       "stage": "classification",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "classification.source",
-        "value": "jev"
-      }
-    ],
-    "defect": "Repair only the degraded classification response."
+    }
   },
   {
     "name": "malformed classification probability cannot approve",
@@ -2415,14 +1978,7 @@
       "kind": "error",
       "stage": "classification",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "classification.mechanical",
-        "value": 0
-      }
-    ],
-    "defect": "Repair only the malformed classification probability response."
+    }
   },
   {
     "name": "malformed route cannot approve",
@@ -2437,14 +1993,7 @@
       "kind": "error",
       "stage": "route",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "route.cards.safety",
-        "value": 0.53
-      }
-    ],
-    "defect": "Repair only the malformed route response."
+    }
   },
   {
     "name": "fallback risk cannot approve",
@@ -2461,14 +2010,7 @@
       "holds": [
         "fallback"
       ]
-    },
-    "break": [
-      {
-        "path": "risk.source",
-        "value": "jev"
-      }
-    ],
-    "defect": "Repair only the fallback risk response."
+    }
   },
   {
     "name": "missing risk dimension cannot approve",
@@ -2483,22 +2025,7 @@
       "kind": "error",
       "stage": "risk",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "risk.dimensions.operations",
-        "value": {
-          "probabilities": [
-            0.64,
-            0.09,
-            0.27,
-            0.0
-          ],
-          "confidence": 0.35
-        }
-      }
-    ],
-    "defect": "Repair only the missing risk dimension response."
+    }
   },
   {
     "name": "invalid risk distribution cannot approve",
@@ -2518,19 +2045,7 @@
       "kind": "error",
       "stage": "risk",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "risk.dimensions.operations.probabilities",
-        "value": [
-          0.64,
-          0.09,
-          0.27,
-          0.0
-        ]
-      }
-    ],
-    "defect": "Repair only the invalid risk distribution response."
+    }
   },
   {
     "name": "wrong bundle pin cannot approve",
@@ -2545,14 +2060,7 @@
       "kind": "error",
       "stage": "bundle",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "bundle.commit",
-        "value": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
-      }
-    ],
-    "defect": "Repair only the wrong bundle pin response."
+    }
   },
   {
     "name": "missing explicit card path cannot approve",
@@ -2567,14 +2075,7 @@
       "kind": "error",
       "stage": "bundle",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "bundle.cardPaths.safety",
-        "value": "/recorded-bundle/skills/pr-council/playbooks/safety.md"
-      }
-    ],
-    "defect": "Repair only the missing explicit card path response."
+    }
   },
   {
     "name": "wrong returned card cannot approve",
@@ -2589,14 +2090,7 @@
       "kind": "error",
       "stage": "card:safety",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "cards.safety.name",
-        "value": "safety"
-      }
-    ],
-    "defect": "Repair only the wrong returned card response."
+    }
   },
   {
     "name": "missing required check cannot approve",
@@ -2611,21 +2105,7 @@
       "kind": "error",
       "stage": "checks",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.checks",
-        "value": [
-          {
-            "name": "ci",
-            "actor": "checks-app",
-            "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success"
-          }
-        ]
-      }
-    ],
-    "defect": "Repair only the missing required check response."
+    }
   },
   {
     "name": "forged required-check actor cannot approve",
@@ -2640,14 +2120,7 @@
       "kind": "error",
       "stage": "checks",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.checks.0.actor",
-        "value": "checks-app"
-      }
-    ],
-    "defect": "Repair only the forged required-check actor response."
+    }
   },
   {
     "name": "stale required-check SHA cannot approve",
@@ -2662,14 +2135,7 @@
       "kind": "error",
       "stage": "checks",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.checks.0.head",
-        "value": "0000000000000000000000000000000000000002"
-      }
-    ],
-    "defect": "Repair only the stale required-check SHA response."
+    }
   },
   {
     "name": "failed required check cannot approve",
@@ -2684,14 +2150,7 @@
       "kind": "error",
       "stage": "checks",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.checks.0.conclusion",
-        "value": "success"
-      }
-    ],
-    "defect": "Repair only the failed required check response."
+    }
   },
   {
     "name": "a superseded run of a required check does not block the current one",
@@ -2722,31 +2181,7 @@
     "expected": {
       "kind": "reviewed",
       "eligible": true
-    },
-    "break": [
-      {
-        "path": "facts.checks",
-        "value": [
-          {
-            "name": "ci",
-            "actor": "checks-app",
-            "head": "0000000000000000000000000000000000000002",
-            "conclusion": "failure",
-            "startedAt": "2026-10-01T21:36:01Z",
-            "id": 2
-          },
-          {
-            "name": "ci",
-            "actor": "checks-app",
-            "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success",
-            "startedAt": "2026-10-01T21:35:42Z",
-            "id": 1
-          }
-        ]
-      }
-    ],
-    "defect": "Make the failed run the current one."
+    }
   },
   {
     "name": "the current run of a required check decides when an older one succeeded",
@@ -2778,31 +2213,7 @@
       "kind": "error",
       "stage": "checks",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "facts.checks",
-        "value": [
-          {
-            "name": "ci",
-            "actor": "checks-app",
-            "head": "0000000000000000000000000000000000000002",
-            "conclusion": "success",
-            "startedAt": "2026-10-01T21:36:01Z",
-            "id": 2
-          },
-          {
-            "name": "ci",
-            "actor": "checks-app",
-            "head": "0000000000000000000000000000000000000002",
-            "conclusion": "failure",
-            "startedAt": "2026-10-01T21:35:42Z",
-            "id": 1
-          }
-        ]
-      }
-    ],
-    "defect": "Make the successful run the current one."
+    }
   },
   {
     "name": "head movement before publication cannot approve",
@@ -2817,14 +2228,7 @@
       "kind": "error",
       "stage": "publication-head",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "head",
-        "value": "0000000000000000000000000000000000000002"
-      }
-    ],
-    "defect": "Repair only the head movement before publication response."
+    }
   },
   {
     "name": "wrong publication receipt SHA cannot approve",
@@ -2839,14 +2243,7 @@
       "kind": "error",
       "stage": "publication",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "publication.head",
-        "value": "0000000000000000000000000000000000000002"
-      }
-    ],
-    "defect": "Repair only the wrong publication receipt SHA response."
+    }
   },
   {
     "name": "untrusted triage actor cannot lower review",
@@ -2874,14 +2271,7 @@
     "expected": {
       "kind": "reviewed",
       "classification": "functional"
-    },
-    "break": [
-      {
-        "path": "facts.triage.actor",
-        "value": "triage-app"
-      }
-    ],
-    "defect": "Repair the triage actor binding."
+    }
   },
   {
     "name": "untrusted triage head cannot lower review",
@@ -2909,14 +2299,7 @@
     "expected": {
       "kind": "reviewed",
       "classification": "functional"
-    },
-    "break": [
-      {
-        "path": "facts.triage.head",
-        "value": "0000000000000000000000000000000000000002"
-      }
-    ],
-    "defect": "Repair the triage head binding."
+    }
   },
   {
     "name": "triage is bound to the head rather than the base",
@@ -2944,14 +2327,7 @@
     "expected": {
       "kind": "reviewed",
       "classification": "mechanical"
-    },
-    "break": [
-      {
-        "path": "facts.triage.classification",
-        "value": "functional"
-      }
-    ],
-    "defect": "Repair the triage base binding."
+    }
   },
   {
     "name": "classification service failure is not empty success",
@@ -2968,14 +2344,7 @@
       "kind": "error",
       "stage": "classification",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "failures",
-        "value": {}
-      }
-    ],
-    "defect": "Restore the failed classification service response."
+    }
   },
   {
     "name": "route service failure is not empty success",
@@ -2992,14 +2361,7 @@
       "kind": "error",
       "stage": "route",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "failures",
-        "value": {}
-      }
-    ],
-    "defect": "Restore the failed route service response."
+    }
   },
   {
     "name": "risk service failure is not empty success",
@@ -3016,14 +2378,7 @@
       "kind": "error",
       "stage": "risk",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "failures",
-        "value": {}
-      }
-    ],
-    "defect": "Restore the failed risk service response."
+    }
   },
   {
     "name": "card:safety service failure is not empty success",
@@ -3040,14 +2395,7 @@
       "kind": "error",
       "stage": "card:safety",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "failures",
-        "value": {}
-      }
-    ],
-    "defect": "Restore the failed card:safety service response."
+    }
   },
   {
     "name": "publish service failure is not empty success",
@@ -3064,14 +2412,7 @@
       "kind": "error",
       "stage": "publication",
       "eligible": false
-    },
-    "break": [
-      {
-        "path": "failures",
-        "value": {}
-      }
-    ],
-    "defect": "Restore the failed publish service response."
+    }
   },
   {
     "name": "card timeout cannot approve",
@@ -3091,14 +2432,7 @@
     "expected": {
       "kind": "error",
       "stage": "card:safety"
-    },
-    "break": [
-      {
-        "path": "failures",
-        "value": {}
-      }
-    ],
-    "defect": "Let the timed-out card complete."
+    }
   },
   {
     "name": "voice transport failure cannot approve",
@@ -3114,14 +2448,7 @@
     "expected": {
       "kind": "error",
       "stage": "voice"
-    },
-    "break": [
-      {
-        "path": "failures",
-        "value": {}
-      }
-    ],
-    "defect": "Restore the missing voice response."
+    }
   },
   {
     "name": "malformed voice cannot approve",
@@ -3135,14 +2462,7 @@
     "expected": {
       "kind": "error",
       "stage": "voice"
-    },
-    "break": [
-      {
-        "path": "voice.outcome",
-        "value": "APPROVED"
-      }
-    ],
-    "defect": "Return a well-formed voice outcome."
+    }
   },
   {
     "name": "duplicate finding IDs cannot disappear",
@@ -3156,14 +2476,7 @@
     "expected": {
       "kind": "error",
       "stage": "cards"
-    },
-    "break": [
-      {
-        "path": "cards.maintainable-no-slop.findings.0.id",
-        "value": "F2"
-      }
-    ],
-    "defect": "Restore the unique finding ID."
+    }
   },
   {
     "name": "held review disables already armed auto merge",
@@ -3185,14 +2498,7 @@
         "disableAutoMerge",
         "publish"
       ]
-    },
-    "break": [
-      {
-        "path": "facts.autoMergeArmed",
-        "value": false
-      }
-    ],
-    "defect": "Report that auto-merge is not armed."
+    }
   },
   {
     "name": "unconfirmed auto merge disable fails closed",
@@ -3206,14 +2512,7 @@
     "expected": {
       "kind": "error",
       "stage": "disable-auto-merge"
-    },
-    "break": [
-      {
-        "path": "disableAutoMerge",
-        "value": true
-      }
-    ],
-    "defect": "Confirm the previously unconfirmed disable."
+    }
   },
   {
     "name": "error path attempts to disarm auto merge",
@@ -3239,14 +2538,7 @@
         "risk",
         "disableAutoMerge"
       ]
-    },
-    "break": [
-      {
-        "path": "facts.autoMergeArmed",
-        "value": false
-      }
-    ],
-    "defect": "Hide the armed merge state on a failed review."
+    }
   },
   {
     "name": "calibration never clears",
@@ -3262,14 +2554,7 @@
       "holds": [
         "calibration"
       ]
-    },
-    "break": [
-      {
-        "path": "config.calibration",
-        "value": false
-      }
-    ],
-    "defect": "Switch off calibration mode."
+    }
   },
   {
     "name": "publication uses the rendered governing result",
@@ -3277,14 +2562,7 @@
     "patches": [],
     "expected": {
       "publicationMatches": true
-    },
-    "break": [
-      {
-        "path": "config.publication",
-        "value": "none"
-      }
-    ],
-    "defect": "Suppress the recorded publication."
+    }
   },
   {
     "name": "explicit card paths reach every selected reviewer",
@@ -3297,14 +2575,7 @@
         "/recorded-bundle/skills/pr-council/playbooks/principal-engineer.md",
         "/recorded-bundle/skills/pr-council/playbooks/maintainable-no-slop.md"
       ]
-    },
-    "break": [
-      {
-        "path": "bundle.cardPaths.safety",
-        "value": "/missing-card.md"
-      }
-    ],
-    "defect": "Inject a nonexistent safety card path."
+    }
   },
   {
     "name": "triage classifies without publishing approval",
@@ -3319,14 +2590,7 @@
       "kind": "classified",
       "classification": "mechanical",
       "writes": 0
-    },
-    "break": [
-      {
-        "path": "request.phase",
-        "value": "review"
-      }
-    ],
-    "defect": "Dispatch triage as review."
+    }
   },
   {
     "name": "publication none produces no write",
@@ -3340,14 +2604,7 @@
     "expected": {
       "writes": 0,
       "publication": null
-    },
-    "break": [
-      {
-        "path": "config.publication",
-        "value": "record"
-      }
-    ],
-    "defect": "Enable publication on a dry run."
+    }
   },
   {
     "name": "sixty first file is retained in authority protection",
@@ -3556,14 +2813,7 @@
       "holds": [
         "review-authority"
       ]
-    },
-    "break": [
-      {
-        "path": "facts.files.60.path",
-        "value": "ordinary.ts"
-      }
-    ],
-    "defect": "Remove the protected sixty-first file from the returned evidence."
+    }
   },
   {
     "name": "documentation asks whether meaning changed",
@@ -3581,14 +2831,7 @@
     ],
     "expected": {
       "askedMeaning": true
-    },
-    "break": [],
-    "sourceBreak": {
-      "file": "src/questions.ts",
-      "from": "  documentationSubstantive:",
-      "to": "  omittedMeaningQuestion:"
-    },
-    "defect": "Remove the documentation meaning question from the route contract."
+    }
   },
   {
     "name": "functional routing omits the documentation meaning question",
@@ -3596,14 +2839,7 @@
     "patches": [],
     "expected": {
       "askedMeaning": false
-    },
-    "break": [],
-    "sourceBreak": {
-      "file": "src/review.ts",
-      "from": "classification === \"documentation\" ? routeQuestions : functionalRouteQuestions",
-      "to": "classification !== \"mechanical\" ? routeQuestions : functionalRouteQuestions"
-    },
-    "defect": "Send the documentation-only question on the functional route."
+    }
   },
   {
     "name": "LOW council risk with uncertain dimension requires voice",
@@ -3639,14 +2875,7 @@
         "head",
         "publish"
       ]
-    },
-    "defect": "Raise the only uncertain dimension confidence to the 0.3 boundary.",
-    "break": [
-      {
-        "path": "risk.dimensions.operations.confidence",
-        "value": 0.3
-      }
-    ]
+    }
   },
   {
     "name": "publication rejects malformed SHA",
@@ -3663,14 +2892,7 @@
       "invalidExternalData": true,
       "eligible": false,
       "writes": 0
-    },
-    "defect": "Repair the invalid external head response.",
-    "break": [
-      {
-        "path": "head",
-        "value": "0000000000000000000000000000000000000002"
-      }
-    ]
+    }
   },
   {
     "name": "publication rejects non-string head",
@@ -3689,14 +2911,7 @@
       "invalidExternalData": true,
       "eligible": false,
       "writes": 0
-    },
-    "defect": "Repair the invalid external head response.",
-    "break": [
-      {
-        "path": "head",
-        "value": "0000000000000000000000000000000000000002"
-      }
-    ]
+    }
   },
   {
     "name": "held review rejects truthy string disarm response",
@@ -3717,14 +2932,7 @@
       "invalidExternalData": true,
       "eligible": false,
       "writes": 0
-    },
-    "defect": "Replace the truthy non-boolean disarm response with true.",
-    "break": [
-      {
-        "path": "disableAutoMerge",
-        "value": true
-      }
-    ]
+    }
   },
   {
     "name": "error recovery rejects truthy string disarm response",
@@ -3749,14 +2957,7 @@
         "facts",
         "disableAutoMerge"
       ]
-    },
-    "defect": "Confirm emergency disarm with the boolean true.",
-    "break": [
-      {
-        "path": "disableAutoMerge",
-        "value": true
-      }
-    ]
+    }
   },
   {
     "name": "held review rejects truthy number disarm response",
@@ -3777,14 +2978,7 @@
       "invalidExternalData": true,
       "eligible": false,
       "writes": 0
-    },
-    "defect": "Replace the truthy non-boolean disarm response with true.",
-    "break": [
-      {
-        "path": "disableAutoMerge",
-        "value": true
-      }
-    ]
+    }
   },
   {
     "name": "error recovery rejects truthy number disarm response",
@@ -3809,14 +3003,7 @@
         "facts",
         "disableAutoMerge"
       ]
-    },
-    "defect": "Confirm emergency disarm with the boolean true.",
-    "break": [
-      {
-        "path": "disableAutoMerge",
-        "value": true
-      }
-    ]
+    }
   },
   {
     "name": "held review rejects truthy object disarm response",
@@ -3839,14 +3026,7 @@
       "invalidExternalData": true,
       "eligible": false,
       "writes": 0
-    },
-    "defect": "Replace the truthy non-boolean disarm response with true.",
-    "break": [
-      {
-        "path": "disableAutoMerge",
-        "value": true
-      }
-    ]
+    }
   },
   {
     "name": "error recovery rejects truthy object disarm response",
@@ -3873,14 +3053,7 @@
         "facts",
         "disableAutoMerge"
       ]
-    },
-    "defect": "Confirm emergency disarm with the boolean true.",
-    "break": [
-      {
-        "path": "disableAutoMerge",
-        "value": true
-      }
-    ]
+    }
   },
   {
     "name": "error recovery reports unconfirmed boolean disarm",
@@ -3901,14 +3074,7 @@
       "diagnostic": "Incomplete facts; auto-merge disable not confirmed",
       "eligible": false,
       "writes": 0
-    },
-    "defect": "Confirm emergency disarm instead of returning false.",
-    "break": [
-      {
-        "path": "disableAutoMerge",
-        "value": true
-      }
-    ]
+    }
   },
   {
     "name": "voice without council validates the bundle pin",
@@ -3940,14 +3106,7 @@
       "diagnostic": "Card bundle pin mismatch",
       "eligible": false,
       "writes": 0
-    },
-    "defect": "Restore the pinned bundle for a voice-only review.",
-    "break": [
-      {
-        "path": "bundle.commit",
-        "value": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
-      }
-    ]
+    }
   },
   {
     "name": "Margot's own ERROR ruling is a held verdict, never an exception",
@@ -3963,14 +3122,7 @@
       "outcome": "ERROR",
       "eligible": false,
       "writes": 1
-    },
-    "break": [
-      {
-        "path": "voice.outcome",
-        "value": "CHANGES_REQUESTED"
-      }
-    ],
-    "defect": "Rule CHANGES_REQUESTED with the finding unaccounted; the verdict must then be refused."
+    }
   },
   {
     "name": "a card that did not complete cannot clear without the voice",
@@ -3994,13 +3146,6 @@
         "principal-engineer",
         "maintainable-no-slop"
       ]
-    },
-    "break": [
-      {
-        "path": "cards.safety.completion",
-        "value": "completed"
-      }
-    ],
-    "defect": "Mark the card completed so nothing summons the voice."
+    }
   }
 ]

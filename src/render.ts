@@ -38,7 +38,6 @@ function firstSentences(value: string, count: number): string {
 }
 
 const firstSentence = (value: string) => cutAtWord(firstSentences(value, 1));
-const firstLine = (value: string) => cutAtWord(value.trim().split(/\r?\n/u, 1)[0] ?? "");
 const sentence = (value: string) => (/[.!?…]$/u.test(value) ? value : `${value}.`);
 
 function firstClause(value: string): string {
@@ -158,19 +157,44 @@ export function render(review: Review): string {
   const ticket = presentation.ticket
     ? `[${presentation.ticket.label}](${presentation.ticket.url})`
     : "none";
+  const risk = normalized(review.voice?.risk ?? "");
+  const clarification = review.voice?.clarification?.trim();
+  const mechanical = review.classification === "mechanical" && review.cards.length === 0;
+  const confidence =
+    typeof review.provenance.mechanicalProbability === "number"
+      ? ` (confidence ${Math.round(review.provenance.mechanicalProbability * 100)}%)`
+      : "";
+  const files = `${presentation.files} file${presentation.files === 1 ? "" : "s"}`;
   const lines = [
     `### ${outcomeIcons[decision.outcome]} ${decision.outcome}`,
-    `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}** — ${firstLine(decision.rating.rationale)}`,
+    `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}**${risk ? ` — ${risk}` : ""}`,
     `> ${firstSentences(rationale, 2)}`,
+    ...(review.provenance.decision_source && review.provenance.decision_source !== "jev"
+      ? [
+          "> ⚠️ _The risk model was unavailable — this risk was scored by a fallback at reduced confidence, so nothing was auto-merged._",
+        ]
+      : []),
     ...(authority ? ["", `Above my authority: ${authority}. Yours to merge.`] : []),
+    ...(decision.outcome === "CLARIFICATION_REQUESTED" && clarification
+      ? [
+          "",
+          `${presentation.author ? `@${presentation.author}` : "author"}, your call: ${clarification}`,
+        ]
+      : []),
     // Python's line for Margot's own ERROR ruling: the review could not be completed.
     ...(decision.outcome === "ERROR"
       ? ["", "Not reviewed: the review could not be completed. Held for the operator."]
       : []),
     "",
     "---",
-    `Council reviewed ${presentation.files} file${presentation.files === 1 ? "" : "s"} • ${review.cards.length} of 6 cards • ${cards.findings} finding${cards.findings === 1 ? "" : "s"} • ${cost} • ${duration(presentation.durationMs)}`,
-    ...cards.rows,
+    ...(mechanical
+      ? [
+          `Mechanical change${confidence} • ${files} • ${cost} • ${duration(presentation.durationMs)}`,
+        ]
+      : [
+          `Council reviewed ${files} • ${review.cards.length} of 6 cards • ${cards.findings} finding${cards.findings === 1 ? "" : "s"} • ${cost} • ${duration(presentation.durationMs)}`,
+          ...cards.rows,
+        ]),
     "",
     `Review ${review.convergence.round} · New: ${tally.new} · Open: ${tally.open} · Closed: ${tally.closed}`,
     "",
@@ -183,7 +207,7 @@ export function render(review: Review): string {
     "<!-- margot:v1 -->",
   ];
   const body = lines.join("\n").replaceAll("margot-ledger", "margot‑ledger");
-  return review.ledgerUnavailable ? body : `${body}\n${ledgerBlock(review.ledger)}`;
+  return `${body}\n${ledgerBlock(review.ledger)}`;
 }
 
 /**
@@ -193,7 +217,6 @@ export function render(review: Review): string {
  * her review. Python's check carried these lines; they are the contract, not decoration.
  */
 export function checkText(review: Review): string {
-  const tally = findingTally(review);
   const summoned = review.cards.map((card) => card.name);
   const verdictSource =
     review.classification === "mechanical"
@@ -207,14 +230,13 @@ export function checkText(review: Review): string {
     `verdict_source: ${verdictSource}`,
     `class: ${review.classification}`,
     `summoned: ${summoned.join(", ") || "none"}`,
-    `convergence: round ${review.convergence.round} · new ${tally.new} · open ${tally.open} · closed ${tally.closed}`,
+    `convergence: ${JSON.stringify(review.convergence)}`,
     `can auto-merge: ${review.decision.mergeEligible ? "True" : "False"}`,
     `band_reason: ${review.decision.rating.rationale}`,
     "pipeline_ok: true",
     `vector: ${JSON.stringify(review.riskAnswer?.dimensions ?? {})}`,
     `owned tier: ${review.decision.ownedPathTier ?? "unknown"}`,
-    "summoned by ledger: none",
-    ...(review.ledgerWarnings ?? []).map((warning) => `warning: ${warning}`),
+    `summoned by ledger: ${review.provenance.summonedByLedger?.join(", ") || "none"}`,
   ];
   const findingById = new Map(
     review.cards.flatMap((card) =>

@@ -17,7 +17,7 @@ npm test
 npm pack
 ```
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.6.1.tgz`.
+Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.6.2.tgz`.
 Then run this as an `.mjs` file:
 
 ```js
@@ -49,17 +49,18 @@ this against an installed package.
 
 ## API and configuration
 
-`review(request, config, services)` returns a `classified`, `reviewed` or `error`
+`review(request, config, services)` returns a `classified`, `reviewed`, `held` or `error`
 result. Types are exported from the package. Request and service values are
 validated at runtime with Zod. Errors cannot approve and carry a diagnostic stage,
-without inventing a risk rating.
+without inventing a risk rating. Unreadable or corrupt authenticated review history
+returns `held`, names the reason for the operator, and has no verdict or risk band.
 
 The request identifies repository, PR number, exact base/head SHAs, and phase
 (`triage` or `review`). Services fetch facts; a caller cannot supply a pre-cleared
 result. The service adapter is trusted infrastructure: it must authenticate actors,
 fetch complete evidence, bind facts to both SHAs, honor abort signals, and prevent
 writes if the head changes. Recorded services implement that boundary in memory.
-The live adapter and thin composite Action support shadow and explicitly configured GitHub publication.
+The live adapter supports shadow and explicitly configured GitHub publication.
 
 Configuration has no implicit authority defaults. An explicitly empty protection
 list is allowed; missing configuration is rejected. The recordings show every key:
@@ -70,7 +71,7 @@ list is allowed; missing configuration is rejected. The recordings show every ke
 - `mechanicalDiffLineCap`: maximum changed lines eligible for the mechanical
   short-circuit. The default is 2000; larger changes take the full review path.
 - `requiredChecks`, `trustedCheckActors`, `trustedTriageActors`: caller-owned policy.
-  Required checks need one trusted successful receipt on the reviewed head.
+  Required checks need their latest run to be trusted and successful on the reviewed head.
   `allowedSkippedChecks` explicitly permits named skipped jobs; its default is empty.
 - `trustedLedgerActors`: logins of the GitHub Apps allowed to supply review history.
   The default empty list trusts nobody. `github.freshShadow: true` explicitly selects
@@ -110,7 +111,7 @@ Credentials are environment values, never configuration file values. The package
 contains no vault paths, estate identity, enrolment rules or publisher credentials.
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.6.1.tgz
+npm install --global /absolute/path/margot-pr-reviewer-0.6.2.tgz
 npm install --global @anthropic-ai/claude-code@2.1.283
 git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
 git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
@@ -236,7 +237,8 @@ Jev uses native fetch and bounded p-retry backoff. Terminal authentication error
 fail immediately; exhausted transient failures cannot approve. Its Noul responses
 contain no confidence field: routing confidence comes from the exposure Score,
 as in Python. Risk confidence comes directly from Jev's five Score answers. No Claude fallback
-can substitute for failed Jev evidence.
+can authorize functional clearance after failed Jev evidence; the fallback can
+produce a review, but that review holds for the operator.
 
 The runner retains prose and reads it as the Python reviewer did: labels at line
 start with the first match winning, tagged finding bullets anywhere in the card
@@ -255,25 +257,26 @@ complete finding accounting under every other outcome. It does not depend on
 - `npm run build`: ESM and declarations into `dist`.
 - `npm run typecheck`: strict checks of source and tests.
 - `npm test`: named behavior tests, with no TODOs.
-- `npm run test:breaks`: baseline, one changed response/input at a time, full-suite
-  single-failure verification, restore, final baseline; writes the receipts.
 - `pre-commit install`: install the repository's commit hooks. Fix findings;
   do not bypass them.
 
-The estate-owned workflows remain unchanged. Package checks and break receipts
-are reproducible locally; no live network or paid models run in the test suite.
+The estate-owned workflows remain unchanged. The test suite runs with no live
+network and no paid models. `node scripts/package-smoke.mjs <tarball>` installs a
+packed tarball in an empty directory and runs both executables.
 
 ## Later rounds
 
 A reviewed result contains `ledger` and `convergence`. The rendered report ends
 with a versioned ledger block. GitHub review author, author type, submitted time
-and commit ID authenticate selection; a malformed or untrusted ledger stops the
-review. The adapter reads every review page. Python v1 ledgers are accepted as
+and commit ID authenticate selection. Untrusted actors' ledgers are ignored;
+unreadable history or a corrupt authenticated ledger holds for the operator before
+model calls. The adapter reads every review page. Python v1 ledgers are accepted as
 prior-round inputs. The typed v2 ledger is posted in a v1-compatible JSON envelope with plain entries
 and a compressed `receipt_v2` extension. Unchanged Python reads the same entries;
 TypeScript restores the exact saved receipt. Earlier compressed v2 blocks remain
-readable. Decoding has a one-MiB limit. Oversized
-results fail rather than silently dropping open findings or dismissals.
+readable. Compressed receipt decoding has a one-MiB limit. When the encoded block exceeds
+24,000 characters, Margot drops the oldest dismissals first, then other
+non-standing entries, then the optional replay receipt. Standing entries remain.
 
 ### 0.4.1 receipt compatibility
 
@@ -298,13 +301,15 @@ counts as fixed; a silent MAJOR or BLOCKING requires Margot's confirmation. No
 absence, as Python inferred it. Dismissals retain their
 reasons until the delta changes the cited code. A new delta finding must state
 whether it is new, missed, or caused through delta reach; missing attribution fails
-closed. The displayed counts are New, Open, Closed, with each finding listed below.
+closed. The displayed counts are New, Open, Closed; the council roster summarizes findings.
 
-An exact-head retry reuses the authenticated v2 result and counts without model
-calls, after checking configuration, evidence, required checks and current head.
+An exact-head retry reuses the authenticated v2 result and counts when fresh
+classification agrees, after checking configuration, evidence, required checks and current head.
+Classification still runs; compatible retries skip council, risk and voice calls.
 A changed base, body, evidence or configuration invalidates the cached result.
-An old Python same-head ledger has no saved result and fails closed; a new head
-can still build on it normally.
+A same-head ledger without a saved result reruns review: a first-round ledger
+starts round one again; later-round ledgers keep their round and standing findings
+with an empty delta. A new head builds on the prior ledger normally.
 
 Large Jev requests are split into complete evidence batches. Classification and
 routing take maximum probabilities across batches; risk takes maximum tail
@@ -312,8 +317,6 @@ probabilities and minimum confidence. The live model reads the complete scoped
 diff through a paged, read-only tool; prompts travel through stdin. These transport
 limits never authorize dropping the tail of the evidence. Cross-batch reasoning
 is a model-quality limitation; the live comparison records its observed effects.
-
-Run `npm run test:breaks` for all recorded, adapter and convergence break receipts.
 
 ## GitHub publication
 
@@ -334,23 +337,34 @@ nor its tools.
 
 The publisher adopts the caller's check by App, name and head, records run
 ownership and refuses to let a superseded invocation close the newer run's check.
-It withdraws earlier App approvals before reevaluation, keeps the required check
-pending, then publishes classification, authority status and the SHA-bound native
-review. Every check write must succeed before the eligible native approval is posted.
-Reviewed holds use COMMENT and neutral; errors use action_required. It never
+It keeps the required check pending, then publishes classification, authority status
+and the SHA-bound native review. It preserves earlier App approvals; the consumer's
+ruleset is responsible for stale approvals. After the native review, it disables
+auto-merge for holds, completes the required check and confirms that check's receipt.
+Reviewed holds use COMMENT and neutral, except calibration and ERROR outcomes use
+action_required. History holds use action_required with a named reason and no
+native review; errors also use action_required. It never
 requests changes at GitHub's review gate, enables auto-merge, or merges.
-Every write rechecks head/base and admission. Partial failures attempt to disarm,
-withdraw approvals and close the gate. A failed cleanup remains an error; an API
+Checks and native reviews recheck head/base and admission before writing. Partial failures attempt
+to disarm auto-merge and close the gate; they do not withdraw a posted approval.
+A failed cleanup remains an error; an API
 outage can leave the check pending. GitHub has no transaction spanning these
 writes, so same-head writers must share the caller's PR concurrency group.
 
 New counts issues first raised this round. Open counts standing and advisory
-issues. Closed counts retained fixed and dismissed issues. Every ledger issue
-appears exactly once below the tally, with its fate, first-round marker and late
-attribution. Closed history remains visible in later rounds; notes are separate
-and are not issues. These are the operator's three labels, not Python arithmetic.
-The saved receipt retains old diagnostic counters for compatibility; the
-visible tally is derived from the listed entries. Oversize history fails closed.
+issues. Closed counts retained fixed and dismissed issues. The visible tally is
+derived from ledger entries; the council roster shows each card's first visible
+finding. Check text retains finding details and serializes the diagnostic
+convergence counters as JSON. It also names cards recalled by the ledger beyond
+those selected by routing. Encoded history is trimmed as described under Later rounds.
+
+Mechanical reviews with no council use the mechanical coverage line, including
+the measured classification confidence when available. A voice's short `risk`
+statement appears on the risk line; its `band_reason` remains in check details.
+Clarifications name the author and the required choice, and fallback reviews
+display a reduced-confidence warning. An approval with an open clarification or
+an established finding is refused. The Python self-attribution patterns in the
+voice's synthesis also refuse publication; card findings may still quote PR text.
 
 The self-hosted sample workflow installs the exact release asset and verifies its
 SHA-256 before installing. No hosted-runner
@@ -362,8 +376,10 @@ The review CLI accepts Python's dispatcher inputs `MARGOT_CLASSIFICATION`
 `MARGOT_TRIAGE=mechanical`. The request JSON can also carry `classification`
 and `triage`; environment inputs take precedence. Missing or invalid dispatch
 classification requires functional review. Margot combines it conservatively
-with fresh classification and the latest completed `review / triage` check from
-her configured App on the requested head.
+with fresh classification and the latest completed configured triage check from
+her configured App on the requested head. `publisher.appId` and
+`publisher.checks.triage` supply both the read and write paths; without publisher
+configuration, the live adapter trusts no prior triage check.
 
 Pass the workflow-computed ownership tier through `MARGOT_OWNED_TIER` (`none`,
 `owned`, or `required_owned`). An unset, blank, or invalid tier is uncomputed
@@ -377,5 +393,5 @@ On a Jev outage, functional routing and risk use the tool-free
 verdict posts with `decision_source: fallback` and cannot clear auto-merge.
 Classification outages require functional review. Documentation routing outages
 summon review without a fallback call or a risk hold. If both deciders fail,
-Margot reports an error. Unreadable review history starts round one without a
-ledger in the posted review, preserving the last readable ledger.
+Margot reports an error. Unreadable or corrupt authenticated review history holds
+for the operator with the reason named, without a verdict, risk band or model calls.

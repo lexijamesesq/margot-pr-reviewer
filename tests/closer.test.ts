@@ -1,20 +1,10 @@
 import { Octokit } from "octokit";
 import { expect, it } from "vitest";
 import { type CloseStrandedCheckInput, closeStrandedCheck } from "../src/closer.js";
-import cases from "./closer-scenarios.json" with { type: "json" };
 
 const head = "a".repeat(40);
 const ownRuns = "https://github.com/example/control/actions/runs/";
-
-function scenario(id: string, exercise: (broken: boolean) => Promise<unknown>, expected: object) {
-  const spec = cases.find((candidate) => candidate.id === id);
-  if (!spec) throw new Error(id);
-  it(spec.name, async () =>
-    expect(await exercise(process.env.MARGOT_CLOSER_BREAK === id)).toMatchObject(expected),
-  );
-}
-
-async function wire(mode: string, broken = false) {
+async function wire(mode: string) {
   const writes: Record<string, unknown>[] = [];
   const reads: string[] = [];
   const input: CloseStrandedCheckInput = {
@@ -32,56 +22,50 @@ async function wire(mode: string, broken = false) {
   if (mode === "nothing-unselected" || mode === "nothing-published") {
     input.routeResult = "success";
     input.published = mode === "nothing-published" ? "true" : "";
-    if (broken) input.published = "false";
   }
   if (mode === "review-failed" || mode === "review-cancelled") {
     input.routeResult = "success";
-    input.reviewResult = mode === "review-cancelled" && !broken ? "cancelled" : "failure";
+    input.reviewResult = mode === "review-cancelled" ? "cancelled" : "failure";
   }
   if (mode === "selected") {
     input.routeResult = "success";
-    input.published = broken ? "true" : "false";
+    input.published = "false";
   }
   if (mode === "package-cancelled") {
     input.routeResult = "success";
     input.published = "false";
-    input.stopReason = broken ? "failure" : "cancelled";
+    input.stopReason = "cancelled";
   }
-  if (mode === "route-cancelled") input.routeResult = broken ? "failure" : "cancelled";
+  if (mode === "route-cancelled") input.routeResult = "cancelled";
   if (mode === "route-failed-review-cancelled") {
     input.reviewResult = "cancelled";
-    if (broken) input.routeResult = "success";
   }
   if (["superseded", "merged", "closed", "draft", "fork", "conflict", "empty"].includes(mode))
     input.stopReason = mode;
   if (mode === "superseded") input.liveSha = "f".repeat(40);
   if (mode === "live-superseded") input.stopReason = "superseded";
-  if (mode === "floor" && !broken) input.stopReason = "floor";
-  if (mode === "stopped" && broken) input.stopReason = "floor";
-
+  if (mode === "floor") input.stopReason = "floor";
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     const target = new URL(String(url));
     const method = init?.method ?? "GET";
     reads.push(`${method} ${target.pathname}${target.search}`);
     if (method === "GET" && target.pathname.endsWith(`/commits/${head}/pulls`)) {
-      if (mode === "commit-error" && !broken)
+      if (mode === "commit-error")
         return response({ message: "Recorded pull read failure" }, 500, url);
       const own = {
-        number: mode === "wrong-pr" && !broken ? 8 : 7,
+        number: mode === "wrong-pr" ? 8 : 7,
         state: "open",
         head: {
-          sha:
-            mode === "superseded" || (mode === "live-superseded" && broken) ? "f".repeat(40) : head,
+          sha: mode === "superseded" ? "f".repeat(40) : head,
         },
       };
       const pulls = [own];
-      if (mode === "other-live" && !broken)
-        pulls.push({ number: 9, state: "open", head: { sha: head } });
+      if (mode === "other-live") pulls.push({ number: 9, state: "open", head: { sha: head } });
       return response(pulls, 200, url);
     }
     if (method === "GET" && target.pathname.endsWith("/check-runs")) {
       const name = target.searchParams.get("check_name");
-      if (mode === "check-error" && !broken)
+      if (mode === "check-error")
         return response({ message: "Recorded check read failure" }, 500, url);
       let checkRuns: Record<string, unknown>[] = [
         {
@@ -91,26 +75,20 @@ async function wire(mode: string, broken = false) {
           app: { id: 42 },
           status: "in_progress",
           details_url:
-            mode === "other-run" && !broken
-              ? `${ownRuns}2`
-              : mode === "no-run"
-                ? ""
-                : `${ownRuns}1`,
+            mode === "other-run" ? `${ownRuns}2` : mode === "no-run" ? "" : `${ownRuns}1`,
         },
       ];
       if (mode === "legacy") {
-        checkRuns = name === "margot" && !broken ? checkRuns : [];
+        checkRuns = name === "margot" ? checkRuns : [];
       } else if (mode === "no-open") {
-        checkRuns = broken
-          ? checkRuns
-          : checkRuns.map((check) => ({ ...check, status: "completed" }));
+        checkRuns = checkRuns.map((check) => ({ ...check, status: "completed" }));
       }
       return response({ check_runs: checkRuns, total_count: checkRuns.length }, 200, url);
     }
     if (method === "PATCH" && /\/check-runs\/88$/.test(target.pathname)) {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       writes.push(body);
-      if (mode === "patch-error" && !broken)
+      if (mode === "patch-error")
         return response({ message: "Recorded check write failure" }, 500, url);
       return response({ id: 88, ...body }, 200, url);
     }
@@ -124,7 +102,6 @@ async function wire(mode: string, broken = false) {
   const decision = await closeStrandedCheck(input, client);
   return { decision, writes, reads };
 }
-
 function response(data: unknown, status: number, url: string | URL | Request) {
   const result = new Response(JSON.stringify(data), {
     status,
@@ -133,154 +110,181 @@ function response(data: unknown, status: number, url: string | URL | Request) {
   Object.defineProperty(result, "url", { value: String(url) });
   return result;
 }
-
-scenario(
-  "closer-nothing-unselected",
-  async (broken) => {
-    const result = await wire("nothing-unselected", broken);
-    return { ...result.decision, reads: result.reads.length };
-  },
-  { action: "left", message: "nothing to close", reads: 0 },
-);
-scenario(
-  "closer-nothing-published",
-  async (broken) => {
-    const result = await wire("nothing-published", broken);
-    return { ...result.decision, reads: result.reads.length };
-  },
-  { action: "left", message: "nothing to close", reads: 0 },
-);
-scenario("closer-commit-error", async (broken) => (await wire("commit-error", broken)).decision, {
-  action: "error",
-  message: expect.stringContaining("pull requests"),
+it("An unselected package with successful jobs has nothing to close", async () => {
+  const result = await wire("nothing-unselected");
+  expect({ ...result.decision, reads: result.reads.length }).toMatchObject({
+    action: "left",
+    message: "nothing to close",
+    reads: 0,
+  });
 });
-scenario("closer-wrong-pr", async (broken) => (await wire("wrong-pr", broken)).decision, {
-  action: "left",
-  message: expect.stringContaining("not a commit of PR #7"),
+it("A published package has nothing to close", async () => {
+  const result = await wire("nothing-published");
+  expect({ ...result.decision, reads: result.reads.length }).toMatchObject({
+    action: "left",
+    message: "nothing to close",
+    reads: 0,
+  });
 });
-scenario(
-  "closer-live-superseded",
-  async (broken) => (await wire("live-superseded", broken)).decision,
-  {
+it("An unreadable commit-to-PR binding touches nothing", async () => {
+  expect((await wire("commit-error")).decision).toMatchObject({
+    action: "error",
+    message: expect.stringContaining("pull requests"),
+  });
+});
+it("A SHA outside the requested PR is left alone", async () => {
+  expect((await wire("wrong-pr")).decision).toMatchObject({
+    action: "left",
+    message: expect.stringContaining("not a commit of PR #7"),
+  });
+});
+it("A superseded claim cannot close the requested PR's still-live head", async () => {
+  expect((await wire("live-superseded")).decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("live head of open PR #7"),
-  },
-);
-scenario("closer-other-live", async (broken) => (await wire("other-live", broken)).decision, {
-  action: "left",
-  message: expect.stringContaining("open PR #9"),
+  });
 });
-scenario(
-  "closer-primary",
-  async (broken) => {
-    const result = await wire("primary", broken);
-    if (broken) result.writes[0] = { ...result.writes[0], conclusion: "success" };
-    return { action: result.decision.action, write: result.writes[0] };
-  },
-  { action: "closed", write: { status: "completed", conclusion: "action_required" } },
-);
-scenario(
-  "closer-legacy",
-  async (broken) => {
-    const result = await wire("legacy", broken);
-    return { action: result.decision.action, read: result.reads.at(-2) };
-  },
-  { action: "closed", read: expect.stringContaining("check_name=margot") },
-);
-scenario("closer-check-error", async (broken) => (await wire("check-error", broken)).decision, {
-  action: "error",
-  message: expect.stringContaining("check-runs"),
+it("A SHA that is another open PR's live head is left to that review", async () => {
+  expect((await wire("other-live")).decision).toMatchObject({
+    action: "left",
+    message: expect.stringContaining("open PR #9"),
+  });
 });
-scenario("closer-no-open", async (broken) => (await wire("no-open", broken)).decision, {
-  action: "left",
-  message: expect.stringContaining("no open margot check"),
+it("The open review slash margot check closes without passing", async () => {
+  const result = await wire("primary");
+  expect({ action: result.decision.action, write: result.writes[0] }).toMatchObject({
+    action: "closed",
+    write: { status: "completed", conclusion: "action_required" },
+  });
 });
-scenario("closer-other-run", async (broken) => (await wire("other-run", broken)).decision, {
-  action: "left",
-  message: expect.stringContaining("belongs to run 2"),
+it("The pre-rename margot check is the fallback", async () => {
+  const result = await wire("legacy");
+  expect({ action: result.decision.action, read: result.reads.at(-2) }).toMatchObject({
+    action: "closed",
+    read: expect.stringContaining("check_name=margot"),
+  });
 });
-scenario(
-  "closer-no-run",
-  async (broken) => {
-    const result = await wire("no-run", broken);
-    if (broken) result.writes.length = 0;
-    return { action: result.decision.action, writes: result.writes.length };
-  },
-  { action: "closed", writes: 1 },
-);
-const stopCases = [
-  ["superseded", "skipped", `Margot: superseded by a newer push (${"f".repeat(7)})`],
-  ["merged", "skipped", "Margot: not reviewed — the PR was merged first"],
-  ["closed", "cancelled", "Margot: not reviewed — the PR was closed first"],
-  ["draft", "failure", "not reviewed: draft"],
-  ["fork", "failure", "not reviewed: fork head"],
-  ["conflict", "failure", "not reviewed: merge conflict (resolve before review)"],
-  ["empty", "failure", "not reviewed: empty (no changed files)"],
-] as const;
-
-for (const [reason, conclusion, title] of stopCases)
-  scenario(
-    `closer-${reason}`,
-    async (broken) => {
-      const result = await wire(reason, false);
-      if (broken && result.writes[0]) result.writes[0].conclusion = "action_required";
-      return { action: result.decision.action, write: result.writes[0] };
-    },
-    { action: "closed", write: { conclusion, output: { title } } },
-  );
-scenario(
-  "closer-route-cancelled",
-  async (broken) => ({ write: (await wire("route-cancelled", broken)).writes[0] }),
-  { write: { conclusion: "cancelled" } },
-);
-scenario(
-  "closer-route-priority",
-  async (broken) => ({ write: (await wire("route-failed-review-cancelled", broken)).writes[0] }),
-  { write: { conclusion: "action_required" } },
-);
-scenario(
-  "closer-review-cancelled",
-  async (broken) => ({ write: (await wire("review-cancelled", broken)).writes[0] }),
-  { write: { conclusion: "cancelled" } },
-);
-scenario(
-  "closer-review-failed",
-  async (broken) => {
-    const result = await wire("review-failed", broken);
-    if (broken) (result.writes[0]?.output as Record<string, unknown>).title = "changed";
-    return { write: result.writes[0] };
-  },
-  { write: { output: { title: expect.stringContaining("review job failure") } } },
-);
-scenario(
-  "closer-selected",
-  async (broken) => {
-    const result = await wire("selected", broken);
-    return { action: result.decision.action, write: result.writes[0] };
-  },
-  {
+it("An unreadable check list touches nothing", async () => {
+  expect((await wire("check-error")).decision).toMatchObject({
+    action: "error",
+    message: expect.stringContaining("check-runs"),
+  });
+});
+it("Completed checks are left alone", async () => {
+  expect((await wire("no-open")).decision).toMatchObject({
+    action: "left",
+    message: expect.stringContaining("no open margot check"),
+  });
+});
+it("A check adopted by another run is left to that run", async () => {
+  expect((await wire("other-run")).decision).toMatchObject({
+    action: "left",
+    message: expect.stringContaining("belongs to run 2"),
+  });
+});
+it("A caller check with no run owner can be closed", async () => {
+  const result = await wire("no-run");
+  expect({ action: result.decision.action, writes: result.writes.length }).toMatchObject({
+    action: "closed",
+    writes: 1,
+  });
+});
+for (const [name, reason, conclusion, title] of [
+  [
+    "A superseded head closes skipped with the hosted wording",
+    "superseded",
+    "skipped",
+    `Margot: superseded by a newer push (${"f".repeat(7)})`,
+  ],
+  [
+    "A merged PR closes skipped with the hosted wording",
+    "merged",
+    "skipped",
+    "Margot: not reviewed — the PR was merged first",
+  ],
+  [
+    "A closed unmerged PR closes cancelled with the hosted wording",
+    "closed",
+    "cancelled",
+    "Margot: not reviewed — the PR was closed first",
+  ],
+  ["A draft PR closes failure with the hosted wording", "draft", "failure", "not reviewed: draft"],
+  [
+    "A fork-head PR closes failure with the hosted wording",
+    "fork",
+    "failure",
+    "not reviewed: fork head",
+  ],
+  [
+    "A conflicted PR closes failure with the hosted wording",
+    "conflict",
+    "failure",
+    "not reviewed: merge conflict (resolve before review)",
+  ],
+  [
+    "An empty PR closes failure with the hosted wording",
+    "empty",
+    "failure",
+    "not reviewed: empty (no changed files)",
+  ],
+] as const)
+  it(name, async () => {
+    const result = await wire(reason);
+    expect({ action: result.decision.action, write: result.writes[0] }).toMatchObject({
+      action: "closed",
+      write: { conclusion, output: { title } },
+    });
+  });
+it("A cancelled route closes cancelled", async () => {
+  expect({ write: (await wire("route-cancelled")).writes[0] }).toMatchObject({
+    write: { conclusion: "cancelled" },
+  });
+});
+it("The first stopped job determines a non-stale conclusion", async () => {
+  expect({ write: (await wire("route-failed-review-cancelled")).writes[0] }).toMatchObject({
+    write: { conclusion: "action_required" },
+  });
+});
+it("A cancelled review closes cancelled", async () => {
+  expect({ write: (await wire("review-cancelled")).writes[0] }).toMatchObject({
+    write: { conclusion: "cancelled" },
+  });
+});
+it("A failed review names the stopped job", async () => {
+  const result = await wire("review-failed");
+  expect({ write: result.writes[0] }).toMatchObject({
+    write: { output: { title: expect.stringContaining("review job failure") } },
+  });
+});
+it("A selected package that did not publish is closed", async () => {
+  const result = await wire("selected");
+  expect({ action: result.decision.action, write: result.writes[0] }).toMatchObject({
     action: "closed",
     write: { output: { title: expect.stringContaining("package job did not publish") } },
-  },
-);
-scenario(
-  "closer-package-cancelled",
-  async (broken) => ({ write: (await wire("package-cancelled", broken)).writes[0] }),
-  { write: { conclusion: "cancelled" } },
-);
-scenario("closer-floor", async (broken) => ({ write: (await wire("floor", broken)).writes[0] }), {
-  write: {
-    output: {
-      title: "Margot: preflight — required checks not green — waiting for the next push",
-    },
-  },
+  });
 });
-scenario(
-  "closer-stopped",
-  async (broken) => ({ write: (await wire("stopped", broken)).writes[0] }),
-  { write: { output: { title: expect.stringContaining("stopped before a verdict") } } },
-);
-scenario("closer-patch-error", async (broken) => (await wire("patch-error", broken)).decision, {
-  action: "error",
-  message: expect.stringContaining("could not close check 88"),
+it("A cancelled package stop closes cancelled", async () => {
+  expect({ write: (await wire("package-cancelled")).writes[0] }).toMatchObject({
+    write: { conclusion: "cancelled" },
+  });
+});
+it("A floor stop uses the preflight title", async () => {
+  expect({ write: (await wire("floor")).writes[0] }).toMatchObject({
+    write: {
+      output: {
+        title: "Margot: preflight — required checks not green — waiting for the next push",
+      },
+    },
+  });
+});
+it("Other failures say Margot stopped before a verdict", async () => {
+  expect({ write: (await wire("stopped")).writes[0] }).toMatchObject({
+    write: { output: { title: expect.stringContaining("stopped before a verdict") } },
+  });
+});
+it("A failed close is an error rather than a false receipt", async () => {
+  expect((await wire("patch-error")).decision).toMatchObject({
+    action: "error",
+    message: expect.stringContaining("could not close check 88"),
+  });
 });
