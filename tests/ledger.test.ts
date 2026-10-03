@@ -484,7 +484,13 @@ it("Same head with a changed PR body is reviewed afresh in the same round, never
     kind: "reviewed",
     convergence: { round: result.convergence.round },
   });
-  expect(s.calls.map((c) => c.name)).toContain("route");
+  // The council saw the whole PR, not the empty delta from the head to itself.
+  const route = s.calls.find((c) => c.name === "route") as
+    | { input: { facts: { diff: string; files: unknown[] } } }
+    | undefined;
+  expect(route).toBeDefined();
+  expect(route?.input.facts.diff).toBe(f.diff);
+  expect(route?.input.facts.files).toEqual(f.files);
 });
 it("A receipt written by Margot 0.4.0 remains readable", async () => {
   const { result, r } = await margot();
