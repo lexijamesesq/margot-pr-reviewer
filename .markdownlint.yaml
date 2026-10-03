@@ -1,4 +1,3 @@
----
 # Minimal config for the markdownlint pre-commit hook (see
 # .pre-commit-config.yaml). Disables only the rule that is genuinely noisy
 # on this repo's long prose-style commit-history comments and doc lines;
