@@ -120,29 +120,46 @@ export function githubAdapter(
         after.title !== before.title
       )
         throw new Error("PR changed while reading facts");
-      // GitHub's list-files cap is 3000. Never infer completeness from a last page alone.
       const diffText: unknown = diff.data;
-      if (files.length !== before.changed_files || typeof diffText !== "string")
-        throw new Error("Incomplete GitHub diff");
-      // Metadata-only changes have no patch. Binary or missing content remains incomplete.
-      if (
-        files.some((f) => typeof f.patch !== "string" && (f.additions !== 0 || f.deletions !== 0))
-      )
-        throw new Error("A changed file has no complete text patch");
+      if (typeof diffText !== "string") throw new Error("Incomplete GitHub diff");
+      // The whole-PR diff is the source of truth, as it was for Python ("the compare endpoint
+      // caps its files array; the diff has no such cap"): the file list comes from it, and it
+      // is complete when every hunk is closed. GitHub's per-file listing is capped at 3,000,
+      // lags the PR's own `changed_files` on a fresh push, and omits `patch` with zero counts
+      // for large files; it is used only to enrich a file the diff already names, and its
+      // counts are cross-checked only where it supplied the content.
       const parsed = parseDiff(diffText);
       if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
-      if (
-        parsed.length !== files.length ||
-        parsed.some((file, index) => {
-          const expected = files[index];
-          return (
-            !expected ||
-            file.additions !== expected.additions ||
-            file.deletions !== expected.deletions
-          );
-        })
-      )
-        throw new Error("Diff hunks are incomplete");
+      // parse-diff names each section from its `---`/`+++`/`rename` lines, one path per line,
+      // never by splitting the `diff --git a/X b/Y` header (a path can contain " b/"), which
+      // is the rule Python's changed_files_from_diff followed. Where GitHub's listing is as
+      // long as the diff it is complete, and every diff path must appear in it; a shorter
+      // listing is GitHub's cap, and the diff's names stand on their own.
+      const listed = new Map(files.map((f) => [f.filename, f]));
+      const listingComplete = files.length >= parsed.length;
+      const diffFiles = parsed.map((file) => {
+        const path = file.to && file.to !== "/dev/null" ? file.to : (file.from ?? "");
+        const from = file.from && file.from !== "/dev/null" ? file.from : undefined;
+        const entry = listed.get(path);
+        if (!entry && listingComplete) throw new Error("Diff and file listing disagree");
+        if (
+          entry &&
+          typeof entry.patch === "string" &&
+          (file.additions !== entry.additions || file.deletions !== entry.deletions)
+        )
+          throw new Error("Diff hunks are incomplete");
+        const previous = entry?.previous_filename ?? (from && from !== path ? from : undefined);
+        return { path, ...(previous ? { previousPath: previous } : {}) };
+      });
+      if (diffFiles.some((f) => !f.path)) throw new Error("Diff hunks are incomplete");
+      // Over-inclusion is the safe direction for the protected-path gate: a file GitHub lists
+      // that the diff did not name is still a changed file.
+      for (const f of files)
+        if (!diffFiles.some((d) => d.path === f.filename))
+          diffFiles.push({
+            path: f.filename,
+            ...(f.previous_filename ? { previousPath: f.previous_filename } : {}),
+          });
       const historyReviews = options.shadowBeforeHead
         ? reviews.filter((v) => v.commit_id !== r.head)
         : reviews;
@@ -194,11 +211,8 @@ export function githubAdapter(
         author: before.user.login,
         diff: diffText,
         complete: true,
-        fileCount: before.changed_files,
-        files: files.map((f) => ({
-          path: f.filename,
-          ...(f.previous_filename ? { previousPath: f.previous_filename } : {}),
-        })),
+        fileCount: diffFiles.length,
+        files: diffFiles,
         checks: checks.map((check) => ({
           name: check.name,
           actor: check.app?.slug ?? "unknown",

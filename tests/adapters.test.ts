@@ -123,11 +123,40 @@ it("GitHub follows the second file page", async () => {
   const facts = await adapter.facts(request, context());
   expect(facts.files.length === 2 && calls.some((c) => c.includes("page=2"))).toBe(true);
 });
-it("GitHub refuses an incomplete file inventory", async () => {
-  await expect(github({ count: 2 }).adapter.facts(request, context())).rejects.toThrow();
+it("The PR's changed_files count lagging the listing does not refuse; the diff decides", async () => {
+  // GitHub's `changed_files` lags on a fresh push and the listing is capped at 3,000; Python
+  // took the file list from the diff and never compared the two.
+  const result = await github({ count: 2 }).adapter.facts(request, context());
+  expect(result.fileCount).toBe(1);
+  expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
 });
-it("GitHub refuses a missing text patch", async () => {
-  await expect(github({ patch: null }).adapter.facts(request, context())).rejects.toThrow();
+it("A file the diff names but the listing omits is still a reviewed file", async () => {
+  const result = await github({
+    diff: "diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n-old\n+new\ndiff --git a/b.ts b/b.ts\n@@ -1 +1 @@\n-old\n+new\n",
+  }).adapter.facts(request, context());
+  expect(result.files.map((f) => f.path)).toEqual(["a.ts", "b.ts"]);
+});
+it("GitHub accepts a file listed without its own patch when the whole diff carries it", async () => {
+  const result = await github({ patch: null }).adapter.facts(request, context());
+  expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
+});
+it("GitHub refuses a file whose supplied counts the whole diff does not match", async () => {
+  await expect(github({ additions: 3 }).adapter.facts(request, context())).rejects.toThrow(
+    "Diff hunks are incomplete",
+  );
+});
+it("A listing entry with no patch and zero counts defers to the whole diff, as GitHub reports large PRs", async () => {
+  // GitHub listed 272 files for a real PR with additions 0, deletions 0 and no patch for files
+  // past its size threshold; the diff carried 146- and 373-line deletions for them.
+  const deleted = Array.from({ length: 4 }, (_, i) => `-line ${i}`).join("\n");
+  const result = await github({
+    patch: null,
+    additions: 0,
+    deletions: 0,
+    status: "removed",
+    diff: `diff --git a/a.ts b/a.ts\n@@ -1,4 +0,0 @@\n${deleted}\n`,
+  }).adapter.facts(request, context());
+  expect(result.files[0]).toMatchObject({ path: "a.ts" });
 });
 it("GitHub refuses a diff missing its file header", async () => {
   await expect(
@@ -595,6 +624,65 @@ it("Claude rejects an error-marked result", async () => {
 it("Claude rejects an empty result body", async () => {
   await expect(fakeClaude({ envelope: { result: "" } })).rejects.toThrow("result");
 });
+it("A file GitHub lists without its own patch is complete when the whole diff carries it", async () => {
+  // GitHub omits `patch` for large changes; a 2,289-line deletion in a real PR had none.
+  const deleted = Array.from({ length: 5 }, (_, i) => `-line ${i}`).join("\n");
+  const result = await github({
+    patch: null,
+    additions: 0,
+    deletions: 5,
+    status: "removed",
+    diff: `diff --git a/a.ts b/a.ts\n@@ -1,5 +0,0 @@\n${deleted}\n`,
+  }).adapter.facts(request, context());
+  expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
+});
+it("Deleted, added, renamed and oddly named files are named from the diff's own header lines", async () => {
+  // Real diffs carry `---`/`+++`/`rename` lines; the `diff --git a/X b/Y` header is never split,
+  // so a path containing " b/" or spaces survives, as Python's reader guaranteed.
+  const diff = [
+    "diff --git a/dir b/x.ts b/dir b/x.ts",
+    "deleted file mode 100644",
+    "--- a/dir b/x.ts",
+    "+++ /dev/null",
+    "@@ -1 +0,0 @@",
+    "-old",
+    "diff --git a/new.ts b/new.ts",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/new.ts",
+    "@@ -0,0 +1 @@",
+    "+new",
+    "diff --git a/old.ts b/renamed.ts",
+    "similarity index 100%",
+    "rename from old.ts",
+    "rename to renamed.ts",
+    'diff --git "a/sp ace.ts" "b/sp ace.ts"',
+    '--- "a/sp ace.ts"',
+    '+++ "b/sp ace.ts"',
+    "@@ -1 +1 @@",
+    "-a",
+    "+b",
+    "",
+  ].join("\n");
+  const result = await github({ diff, patch: null, additions: 0, deletions: 0 }).adapter.facts(
+    request,
+    context(),
+  );
+  expect(result.files).toEqual([
+    { path: "dir b/x.ts" },
+    { path: "new.ts" },
+    { path: "renamed.ts", previousPath: "old.ts" },
+    { path: "sp ace.ts" },
+    { path: "a.ts" },
+  ]);
+});
+it("A diff path GitHub's complete listing does not know is refused", async () => {
+  await expect(
+    github({
+      diff: "diff --git a/zzz.ts b/zzz.ts\n--- a/zzz.ts\n+++ b/zzz.ts\n@@ -1 +1 @@\n-old\n+new\n",
+    }).adapter.facts(request, context()),
+  ).rejects.toThrow("Diff and file listing disagree");
+});
 it("A partial final hunk cannot claim complete facts", async () => {
   await expect(
     github({
@@ -662,18 +750,23 @@ for (const [name, id, diff] of [
   });
 }
 for (const [name, marker] of [
-  ["GitHub refuses binary changes with zero line counts", "Binary files a/a.ts and b/a.ts differ"],
-  ["GitHub refuses an encoded binary patch", "GIT binary patch\nliteral 1\nIc${Nk000310RR91"],
+  [
+    "A binary file is a listed change with no text lines, as Python read it",
+    "Binary files a/a.ts and b/a.ts differ",
+  ],
+  [
+    "An encoded binary patch is a listed change with no text lines",
+    "GIT binary patch\nliteral 1\nIc${Nk000310RR91",
+  ],
 ] as const) {
   it(name, async () => {
-    await expect(
-      github({
-        patch: null,
-        additions: 0,
-        deletions: 0,
-        diff: `${modeOnlyDiff}${marker}\n`,
-      }).adapter.facts(request, context()),
-    ).rejects.toThrow("Diff hunks are incomplete");
+    const result = await github({
+      patch: null,
+      additions: 0,
+      deletions: 0,
+      diff: `${modeOnlyDiff}${marker}\n`,
+    }).adapter.facts(request, context());
+    expect(result.complete && result.files[0]?.path).toBe("a.ts");
   });
 }
 it("Large evidence files can be read in bounded numbered ranges", async () => {
