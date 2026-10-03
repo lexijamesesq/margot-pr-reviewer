@@ -1,11 +1,14 @@
 import parseDiff from "parse-diff";
 
-/** Validate text inventory and hunk lengths; caller metadata is checked separately. */
+/**
+ * Validate text inventory and hunk lengths; caller metadata is checked separately.
+ * A binary file appears as its own section with no text hunks ("Binary files … differ" or an
+ * encoded "GIT binary patch"); Python listed the path and reviewed on, so it is complete here too.
+ */
 export function diffIsComplete(diff: string, files = parseDiff(diff)): boolean {
   return (
     files.length === [...diff.matchAll(/^diff --git /gm)].length &&
     (!diff.trim() || files.length > 0) &&
-    !/^Binary files .* differ$|^GIT binary patch$/m.test(diff) &&
     files.every((file) =>
       file.chunks.every(
         (chunk) =>

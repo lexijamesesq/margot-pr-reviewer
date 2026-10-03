@@ -126,8 +126,27 @@ it("GitHub follows the second file page", async () => {
 it("GitHub refuses an incomplete file inventory", async () => {
   await expect(github({ count: 2 }).adapter.facts(request, context())).rejects.toThrow();
 });
-it("GitHub refuses a missing text patch", async () => {
-  await expect(github({ patch: null }).adapter.facts(request, context())).rejects.toThrow();
+it("GitHub accepts a file listed without its own patch when the whole diff carries it", async () => {
+  const result = await github({ patch: null }).adapter.facts(request, context());
+  expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
+});
+it("GitHub refuses a file whose supplied counts the whole diff does not match", async () => {
+  await expect(github({ additions: 3 }).adapter.facts(request, context())).rejects.toThrow(
+    "Diff hunks are incomplete",
+  );
+});
+it("A listing entry with no patch and zero counts defers to the whole diff, as GitHub reports large PRs", async () => {
+  // GitHub listed 272 files for a real PR with additions 0, deletions 0 and no patch for files
+  // past its size threshold; the diff carried 146- and 373-line deletions for them.
+  const deleted = Array.from({ length: 4 }, (_, i) => `-line ${i}`).join("\n");
+  const result = await github({
+    patch: null,
+    additions: 0,
+    deletions: 0,
+    status: "removed",
+    diff: `diff --git a/a.ts b/a.ts\n@@ -1,4 +0,0 @@\n${deleted}\n`,
+  }).adapter.facts(request, context());
+  expect(result.files[0]).toMatchObject({ path: "a.ts" });
 });
 it("GitHub refuses a diff missing its file header", async () => {
   await expect(
@@ -595,6 +614,18 @@ it("Claude rejects an error-marked result", async () => {
 it("Claude rejects an empty result body", async () => {
   await expect(fakeClaude({ envelope: { result: "" } })).rejects.toThrow("result");
 });
+it("A file GitHub lists without its own patch is complete when the whole diff carries it", async () => {
+  // GitHub omits `patch` for large changes; a 2,289-line deletion in a real PR had none.
+  const deleted = Array.from({ length: 5 }, (_, i) => `-line ${i}`).join("\n");
+  const result = await github({
+    patch: null,
+    additions: 0,
+    deletions: 5,
+    status: "removed",
+    diff: `diff --git a/a.ts b/a.ts\n@@ -1,5 +0,0 @@\n${deleted}\n`,
+  }).adapter.facts(request, context());
+  expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
+});
 it("A partial final hunk cannot claim complete facts", async () => {
   await expect(
     github({
@@ -662,18 +693,23 @@ for (const [name, id, diff] of [
   });
 }
 for (const [name, marker] of [
-  ["GitHub refuses binary changes with zero line counts", "Binary files a/a.ts and b/a.ts differ"],
-  ["GitHub refuses an encoded binary patch", "GIT binary patch\nliteral 1\nIc${Nk000310RR91"],
+  [
+    "A binary file is a listed change with no text lines, as Python read it",
+    "Binary files a/a.ts and b/a.ts differ",
+  ],
+  [
+    "An encoded binary patch is a listed change with no text lines",
+    "GIT binary patch\nliteral 1\nIc${Nk000310RR91",
+  ],
 ] as const) {
   it(name, async () => {
-    await expect(
-      github({
-        patch: null,
-        additions: 0,
-        deletions: 0,
-        diff: `${modeOnlyDiff}${marker}\n`,
-      }).adapter.facts(request, context()),
-    ).rejects.toThrow("Diff hunks are incomplete");
+    const result = await github({
+      patch: null,
+      additions: 0,
+      deletions: 0,
+      diff: `${modeOnlyDiff}${marker}\n`,
+    }).adapter.facts(request, context());
+    expect(result.complete && result.files[0]?.path).toBe("a.ts");
   });
 }
 it("Large evidence files can be read in bounded numbered ranges", async () => {

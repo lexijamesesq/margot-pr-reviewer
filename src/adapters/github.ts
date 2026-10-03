@@ -124,22 +124,19 @@ export function githubAdapter(
       const diffText: unknown = diff.data;
       if (files.length !== before.changed_files || typeof diffText !== "string")
         throw new Error("Incomplete GitHub diff");
-      // Metadata-only changes have no patch. Binary or missing content remains incomplete.
-      if (
-        files.some((f) => typeof f.patch !== "string" && (f.additions !== 0 || f.deletions !== 0))
-      )
-        throw new Error("A changed file has no complete text patch");
+      // The whole-PR diff is the source of truth, as it was for Python ("the compare endpoint
+      // caps its files array; the diff has no such cap"). GitHub's per-file listing omits
+      // `patch` and reports zero counts for large files and for files deep in a large PR, so
+      // its counts are cross-checked only where it supplied the content.
       const parsed = parseDiff(diffText);
       if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
       if (
         parsed.length !== files.length ||
         parsed.some((file, index) => {
           const expected = files[index];
-          return (
-            !expected ||
-            file.additions !== expected.additions ||
-            file.deletions !== expected.deletions
-          );
+          if (!expected) return true;
+          if (typeof expected.patch !== "string") return false;
+          return file.additions !== expected.additions || file.deletions !== expected.deletions;
         })
       )
         throw new Error("Diff hunks are incomplete");
