@@ -227,7 +227,7 @@ export async function review(
         comparison = undefined;
       } // Complete full-PR evidence above is the recovery path.
     }
-    const scope = roundScope(facts, prior, comparison);
+    const scope = roundScope(facts, prior, comparison, cached !== undefined);
     let result: Review;
     if (cached && prior) {
       result = {

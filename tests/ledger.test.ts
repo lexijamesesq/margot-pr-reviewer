@@ -703,12 +703,18 @@ describe("history retention and retries", () => {
     submittedAt: `2026-10-02T00:00:0${id}Z`,
     body: ledgerBlock(value),
   });
+  it("a same-head later re-run without a usable saved result is a full review of the PR", () => {
+    // The delta from a head to itself is empty; reviewing it would let the council approve
+    // nothing. Without the saved result, the whole PR is reviewed again in the same round.
+    const scope = roundScope(facts, { ...ledger(3), head: facts.head }, undefined, false);
+    expect(scope).toMatchObject({ round: 3, full: true, diff: facts.diff, files: facts.files });
+  });
   for (const [name, round] of [
     ["restarts a same-head first review with full scope", 1],
     ["reuses same-head later review scope and allocates new finding keys", 3],
   ] as const)
     it(name, async () => {
-      const scope = roundScope(facts, { ...ledger(round), head: facts.head });
+      const scope = roundScope(facts, { ...ledger(round), head: facts.head }, undefined, true);
       let keys: string[] = [];
       if (round === 3) {
         const r = recording();
