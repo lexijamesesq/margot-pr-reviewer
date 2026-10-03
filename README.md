@@ -1,151 +1,93 @@
 # Margot PR reviewer
 
-Margot, the PR reviewer, as an ESM TypeScript package: first-round review and later-round verification, with live GitHub, Jev and
-Claude Code adapters. Live operation defaults to shadow mode: it records proposed publication
-and auto-merge disarming locally. Explicit GitHub mode posts checks and native
-reviews, and disarms holds. Later rounds read authenticated review ledgers.
+Margot is an automated pull-request reviewer. A host — typically a GitHub Actions
+workflow — installs a released copy of this package, binds a request and
+configuration to a specific pull request, and runs the review.
 
-## Install and run the recorded review
+Margot classifies a change as mechanical, documentation, or functional. A
+mechanical change gets no further review. A documentation or functional change
+is routed to a council of review cards, each one a fresh model run judging the
+diff against a single standard (safety, works-and-proven, principal-engineer,
+achieves-the-objective, maintainable-no-slop, house-style). A risk model scores
+the change into a LOW, MEDIUM, or HIGH band. When code alone cannot affirmatively
+clear the change — any mandatory finding, risk above LOW, an incomplete card, or
+model doubt — a voice model rules the verdict: APPROVED, CHANGES_REQUESTED,
+CLARIFICATION_REQUESTED, or ERROR. Margot renders that verdict as a PR comment
+and, in GitHub mode, as a check run; some outcomes hold the PR for the operator
+instead of clearing it for merge.
 
-Use Node 22 or later and npm. From a clone:
+## Requirements and install
 
-```sh
-npm ci
-npm run build
-npm run typecheck
-npm test
-npm pack
-```
+Margot requires Node 22 or later (see `engines` in `package.json`).
 
-Install the resulting tarball in a separate project with `npm install /path/to/margot-pr-reviewer-0.6.2.tgz`.
-Then run this as an `.mjs` file:
-
-```js
-import { readFile } from "node:fs/promises";
-import { review, recordedServices } from "margot-pr-reviewer";
-
-const recording = JSON.parse(await readFile(
-  new URL(import.meta.resolve("margot-pr-reviewer/recordings/author-changes.json")),
-  "utf8",
-));
-const services = recordedServices(recording);
-const result = await review(recording.request, recording.config, services);
-if (result.kind === "reviewed") {
-  console.log(result.report);
-  console.log(services.publications);
-} else {
-  console.log(result);
-}
-```
-
-The seven recordings preserve historical review behavior under neutral names.
-Five exact historical diffs were retrieved from public GitHub. Classifier answers,
-check receipts and publication are reconstructed where the original harness lacked
-compatible evidence; each file labels that limitation. These prove recorded
-wiring, not current live model quality.
-See [recording provenance](docs/recordings.md). Change a card finding and its voice
-disposition to see clearance disappear; `scripts/consumer-smoke.mjs` demonstrates
-this against an installed package.
-
-## API and configuration
-
-`review(request, config, services)` returns a `classified`, `reviewed`, `held` or `error`
-result. Types are exported from the package. Request and service values are
-validated at runtime with Zod. Errors cannot approve and carry a diagnostic stage,
-without inventing a risk rating. Unreadable or corrupt authenticated review history
-returns `held`, names the reason for the operator, and has no verdict or risk band.
-
-The request identifies repository, PR number, exact base/head SHAs, and phase
-(`triage` or `review`). Services fetch facts; a caller cannot supply a pre-cleared
-result. The service adapter is trusted infrastructure: it must authenticate actors,
-fetch complete evidence, bind facts to both SHAs, honor abort signals, and prevent
-writes if the head changes. Recorded services implement that boundary in memory.
-The live adapter supports shadow and explicitly configured GitHub publication.
-
-Configuration has no implicit authority defaults. An explicitly empty protection
-list is allowed; missing configuration is rejected. The recordings show every key:
-
-- `protectedPaths`: picomatch globs for review-authority paths, including dotfiles.
-  Functional edits hold. Documentation and mechanical edits do not hold solely
-  for a protected path; renames touching either protected endpoint always hold.
-- `mechanicalDiffLineCap`: maximum changed lines eligible for the mechanical
-  short-circuit. The default is 2000; larger changes take the full review path.
-- `requiredChecks`, `trustedCheckActors`, `trustedTriageActors`: caller-owned policy.
-  Required checks need their latest run to be trusted and successful on the reviewed head.
-  `allowedSkippedChecks` explicitly permits named skipped jobs; its default is empty.
-- `trustedLedgerActors`: logins of the GitHub Apps allowed to supply review history.
-  The default empty list trusts nobody. `github.freshShadow: true` explicitly selects
-  an independent first-round experiment; leave it false for convergence.
-  `github.shadowBeforeHead: true` instead omits only reviews on the requested head,
-  preserving earlier-round history for side-by-side shadows. Both options are
-  refused with GitHub publication.
-- `cardBundle.commit`: the exact publish-skills revision. The resolver supplies
-  both agents and an absolute path to every card. Each reviewer receives its own
-  explicit card path; it never guesses a skill/cache location.
-- `classificationThreshold`, `routeThreshold`, `riskTailThreshold`,
-  `confidenceThreshold`, `noCouncilConfidenceFloor`: positive probabilities.
-  The carried settings are 0.6, 0.35, 0.3, 0.3 and 0.3, respectively.
-- `timeoutMs`: deadline for each service call; a failed or timed-out call is an error.
-- `publication`: `record`, `none`, or `github`. `calibration: true` always prevents clearance.
-
-The fresh Jev class selects the path; a trusted earlier triage can only raise the
-test profile. Functional outranks documentation, which outranks mechanical.
-Mechanical reviews without standing findings spend no Claude. Substantive documentation defaults to
-`works-and-proven`, stays LOW, and sends defects/questions to the author. Jev's
-questions live in `src/questions.ts`. Playbooks and the voice stay in publish-skills.
-The voice model belongs to the bundle's `agents/margot.md`, not ReviewConfig.
-
-The final rating drives both display and eligibility. Every mandatory finding must
-have exactly one disposition. Shadow records a proposed auto-merge disable;
-GitHub publication confirms the real disable on holds. A moved head fails even with publication
-set to `none`. A shadow result is not an authorization for an external publisher.
-
-## Live shadow review on a self-hosted runner
-
-Provision Node 22+, git, Claude Code **2.1.283**, and a clean publish-skills clone
-at **dc82ec72eea97ae6b0e161dd2ec909cb75033045**. Supply `JEV_KEY` for Jev
-**jev-1.13.0**, `CLAUDE_CODE_OAUTH_TOKEN` for Claude, and a read-scoped `GH_TOKEN`.
-Local CLI login is also supported. Alternatively, configure an absolute `github.gh`
-path to a credential broker's gh executable. The bridge only permits GitHub GETs.
-Credentials are environment values, never configuration file values. The package
-contains no vault paths, estate identity, enrolment rules or publisher credentials.
+Install a released tarball by URL, verifying it before use:
 
 ```sh
-npm install --global /absolute/path/margot-pr-reviewer-0.6.2.tgz
-npm install --global @anthropic-ai/claude-code@2.1.283
-git clone https://github.com/lexijamesesq/publish-skills.git /absolute/runtime/publish-skills
-git -C /absolute/runtime/publish-skills checkout dc82ec72eea97ae6b0e161dd2ec909cb75033045
-cp samples/config.sample.json /absolute/runtime/config.json
-cp samples/request.sample.json /absolute/runtime/request.json
-# Replace sample values with trusted runner paths, pins, policy and exact PR SHAs.
-margot-review /absolute/runtime/request.json /absolute/runtime/config.json /absolute/runtime/result.json
+curl --fail --location --silent --show-error "$PACKAGE_URL" --output margot-pr-reviewer.tgz
+echo "$PACKAGE_SHA256  margot-pr-reviewer.tgz" | sha256sum --check
+npm install --ignore-scripts --save-exact ./margot-pr-reviewer.tgz
 ```
 
-All sample files use `*.sample.*` and contain placeholders. Only self-hosted runner
-setup is supplied. The sample workflow calls the hash-verified installed
-`margot-review` executable directly.
-Store request/config outside the PR checkout. Do not use the shadow job as a merge gate.
-The output includes Margot's result, proposed local actions and raw model responses.
-It exits nonzero for infrastructure/validation errors; a reviewed hold remains a valid result.
+The SHA-256 check against the downloaded bytes is the integrity control. A
+deployment file's `packageIntegrity` field (an npm-style `sha512-…` string) is
+validated only for shape; see [Instance commands](#instance-commands) for the
+`validate-deployment` command that checks the rest of a deployment pin.
 
-The GitHub adapter paginates files, checks and reviews; rejects draft/fork PRs,
-missing text patches, truncated hunks and moving revisions; and checks head freshness
-again before recording. Closed PRs are allowed for retrospective comparisons.
-`github.freshShadow` defaults to false, so complete authenticated history participates
-in later rounds. Nothing is posted or overwritten.
-Binary changes and files outside GitHub's complete text evidence limits fail closed.
+## Configuration
+
+A review run takes two JSON files: a request and a configuration.
+
+- **Request** — repository, PR number, exact base and head SHAs, and phase
+  (`triage` or `review`). See `samples/request.sample.json`.
+- **Configuration** — review policy, GitHub options, the Jev risk model, and the
+  Claude executable and plugin directory. See `samples/config.sample.json` for
+  every key, including the review card bundle pin, protected paths, required
+  checks, trusted actors, and the classification/routing/risk thresholds.
+
+Both files, and values inside them, may contain the placeholder `${MARGOT_ROOT}`.
+It is replaced with the absolute path to Margot's installed root (where
+`margot-instance bind-request` wrote the resolved request and configuration).
+
+### Environment variables
+
+`margot-review` and `margot-instance` read these from the process environment:
+
+| Variable | Meaning |
+| --- | --- |
+| `JEV_KEY` | API key for the Jev risk model. Required by `margot-review`. |
+| `GH_TOKEN` | Read-scoped GitHub token for fetching PR facts, checks, and review history. |
+| `MARGOT_WRITE_TOKEN` | Separate token with checks and pull-request write access. Required for GitHub publication; never forwarded to a model or evidence server. |
+| `MARGOT_OWNED_TIER` | Caller-computed protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing, blank, or invalid holds the review. |
+| `MARGOT_CLASSIFICATION` | Overrides the request's classification (`functional`, `documentation`, or `mechanical`). |
+| `MARGOT_TRIAGE` | Legacy override; only the value `mechanical` has any effect. |
+| names listed in `claude.ticketing.env` | Forwarded only to the configured ticketing MCP server, never to the model environment generally. |
+
+## Running it in GitHub Actions
+
+`samples/self-hosted.sample.yml` is a full workflow. It has three jobs:
+
+1. **`route`** — installs the exact release bytes, verifies them, and runs
+   `margot-instance validate-deployment` to confirm the target repository is
+   enrolled and to decide whether this run has GitHub publication authority.
+2. **`review`** — runs `margot-instance bind-request` to resolve the request and
+   configuration for the PR, then runs `margot-review` to produce and publish
+   the result.
+3. **`close-stranded-check`** — runs on a normal (non-self-hosted) runner with
+   `if: always()`. If the earlier jobs did not successfully publish a result, it
+   closes any review check this run owns so the PR is not left with a check
+   stuck in progress.
 
 ## Instance commands
 
-Margot ships `margot-instance` so a consumer does not need a parallel JavaScript
-implementation of routing and request admission. The commands are strict: malformed
-JSON, incomplete pins, invalid policy inputs, or uncertain GitHub facts fail nonzero.
+`margot-instance` ships three commands so a consumer does not need its own
+implementation of routing and request admission.
 
-`validate-deployment` checks a trusted deployment file's `version`, exact GitHub
-release asset URL, npm SHA-512 integrity, and bootstrap SHA-256. It also checks the
-target against caller-supplied enrolled repositories, limits authority to a supplied
-authority subset, and appends `authority` plus `repositoryName` to `GITHUB_OUTPUT`
-when that variable is present:
+### `validate-deployment`
+
+Checks a trusted deployment file's version, exact GitHub release asset URL, and
+SHA-256 pin against the caller's enrolled and authority-bearing repositories.
+Appends `authority` and `repositoryName` to `GITHUB_OUTPUT` when that variable is
+set.
 
 ```sh
 margot-instance validate-deployment \
@@ -156,18 +98,20 @@ margot-instance validate-deployment \
   --authority-repositories '[]'
 ```
 
-`bind-request` reads the PR through Octokit using `GH_TOKEN`. Before binding any
-configuration, it classifies a superseded, merged, closed, draft, fork-head,
-conflicted, or empty request; otherwise it writes mode-0600 `request.json` and `config.json`
-under the absolute Margot root. Required checks, protected paths, permitted skipped
-checks, and authority are explicit inputs. Authority selects GitHub publication;
-otherwise the configuration is a before-head shadow. Authority requires a nonempty,
-invocation-unique `--run-url` so the publisher can reject a superseded writer.
-`${MARGOT_ROOT}` in the Claude executable, plugin directory, and ticketing command is
-replaced with the trusted root. Every classified stop exits 75 (`EX_TEMPFAIL`),
-prints `stop_reason=<reason>`, and appends that field to `GITHUB_OUTPUT` when set.
-A superseded stop also prints and appends `live_sha=<current head>`, so the caller
-does not need to read the PR again.
+### `bind-request`
+
+Reads the PR through the GitHub API using `GH_TOKEN`. Before writing any
+configuration it classifies a merged, closed, superseded, draft, fork-head,
+conflicted, or empty request and stops instead. Otherwise it writes mode-0600
+`request.json` and `config.json` under the given Margot root, with the supplied
+required checks, protected paths, allowed skipped checks, and authority applied.
+Authority selects GitHub publication and requires a nonempty, run-unique
+`--run-url`; without it, the configuration is a before-head shadow run.
+
+Every classified stop exits **75** and prints `stop_reason=<reason>` (one of
+`superseded`, `merged`, `closed`, `draft`, `fork`, `conflict`, `empty`); a
+superseded stop also prints `live_sha=<current head>`. Both lines are appended
+to `GITHUB_OUTPUT` when that variable is set.
 
 ```sh
 margot-instance bind-request \
@@ -178,14 +122,14 @@ margot-instance bind-request \
   --run-url "$RUN_URL"
 ```
 
-`close-stranded-check` is the hosted cleanup decision as a package command. It acts
-when routing failed, review failed, or a selected package reports
-`--published false`; an empty `--published` means the package was not selected. It
-checks commit-to-PR membership, shared live-head ownership, the open
-`review / margot` (then legacy `margot`) check, and run ownership before PATCHing.
-The token is read from `GH_TOKEN`.
-`--own-runs` is the Actions runs URL prefix and must end in `/`, for example
-`https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/`.
+### `close-stranded-check`
+
+Closes a review check left open when routing failed, review failed, or
+publication did not happen. It checks that the given head belongs to the named
+PR, that the PR isn't still open on that head under another run, that the open
+`review / margot` check (or the legacy name `margot`) belongs to this run, and
+only then closes it with a reason-specific conclusion. Exits 0 after closing or
+finding nothing to close, and 2 on a GitHub read or write failure.
 
 ```sh
 margot-instance close-stranded-check \
@@ -195,203 +139,42 @@ margot-instance close-stranded-check \
   --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"
 ```
 
-A superseded head (`--stop-reason superseded --live-sha "$LIVE_SHA"`) and a merged
-PR close `skipped`; a closed PR and a cancelled run close `cancelled`; draft,
-fork-head, conflicted, and empty PRs close `failure`. A floor or other stop closes
-`action_required`. The stop table also supplies the Python-compatible title and
-summary for each classified reason. The command
-exits 0 after a close or when there is nothing safe to close, and 2 on a GitHub
-read/write failure.
+## What Margot posts
 
-The consumer still owns estate policy derivation, token minting, package download,
-and exact-byte verification. The SHA-256 check before installation is deliberately the
-integrity control over the downloaded bytes. `validate-deployment` then runs from the
-installed artifact as a post-install consistency check of the pin's shape and target
-enrolment; it is not the byte-integrity control. Before Margot is installed, use stock
-shell tools to read `packageReference` and `packageSha256`, download the asset, run
-`sha256sum --check`, and install that tarball with `npm install --ignore-scripts`; see
-`samples/self-hosted.sample.yml`.
+The review comment opens with the outcome and risk band, a short rationale, and
+(when applicable) a note that the change is above Margot's authority and is the
+operator's to merge. Below a divider it lists either the mechanical-change line
+or the council's per-card results — a status icon, the card name, and its
+finding, if any — followed by a round summary (new, open, and closed findings)
+and the PR's author, ticket, commit, and run links.
 
-The runner verifies the bundle's Git commit, clean tree, both agents, common law
-and all six playbooks. Agent prose, voice model and effort come from that pin.
-The original plugin agents' tool lists override CLI `--tools`; the live probe showed
-that they hid the replacement MCP tools. Therefore the runner loads the unchanged
-agent prose through the CLI's standard `--agents` mechanism and replaces only the
-runtime tool grant. It neither copies nor rewrites prompts into this package.
-Cards read their exact pinned playbook and common law through `read_card`.
+In GitHub mode this comment is accompanied by a check run — conventionally
+named `review / margot`, the name `close-stranded-check` looks for. Its text
+carries plain-text lines meant for automation to parse, including
+`outcome: <OUTCOME> | band: <BAND>` and `decision_source: <source>`, alongside
+the classification, which cards were summoned, the convergence counters, and
+whether the result is auto-merge eligible.
 
-Each card has a new Claude process, its own isolated working directory, no built-in
-tools, no project settings/instructions/hooks, and a strict MCP configuration.
-The standard MCP SDK exposes only `read_file`, `search_file`, `read_diff` and `list_files` bound to this
-repository's base/head SHAs, plus `read_card` for the selected card. The voice sees
-only the repository read tools. Optional `claude.references` maps a reference name
-to `{ repository, head }`, where `head` is an immutable 40-character SHA; it enables
-`read_reference` only for those configured pins. No shell, PR code execution, GitHub mutation, local
-arbitrary filesystem read or arbitrary URL fetch is available to the model. A runner must
-keep its trusted package and bundle immutable during a review. Optional
-`claude.ticketing` configuration gives card runs, but never the voice, a named
-MCP server and an exact tool allowlist. The consumer's own MCP server for their
-ticketing system goes here.
-
-Jev uses native fetch and bounded p-retry backoff. Terminal authentication errors
-fail immediately; exhausted transient failures cannot approve. Its Noul responses
-contain no confidence field: routing confidence comes from the exposure Score,
-as in Python. Risk confidence comes directly from Jev's five Score answers. No Claude fallback
-can authorize functional clearance after failed Jev evidence; the fallback can
-produce a review, but that review holds for the operator.
-
-The runner retains prose and reads it as the Python reviewer did: labels at line
-start with the first match winning, tagged finding bullets anywhere in the card
-with or without emphasis, `completion: incomplete` or `skipped` recorded with its
-reason rather than refused, `[issue]` findings numbered `F1`…`Fn` across the
-council in card order, Margot's own `ERROR` outcome accepted as her ruling, and
-complete finding accounting under every other outcome. It does not depend on
-`--json-schema`; see [the earlier probe](docs/cli-compatibility.md). Transport references:
-[Claude CLI](https://code.claude.com/docs/en/cli-reference),
-[TypeSafe API](https://docs.typesafe.ai/api),
-[Octokit](https://github.com/octokit/octokit.js),
-[MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk).
+A PR is held for the operator — not cleared for merge, even on an outcome of
+APPROVED — when any of the following holds: risk is above LOW, the change
+touches a protected path under Margot's own review authority, the protected-path
+ownership tier could not be computed, calibration mode is on, or the voice's
+outcome is anything other than APPROVED. An `ERROR` outcome means the review
+could not be completed at all and is always held.
 
 ## Development
 
-- `npm run build`: ESM and declarations into `dist`.
-- `npm run typecheck`: strict checks of source and tests.
-- `npm test`: named behavior tests, with no TODOs.
-- `pre-commit install`: install the repository's commit hooks. Fix findings;
-  do not bypass them.
+```sh
+npm ci
+npm run build
+npm run typecheck
+npm test
+node scripts/package-smoke.mjs <tarball>
+```
 
-The estate-owned workflows remain unchanged. The test suite runs with no live
-network and no paid models. `node scripts/package-smoke.mjs <tarball>` installs a
-packed tarball in an empty directory and runs both executables.
+`npm test` runs the Vitest suite with no live network calls and no paid models.
+`scripts/package-smoke.mjs` installs a packed tarball into an empty directory
+and exercises both installed executables.
 
-## Later rounds
-
-A reviewed result contains `ledger` and `convergence`. The rendered report ends
-with a versioned ledger block. GitHub review author, author type, submitted time
-and commit ID authenticate selection. Untrusted actors' ledgers are ignored;
-unreadable history or a corrupt authenticated ledger holds for the operator before
-model calls. The adapter reads every review page. Python v1 ledgers are accepted as
-prior-round inputs. The typed v2 ledger is posted in a v1-compatible JSON envelope with plain entries
-and a compressed `receipt_v2` extension. Unchanged Python reads the same entries;
-TypeScript restores the exact saved receipt. Earlier compressed v2 blocks remain
-readable. Compressed receipt decoding has a one-MiB limit. When the encoded block exceeds
-24,000 characters, Margot drops the oldest dismissals first, then other
-non-standing entries, then the optional replay receipt. Standing entries remain.
-
-### 0.4.1 receipt compatibility
-
-Margot 0.4.1 reads receipts written by 0.4.0; Margot 0.4.0 does not read receipts
-written by 0.4.1. This boundary is acceptable because 0.4.0 has never published
-a receipt (shadow only, publication none) and will not; the rollback target during
-the canary is the Python runtime, not 0.4.0.
-
-Cards review the complete unified delta, restricted to the PR's files, plus their
-own standing, advisory and dismissed entries. The compare JSON file list is not used as an
-inventory. A rebase, unreadable compare or incomplete diff keeps the ledger and
-uses the already validated full PR evidence. Every card with an open finding
-is recalled, including on mechanical and editorial paths. Matching, fix evidence,
-dismissal reopening and late attribution remain model judgments. Margot does
-not infer finding identity or fixes from line-number arithmetic.
-
-From round two, MINOR findings become advisory. A missed finding blocks only at
-BLOCKING, or MAJOR for safety; a delta-reach regression keeps its honest severity.
-Nothing escalates or relaxes after round three. A silent MINOR or advisory entry
-counts as fixed; a silent MAJOR or BLOCKING requires Margot's confirmation. No
-`Resolved:` section is parsed: fixed-ness is inferred from a standing finding's
-absence, as Python inferred it. Dismissals retain their
-reasons until the delta changes the cited code. A new delta finding must state
-whether it is new, missed, or caused through delta reach; missing attribution fails
-closed. The displayed counts are New, Open, Closed; the council roster summarizes findings.
-
-An exact-head retry reuses the authenticated v2 result and counts when fresh
-classification agrees, after checking configuration, evidence, required checks and current head.
-Classification still runs; compatible retries skip council, risk and voice calls.
-A changed base, body, evidence or configuration invalidates the cached result.
-A same-head ledger without a saved result reruns review: a first-round ledger
-starts round one again; later-round ledgers keep their round and standing findings
-with an empty delta. A new head builds on the prior ledger normally.
-
-Large Jev requests are split into complete evidence batches. Classification and
-routing take maximum probabilities across batches; risk takes maximum tail
-probabilities and minimum confidence. The live model reads the complete scoped
-diff through a paged, read-only tool; prompts travel through stdin. These transport
-limits never authorize dropping the tail of the evidence. Cross-batch reasoning
-is a model-quality limitation; the live comparison records its observed effects.
-
-## GitHub publication
-
-Set `review.publication` to `github`, leave `github.freshShadow` false and supply
-`publisher` with three check names (`triage`, `review`, `authority`), the App's
-`actor` login, numeric `appId`, and this invocation's unique `runUrl`. Supply a
-read-only `GH_TOKEN` and a separate `MARGOT_WRITE_TOKEN`. The latter needs checks
-and pull-request write access, plus the permission needed to disable auto-merge.
-It is never forwarded to the model environment or read-only evidence server.
-The CLI calls `liveServices(...).run(request)`; API consumers using publication
-must use that lifecycle too. Calling its publisher outside the lifecycle fails.
-
-The optional `claude.ticketing` block specifies `server`, `command`, `args`,
-`env`, and `tools`. `env` contains environment-variable names, never values;
-Margot forwards only those named values to the ticketing server. If the block is
-absent or any named value is empty or unset, Margot attaches neither the server
-nor its tools.
-
-The publisher adopts the caller's check by App, name and head, records run
-ownership and refuses to let a superseded invocation close the newer run's check.
-It keeps the required check pending, then publishes classification, authority status
-and the SHA-bound native review. It preserves earlier App approvals; the consumer's
-ruleset is responsible for stale approvals. After the native review, it disables
-auto-merge for holds, completes the required check and confirms that check's receipt.
-Reviewed holds use COMMENT and neutral, except calibration and ERROR outcomes use
-action_required. History holds use action_required with a named reason and no
-native review; errors also use action_required. It never
-requests changes at GitHub's review gate, enables auto-merge, or merges.
-Checks and native reviews recheck head/base and admission before writing. Partial failures attempt
-to disarm auto-merge and close the gate; they do not withdraw a posted approval.
-A failed cleanup remains an error; an API
-outage can leave the check pending. GitHub has no transaction spanning these
-writes, so same-head writers must share the caller's PR concurrency group.
-
-New counts issues first raised this round. Open counts standing and advisory
-issues. Closed counts retained fixed and dismissed issues. The visible tally is
-derived from ledger entries; the council roster shows each card's first visible
-finding. Check text retains finding details and serializes the diagnostic
-convergence counters as JSON. It also names cards recalled by the ledger beyond
-those selected by routing. Encoded history is trimmed as described under Later rounds.
-
-Mechanical reviews with no council use the mechanical coverage line, including
-the measured classification confidence when available. A voice's short `risk`
-statement appears on the risk line; its `band_reason` remains in check details.
-Clarifications name the author and the required choice, and fallback reviews
-display a reduced-confidence warning. An approval with an open clarification or
-an established finding is refused. The Python self-attribution patterns in the
-voice's synthesis also refuse publication; card findings may still quote PR text.
-
-The self-hosted sample workflow installs the exact release asset and verifies its
-SHA-256 before installing. No hosted-runner
-sample is supplied. Publication remains subject to a consumer's reversible live
-canary.
-
-The review CLI accepts Python's dispatcher inputs `MARGOT_CLASSIFICATION`
-(`functional`, `documentation`, or `mechanical`) and the legacy
-`MARGOT_TRIAGE=mechanical`. The request JSON can also carry `classification`
-and `triage`; environment inputs take precedence. Missing or invalid dispatch
-classification requires functional review. Margot combines it conservatively
-with fresh classification and the latest completed configured triage check from
-her configured App on the requested head. `publisher.appId` and
-`publisher.checks.triage` supply both the read and write paths; without publisher
-configuration, the live adapter trusts no prior triage check.
-
-Pass the workflow-computed ownership tier through `MARGOT_OWNED_TIER` (`none`,
-`owned`, or `required_owned`). An unset, blank, or invalid tier is uncomputed
-and independently holds clearance. Only an explicit `none` means no owned paths.
-The sample declares `owned_tier` (default `unknown`), `classification` and
-`triage` (both default empty) and passes all three to the review step. API callers
-supply `facts.ownedPathTier`; live service callers supply `credentials.ownedPathTier`.
-
-On a Jev outage, functional routing and risk use the tool-free
-`claude-haiku-4-5` fallback through the configured Claude executable. A fallback
-verdict posts with `decision_source: fallback` and cannot clear auto-merge.
-Classification outages require functional review. Documentation routing outages
-summon review without a fallback call or a risk hold. If both deciders fail,
-Margot reports an error. Unreadable or corrupt authenticated review history holds
-for the operator with the reason named, without a verdict, risk band or model calls.
+This repository uses pre-commit hooks (`pre-commit install`). Fix findings
+rather than bypassing them.
