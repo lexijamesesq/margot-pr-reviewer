@@ -123,8 +123,18 @@ it("GitHub follows the second file page", async () => {
   const facts = await adapter.facts(request, context());
   expect(facts.files.length === 2 && calls.some((c) => c.includes("page=2"))).toBe(true);
 });
-it("GitHub refuses an incomplete file inventory", async () => {
-  await expect(github({ count: 2 }).adapter.facts(request, context())).rejects.toThrow();
+it("The PR's changed_files count lagging the listing does not refuse; the diff decides", async () => {
+  // GitHub's `changed_files` lags on a fresh push and the listing is capped at 3,000; Python
+  // took the file list from the diff and never compared the two.
+  const result = await github({ count: 2 }).adapter.facts(request, context());
+  expect(result.fileCount).toBe(1);
+  expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
+});
+it("A file the diff names but the listing omits is still a reviewed file", async () => {
+  const result = await github({
+    diff: "diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n-old\n+new\ndiff --git a/b.ts b/b.ts\n@@ -1 +1 @@\n-old\n+new\n",
+  }).adapter.facts(request, context());
+  expect(result.files.map((f) => f.path)).toEqual(["a.ts", "b.ts"]);
 });
 it("GitHub accepts a file listed without its own patch when the whole diff carries it", async () => {
   const result = await github({ patch: null }).adapter.facts(request, context());

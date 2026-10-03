@@ -120,26 +120,31 @@ export function githubAdapter(
         after.title !== before.title
       )
         throw new Error("PR changed while reading facts");
-      // GitHub's list-files cap is 3000. Never infer completeness from a last page alone.
       const diffText: unknown = diff.data;
-      if (files.length !== before.changed_files || typeof diffText !== "string")
-        throw new Error("Incomplete GitHub diff");
+      if (typeof diffText !== "string") throw new Error("Incomplete GitHub diff");
       // The whole-PR diff is the source of truth, as it was for Python ("the compare endpoint
-      // caps its files array; the diff has no such cap"). GitHub's per-file listing omits
-      // `patch` and reports zero counts for large files and for files deep in a large PR, so
-      // its counts are cross-checked only where it supplied the content.
+      // caps its files array; the diff has no such cap"): the file list comes from it, and it
+      // is complete when every hunk is closed. GitHub's per-file listing is capped at 3,000,
+      // lags the PR's own `changed_files` on a fresh push, and omits `patch` with zero counts
+      // for large files; it is used only to enrich a file the diff already names, and its
+      // counts are cross-checked only where it supplied the content.
       const parsed = parseDiff(diffText);
       if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
-      if (
-        parsed.length !== files.length ||
-        parsed.some((file, index) => {
-          const expected = files[index];
-          if (!expected) return true;
-          if (typeof expected.patch !== "string") return false;
-          return file.additions !== expected.additions || file.deletions !== expected.deletions;
-        })
-      )
-        throw new Error("Diff hunks are incomplete");
+      const listed = new Map(files.map((f) => [f.filename, f]));
+      const diffFiles = parsed.map((file) => {
+        const path = file.to && file.to !== "/dev/null" ? file.to : (file.from ?? "");
+        const from = file.from && file.from !== "/dev/null" ? file.from : undefined;
+        const entry = listed.get(path);
+        if (
+          entry &&
+          typeof entry.patch === "string" &&
+          (file.additions !== entry.additions || file.deletions !== entry.deletions)
+        )
+          throw new Error("Diff hunks are incomplete");
+        const previous = entry?.previous_filename ?? (from && from !== path ? from : undefined);
+        return { path, ...(previous ? { previousPath: previous } : {}) };
+      });
+      if (diffFiles.some((f) => !f.path)) throw new Error("Diff hunks are incomplete");
       const historyReviews = options.shadowBeforeHead
         ? reviews.filter((v) => v.commit_id !== r.head)
         : reviews;
@@ -191,11 +196,8 @@ export function githubAdapter(
         author: before.user.login,
         diff: diffText,
         complete: true,
-        fileCount: before.changed_files,
-        files: files.map((f) => ({
-          path: f.filename,
-          ...(f.previous_filename ? { previousPath: f.previous_filename } : {}),
-        })),
+        fileCount: diffFiles.length,
+        files: diffFiles,
         checks: checks.map((check) => ({
           name: check.name,
           actor: check.app?.slug ?? "unknown",
