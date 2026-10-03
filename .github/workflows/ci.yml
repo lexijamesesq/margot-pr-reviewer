@@ -34,7 +34,7 @@ jobs:
       dotty_ref: v1
       check_name: checks
 
-  margot-tests:
+  test:
     name: ci / test
     needs: [floor]
     if: ${{ (github.event_name == 'pull_request') && needs.floor.outputs.mechanical != 'true' }}
