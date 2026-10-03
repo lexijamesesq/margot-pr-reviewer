@@ -33,6 +33,13 @@ deployment file's `packageIntegrity` field (an npm-style `sha512-…` string) is
 validated only for shape; see [Instance commands](#instance-commands) for the
 `validate-deployment` command that checks the rest of a deployment pin.
 
+A live (non-recorded) review needs more than Node: the exact Claude Code CLI
+pinned at the configuration's `claude.executable` (its version is checked
+against `claude.version`), a Claude credential in the process environment
+(`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`), and the review card bundle —
+a clean git checkout of the review skills at `claude.pluginDirectory`, pinned
+to the exact commit named in `review.cardBundle.commit`.
+
 ## Configuration
 
 A review run takes two JSON files: a request and a configuration.
@@ -44,9 +51,13 @@ A review run takes two JSON files: a request and a configuration.
   every key, including the review card bundle pin, protected paths, required
   checks, trusted actors, and the classification/routing/risk thresholds.
 
-Both files, and values inside them, may contain the placeholder `${MARGOT_ROOT}`.
-It is replaced with the absolute path to Margot's installed root (where
-`margot-instance bind-request` wrote the resolved request and configuration).
+The configuration's `claude.executable`, `claude.pluginDirectory`, and
+`claude.ticketing.command` (when set) may contain the placeholder
+`${MARGOT_ROOT}`. Only `margot-instance bind-request` resolves it, replacing it
+with the absolute Margot root it was given; it rejects any of those three
+values left with an unresolved `${...}` after substitution. The request file
+never contains the placeholder, and `margot-review` itself reads whatever
+configuration it is given unchanged, without resolving `${MARGOT_ROOT}`.
 
 ### Environment variables
 
@@ -55,12 +66,27 @@ It is replaced with the absolute path to Margot's installed root (where
 | Variable | Meaning |
 | --- | --- |
 | `JEV_KEY` | API key for the Jev risk model. Required by `margot-review`. |
-| `GH_TOKEN` | Read-scoped GitHub token for fetching PR facts, checks, and review history. |
+| `GH_TOKEN` | GitHub token read by `margot-review` (facts, checks, review history) and by `margot-instance bind-request`/`close-stranded-check`. For `margot-review` and `bind-request` it only needs read access; `close-stranded-check` also uses it to update a check run, so it needs `checks: write` there. |
 | `MARGOT_WRITE_TOKEN` | Separate token with checks and pull-request write access. Required for GitHub publication; never forwarded to a model or evidence server. |
 | `MARGOT_OWNED_TIER` | Caller-computed protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing, blank, or invalid holds the review. |
 | `MARGOT_CLASSIFICATION` | Overrides the request's classification (`functional`, `documentation`, or `mechanical`). |
 | `MARGOT_TRIAGE` | Legacy override; only the value `mechanical` has any effect. |
 | names listed in `claude.ticketing.env` | Forwarded only to the configured ticketing MCP server, never to the model environment generally. |
+
+## Running `margot-review`
+
+```sh
+margot-review REQUEST.json CONFIG.json OUTPUT.json
+```
+
+It writes `OUTPUT.json` (mode 0600) with `{ result, actions, responses }`:
+`result` is the review outcome described under
+[Library API](#library-api) (`classified`, `reviewed`, `held`, or `error`);
+`actions` lists the shadow-mode local actions it recorded instead of actually
+publishing (empty once GitHub publication is configured); `responses` are the
+raw model responses captured during the run. It exits 1 when `result.kind` is
+`"error"`, and 0 otherwise — a `held`, `classified`, or non-merge-eligible
+`reviewed` result all still exit 0.
 
 ## Running it in GitHub Actions
 
@@ -156,11 +182,47 @@ the classification, which cards were summoned, the convergence counters, and
 whether the result is auto-merge eligible.
 
 A PR is held for the operator — not cleared for merge, even on an outcome of
-APPROVED — when any of the following holds: risk is above LOW, the change
-touches a protected path under Margot's own review authority, the protected-path
-ownership tier could not be computed, calibration mode is on, or the voice's
-outcome is anything other than APPROVED. An `ERROR` outcome means the review
+APPROVED — when any of the following holds: risk is above LOW; the
+protected-path ownership tier could not be computed; calibration mode is on; the
+voice's outcome is anything other than APPROVED; a rename touches a protected
+path on either its old or new path; or the change is classified `functional`
+and touches a protected path. A documentation or mechanical edit to a protected
+path does not hold on that account alone. An `ERROR` outcome means the review
 could not be completed at all and is always held.
+
+## Library API
+
+The package's main entry also exports a programmatic API for driving a review
+without a host process:
+
+- `review(request, config, services)` — runs a review against a `Services`
+  implementation and returns a `ReviewResult` whose `kind` is one of:
+  `"classified"` (the request's `phase` was `triage`: classification decided,
+  no council or verdict run), `"reviewed"` (a verdict, with rendered `report`
+  text), `"held"` (the review could not proceed; `reason` names why), or
+  `"error"` (`stage` and `diagnostic` describe what failed).
+- `recordedServices(recording)` — builds a `Services` implementation from a
+  plain JSON `Recording` object, such as the files under `recordings/`, for
+  review offline without live GitHub, Jev, or Claude calls.
+- `liveServices(config, credentials, onResponse?)` and `liveConfigSchema` — the
+  live GitHub/Jev/Claude-backed implementation `margot-review` itself runs on.
+
+Minimal recorded-review example:
+
+```js
+import { readFile } from "node:fs/promises";
+import { review, recordedServices } from "margot-pr-reviewer";
+
+const recording = JSON.parse(
+  await readFile(
+    new URL(import.meta.resolve("margot-pr-reviewer/recordings/author-changes.json")),
+    "utf8",
+  ),
+);
+const services = recordedServices(recording);
+const result = await review(recording.request, recording.config, services);
+console.log(result.kind === "reviewed" ? result.report : result);
+```
 
 ## Development
 
