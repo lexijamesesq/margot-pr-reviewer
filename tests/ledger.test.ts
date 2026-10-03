@@ -469,6 +469,23 @@ it("Same head rechecks classification and reuses the council result", async () =
     calls: s.calls.map((c) => c.name),
   }).toMatchObject({ equal: true, calls: ["facts", "classification", "head"] });
 });
+it("Same head with a changed PR body is reviewed afresh in the same round, never refused", async () => {
+  // Python re-reviewed a same-head re-run as the same round; a body edit between runs changes the
+  // evidence, so the saved result is stale and the council runs again.
+  const { result, r } = await margot();
+  if (result.kind !== "reviewed") throw new Error("baseline");
+  const f = factsSchema.parse(r.facts);
+  f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
+  f.body = `${f.body}\n\nEdited after the first review.`;
+  r.facts = f;
+  const s = recordedServices(r);
+  const retry = await review(r.request, r.config, s);
+  expect(retry).toMatchObject({
+    kind: "reviewed",
+    convergence: { round: result.convergence.round },
+  });
+  expect(s.calls.map((c) => c.name)).toContain("route");
+});
 it("A receipt written by Margot 0.4.0 remains readable", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed" || !result.ledger.receipt) throw new Error("baseline");
@@ -604,17 +621,16 @@ it("requires the voice to account for a prior MAJOR alongside a dismissed findin
   expect(() => validateVoice(cards, omitted)).toThrow();
   expect(() => validateVoice(cards, accounted)).not.toThrow();
 });
-it("Changed PR evidence invalidates saved approval", async () => {
+it("Changed PR evidence does not reuse the saved approval; the council runs again", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");
   const f = factsSchema.parse(r.facts);
   f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
   f.body = "New authorization request";
   r.facts = f;
-  expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
-    kind: "error",
-    stage: "history",
-  });
+  const s = recordedServices(r);
+  expect(await review(r.request, r.config, s)).toMatchObject({ kind: "reviewed" });
+  expect(s.calls.map((c) => c.name)).toContain("route");
 });
 it("Voice cannot reestablish demoted advisory", async () => {
   const { validateVoice } = await import("../src/policy.js");
@@ -632,17 +648,16 @@ it("Identical trees preserve ledger with empty delta", () => {
     entries: [entry()],
   });
 });
-it("Changed live service configuration invalidates retry", async () => {
+it("Changed live service configuration does not reuse the saved result; the council runs again", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");
   const f = factsSchema.parse(r.facts);
   f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
   r.facts = f;
   r.provenance = "different-model-or-reference-configuration";
-  expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
-    kind: "error",
-    stage: "history",
-  });
+  const s = recordedServices(r);
+  expect(await review(r.request, r.config, s)).toMatchObject({ kind: "reviewed" });
+  expect(s.calls.map((c) => c.name)).toContain("route");
 });
 it("Model ledger markers cannot become authenticated history", async () => {
   const { render } = await import("../src/render.js");
