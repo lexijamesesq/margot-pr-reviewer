@@ -100,8 +100,18 @@ export function selectLedger(
   return null;
 }
 
-/** Unified diff is the inventory: the compare JSON file list is capped at 300. */
-export function roundScope(facts: Facts, prior: Ledger | null, comparison?: unknown): RoundScope {
+/**
+ * Unified diff is the inventory: the compare JSON file list is capped at 300.
+ * `reusingSavedResult` says whether the caller will reuse the prior same-head result; when it
+ * will not (the saved result no longer fits), a same-head re-run is a full review of the PR,
+ * because the delta from a head to itself is empty and would let the council approve nothing.
+ */
+export function roundScope(
+  facts: Facts,
+  prior: Ledger | null,
+  comparison?: unknown,
+  reusingSavedResult = false,
+): RoundScope {
   const full: RoundScope = {
     round: prior ? prior.round + 1 : 1,
     priorHead: prior?.head ?? null,
@@ -113,7 +123,9 @@ export function roundScope(facts: Facts, prior: Ledger | null, comparison?: unkn
   if (!prior) return full;
   if (prior.head === facts.head) {
     if (prior.round < 2) return { ...full, round: 1, priorHead: null, entries: [] };
-    return { ...full, round: prior.round, full: false, diff: "", files: [] };
+    if (reusingSavedResult)
+      return { ...full, round: prior.round, full: false, diff: "", files: [] };
+    return { ...full, round: prior.round };
   }
   const parsed = comparisonSchema.safeParse(comparison);
   if (!parsed.success) return full;

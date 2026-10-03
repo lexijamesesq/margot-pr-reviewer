@@ -155,16 +155,18 @@ export async function review(
         throw new Error("Auto-merge disable was not confirmed");
       return { kind: "held", request, reason: historyReason, recovery, mergeEligible: false };
     }
+    // A same-head re-run reuses the saved result only when nothing it depended on has moved.
+    // Otherwise the head is reviewed afresh in the same round, as Python did; a changed body,
+    // configuration or base is a reason to look again, never a reason to refuse.
     let cached = prior?.head === request.head ? prior.receipt : undefined;
     if (
-      prior?.head === request.head &&
       cached &&
       (cached.configHash !== configHash(config) ||
         cached.review.provenance.services !== services.provenance ||
         cached.evidenceHash !== evidenceHash(facts) ||
         cached.review.request.base !== request.base)
     )
-      throw new Error("Same-head history has no compatible saved result");
+      cached = undefined;
     stage = "triage";
     const oversized = changedLineCount(facts.diff) > config.mechanicalDiffLineCap;
     const answer = oversized
@@ -225,7 +227,7 @@ export async function review(
         comparison = undefined;
       } // Complete full-PR evidence above is the recovery path.
     }
-    const scope = roundScope(facts, prior, comparison);
+    const scope = roundScope(facts, prior, comparison, cached !== undefined);
     let result: Review;
     if (cached && prior) {
       result = {

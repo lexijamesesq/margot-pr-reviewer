@@ -1,6 +1,6 @@
 {
   "name": "margot-pr-reviewer",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Margot, the PR reviewer: review, convergence and GitHub publication",
   "type": "module",
   "license": "MIT",
