@@ -177,7 +177,9 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     if (!active || JSON.stringify(active) !== JSON.stringify(r) || expectedHead !== r.head)
       throw new Error("Publication must run inside its check lifecycle");
     const { decision } = review;
-    await triage(r, review.classification, c, review.provenance.classification);
+    // The review run never writes `review / triage`; that check is the triage run's alone, as
+    // in Python. Rewriting it here replaced Jev's answer with the review's merged class, which
+    // the estate's readers reject unless it came from Jev, so a mechanical PR read as functional.
     const authorityHold = decision.holdReasons.includes("review-authority");
     await check(
       r,

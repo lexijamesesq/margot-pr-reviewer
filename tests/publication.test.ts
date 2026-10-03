@@ -1096,3 +1096,13 @@ describe("check text limits", () => {
     }).toMatchObject({ length: 60000, top: true, note: true });
   });
 });
+it("A review run never writes the triage check; that check is the triage run's alone", async () => {
+  // Rewriting `review / triage` from the review run replaced Jev's answer with the review's
+  // merged class; the estate reads only a Jev-sourced triage, so a mechanical PR read as
+  // functional (core-skills #148). Python's review job never wrote it.
+  const x = await wire("clear");
+  const triageWrites = x.writes.filter(
+    (w) => (w.body as { name?: string } | undefined)?.name === options.checks.triage,
+  );
+  expect(triageWrites).toEqual([]);
+});
