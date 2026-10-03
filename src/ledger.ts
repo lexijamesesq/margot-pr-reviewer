@@ -163,7 +163,7 @@ export const standingCards = (scope: RoundScope): Card["name"][] => [
   ),
 ];
 
-/** Python's `_late_missed`: a `late=` mark that starts with `missed`, with or without a reason. */
+/** A `late=` mark that starts with `missed`, with or without a reason, counts as missed. */
 const lateMissed = (late: string | undefined): boolean => /^missed\b/i.test(late ?? "");
 
 /** Matching, reach and fix evidence are model judgments; severity and memory are code. */
@@ -252,8 +252,8 @@ export function nextLedger(
     ),
   );
   for (const card of cards) {
-    // Fixed-ness is inferred from absence, as Python infers it: no card parses a `Resolved:`
-    // section. An entry that can no longer block (advisory, or MINOR from round two) its card
+    // Fixed-ness is inferred from absence: no card parses a `Resolved:` section. An entry
+    // that can no longer block (advisory, or MINOR from round two) its card
     // stops raising is fixed without a ruling.
     const raised = (key: string) =>
       card.findings.some((f) => f.ledger === key && f.tag === "issue");
@@ -304,8 +304,8 @@ export function nextLedger(
         continue;
       }
       const ruling = f.id ? dispositions.get(f.id) : undefined;
-      // Under Margot's own ERROR ruling an unaccounted finding is legitimate (Python skips it);
-      // under any other outcome the voice already accounted for every one.
+      // Under Margot's own ERROR ruling an unaccounted finding is legitimate; under any
+      // other outcome the voice already accounted for every one.
       if (!ruling) {
         if (core.decision.outcome === "ERROR") continue;
         throw new Error("Ledger finding has no ruling");
@@ -396,7 +396,7 @@ export function ledgerBlock(ledger: Ledger): string {
     const gone = droppable.shift();
     trimmed.entries = trimmed.entries.filter((e) => e !== gone);
   }
-  // The optional replay receipt must not consume Python's standing-entry budget.
+  // The optional replay receipt must not consume the standing-entry budget.
   if ((encodeLedger(trimmed).split(" ")[2]?.length ?? 0) > 24000 && trimmed.receipt) {
     delete trimmed.receipt;
     trimmed.v = 1;

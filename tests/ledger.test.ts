@@ -470,7 +470,7 @@ it("Same head rechecks classification and reuses the council result", async () =
   }).toMatchObject({ equal: true, calls: ["facts", "classification", "head"] });
 });
 it("Same head with a changed PR body is reviewed afresh in the same round, never refused", async () => {
-  // Python re-reviewed a same-head re-run as the same round; a body edit between runs changes the
+  // A same-head re-run is reviewed as the same round; a body edit between runs changes the
   // evidence, so the saved result is stale and the council runs again.
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");

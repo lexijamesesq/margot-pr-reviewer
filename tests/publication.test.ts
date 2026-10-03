@@ -215,8 +215,8 @@ async function wire(mode = "clear") {
     }
     const value = structuredClone(baseReview);
     if (defect("voice-error")) {
-      // Margot's own ERROR ruling, as Python posted it: a COMMENT review, the check
-      // `action_required`, titled `not reviewed (error)`.
+      // Margot's own ERROR ruling: a COMMENT review, the check `action_required`,
+      // titled `not reviewed (error)`.
       value.decision.outcome = "ERROR";
       value.decision.mergeEligible = false;
       value.decision.holdReasons = ["error"];
@@ -371,10 +371,10 @@ it("Unreadable history disarms auto-merge before holding the check without a rat
   expect(output.text).toContain("Review history unavailable");
   expect(output.text).not.toMatch(/outcome:|band:/u);
 });
-// Ollie's state script (dotty .github/scripts/ollie-state.py, parse_verdict) reads these
-// lines from the check text and requests the operator's review on a held PR. Without them
-// a hold is invisible to her; this is the live defect found on margot #94.
-function parseVerdictLikeOllie(text: string | undefined) {
+// The estate's merge tooling reads these lines from the check text and requests the
+// operator's review on a held PR. Without them a hold is invisible to her, so these
+// lines must always be present on a hold.
+function parseVerdictText(text: string | undefined) {
   const out = { outcome: "", band: "", source: "" };
   for (const line of (text ?? "").split("\n")) {
     if (line.startsWith("outcome:")) {
@@ -388,13 +388,13 @@ function parseVerdictLikeOllie(text: string | undefined) {
   }
   return out;
 }
-it("The verdict check's text carries the lines Ollie parses to request the operator on a hold", async () => {
+it("The verdict check's text carries the lines the estate's merge tooling parses to request the operator on a hold", async () => {
   const x = await wire("hold");
   const output = (x.final?.output ?? {}) as {
     text?: string;
     title?: string;
   };
-  const parsed = parseVerdictLikeOllie(output.text);
+  const parsed = parseVerdictText(output.text);
   expect({ ...parsed, title: output.title }).toMatchObject({
     outcome: "APPROVED",
     band: "HIGH",
@@ -412,14 +412,14 @@ it("A held title names the reason the PR is held, not the band", async () => {
     ).title,
   }).toMatchObject({ title: "held for the operator: a change to Margot's own machinery" });
 });
-it("A failure after the verdict check overwrites its text so Ollie never reads a stale approval", async () => {
+it("A failure after the verdict check overwrites its text so the estate's merge tooling never reads a stale approval", async () => {
   const x = await wire("review-fail");
   const output = (x.final?.output ?? {}) as {
     text?: string;
   };
   expect({
     kind: x.result.kind,
-    staleApproval: parseVerdictLikeOllie(output.text).outcome,
+    staleApproval: parseVerdictText(output.text).outcome,
     hasText: typeof output.text === "string" && output.text.length > 0,
   }).toMatchObject({ kind: "error", staleApproval: "", hasText: true });
 });
@@ -1099,7 +1099,7 @@ describe("check text limits", () => {
 it("A review run never writes the triage check; that check is the triage run's alone", async () => {
   // Rewriting `review / triage` from the review run replaced Jev's answer with the review's
   // merged class; the estate reads only a Jev-sourced triage, so a mechanical PR read as
-  // functional (core-skills #148). Python's review job never wrote it.
+  // functional. The review run never writes it.
   const x = await wire("clear");
   const triageWrites = x.writes.filter(
     (w) => (w.body as { name?: string } | undefined)?.name === options.checks.triage,

@@ -1,9 +1,3 @@
 {
-  "exemptions": [
-    {
-      "path": "settings\\.json",
-      "rule": "sample-shape",
-      "reason": "This filename occurs only inside the recorded external repository-tree responses in docs/live/functional-cards.json. Margot does not consume a settings file; its runtime settings are supplied directly to the CLI. The response is retained as evidence, not an operator configuration dependency."
-    }
-  ]
+  "exemptions": []
 }

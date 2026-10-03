@@ -3,7 +3,7 @@ import parseDiff from "parse-diff";
 /**
  * Validate text inventory and hunk lengths; caller metadata is checked separately.
  * A binary file appears as its own section with no text hunks ("Binary files … differ" or an
- * encoded "GIT binary patch"); Python listed the path and reviewed on, so it is complete here too.
+ * encoded "GIT binary patch"); listing the path is enough to call it complete.
  */
 export function diffIsComplete(diff: string, files = parseDiff(diff)): boolean {
   return (
@@ -21,7 +21,7 @@ export function diffIsComplete(diff: string, files = parseDiff(diff)): boolean {
   );
 }
 
-/** Python counts every newline, including headers and context. */
+/** Every newline counts, including headers and context. */
 export function changedLineCount(diff: string): number {
   return diff.split("\n").length - 1;
 }

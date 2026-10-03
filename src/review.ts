@@ -132,8 +132,8 @@ export async function review(
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
     const ledgerWarnings: string[] = [];
     const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
-    // Python could approve over unreadable history; the port holds instead (the charter's
-    // recorded divergence). The reason names the way out, because the hold recurs on every
+    // Holding over unreadable history, rather than approving past it, is a deliberate choice
+    // recorded in the charter. The reason names the way out, because the hold recurs on every
     // run until the history is fixed or the operator merges.
     const recovery =
       "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.";
@@ -156,7 +156,7 @@ export async function review(
       return { kind: "held", request, reason: historyReason, recovery, mergeEligible: false };
     }
     // A same-head re-run reuses the saved result only when nothing it depended on has moved.
-    // Otherwise the head is reviewed afresh in the same round, as Python did; a changed body,
+    // Otherwise the head is reviewed afresh in the same round; a changed body,
     // configuration or base is a reason to look again, never a reason to refuse.
     let cached = prior?.head === request.head ? prior.receipt : undefined;
     if (
