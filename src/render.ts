@@ -56,7 +56,9 @@ function authorityReason(review: Review): string | null {
   if (review.decision.outcome !== "APPROVED" || review.decision.mergeEligible) return null;
   if (review.decision.holdReasons.includes("risk")) return `risk is ${review.decision.rating.band}`;
   if (review.decision.holdReasons.includes("review-authority"))
-    return "it changes Margot's own machinery; approve it and the estate's merge tooling merges it";
+    return review.presentation?.mergeActor
+      ? `it changes Margot's own machinery; approve it and ${review.presentation.mergeActor} merges it`
+      : "it changes Margot's own machinery; approve it to merge it";
   if (review.decision.holdReasons.includes("calibration")) return "calibration requires review";
   return "the review is held";
 }

@@ -23,6 +23,7 @@
     "mechanicalDiffLineCap": 2000,
     "timeoutMs": 900000,
     "publication": "record",
+    "mergeActor": "YOUR_MERGE_ACTOR",
     "calibration": false,
     "trustedLedgerActors": [
       "YOUR_REVIEW_APP[bot]"

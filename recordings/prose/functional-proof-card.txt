@@ -1,0 +1,23 @@
+card: works-and-proven
+completion: completed
+
+Checked:
+- Traced `merge()` for a repo that already lists `check-yaml` with no exclude (`scripts/suite-merge.py:307-315`). `_hook_present` matches `- id: check-yaml`, so `missing` is empty and the block is skipped. The new extra lines are only ever written when the hook is missing (`:318-320`) or the whole block is new (`:332-334`). This probe would have caught a body claim of organization-wide rollout that the merge tool can't deliver. It did catch one (finding 1).
+- Mapped the new check-yaml `exclude:` payload (`scripts/suite-merge.py:132-142`) to the existing assertions in `tests/provision.test.sh`. The stale-suite test at `:4246` only greps `id: check-yaml`. The already-complete test at `:4112-4185` uses a check-yaml with no exclude and still expects `changed=false`. No assertion checks the exclude line, unlike biome-check's exclude, which `:4259` checks. This probe would have caught the new behavior shipping with no test that fails if it regresses. It did catch that (finding 2).
+- Looked at the diff for deleted or loosened assertions. The diff touches only the merge script and the shared repository's own `.pre-commit-config.yaml`, and no test file changed. This probe would have caught a failing test weakened to reach green.
+- Looked for new mock-only or implementation-mirroring tests. The diff adds no tests at all. This probe would have caught tests that prove nothing.
+- Checked the body's "fresh config inserts the exclude" claim against the code. An empty template repo (`templates/common/.pre-commit-config.yaml:8`, `repos:` only) goes through the new-block path at `:329-341`, which writes the `check-yaml` extra lines. The claim holds. The "example/project config reports no change" claim is consistent with `_hook_present` short-circuiting. This probe would have caught a verification bullet the code contradicts.
+
+Not covered:
+- I didn't reproduce the body's real-lockfile check-yaml run ("expected a single document in the stream"). It needs running pre-commit on another repo's lockfile, and I have no execution. I treated it as a claim, not evidence.
+- I didn't open the log for `ci / eval-suite` or `ci / checks`. The receipt says they passed, and no body claim depends on what those runs exercised.
+
+Findings:
+- [issue] scripts/suite-merge.py:314 · severity=MAJOR · confidence=HIGH
+    what: The PR says every pnpm repo gets this fix on its next update, but repos that already have the YAML check won't get the new exclusion.
+    consequence: The body says "Fix it once in the suite, so every pnpm repo gets it" and gives the scope as "every repo the provisioner manages, taking effect on each repo's next callers run". But `merge()` only adds the extra lines when `check-yaml` is missing. Any existing caller whose config already lists `- id: check-yaml` gets `changed=false` (`:314-315`), and the repo's own test at `tests/provision.test.sh:4134,4185` pins exactly that outcome. Existing repos stay unchanged, so a pnpm lockfile added to one of them later still fails check-yaml. Only brand-new blocks and repos missing the hook get the exclude.
+    action: Either make the claim true by having the merge add the `exclude:` line under an existing `check-yaml` that lacks it, with a test that feeds a config with no exclude and asserts `changed=true` plus the exclude line, or rewrite the body's Intent and Scope to say only new or missing `check-yaml` hooks get it and existing callers need their own edit. It's fixed when the body and the merge behavior agree.
+- [issue] tests/provision.test.sh:4246 · severity=MINOR · confidence=HIGH
+    what: No automated test checks that the YAML check's new lockfile exclusion is actually written, so it could be dropped or mistyped without anyone noticing.
+    consequence: The only assertion covering the stale-suite `check-yaml` insertion is `grep -q "id: check-yaml"`. If someone deleted the `exclude: ^pnpm-lock\.yaml$` line at `scripts/suite-merge.py:140`, or broke its escaping, the suite would still pass. Every newly provisioned pnpm repo would then fail check-yaml again. The sibling biome-check exclude is pinned verbatim at `:4259`, so the file already sets the precedent that an exclude line gets its own assertion.
+    action: Next to the biome-check assertion, add `grep -qF 'exclude: ^pnpm-lock\.yaml$' <<<"$STALE_OUT"` as a pass/fail. You'll know it's fixed when that assertion fails after temporarily removing line 140 of the merge script.

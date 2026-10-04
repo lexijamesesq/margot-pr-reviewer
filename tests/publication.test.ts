@@ -1106,3 +1106,35 @@ it("A review run never writes the triage check; that check is the triage run's a
   );
   expect(triageWrites).toEqual([]);
 });
+describe("merge actor in the authority hold", () => {
+  function authorityHold(mergeActor?: string) {
+    const value = structuredClone(baseReview);
+    value.decision.mergeEligible = false;
+    value.decision.holdReasons = ["review-authority"];
+    value.presentation = { ...value.presentation!, ...(mergeActor ? { mergeActor } : {}) };
+    return render(value);
+  }
+  it("names the configured merge actor", () => {
+    expect(authorityHold("Ollie")).toContain(
+      "Above my authority: it changes Margot's own machinery; approve it and Ollie merges it. Yours to merge.",
+    );
+  });
+  it("names no merger when none is configured", () => {
+    const report = authorityHold();
+    expect(report).toContain(
+      "Above my authority: it changes Margot's own machinery; approve it to merge it. Yours to merge.",
+    );
+    expect(report).not.toContain("merges it");
+  });
+  it("carries the configured value from the configuration to the presentation", async () => {
+    const withActor = await review(
+      r,
+      { ...(recording.config as object), mergeActor: "Ollie" },
+      recordedServices(recording),
+    );
+    expect({
+      configured: withActor.kind === "reviewed" && withActor.presentation?.mergeActor,
+      unset: baseReview.presentation?.mergeActor,
+    }).toEqual({ configured: "Ollie", unset: undefined });
+  });
+});

@@ -20,4 +20,21 @@ for (const file of files) {
       assert.match(value, /^\/recorded-bundle\/skills\/pr-council\/playbooks\/[a-z-]+\.md$/);
   }
 }
-console.log("7 recordings: no denylisted identity, credential, host or machine-path residue");
+const placeholderShas = new Set(["0123abcd", "1234abc", "2345bcd"]);
+const proseDirectory = new URL("prose/", directory);
+const proseFiles = readdirSync(proseDirectory).filter((name) => name.endsWith(".txt"));
+assert.equal(proseFiles.length, 8);
+for (const file of proseFiles) {
+  const contents = readFileSync(new URL(file, proseDirectory), "utf8");
+  assert.equal(forbidden.test(contents), false, `Identifying residue in prose/${file}`);
+  assert.equal(
+    /#\d{2,}|\b[A-Z]{2,}-\d+\b/.test(contents),
+    false,
+    `PR number or ticket key in prose/${file}`,
+  );
+  for (const sha of contents.match(/\b[0-9a-f]{7,40}\b/g) ?? [])
+    assert.ok(placeholderShas.has(sha), `Real-looking SHA ${sha} in prose/${file}`);
+}
+console.log(
+  "7 recordings and 8 prose samples: no denylisted identity, credential, host or machine-path residue",
+);

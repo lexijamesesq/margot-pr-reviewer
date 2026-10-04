@@ -1,0 +1,18 @@
+card: maintainable-no-slop
+completion: completed
+
+Checked:
+- Nonexistent API or config option: the new `exclude:` key under `check-yaml` (`scripts/suite-merge.py:140`, `.pre-commit-config.yaml:141`) is the same per-hook key the suite already emits for `biome-check` (`scripts/suite-merge.py:181`). This probe would have caught a made-up pre-commit hook key or a misspelled option. The diff adds no dependency or package name, so the wrong-name angle does not apply.
+- Duplicated helper: I read the whole merge script (lines 1–442). The change reuses the existing mechanism for attaching extra YAML lines to a hook (lines 318–320 and 332–334). It adds no new function, and no new scanner or insertion routine sits beside the existing ones. This would have caught a second extra-line inserter or a copy of `_hook_present`/`_find_blocks`. The same comment block appears in both changed files, but the second copy is the shared repository's own config mirroring the suite on purpose. It is data, not a reimplemented helper.
+- Unnecessary abstraction: the diff adds no interface, base class, wrapper, or config layer. It only puts more data into an existing `REQUIRED_BLOCKS` tuple. This would have caught a new single-caller layer added just to carry the exclude.
+- Error-swallowing: the diff adds no try/except. The one broad handler, at `main()` lines 429–433, is older code and this diff does not touch it. This would have caught a new catch-and-default that hides a merge failure.
+- Comment drift: I compared the new inline comment, and the older comments describing the extra-lines slot (lines 79–88), against what the merge code does. This would have caught a comment describing behaviour the code no longer does. One drift found, listed below. I found no external AI-chat links. The new comment cites pnpm upstream issues, not a chat transcript.
+
+Not covered:
+- The pnpm facts in the new comment (two documents on purpose; pnpm checks its own lockfile during a frozen install) come from pnpm, not this repo. I can't verify them from the checkout, so I'm not asserting either way.
+
+Findings:
+- [issue] scripts/suite-merge.py:79 · severity=MINOR · confidence=HIGH
+    what: The explanation of what the per-hook "extra lines" are for still says they are used for only two things, but this change adds a third use.
+    consequence: Lines 79–88 say extra lines are "used only" for adding `stages:` where upstream doesn't default it (shfmt/yamllint/markdownlint/biome-check/prettier) and for the two node hooks' tool pins and file scoping. `check-yaml` now carries a file exclusion and a comment block (lines 132–142), and neither use is on that list. A maintainer who trusts "used only" could treat the `check-yaml` entry as a mistake and remove it, or miss this slot as the place for future per-hook exclusions.
+    action: Update the comment at lines 79–88 to include per-hook file exclusions for upstream hooks (for example, "…and to carry a receipted file exclusion such as check-yaml's pnpm-lock.yaml carve-out"). It's fixed when that comment names every kind of extra line that `REQUIRED_BLOCKS` actually uses.

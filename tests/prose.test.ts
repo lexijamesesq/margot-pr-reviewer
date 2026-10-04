@@ -219,24 +219,24 @@ describe("captured reviewer output", () => {
   }
   function samples(): Sample[] {
     const out: Sample[] = [];
-    for (const dir of ["recordings"]) {
-      for (const name of readdirSync(dir).filter((n) => n.endsWith(".json"))) {
+    for (const dir of ["recordings", "recordings/prose"]) {
+      for (const name of readdirSync(dir)) {
         const file = join(dir, name);
-        collect(JSON.parse(readFileSync(file, "utf8")), file, out);
+        if (name.endsWith(".json")) collect(JSON.parse(readFileSync(file, "utf8")), file, out);
+        else if (name.endsWith(".txt")) collect(readFileSync(file, "utf8"), file, out);
       }
     }
     return out;
   }
-  // recordings/ holds structured review fixtures (already-parsed Card/Voice objects) for
-  // the pipeline tests, not raw reviewer prose; it currently contributes no sample here.
-  // The two blocks below stay wired so a raw card or voice ever added to recordings/ is
-  // covered automatically, without this file needing to change.
+  // recordings/prose/ holds the sanitized card and voice texts the reviewer actually wrote;
+  // recordings/*.json hold structured fixtures and contribute any raw prose they carry.
   describe("recorded prose", () => {
     const all = samples();
     const cards = all.filter((s) => s.kind === "card");
     const voices = all.filter((s) => s.kind === "voice");
-    it("recordings/ currently holds no raw card or voice prose to parse", () => {
-      expect({ cards: cards.length, voices: voices.length }).toEqual({ cards: 0, voices: 0 });
+    it("recordings/ keeps at least the 7 recorded cards and 1 recorded voice", () => {
+      expect(cards.length).toBeGreaterThanOrEqual(7);
+      expect(voices.length).toBeGreaterThanOrEqual(1);
     });
     it.each(cards.map((s) => [s.source, s]))("parses the recorded card at %s", (_, s) => {
       expect(() => parseCard(s.text, s.card as Parameters<typeof parseCard>[1])).not.toThrow();

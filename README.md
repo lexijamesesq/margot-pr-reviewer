@@ -50,6 +50,8 @@ A review run takes two JSON files: a request and a configuration.
   Claude executable and plugin directory. See `samples/config.sample.json` for
   every key, including the review card bundle pin, protected paths, required
   checks, trusted actors, and the classification/routing/risk thresholds.
+  `review.mergeActor` is optional: the name shown on a held pull request as who
+  merges it once approved; unset, the hold says only "approve it to merge it".
 
 The configuration's `claude.executable`, `claude.pluginDirectory`, and
 `claude.ticketing.command` (when set) may contain the placeholder
