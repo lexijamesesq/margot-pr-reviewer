@@ -22,7 +22,11 @@ import { readRecording } from "./helpers/recordings.js";
 const recording = readRecording("mechanical-bump");
 const request = requestSchema.parse(recording.request);
 const facts = factsSchema.parse(recording.facts);
-const pinnedClaude = { executable: "claude", version: "1.0.0" };
+const pinnedClaude = {
+  executable: "claude",
+  version: "1.0.0",
+  reviewerModel: "configured-reviewer-model",
+};
 const context = () => ({ signal: AbortSignal.timeout(3000) });
 function jev(
   answer: unknown,
@@ -346,7 +350,7 @@ describe("fallback decisions", () => {
         required: schema.required,
       }).toMatchObject({
         answers: { lens: { noul: 0.9 }, exposure: { confidence: 0, probabilities: { "2": 1 } } },
-        model: "claude-haiku-4-5",
+        model: "configured-reviewer-model",
         tools: "",
         strict: true,
         sources: "",

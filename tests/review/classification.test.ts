@@ -19,7 +19,11 @@ import {
   withTriage,
 } from "../helpers/review.js";
 
-const pinnedClaude = { executable: "claude", version: "1.0.0" };
+const pinnedClaude = {
+  executable: "claude",
+  version: "1.0.0",
+  reviewerModel: "configured-reviewer-model",
+};
 
 /** A request from a host with no dispatcher: it carries no class. */
 const withoutDispatchedClass: Change = (draft) => {
