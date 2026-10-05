@@ -4,7 +4,8 @@
 
 - A host that dispatches no class no longer turns every review functional. With no `classification` and no `triage` in the request, nothing is dispatched and the verified triage's class stands (functional, as `triage_unavailable`, when there is none). A dispatched class that is stricter still wins, recorded as `dispatch`.
 - `jev.url` is now a real configuration key: an optional `https` URL for the Jev endpoint. Unset, Margot calls TypeSafe's endpoint as before.
-- The README says what Jev is and that the package is not on the npm registry.
+- The README says what Jev is, that the package is not on the npm registry, and to pin a release asset's SHA-256 digest from the Releases page and verify every install against it.
+- `samples/self-hosted.sample.yml` takes the same `repo`, `pr` and `sha` dispatch inputs. `samples/config.sample.json` lists `jev.url`.
 - `samples/github-hosted.sample.yml` takes `repo`, `pr` and `sha` dispatch inputs in place of hard-coded values, and its header says what dispatches it.
 - New `CONTRIBUTING.md`.
 

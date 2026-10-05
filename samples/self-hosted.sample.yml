@@ -6,6 +6,18 @@ name: Margot review
 on:
   workflow_dispatch:
     inputs:
+      repo:
+        description: repository of the pull request, as owner/name
+        type: string
+        required: true
+      pr:
+        description: pull request number
+        type: string
+        required: true
+      sha:
+        description: head commit of the pull request to review
+        type: string
+        required: true
       owned_tier:
         description: protected-path scrutiny tier
         type: string
@@ -54,7 +66,7 @@ jobs:
       - name: Validate the deployment and enrolled target
         id: route
         env:
-          TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
+          TARGET_REPO: ${{ inputs.repo }}
         run: |
           "$MARGOT_ROOT/node_modules/.bin/margot-instance" validate-deployment \
             --deployment /trusted/margot/deployment.json \
@@ -96,9 +108,9 @@ jobs:
         id: bind
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
-          PR_NUMBER: "1"
-          HEAD_SHA: "0000000000000000000000000000000000000000"
+          TARGET_REPO: ${{ inputs.repo }}
+          PR_NUMBER: ${{ inputs.pr }}
+          HEAD_SHA: ${{ inputs.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           "$MARGOT_ROOT/node_modules/.bin/margot-instance" bind-request \
@@ -155,9 +167,9 @@ jobs:
       - name: Close a review check left in progress
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_REPO: YOUR_ORG/YOUR_REPOSITORY
-          PR_NUMBER: "1"
-          HEAD_SHA: "0000000000000000000000000000000000000000"
+          TARGET_REPO: ${{ inputs.repo }}
+          PR_NUMBER: ${{ inputs.pr }}
+          HEAD_SHA: ${{ inputs.sha }}
           MARGOT_APP_ID: "123456"
           RUNS_URL_PREFIX: ${{ github.server_url }}/${{ github.repository }}/actions/runs/
           RUN_ID: ${{ github.run_id }}

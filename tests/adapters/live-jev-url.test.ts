@@ -1,20 +1,12 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { liveServices } from "../../src/adapters/live.js";
-import type { Recording } from "../../src/index.js";
 import { classificationQuestions } from "../../src/questions.js";
-import { factsSchema, liveConfigSchema } from "../../src/schemas.js";
+import { liveConfigSchema } from "../../src/schemas.js";
+import { context, facts } from "../helpers/adapters.js";
 
 const sample = () =>
   JSON.parse(readFileSync(new URL("../../samples/config.sample.json", import.meta.url), "utf8"));
-const facts = factsSchema.parse(
-  (
-    JSON.parse(
-      readFileSync(new URL("../../recordings/mechanical-bump.json", import.meta.url), "utf8"),
-    ) as Recording
-  ).facts,
-);
-
 /** The URL the live services call when asked to classify, with fetch stubbed out. */
 async function classifyUrl(jev: Record<string, unknown>) {
   const config = { ...sample(), jev: { ...sample().jev, ...jev } };
@@ -28,9 +20,11 @@ async function classifyUrl(jev: Record<string, unknown>) {
       }),
     ),
   );
-  await liveServices(config, { jevKey: "key" }).services.classify(facts, classificationQuestions, {
-    signal: AbortSignal.timeout(3000),
-  });
+  await liveServices(config, { jevKey: "key" }).services.classify(
+    facts,
+    classificationQuestions,
+    context(),
+  );
   return String(fetchSpy.mock.calls[0]?.[0]);
 }
 
@@ -44,7 +38,7 @@ describe("the Jev endpoint", () => {
   });
 
   it("calls the TypeSafe endpoint when no url is configured", async () => {
-    expect(await classifyUrl({})).toBe("https://api.typesafe.ai/v1/systemone");
+    expect(await classifyUrl({ url: undefined })).toBe("https://api.typesafe.ai/v1/systemone");
   });
 
   it("rejects a jev.url that is not https", () => {

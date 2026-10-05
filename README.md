@@ -36,11 +36,15 @@ instead of clearing it for merge.
 
 Margot requires Node 22 or later (see `engines` in `package.json`).
 
-Margot is not on the npm registry. Install a release tarball by the URL on the
-repository's [Releases page](https://github.com/lexijamesesq/margot-pr-reviewer/releases):
+Margot is not on the npm registry. GitHub shows each release asset's SHA-256
+digest on the repository's
+[Releases page](https://github.com/lexijamesesq/margot-pr-reviewer/releases); pin it
+when you choose a release, and verify every install against the pin:
 
 ```sh
-npm install --ignore-scripts --save-exact "$PACKAGE_URL"
+curl --fail --location --silent --show-error "$PACKAGE_URL" --output margot-pr-reviewer.tgz
+echo "$PACKAGE_SHA256  margot-pr-reviewer.tgz" | sha256sum --check
+npm install --ignore-scripts --save-exact ./margot-pr-reviewer.tgz
 ```
 
 A live (non-recorded) review needs more than Node: the exact Claude Code CLI
@@ -77,7 +81,7 @@ A review run takes two JSON files: a request and a configuration.
 | `MARGOT_WRITE_TOKEN` | Token with checks and pull-request write access. Required for GitHub publication. |
 | `MARGOT_OWNED_TIER` | Protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing or invalid holds the review. |
 | `MARGOT_CLASSIFICATION` | The request's dispatched classification (`functional`, `documentation`, or `mechanical`). It can only make the review stricter than the verified triage's class. |
-| `MARGOT_TRIAGE` | An earlier triage result, used when no classification is set; only `mechanical` has any effect. |
+| `MARGOT_TRIAGE` | Used only when no classification is set: `mechanical` leaves the verified triage's class in place, and any other non-empty value makes the review functional. |
 | names listed in `claude.ticketing.env` | Forwarded only to the ticketing MCP server. |
 
 ## Running `margot-review`
