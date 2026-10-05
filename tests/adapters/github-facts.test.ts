@@ -213,7 +213,13 @@ describe("GitHub triage and diff size", () => {
     const files = Symbol("files"),
       checks = Symbol("checks"),
       reviews = Symbol("reviews");
-    const check = (id: number, app: number, name: string, classification: string) => ({
+    const check = (
+      id: number,
+      app: number,
+      name: string,
+      classification: string,
+      extra: object = {},
+    ) => ({
       id,
       name,
       status: "completed",
@@ -221,7 +227,12 @@ describe("GitHub triage and diff size", () => {
       app: { id: app, slug: "triage-app" },
       started_at: `2026-10-02T00:00:0${id}Z`,
       output: {
-        text: JSON.stringify({ head_sha: request.head, decision_source: "jev", classification }),
+        text: JSON.stringify({
+          head_sha: request.head,
+          decision_source: "jev",
+          classification,
+          ...extra,
+        }),
       },
     });
     const diff = "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n-old\n+new\n";
@@ -252,7 +263,7 @@ describe("GitHub triage and diff size", () => {
           : method === checks
             ? [
                 check(1, 321, "custom / triage", "mechanical"),
-                check(2, 321, "custom / triage", "documentation"),
+                check(2, 321, "custom / triage", "documentation", { mechanical_probability: 0.4 }),
                 check(3, 123, "custom / triage", "mechanical"),
                 check(4, 321, "other / triage", "mechanical"),
                 check(5, 4862659, "review / triage", "mechanical"),
@@ -275,7 +286,12 @@ describe("GitHub triage and diff size", () => {
       );
       const unconfigured = await githubAdapter(client).facts(request, context());
       expect({ triage: result.triage, unconfigured: unconfigured.triage }).toMatchObject({
-        triage: { actor: "triage-app", head: request.head, classification: "documentation" },
+        triage: {
+          actor: "triage-app",
+          head: request.head,
+          classification: "documentation",
+          mechanicalProbability: 0.4,
+        },
         unconfigured: null,
       });
     } finally {

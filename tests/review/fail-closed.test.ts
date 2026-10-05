@@ -41,12 +41,18 @@ const rejections: Rejection[] = [
   },
   {
     when: "the classification came from the fallback",
-    change: withClassification({ source: "fallback" }),
+    change: (draft) => {
+      withRequest({ phase: "triage" })(draft);
+      withClassification({ source: "fallback" })(draft);
+    },
     stage: "classification",
   },
   {
     when: "a classification probability is out of range",
-    change: withClassification({ mechanical: 2 }),
+    change: (draft) => {
+      withRequest({ phase: "triage" })(draft);
+      withClassification({ mechanical: 2 })(draft);
+    },
     stage: "classification",
   },
   {
@@ -105,7 +111,10 @@ const rejections: Rejection[] = [
   },
   {
     when: "the classification service fails",
-    change: withFailure("classification", "service unavailable"),
+    change: (draft) => {
+      withRequest({ phase: "triage" })(draft);
+      withFailure("classification", "service unavailable")(draft);
+    },
     stage: "classification",
   },
   {

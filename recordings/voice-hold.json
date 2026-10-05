@@ -63,7 +63,7 @@
       "actor": "triage-app",
       "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "head": "0000000000000000000000000000000000000003",
-      "classification": "mechanical"
+      "classification": "functional"
     },
     "autoMergeArmed": true,
     "ownedPathTier": "none"
@@ -155,7 +155,7 @@
       "name": "safety",
       "completion": "completed",
       "checked": [
-        "Weakened-guard probe. I read the live rules for the default branch with `gh api repos/example/project/rules/branches/main` and the active rulesets. Ruleset 23658219 (\"Protect main \u2014 checks\", active, updated 2026-09-27) requires exactly these checks: `trusted-scan / trusted-scan`, `ci / release-check`, `ci / checks`, `ci / validate-and-test`, `ci / drift-check`, `ci / standalone-check`. `ci / all-passed` is not on that list. So the check this PR removes was not a live required check at head, and the ruleset's own required-check list permits removing it. This probe would have caught the removal of a required check that still gates merges."
+        "Weakened-guard probe. I read the live rules for the default branch with `gh api repos/example/project/rules/branches/main` and the active rulesets. Ruleset 23658219 (\"Protect main — checks\", active, updated 2026-09-27) requires exactly these checks: `trusted-scan / trusted-scan`, `ci / release-check`, `ci / checks`, `ci / validate-and-test`, `ci / drift-check`, `ci / standalone-check`. `ci / all-passed` is not on that list. So the check this PR removes was not a live required check at head, and the ruleset's own required-check list permits removing it. This probe would have caught the removal of a required check that still gates merges."
       ],
       "notCovered": [
         "Other repositories and live service behavior."

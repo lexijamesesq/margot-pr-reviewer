@@ -20,7 +20,6 @@ describe("disarming auto-merge", () => {
     const { calls } = await reviewed(recorded("voice-hold"));
     expect(calls).toEqual([
       "facts",
-      "classification",
       "route",
       "bundle",
       "card:safety",
@@ -141,7 +140,7 @@ describe("publication", () => {
     });
     expect({ kind: result.kind, attempts, writes: services.publications.length }).toEqual({
       kind: "reviewed",
-      attempts: 2,
+      attempts: 1,
       writes: 1,
     });
   });

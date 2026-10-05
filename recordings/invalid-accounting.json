@@ -63,7 +63,7 @@
       "actor": "triage-app",
       "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "head": "0000000000000000000000000000000000000004",
-      "classification": "mechanical"
+      "classification": "functional"
     },
     "autoMergeArmed": true,
     "ownedPathTier": "none"
@@ -155,7 +155,7 @@
       "name": "works-and-proven",
       "completion": "completed",
       "checked": [
-        "Mapped the one changed behavior, the new `files.includes` in `biome.json` (lines 4\u201316), against every eval that reads `biome.json`: `.claude/eval/web-lint-configs.test.sh`, `new-repo.test.sh` and `provision-public-repo.test.sh:4540-4545`. The goal was to find the assertion that would fail if the `dist`/`build`/`coverage` skip or the JSON/`.vue`/`.svelte`/`.astro` skip stopped working. None of them asserts it. `web-lint-configs.test.sh` only runs `biome lint`/`check`/`format` on files named explicitly (`bad.ts`, `good.ts`, `ugly.ts`). The provisioner eval only diffs the written bytes against project's copy, and those bytes change together with the file. This probe would have caught a changed behavior with no automated pin; it found one (see finding)."
+        "Mapped the one changed behavior, the new `files.includes` in `biome.json` (lines 4–16), against every eval that reads `biome.json`: `.claude/eval/web-lint-configs.test.sh`, `new-repo.test.sh` and `provision-public-repo.test.sh:4540-4545`. The goal was to find the assertion that would fail if the `dist`/`build`/`coverage` skip or the JSON/`.vue`/`.svelte`/`.astro` skip stopped working. None of them asserts it. `web-lint-configs.test.sh` only runs `biome lint`/`check`/`format` on files named explicitly (`bad.ts`, `good.ts`, `ugly.ts`). The provisioner eval only diffs the written bytes against project's copy, and those bytes change together with the file. This probe would have caught a changed behavior with no automated pin; it found one (see finding)."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -175,7 +175,7 @@
       "name": "principal-engineer",
       "completion": "completed",
       "checked": [
-        "Fetched `biome.json` at head sha c966c5d and compared its new `files.includes` (lines 4\u201316) with the hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` in `.pre-commit-config.yaml:180` and `.github/scripts/pre-commit-suite-merge.py:171`. This would have caught a context bug where the config and the hook disagree about which extensions are in scope. They agree: json, jsonc, vue, svelte and astro are excluded in both places. The list also starts with `\"**\"`, so the negations have something to subtract from, and all other files stay in scope."
+        "Fetched `biome.json` at head sha c966c5d and compared its new `files.includes` (lines 4–16) with the hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` in `.pre-commit-config.yaml:180` and `.github/scripts/pre-commit-suite-merge.py:171`. This would have caught a context bug where the config and the hook disagree about which extensions are in scope. They agree: json, jsonc, vue, svelte and astro are excluded in both places. The list also starts with `\"**\"`, so the negations have something to subtract from, and all other files stay in scope."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -206,7 +206,7 @@
       "name": "house-style",
       "completion": "completed",
       "checked": [
-        "Held the new `files.includes` block in `biome.json` (lines 4\u201316 at c966c5d) against the biome-check hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` (`.pre-commit-config.yaml:180`). I also compared it with the suite generator's copy of that exclude (`.github/scripts/pre-commit-suite-merge.py:171`) and the eval's copy (`.claude/eval/provision-public-repo.test.sh:4173`). This would have caught a file-type exclusion list that differs from the organization's one existing statement of what Biome must skip (for example, `.jsonc` or one of the three framework extensions missing, or an extra type). The five types match exactly."
+        "Held the new `files.includes` block in `biome.json` (lines 4–16 at c966c5d) against the biome-check hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` (`.pre-commit-config.yaml:180`). I also compared it with the suite generator's copy of that exclude (`.github/scripts/pre-commit-suite-merge.py:171`) and the eval's copy (`.claude/eval/provision-public-repo.test.sh:4173`). This would have caught a file-type exclusion list that differs from the organization's one existing statement of what Biome must skip (for example, `.jsonc` or one of the three framework extensions missing, or an extra type). The five types match exactly."
       ],
       "notCovered": [
         "Other repositories and live service behavior."

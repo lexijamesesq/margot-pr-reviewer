@@ -63,7 +63,7 @@
       "actor": "triage-app",
       "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "head": "0000000000000000000000000000000000000005",
-      "classification": "mechanical"
+      "classification": "functional"
     },
     "autoMergeArmed": true,
     "ownedPathTier": "none"
@@ -155,7 +155,7 @@
       "name": "safety",
       "completion": "completed",
       "checked": [
-        "Weakened-guard clause. I checked whether removing the `ci / all-passed` job (`.github/workflows/ci.yml`, formerly lines 33\u201359 on base) takes away a live protection. I read the live branch rules with `gh api repos/example/project/rules/branches/main` (ruleset 23658240). The required checks are exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff` and `ci / shellcheck`, and `ci / all-passed` is not one of them. The aggregator was not enforcing anything, so the protection was already off before this PR, and the PR body's claim checks out. I also compared what the aggregator did with what the required checks still enforce, using the head workflow at lines 16\u201357:"
+        "Weakened-guard clause. I checked whether removing the `ci / all-passed` job (`.github/workflows/ci.yml`, formerly lines 33–59 on base) takes away a live protection. I read the live branch rules with `gh api repos/example/project/rules/branches/main` (ruleset 23658240). The required checks are exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff` and `ci / shellcheck`, and `ci / all-passed` is not one of them. The aggregator was not enforcing anything, so the protection was already off before this PR, and the PR body's claim checks out. I also compared what the aggregator did with what the required checks still enforce, using the head workflow at lines 16–57:"
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -177,7 +177,7 @@
       "name": "principal-engineer",
       "completion": "completed",
       "checked": [
-        "Traced what the removed `ci / all-passed` job used to catch against what the live ruleset now requires (`gh api repos/example/project/rules/branches/main`: `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck`) \u2014 would have caught the aggregator's one extra rule being lost: it failed a functional PR when a dependent job was skipped. I followed the only ways `ruff` or `shellcheck` can be skipped (.github/workflows/ci.yml:35 and :48, `needs: [floor]` plus `if: mechanical != 'true'`). (a) The floor fails, times out or is cancelled. The dependent jobs are then skipped, but `ci / checks` is itself required and not green, so the merge stays blocked. (b) The floor says the PR is mechanical, which is the intended skip and works the same as before. (c) The called workflow never starts, so `ci / checks` is never posted and the required check stays pending. That also fails closed. No path lets a functional PR merge with nothing run."
+        "Traced what the removed `ci / all-passed` job used to catch against what the live ruleset now requires (`gh api repos/example/project/rules/branches/main`: `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck`) — would have caught the aggregator's one extra rule being lost: it failed a functional PR when a dependent job was skipped. I followed the only ways `ruff` or `shellcheck` can be skipped (.github/workflows/ci.yml:35 and :48, `needs: [floor]` plus `if: mechanical != 'true'`). (a) The floor fails, times out or is cancelled. The dependent jobs are then skipped, but `ci / checks` is itself required and not green, so the merge stays blocked. (b) The floor says the PR is mechanical, which is the intended skip and works the same as before. (c) The called workflow never starts, so `ci / checks` is never posted and the required check stays pending. That also fails closed. No path lets a functional PR merge with nothing run."
       ],
       "notCovered": [
         "Other repositories and live service behavior."

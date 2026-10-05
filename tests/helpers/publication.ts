@@ -247,13 +247,10 @@ export async function runPublication(mode: PublicationMode = "clear") {
         kind: "classified",
         request,
         classification: "documentation",
+        mechanical_probability: 0.12,
       };
     if (mode === "phase-titles") {
       const context = { signal: AbortSignal.timeout(3000) };
-      await publisher.progress(
-        "Margot: preflight complete — setting up the review runner",
-        context,
-      );
       await publisher.progress("Margot: council is reviewing the changes", context);
       await publisher.progress("Margot: posting the verdict", context);
     }

@@ -132,6 +132,7 @@ it("exposes the classification JSON without approving on a triage run", async ()
       head_sha: mechanicalRequest.head,
       classification: "documentation",
       decision_source: "jev",
+      mechanical_probability: 0.12,
     },
     reviews: 0,
   });
@@ -154,7 +155,6 @@ it("updates the check title as each review phase begins", async () => {
       ),
   }).toMatchObject({
     titles: [
-      "Margot: preflight — mechanical checks",
       "Margot: preflight complete — setting up the review runner",
       "Margot: council is reviewing the changes",
       "Margot: posting the verdict",

@@ -105,7 +105,13 @@ export const factsSchema = z.strictObject({
       .optional(),
   }),
   triage: z
-    .strictObject({ actor: text, base: shaSchema, head: shaSchema, classification: classSchema })
+    .strictObject({
+      actor: text,
+      base: shaSchema,
+      head: shaSchema,
+      classification: classSchema,
+      mechanicalProbability: probability.optional(),
+    })
     .nullable(),
   ownedPathTier: z.unknown().optional(),
   autoMergeArmed: z.boolean(),

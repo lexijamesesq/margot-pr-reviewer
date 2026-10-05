@@ -134,7 +134,13 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     await assertCurrentRun(r, c);
     return (await client.rest.pulls.get(params(r, c))).data.auto_merge === null;
   };
-  async function triage(r: ReviewRequest, classification: string, c: CallContext, source = "jev") {
+  async function triage(
+    r: ReviewRequest,
+    classification: string,
+    c: CallContext,
+    source = "jev",
+    mechanicalProbability: number | null = null,
+  ) {
     await check(
       r,
       config.checks.triage,
@@ -146,6 +152,9 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         head_sha: r.head,
         classification,
         mechanical: classification === "mechanical",
+        ...(mechanicalProbability === null
+          ? {}
+          : { mechanical_probability: mechanicalProbability }),
       }),
       c,
     );
@@ -256,7 +265,9 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         r,
         r.phase === "triage" ? config.checks.triage : config.checks.review,
         null,
-        r.phase === "review" ? "Margot: preflight — mechanical checks" : "Margot: reviewing",
+        r.phase === "review"
+          ? "Margot: preflight complete — setting up the review runner"
+          : "Margot: reviewing",
         "Clearance has not been established.",
         undefined,
         context(),
@@ -285,7 +296,13 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         return result;
       }
       if (result.kind === "classified")
-        await triage(r, result.classification, context(), result.decision_source);
+        await triage(
+          r,
+          result.classification,
+          context(),
+          result.decision_source,
+          result.mechanical_probability ?? null,
+        );
       else if (!result.publication || result.publication.recorded)
         throw new Error("Missing live publication receipt");
       return result;

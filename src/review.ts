@@ -173,22 +173,30 @@ export async function review(
       cached = undefined;
     stage = "triage";
     const oversized = changedLineCount(facts.diff) > config.mechanicalDiffLineCap;
-    const answer = oversized
-      ? null
-      : classificationSchema.parse(
-          await call("classification", (c) => services.classify(facts, classificationQuestions, c)),
-        );
+    // The triage phase is the one classification; the review takes its class from the
+    // verified triage and never asks Jev again.
+    const verified =
+      request.phase !== "triage" &&
+      facts.triage &&
+      config.trustedTriageActors.includes(facts.triage.actor) &&
+      facts.triage.head === request.head
+        ? facts.triage
+        : null;
+    const answer =
+      request.phase === "triage" && !oversized
+        ? classificationSchema.parse(
+            await call("classification", (c) =>
+              services.classify(facts, classificationQuestions, c),
+            ),
+          )
+        : null;
     const fresh = answer ? classify(answer, { ...facts, triage: null }, config) : "functional";
     let classification = fresh;
     let classSource = answer?.source ?? "diff_too_large";
     if (request.phase !== "triage") {
-      const trusted =
-        facts.triage &&
-        config.trustedTriageActors.includes(facts.triage.actor) &&
-        facts.triage.head === request.head;
-      classification = trusted && facts.triage ? facts.triage.classification : "functional";
-      classSource = trusted ? "jev" : "triage_unavailable";
-      if (classNames.indexOf(fresh) < classNames.indexOf(classification)) {
+      classification = verified ? verified.classification : "functional";
+      classSource = verified ? "jev" : "triage_unavailable";
+      if (oversized && classNames.indexOf(fresh) < classNames.indexOf(classification)) {
         classification = fresh;
         classSource = answer?.source ?? "diff_too_large";
       }
@@ -202,8 +210,13 @@ export async function review(
     }
     if (cached && classification !== cached.review.classification) cached = undefined;
     if (request.phase === "triage")
-      return { kind: "classified", request, classification, decision_source: classSource };
-    await progress("Margot: preflight complete — setting up the review runner");
+      return {
+        kind: "classified",
+        request,
+        classification,
+        decision_source: classSource,
+        mechanical_probability: answer?.source === "jev" ? answer.mechanical : null,
+      };
     stage = "checks";
     for (const name of config.requiredChecks) {
       // One name can carry several runs on one head: a workflow's concurrency cancels a
@@ -370,7 +383,7 @@ export async function review(
         provenance: {
           cardBundle: config.cardBundle.commit,
           classification: classSource,
-          mechanicalProbability: answer?.source === "jev" ? answer.mechanical : null,
+          mechanicalProbability: verified?.mechanicalProbability ?? null,
           summonedByLedger: recalled.filter(
             (name) =>
               !routeAnswer ||
