@@ -124,8 +124,8 @@ it("GitHub follows the second file page", async () => {
   expect(facts.files.length === 2 && calls.some((c) => c.includes("page=2"))).toBe(true);
 });
 it("The PR's changed_files count lagging the listing does not refuse; the diff decides", async () => {
-  // GitHub's `changed_files` lags on a fresh push and the listing is capped at 3,000; Python
-  // took the file list from the diff and never compared the two.
+  // GitHub's `changed_files` lags on a fresh push and the listing is capped at 3,000; the
+  // file list comes from the diff, and the two are never compared.
   const result = await github({ count: 2 }).adapter.facts(request, context());
   expect(result.fileCount).toBe(1);
   expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
@@ -580,9 +580,9 @@ it("Claude receives its complete prompt on stdin and only the round delta throug
   const supplied = JSON.parse(stdin.split("\n").at(-1) ?? "");
   expect({
     stdinPrompt:
-      stdin.startsWith("Perform shadow review round 2.") &&
+      stdin.startsWith("Perform review round 2.") &&
       stdin.includes("Review only the supplied delta plus standing entries."),
-    argvPrompt: args.some((arg) => arg.includes("Perform shadow review round")),
+    argvPrompt: args.some((arg) => arg.includes("Perform review round")),
     facts: supplied.facts,
     round: supplied.round,
     diff,
@@ -638,7 +638,7 @@ it("A file GitHub lists without its own patch is complete when the whole diff ca
 });
 it("Deleted, added, renamed and oddly named files are named from the diff's own header lines", async () => {
   // Real diffs carry `---`/`+++`/`rename` lines; the `diff --git a/X b/Y` header is never split,
-  // so a path containing " b/" or spaces survives, as Python's reader guaranteed.
+  // so a path containing " b/" or spaces survives.
   const diff = [
     "diff --git a/dir b/x.ts b/dir b/x.ts",
     "deleted file mode 100644",
@@ -750,10 +750,7 @@ for (const [name, id, diff] of [
   });
 }
 for (const [name, marker] of [
-  [
-    "A binary file is a listed change with no text lines, as Python read it",
-    "Binary files a/a.ts and b/a.ts differ",
-  ],
+  ["A binary file is a listed change with no text lines", "Binary files a/a.ts and b/a.ts differ"],
   [
     "An encoded binary patch is a listed change with no text lines",
     "GIT binary patch\nliteral 1\nIc${Nk000310RR91",

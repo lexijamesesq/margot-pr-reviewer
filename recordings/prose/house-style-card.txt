@@ -1,0 +1,17 @@
+card: house-style
+completion: completed
+
+Checked:
+- Checked for any shared check the change gets around. The new comment text cites public upstream issues ("example/pnpm issues"). I compared it with style-check's ticket-id pattern in `hooks/style-check.py:101` (`\b(?:ABC|DEF)-\d+\b`) and the private-path patterns (lines 103–106). The references are upstream links, not internal ticket ids, so they are outside what style-check enforces. No sample file or cited path was added that the scaffold or citation checks would miss. The `ci / checks` and `trusted-scan` receipts are success at 2345bcd. This would have caught a change that hides an internal ticket id, private path or unrecognised sample shape from a floor check that should have blocked it.
+- Checked whether the new check-yaml spec matches how the rest of the suite list writes its per-hook extras, in `scripts/suite-merge.py:132-142`. The siblings are shfmt/yamllint/markdownlint at 161–171, biome-check at 176–185 and prettier at 190–198. The new extras use the same 8-space indent, one YAML line per string, and an `exclude:` key in the same style as biome-check's line 181. I also checked the mirror in `.pre-commit-config.yaml:135-141`. It matches the Python extras byte for byte, and it follows the precedent of a comment inside a hook body at `.pre-commit-config.yaml:79-83` (style-check's no-`exclude:` rationale). It also matches how biome-check's `exclude` is mirrored at 186. This would have caught extras that break the suite's indentation or key shape, or a hand-written config line that drifts from what the merge tool writes.
+
+Not covered:
+- Where the rationale lives: the biome carve-out's reason sits in the header comment above `REQUIRED_BLOCKS` (lines 95–104), while this change puts its reason in the inserted YAML. biome-check is the only earlier carve-out and it has no counterpart inside the extras, so one sibling doesn't make a convention. I'm not raising it.
+- Quoting of the regex: this `exclude` is unquoted, while biome-check's (line 186) is single-quoted. Quoting is yamllint's job, and yamllint passed on this head; one sibling isn't a convention.
+- Out of scope for this card: whether the merge tool adds the exclude to repos that already have a bare `check-yaml` (the "every repo" claim in the PR body). That is a correctness and objective question, not a style one.
+
+Findings:
+
+established:
+
+dismissed:

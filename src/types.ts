@@ -38,6 +38,7 @@ export type ReviewPresentation = {
   files: number;
   runUrl: string | null;
   ticket: { label: string; url: string } | null;
+  mergeActor?: string;
   skipReasons?: Partial<Record<Card["name"], string>>;
 };
 export type Review = ReviewCore & {

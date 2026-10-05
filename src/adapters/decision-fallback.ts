@@ -3,7 +3,7 @@ import type { CallContext } from "../types.js";
 import { claudeEnvironment } from "./claude.js";
 import { execute } from "./process.js";
 
-/** Python's tool-free Haiku decider uses exactly the questions and state Jev saw. */
+/** The tool-free Haiku decider uses exactly the questions and state Jev saw. */
 export async function decisionFallback(
   questions: object,
   state: unknown,

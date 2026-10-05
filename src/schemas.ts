@@ -52,6 +52,7 @@ export const configSchema = z
     mechanicalDiffLineCap: z.number().int().positive().default(2000),
     timeoutMs: z.number().int().positive(),
     publication: z.enum(["record", "none", "github"]),
+    mergeActor: text.optional(),
     calibration: z.boolean(),
   })
   .refine(
@@ -137,7 +138,7 @@ export const riskSchema = z.strictObject({
   ),
 });
 export const findingSchema = z.strictObject({
-  // Python's ids: `[issue]` findings are F1…Fn across the council; an `[info]` carries none.
+  // `[issue]` findings are F1…Fn across the council; an `[info]` carries none.
   id: text.optional(),
   tag: z.enum(["issue", "info"]),
   severity: z.enum(["MINOR", "MAJOR", "BLOCKING"]),
@@ -149,7 +150,7 @@ export const findingSchema = z.strictObject({
     .string()
     .regex(/^R[1-9]\d*-F[1-9]\d*$/)
     .optional(),
-  // Python keeps any `late=` value; only a `missed` prefix changes what the ledger does.
+  // Any `late=` value is kept; only a `missed` prefix changes what the ledger does.
   late: text.optional(),
   reopens: text.optional(),
   unconfirmed: z.boolean().optional(),
@@ -157,7 +158,7 @@ export const findingSchema = z.strictObject({
 });
 export const cardSchema = z.strictObject({
   name: cardNameSchema,
-  // Python's three completion tokens; anything but `completed` cannot affirmatively clear.
+  // The three completion tokens; anything but `completed` cannot affirmatively clear.
   completion: z.enum(["completed", "incomplete", "skipped"]),
   completionReason: text.optional(),
   checked: z.array(text),

@@ -1,5 +1,5 @@
 /** Margot's own Jev questions. Card playbooks and Margot's voice stay in publish-skills. */
-// P1 from flag-build/harness/profiles.py, measured in three runs of 75 PRs.
+// Measured across three runs of 75 PRs.
 // Keep the complete definition and endings: shortening them changed classification.
 const definition =
   'The operator defines mechanical as "any change that does not impact functionality within the ' +
@@ -69,7 +69,7 @@ export const riskQuestions = {
     "cannot be established with execution or static proof",
   ],
 } as const;
-/** Python's route confidence comes from this Score, not an invented Noul confidence. */
+/** Route confidence comes from this Score, not an invented Noul confidence. */
 export const routingExposureQuestion = {
   type: "score",
   instructions: "Score this change's overall security and operational exposure.",

@@ -132,9 +132,10 @@ export async function review(
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
     const ledgerWarnings: string[] = [];
     const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
-    // Python could approve over unreadable history; the port holds instead (the charter's
-    // recorded divergence). The reason names the way out, because the hold recurs on every
-    // run until the history is fixed or the operator merges.
+    // Unreadable history holds rather than approves: without the earlier ledger Margot cannot
+    // know whether findings from earlier rounds were resolved, so an approval would be a guess.
+    // The reason names the way out, because the hold recurs on every run until the history is
+    // fixed or the operator merges.
     const recovery =
       "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.";
     const historyReason = historyUnavailable
@@ -156,7 +157,7 @@ export async function review(
       return { kind: "held", request, reason: historyReason, recovery, mergeEligible: false };
     }
     // A same-head re-run reuses the saved result only when nothing it depended on has moved.
-    // Otherwise the head is reviewed afresh in the same round, as Python did; a changed body,
+    // Otherwise the head is reviewed afresh in the same round; a changed body,
     // configuration or base is a reason to look again, never a reason to refuse.
     let cached = prior?.head === request.head ? prior.receipt : undefined;
     if (
@@ -204,7 +205,7 @@ export async function review(
     for (const name of config.requiredChecks) {
       // One name can carry several runs on one head: a workflow's concurrency cancels a
       // superseded run and the cancelled one stays in the list beside the current one.
-      // The current run decides (most recent start, then id), as the estate's floor
+      // The current run decides (most recent start, then id), as the required-check floor
       // gate does; with no recency recorded, the first listed wins.
       const check = currentCheck(facts.checks.filter((c) => c.name === name));
       if (
@@ -395,6 +396,7 @@ export async function review(
         files: facts.fileCount,
         runUrl: metadata.runUrl ?? null,
         ticket: ticket(facts.body),
+        ...(config.mergeActor ? { mergeActor: config.mergeActor } : {}),
       },
     };
     stage = "render";

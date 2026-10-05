@@ -35,7 +35,7 @@ it("Card prose preserves a real mandatory finding", () => {
     ],
   });
 });
-// Python's parse_council reads the whole block for tagged bullets and never requires the
+// The card parser reads the whole block for tagged bullets and never requires the
 // Checked, Not covered or Findings labels; a label mentioned again in free text is not an error.
 it("A card without its block labels still yields its tagged findings", () => {
   const finding =
@@ -63,9 +63,9 @@ it("Repeated card labels take the first match", () => {
     checked: 1,
   });
 });
-// Python's _TAG_BULLET tolerates emphasis around the tag and numbered bullets; its
-// _finding_fields reads `k=v` in any order, ignores keys it does not know, and drops a
-// `ledger=` value that is not a ledger key. `(none)` under Findings is prose, not a finding.
+// A tagged bullet tolerates emphasis around the tag and numbered bullets; its fields read
+// `k=v` in any order, ignore keys they do not know, and drop a `ledger=` value that is not
+// a ledger key. `(none)` under Findings is prose, not a finding.
 it("Tagged bullets tolerate emphasis, key order and unknown annotations", () => {
   const card = parseCard(
     "card: safety\ncompletion: completed\nFindings:\n(none yet)\n- **[issue]** a.ts:1 \u00B7 confidence=high \u00B7 severity=**major** \u00B7 owner=reviewer \u00B7 ledger=not-a-key \u00B7 late=missed\n    what: A guard is missing.\n1. *[ info ]* b.ts:2 \u00B7 severity=MINOR \u00B7 confidence=LOW\n    what: A note.\n    note: Optional.\n",
@@ -84,8 +84,8 @@ it("Tagged bullets tolerate emphasis, key order and unknown annotations", () => 
     ],
   });
 });
-// Python read only `what:`/`note:`; consequence and action are run-only fields that are never
-// a reason to refuse: missing is empty, a repeated label takes the last value.
+// Only `what:`/`note:` feeds the finding's text; consequence and action are run-only fields
+// that are never a reason to refuse: missing is empty, a repeated label takes the last value.
 it("Missing or repeated finding sub-fields are read, never refused", () => {
   const card = parseCard(
     "card: safety\ncompletion: completed\nFindings:\n- [issue] a.ts:1 \u00B7 severity=MAJOR \u00B7 confidence=HIGH\n    what: A guard is missing.\n    action: Draft fix.\n    action: Restore the guard.\n- [info] b.ts:2 \u00B7 severity=MINOR \u00B7 confidence=LOW\n    note: Only a note line.\n",
@@ -98,7 +98,7 @@ it("Missing or repeated finding sub-fields are read, never refused", () => {
     ],
   });
 });
-// Python's _OUTCOMES includes ERROR: Margot's own fail-closed ruling, with a finding she could
+// The outcomes include ERROR: Margot's own fail-closed ruling, with a finding she could
 // not resolve legitimately in neither list.
 it("Margot's ERROR is a parsed ruling, not an exception", () => {
   const voice = parseVoice(
@@ -134,7 +134,7 @@ it("parses emphasized verdicts, repeated sections and varied disposition bullets
     "outcome: approved.\nband: `low`\nband_reason: Bounded.\nsummary: Clear.\nEsTaBlIsHeD:\n- **alpha-F1** · dot reason\n- __beta_F2__ — dash reason\n- *gamma-F3*: colon reason\n- _delta_\n- `epsilon-5` · tick reason\n- (not an id) is ignored\n### Notes\n- after-heading · ignored\nESTABLISHED:\n- zeta-F6 · before rule\n---\n- after-rule · ignored\nestablished:\n- eta-F7 · before prose\nThese notes are optional.\n- **after-prose (MINOR):** ignored\nDISMISSED:\n- unknown-id: dismissed reason\n",
   );
   const liveFailure = parseVoice(
-    "I checked the one finding that could still block and dismissed it, so this is approved. It's banded HIGH, though, which means you merge it, not me.\n\noutcome: APPROVED\nband: HIGH\nband_reason: I'm keeping the model's HIGH, and for a stronger reason than its scoring. The model's blast_radius and verification_gap readings have zero confidence. But this repository is the package Margot runs as. The change alters how the stranded-check closer concludes required checks: superseded and merged now close as `skipped`, which GitHub treats as passing. It also changes how `bind-request` reports a stop: it exits 75 with `stop_reason`/`live_sha` in GITHUB_OUTPUT, and the sample drops its `set +e` wrapper. Changing what grades or gates a review is above my authority, so the operator decides. The safety card checked that `skipped` only happens for superseded or merged, and that the leave-the-live-head rule still holds. That makes the risk a matter of who decides, not a defect. A lower band is not justified.\nrisk: changes to the reviewer's own gate\nsummary: This change renames Margot's install-location setting so that nothing is called \"engine\". It also makes every early stop close Margot's status check with the same result the older Python version gave, and it puts back saved records of past reviews that the first round had wrongly edited. The only blocking problem left from round one, the edited records, is fixed: the files match the originals exactly. Because the change affects how Margot's own pass/fail check is closed, the operator decides whether to merge. Three small notes are optional.\nfinding: none\nestablished:\ndismissed:\n- verify-R1-F2 · docs/live/documentation.json:54 · Fixed. Line 54 at head is byte-for-byte the same as base 4437550, and nothing under docs/ is in this PR's changed-file list anymore, so the saved record shows what GitHub actually supplied again. The maintainable-no-slop card's own resolution of R1-F2 says the same.\n\nThese three notes don't block and the author can take or leave them:\n- **achieves-the-objective-F1 (MINOR):** the PR description's \"grep finds only principal-engineer\" claim is now false. The restored lines `docs/SLICE4.md:22` and `docs/SLICE4.md:175` still contain \"engine\".\n- **maintainable-no-slop-F1 (MINOR):** in `src/closer.ts`, the `cancelled` and `unknown` entries repeat the same title and summary text.\n- **house-style-F1 (info):** the draft, fork, conflict and empty check titles in `src/closer.ts` don't start with \"Margot:\" like the other titles do.\n",
+    "I checked the one finding that could still block and dismissed it, so this is approved. It's banded HIGH, though, which means you merge it, not me.\n\noutcome: APPROVED\nband: HIGH\nband_reason: I'm keeping the model's HIGH, for a stronger reason than its scoring. The model's two lowest-confidence readings carry zero confidence, and the one finding that could still block has been dismissed below. A lower band is not justified.\nrisk: changes to a configuration surface\nsummary: This change adjusts how an existing check concludes. The only blocking problem from round one is fixed below. Because the change affects how a required check is closed, the operator decides whether to merge. Three small notes are optional.\nfinding: none\nestablished:\ndismissed:\n- verify-R1-F2 · a.ts:12 · Fixed. Line 12 at head matches the base exactly, and the file is no longer part of this PR's changed-file list, so the saved record is accurate again.\n\nThese three notes don't block and the author can take or leave them:\n- **first-note-F1 (MINOR):** a claim in the PR description is no longer accurate.\n- **second-note-F1 (MINOR):** two entries in b.ts repeat the same title and summary text.\n- **third-note-F1 (info):** some titles in c.ts don't follow the house naming convention.\n",
   );
   expect({
     final: {
@@ -167,7 +167,7 @@ it("parses emphasized verdicts, repeated sections and varied disposition bullets
         id: "verify-R1-F2",
         status: "dismissed",
         reason:
-          "docs/live/documentation.json:54 · Fixed. Line 54 at head is byte-for-byte the same as base 4437550, and nothing under docs/ is in this PR's changed-file list anymore, so the saved record shows what GitHub actually supplied again. The maintainable-no-slop card's own resolution of R1-F2 says the same.",
+          "a.ts:12 · Fixed. Line 12 at head matches the base exactly, and the file is no longer part of this PR's changed-file list, so the saved record is accurate again.",
       },
     ],
   });
@@ -180,15 +180,15 @@ describe("bound evidence", () => {
         "safety",
       ),
     ).toMatchObject({
-      // Python never parsed `Resolved:`; the section is prose, and fixed-ness comes from absence.
+      // The `Resolved:` section is never parsed; it is prose, and fixed-ness comes from absence.
       findings: [{ ledger: "R1-F1", late: "delta-reach: new caller" }],
     });
   });
 });
 describe("captured reviewer output", () => {
   // Every card and voice Margot has actually written and that the repository keeps
-  // (docs/live, recordings) must parse. The reviewer and the voice write prose; a parser
-  // that refuses a shape they really produce takes the review down for the operator.
+  // (recordings) must parse. The reviewer and the voice write prose; a parser that
+  // refuses a shape they really produce takes the review down for the operator.
   type Sample = {
     source: string;
     kind: "card" | "voice";
@@ -206,7 +206,7 @@ describe("captured reviewer output", () => {
       else if (
         /^\s*(?:\*\*|__)?outcome(?:\*\*|__)?:/im.test(text) &&
         /^\s*(?:\*\*|__)?band_reason(?:\*\*|__)?:/im.test(text) &&
-        !/^\s*verdict_source:/m.test(text) && // Python's check text carries the same labels
+        !/^\s*verdict_source:/m.test(text) && // The check text carries the same labels
         !text.startsWith("{")
       )
         out.push({ source, kind: "voice", text: value });
@@ -219,20 +219,23 @@ describe("captured reviewer output", () => {
   }
   function samples(): Sample[] {
     const out: Sample[] = [];
-    for (const dir of ["docs/live", "recordings"]) {
-      for (const name of readdirSync(dir).filter((n) => n.endsWith(".json"))) {
+    for (const dir of ["recordings", "recordings/prose"]) {
+      for (const name of readdirSync(dir)) {
         const file = join(dir, name);
-        collect(JSON.parse(readFileSync(file, "utf8")), file, out);
+        if (name.endsWith(".json")) collect(JSON.parse(readFileSync(file, "utf8")), file, out);
+        else if (name.endsWith(".txt")) collect(readFileSync(file, "utf8"), file, out);
       }
     }
     return out;
   }
+  // recordings/prose/ holds the sanitized card and voice texts the reviewer actually wrote;
+  // recordings/*.json hold structured fixtures and contribute any raw prose they carry.
   describe("recorded prose", () => {
     const all = samples();
     const cards = all.filter((s) => s.kind === "card");
     const voices = all.filter((s) => s.kind === "voice");
-    it("retains captured cards and voice rulings for parser compatibility", () => {
-      expect(cards.length).toBeGreaterThanOrEqual(5);
+    it("recordings/ keeps at least the 7 recorded cards and 1 recorded voice", () => {
+      expect(cards.length).toBeGreaterThanOrEqual(7);
       expect(voices.length).toBeGreaterThanOrEqual(1);
     });
     it.each(cards.map((s) => [s.source, s]))("parses the recorded card at %s", (_, s) => {

@@ -122,18 +122,18 @@ export function githubAdapter(
         throw new Error("PR changed while reading facts");
       const diffText: unknown = diff.data;
       if (typeof diffText !== "string") throw new Error("Incomplete GitHub diff");
-      // The whole-PR diff is the source of truth, as it was for Python ("the compare endpoint
-      // caps its files array; the diff has no such cap"): the file list comes from it, and it
-      // is complete when every hunk is closed. GitHub's per-file listing is capped at 3,000,
+      // The whole-PR diff is the source of truth: the compare endpoint caps its files array,
+      // but the diff has no such cap. The file list comes from it, and it is complete when
+      // every hunk is closed. GitHub's per-file listing is capped at 3,000,
       // lags the PR's own `changed_files` on a fresh push, and omits `patch` with zero counts
       // for large files; it is used only to enrich a file the diff already names, and its
       // counts are cross-checked only where it supplied the content.
       const parsed = parseDiff(diffText);
       if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
       // parse-diff names each section from its `---`/`+++`/`rename` lines, one path per line,
-      // never by splitting the `diff --git a/X b/Y` header (a path can contain " b/"), which
-      // is the rule Python's changed_files_from_diff followed. Where GitHub's listing is as
-      // long as the diff it is complete, and every diff path must appear in it; a shorter
+      // never by splitting the `diff --git a/X b/Y` header (a path can contain " b/").
+      // Where GitHub's listing is as long as the diff it is complete, and every diff path
+      // must appear in it; a shorter
       // listing is GitHub's cap, and the diff's names stand on their own.
       const listed = new Map(files.map((f) => [f.filename, f]));
       const listingComplete = files.length >= parsed.length;

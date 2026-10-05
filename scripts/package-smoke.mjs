@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const tarball = resolve(process.argv[2] ?? "margot-pr-reviewer-0.6.1.tgz");
-const consumer = mkdtempSync(join(tmpdir(), "margot-slice4-consumer-"));
+const consumer = mkdtempSync(join(tmpdir(), "margot-consumer-"));
 const run = (file, args, options = {}) =>
   spawnSync(file, args, { cwd: consumer, encoding: "utf8", ...options });
 writeFileSync(join(consumer, "package.json"), '{"private":true,"type":"module"}\n');

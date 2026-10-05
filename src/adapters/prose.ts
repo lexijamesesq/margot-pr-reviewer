@@ -1,8 +1,8 @@
 import { cardSchema, voiceSchema } from "../schemas.js";
 import type { Card } from "../types.js";
 
-// The Python reviewer's parsers are the reference for every shape below: labels at line
-// start, first match wins, tolerated markdown decoration, and no refusal Python did not have.
+// Every shape below follows the same rule: labels at line start, first match wins, tolerated
+// markdown decoration, and no refusal beyond what that rule requires.
 
 /** The first `name: value` line, or undefined; a later mention in free text never matters. */
 function firstField(prose: string, name: string): string | undefined {
@@ -20,7 +20,7 @@ function section(prose: string, name: string): string[] {
     .map((l) => l.replace(/^\s*[-*] /, "").trim());
 }
 
-// A tagged finding bullet: `- [issue] …` / `- **[info]** …`, as Python's `_TAG_BULLET`.
+// A tagged finding bullet: `- [issue] …` / `- **[info]** …`.
 const tagBullet = /^\s*(?:[-*]|\d+\.)\s*[*_ ]*\[\s*(issue|info)\s*\][*_ ]*\s*(.*?)\s*$/i;
 const severities = ["MINOR", "MAJOR", "BLOCKING"] as const;
 const confidences = ["LOW", "MEDIUM", "HIGH"] as const;
@@ -58,7 +58,7 @@ function subFields(lines: string[], index: number): Map<string, string[]> {
   return out;
 }
 
-/** One card's prose. Findings carry no ids yet: the council assigns Python's global F1…Fn once
+/** One card's prose. Findings carry no ids yet: the council assigns a global F1…Fn once
  * every card has parsed (`assignFindingIds` in policy). */
 export function parseCard(raw: string, name: Card["name"]): Card {
   const completionLine = firstField(raw, "completion");
@@ -82,7 +82,7 @@ export function parseCard(raw: string, name: Card["name"]): Card {
     )
       throw new Error("Unreadable finding");
     const sub = subFields(lines, index);
-    // Python's `what` is the first `what:`/`note:` sub-line; the run-only fields take the last.
+    // `what` is the first `what:`/`note:` sub-line; the run-only fields take the last.
     const what = sub.get("what")?.[0] ?? sub.get("note")?.[0] ?? "";
     const consequence = sub.get("consequence")?.at(-1) ?? "";
     const action = (tag === "issue" ? sub.get("action") : sub.get("note"))?.at(-1) ?? "";
@@ -162,7 +162,7 @@ export function parseVoice(raw: string) {
   const start = strict.at(-1) ?? loose.at(-1);
   if (start !== undefined) lines = lines.slice(start);
 
-  // Python's scalar read: within the final block, the first line carrying a label wins.
+  // The scalar read: within the final block, the first line carrying a label wins.
   const fields = new Map<string, string>();
   for (const line of lines) {
     const match = line.match(

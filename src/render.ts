@@ -56,7 +56,9 @@ function authorityReason(review: Review): string | null {
   if (review.decision.outcome !== "APPROVED" || review.decision.mergeEligible) return null;
   if (review.decision.holdReasons.includes("risk")) return `risk is ${review.decision.rating.band}`;
   if (review.decision.holdReasons.includes("review-authority"))
-    return "it changes Margot's own machinery; approve it and Ollie merges it";
+    return review.presentation?.mergeActor
+      ? `it changes Margot's own machinery; approve it and ${review.presentation.mergeActor} merges it`
+      : "it changes Margot's own machinery; approve it to merge it";
   if (review.decision.holdReasons.includes("calibration")) return "calibration requires review";
   return "the review is held";
 }
@@ -109,7 +111,7 @@ function cardRows(review: Review): { rows: string[]; findings: number } {
     }
     const findings = visible.get(name) ?? [];
     const first = findings[0];
-    // Python's roster: a card that did not complete shows its completion, never "clear".
+    // A card that did not complete shows its completion, never "clear".
     if (!first && card.completion !== "completed") {
       const icon = card.completion === "incomplete" ? "⏳" : "❓";
       const reason = card.completionReason ? `: ${firstClause(card.completionReason)}` : "";
@@ -181,7 +183,7 @@ export function render(review: Review): string {
           `${presentation.author ? `@${presentation.author}` : "author"}, your call: ${clarification}`,
         ]
       : []),
-    // Python's line for Margot's own ERROR ruling: the review could not be completed.
+    // Margot's own ERROR ruling: the review could not be completed.
     ...(decision.outcome === "ERROR"
       ? ["", "Not reviewed: the review could not be completed. Held for the operator."]
       : []),
@@ -211,10 +213,10 @@ export function render(review: Review): string {
 }
 
 /**
- * The verdict check's text: the lines the estate's readers consume. Ollie's state script
- * (dotty `.github/scripts/ollie-state.py`, `parse_verdict`) reads `outcome: X | band: Y` and
- * `decision_source:` to decide whether a held PR is waiting on the operator and to request
- * her review. Python's check carried these lines; they are the contract, not decoration.
+ * The verdict check's text: the lines downstream automation consumes. Merge automation
+ * reads `outcome: X | band: Y` and `decision_source:` to decide whether a held PR is
+ * waiting on the operator and to request their review. These lines are the contract, not
+ * decoration.
  */
 export function checkText(review: Review): string {
   const summoned = review.cards.map((card) => card.name);

@@ -30,7 +30,7 @@ it("An incomplete card is recorded with its reason and summons the voice", () =>
     voice: true,
   });
 });
-// Python's ids: `[issue]` findings are F1…Fn across the council in card order, assigned once
+// `[issue]` findings are F1…Fn across the council in card order, assigned once
 // every card has parsed; an `[info]` carries none.
 it("assigns finding IDs across the council in card order", () => {
   const first = parseCard(
