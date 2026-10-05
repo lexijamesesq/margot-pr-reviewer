@@ -3,10 +3,15 @@
 Node 22 or later. After `npm ci`:
 
 ```sh
+npm run build
 npm run lint        # biome, zero warnings expected
 npm run typecheck
-npm test
+npm test            # Vitest; no live network calls, no paid models
+node scripts/package-smoke.mjs <tarball>   # installs a packed tarball and runs both executables
 ```
+
+This repository uses pre-commit hooks (`pre-commit install`). Fix findings rather
+than bypassing them.
 
 ## Maintainer tooling
 
