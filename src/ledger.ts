@@ -54,20 +54,15 @@ export function selectLedger(
   );
   for (const review of reviews) {
     if (!/(?:^|\n)<!-- margot-ledger:[^\n]*$/.test(review.body.trimEnd())) continue;
-    const match = review.body.match(/(?:^|\n)<!-- margot-ledger:v([12]) ([A-Za-z0-9+/=]+) -->\s*$/);
+    const match = review.body.match(/(?:^|\n)<!-- margot-ledger:v1 ([A-Za-z0-9+/=]+) -->\s*$/);
     if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor)) continue;
     try {
       if (!match) throw new Error("Malformed ledger encoding");
-      let decoded = JSON.parse(
-        (match[1] === "2"
-          ? inflateSync(Buffer.from(match[2] ?? "", "base64"), { maxOutputLength: 1048576 })
-          : Buffer.from(match[2] ?? "", "base64")
-        ).toString("utf8"),
-      );
-      let version = Number(match[1]);
+      let decoded = JSON.parse(Buffer.from(match[1] ?? "", "base64").toString("utf8"));
+      let version = 1;
       // A version 1 reader ignores this extension and sees the same plain entries.
       // The saved receipt is restored from the compressed field without a second ledger.
-      if (version === 1 && decoded && typeof decoded.receipt_v2 === "string") {
+      if (decoded && typeof decoded.receipt_v2 === "string") {
         const { receipt_v2, ...plain } = decoded;
         if (plain.v !== 1 || "receipt" in plain) throw new Error("Invalid rollback ledger");
         decoded = {
@@ -194,7 +189,7 @@ export function prepareFindings(cards: Card[], scope: RoundScope): void {
         ((!entry && !scope.full && lateMissed(finding.late)) ||
           (entry?.status === "advisory" &&
             lateMissed(entry.late) &&
-            !finding.late?.startsWith("reach:"))) &&
+            !finding.late?.startsWith("delta-reach:"))) &&
         finding.severity !== "BLOCKING" &&
         card.name !== "safety"
       )
