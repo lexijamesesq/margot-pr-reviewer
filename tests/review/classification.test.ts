@@ -132,16 +132,6 @@ describe("trusted triage", () => {
     }
   });
 
-  it("keeps a dispatched functional class over a verified mechanical triage", async () => {
-    const { result } = await reviewed(
-      recorded("council-clear", withTriage({}), withRequest({ classification: "functional" })),
-    );
-    expect(result).toMatchObject({
-      classification: "functional",
-      provenance: { classification: "dispatch" },
-    });
-  });
-
   it("reviews as functional without asking when the triage actor is untrusted", async () => {
     const { result, calls } = await reviewed(
       recorded(

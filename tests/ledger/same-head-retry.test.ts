@@ -55,6 +55,48 @@ it("reuses the council result on the same head without classifying again", async
     calls: s.calls.map((c) => c.name),
   }).toMatchObject({ equal: true, calls: ["facts", "head"] });
 });
+it("replays the saved result under the current request when dispatch fields differ", async () => {
+  const { result, r } = await margot();
+  if (result.kind !== "reviewed") throw new Error("baseline");
+  const f = factsSchema.parse(r.facts);
+  f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
+  r.facts = f;
+  r.request = { ...(r.request as object), triage: "mechanical", classification: "" };
+  const s = recordedServices(r);
+  const retry = await review(r.request, r.config, s);
+  expect({
+    calls: s.calls.map((c) => c.name),
+    replayed: retry.kind === "reviewed" && retry.request,
+  }).toEqual({ calls: ["facts", "head"], replayed: r.request });
+});
+type Scripted = Awaited<ReturnType<typeof margot>>["r"] & {
+  route: { source: string };
+  voice: { outcome: string };
+};
+it.each([
+  ["a fallback hold", (r: Scripted) => (r.route.source = "fallback")],
+  ["a voice ERROR", (r: Scripted) => (r.voice.outcome = "ERROR")],
+])("reviews afresh on the same head instead of replaying %s", async (_name, degrade) => {
+  const first = await margot();
+  degrade(first.r as Scripted);
+  const held = await review(first.r.request, first.r.config, recordedServices(first.r));
+  if (held.kind !== "reviewed") throw new Error("baseline");
+  expect(held.provenance.decision_source === "fallback" || held.decision.outcome === "ERROR").toBe(
+    true,
+  );
+  // The service has recovered: the same head, answered by Jev and a sound voice.
+  const { r } = await margot();
+  const f = factsSchema.parse(r.facts);
+  f.history = { complete: true, priorLedger: true, reviews: [posted(held.ledger)] };
+  r.facts = f;
+  const s = recordedServices(r);
+  const retry = await review(r.request, r.config, s);
+  expect({
+    ran: s.calls.some((c) => c.name === "route"),
+    source: retry.kind === "reviewed" && retry.provenance.decision_source,
+    outcome: retry.kind === "reviewed" && retry.decision.outcome,
+  }).toEqual({ ran: true, source: "jev", outcome: "CHANGES_REQUESTED" });
+});
 it("reviews afresh in the same round when the PR body changed on the same head", async () => {
   // A same-head re-run is reviewed as the same round; a body edit between runs changes the
   // evidence, so the saved result is stale and the council runs again.

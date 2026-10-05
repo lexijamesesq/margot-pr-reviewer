@@ -5,6 +5,8 @@
 - The samples now work across repositories: each job mints its GitHub tokens from the review App with `actions/create-github-app-token`, scoped to the target repository (a read token for `GH_TOKEN`, a checks, contents and pull-requests write token for `MARGOT_WRITE_TOKEN`, a checks-write token for the closer), and the jobs' own `permissions` are `contents: read`. The README's environment table says which token each variable needs. The hosted sample installs the configured ticketing server in a placeholder step.
 - A review is rejected unless Claude reports exactly the requested tools and every MCP server connected; before, a missing tool or a server that failed to start was accepted and a card could finish without reading the diff.
 - The evidence and ticketing MCP servers run with `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` blanked, so a configured ticketing server cannot read the model credential.
+- A same-head re-run that reuses the saved review now carries the current request, so a re-run whose dispatch fields differ (such as `triage` or `classification`) no longer fails publication with a false "Not reviewed: The review could not be published".
+- A saved review that fell back, or whose voice ruled ERROR, is no longer reused on a same-head re-run; the head is reviewed afresh once the service answers.
 
 ## 0.6.15
 

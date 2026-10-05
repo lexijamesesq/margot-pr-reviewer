@@ -1,13 +1,11 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCard } from "../src/adapters/prose.js";
-import { type Recording, recordedServices, review } from "../src/index.js";
+import { recordedServices, review } from "../src/index.js";
 import { assignFindingIds, mandatory, needsVoice, rate } from "../src/policy.js";
 import { configSchema, factsSchema } from "../src/schemas.js";
+import { readRecording } from "./helpers/recordings.js";
 
-const recording = JSON.parse(
-  readFileSync(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
-) as Recording;
+const recording = readRecording("mechanical-bump");
 const config = configSchema.parse(recording.config);
 function cardText() {
   return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
@@ -49,8 +47,7 @@ it("assigns finding IDs across the council in card order", () => {
   }).toMatchObject({ ids: [["F1", null], ["F2"]], mandatory: ["F1", "F2"] });
 });
 describe("ownership clearance", () => {
-  const recording = () =>
-    JSON.parse(readFileSync("recordings/mechanical-bump.json", "utf8")) as Recording;
+  const recording = () => readRecording("mechanical-bump");
   const seed = recording();
   const facts = factsSchema.parse(seed.facts);
   it("allows merge only when the ownership tier is recognized", async () => {

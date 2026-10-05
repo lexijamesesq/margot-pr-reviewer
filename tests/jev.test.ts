@@ -1,9 +1,8 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { decisionFallback } from "../src/adapters/decision-fallback.js";
 import { jevAdapter } from "../src/adapters/jev.js";
 import * as processAdapter from "../src/adapters/process.js";
-import { type Recording, recordedServices, review } from "../src/index.js";
+import { recordedServices, review } from "../src/index.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
 import {
   cardNames,
@@ -18,10 +17,9 @@ import goldenClassificationQuestions from "./classification-questions.golden.jso
   type: "json",
 };
 import { present } from "./helpers/present.js";
+import { readRecording } from "./helpers/recordings.js";
 
-const recording = JSON.parse(
-  readFileSync(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
-) as Recording;
+const recording = readRecording("mechanical-bump");
 const request = requestSchema.parse(recording.request);
 const facts = factsSchema.parse(recording.facts);
 const pinnedClaude = { executable: "claude", version: "1.0.0" };
@@ -153,9 +151,7 @@ it("preserves routing uncertainty in Jev exposure confidence", async () => {
   expect(routeSchema.parse(r).confidence).toBe(0);
 });
 describe("bound evidence batching", () => {
-  const source = JSON.parse(
-    readFileSync(new URL("../recordings/council-clear.json", import.meta.url), "utf8"),
-  ) as Recording;
+  const source = readRecording("council-clear");
   const facts = factsSchema.parse(source.facts);
   for (const [name, check] of [
     ["retains every evidence byte when batching", "evidence"],
@@ -244,8 +240,7 @@ describe("bound evidence batching", () => {
   });
 });
 describe("fallback decisions", () => {
-  const recording = () =>
-    JSON.parse(readFileSync("recordings/mechanical-bump.json", "utf8")) as Recording;
+  const recording = () => readRecording("mechanical-bump");
   const seed = recording();
   const facts = factsSchema.parse(seed.facts);
   const context = () => ({ signal: AbortSignal.timeout(3000) });

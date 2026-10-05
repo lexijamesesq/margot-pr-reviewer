@@ -168,6 +168,9 @@ export async function review(
       cached &&
       (cached.configHash !== configHash(config) ||
         cached.review.provenance.services !== services.provenance ||
+        // A degraded answer is not replayed once the service may have recovered.
+        cached.review.provenance.decision_source === "fallback" ||
+        cached.review.decision.outcome === "ERROR" ||
         cached.evidenceHash !== evidenceHash(facts) ||
         cached.review.request.base !== request.base)
     )
@@ -267,6 +270,7 @@ export async function review(
     if (cached && prior) {
       result = {
         ...cached.review,
+        request,
         provenance: { ...cached.review.provenance, classification: classSource },
         ledger: prior,
         convergence: cached.counts,

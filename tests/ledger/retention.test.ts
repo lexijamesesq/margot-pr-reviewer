@@ -1,13 +1,13 @@
 import { randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { type Recording, recordedServices } from "../../src/adapters/recorded.js";
+import { recordedServices } from "../../src/adapters/recorded.js";
 import { ledgerBlock, nextLedger, roundScope, selectLedger } from "../../src/ledger.js";
 import { review } from "../../src/review.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
 import type { Ledger } from "../../src/types.js";
 import { entry, prior } from "../helpers/ledger.js";
 import { present } from "../helpers/present.js";
+import { readRecording } from "../helpers/recordings.js";
 
 it("keeps standing entries when the ledger exceeds its size budget", () => {
   expect(ledgerBlock(prior([{ ...entry(), what: "x".repeat(50000) }])).length > 24000).toBe(true);
@@ -52,8 +52,7 @@ it("drops this round's fixed entries before any dismissal when the ledger is ove
   expect(keys(kept.filter((e) => e.status === "dismissed"))).toEqual(keys(dismissed));
 });
 describe("history retention and retries", () => {
-  const recording = () =>
-    JSON.parse(readFileSync("recordings/mechanical-bump.json", "utf8")) as Recording;
+  const recording = () => readRecording("mechanical-bump");
   const seed = recording();
   const facts = factsSchema.parse(seed.facts);
   const config = configSchema.parse({

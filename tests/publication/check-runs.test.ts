@@ -17,7 +17,7 @@ it("posts the head-bound approval before completing the check on clearance", asy
   );
   expect({
     kind: run.result.kind,
-    successBeforeApprove: approve >= 0 && success > approve,
+    successAfterApprove: approve >= 0 && success > approve,
     head: run.writes.find((w) => w.body.event === "APPROVE")?.body.commit_id,
     finalStatus: run.final?.status,
     merged: run.writes.some(
@@ -26,7 +26,7 @@ it("posts the head-bound approval before completing the check on clearance", asy
     ),
   }).toMatchObject({
     kind: "reviewed",
-    successBeforeApprove: true,
+    successAfterApprove: true,
     head: mechanicalRequest.head,
     finalStatus: "completed",
     merged: false,

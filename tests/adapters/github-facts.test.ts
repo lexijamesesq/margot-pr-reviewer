@@ -5,9 +5,9 @@ import * as githubModule from "../../src/adapters/github.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { liveServices } from "../../src/adapters/live.js";
 import { diffLineCount } from "../../src/diff.js";
-import type { Recording } from "../../src/index.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
 import { context, github, request } from "../helpers/adapters.js";
+import { readRecording } from "../helpers/recordings.js";
 
 it("follows the second page of the file listing", async () => {
   const { adapter, calls } = github({ pageTwo: true, count: 2 });
@@ -205,8 +205,7 @@ it("starts a before-head shadow fresh despite same-head publication", async () =
   expect({ priorLedger: facts.history.priorLedger }).toMatchObject({ priorLedger: false });
 });
 describe("GitHub triage and diff size", () => {
-  const recording = () =>
-    JSON.parse(readFileSync("recordings/mechanical-bump.json", "utf8")) as Recording;
+  const recording = () => readRecording("mechanical-bump");
   const seed = recording();
   const request = requestSchema.parse(seed.request);
   const context = () => ({ signal: AbortSignal.timeout(3000) });

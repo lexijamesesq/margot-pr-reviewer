@@ -3,10 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runCli } from "../src/cli-run.js";
+import { readRecording } from "./helpers/recordings.js";
 
-const recording = JSON.parse(
-  await readFile(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
-);
+const recording = readRecording("mechanical-bump");
 const sampleConfig = JSON.parse(
   await readFile(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
 );
@@ -70,7 +69,9 @@ describe("margot-review failure messages", () => {
     );
   });
   it("names the request field that is invalid", async () => {
-    const { code, stderr } = await invoke({ request: { ...recording.request, pr: "seven" } });
+    const { code, stderr } = await invoke({
+      request: { ...(recording.request as object), pr: "seven" },
+    });
     expect(code).toBe(1);
     expect(stderr).toMatch(/^Review failed: invalid request file .*request\.json: pr: /);
   });

@@ -2,6 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it, vi } from "vitest";
+import { readRecording } from "./helpers/recordings.js";
 
 vi.mock("../src/cli-services.js", () => ({
   cliServices: () => ({
@@ -16,9 +17,7 @@ vi.mock("../src/cli-services.js", () => ({
 }));
 
 const { runCli } = await import("../src/cli-run.js");
-const recording = JSON.parse(
-  await readFile(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
-);
+const recording = readRecording("mechanical-bump");
 const sampleConfig = JSON.parse(
   await readFile(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
 );

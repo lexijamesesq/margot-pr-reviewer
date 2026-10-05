@@ -176,10 +176,7 @@ export function render(review: Review): string {
       : []),
     ...(authority ? ["", authority] : []),
     ...(decision.outcome === "CLARIFICATION_REQUESTED" && clarification
-      ? [
-          "",
-          `${presentation.author ? `@${presentation.author}` : "author"}, your call: ${clarification}`,
-        ]
+      ? ["", `@${presentation.author}, your call: ${clarification}`]
       : []),
     // Margot's own ERROR ruling: the review could not be completed.
     ...(decision.outcome === "ERROR"
