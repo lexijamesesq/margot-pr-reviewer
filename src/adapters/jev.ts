@@ -1,5 +1,6 @@
 import pRetry, { AbortError } from "p-retry";
 import { z } from "zod";
+import { errorMessage } from "../errors.js";
 import { routingExposureQuestion } from "../questions.js";
 import {
   cardNames,
@@ -45,11 +46,16 @@ export function jevAdapter(options: {
             body: JSON.stringify({ model: options.model, questions, state }),
             signal: c.signal,
           });
-        } catch {
-          throw new Error("Jev transport unavailable");
+        } catch (error) {
+          throw new Error(`Jev transport unavailable: ${errorMessage(error)}`);
         }
         if (!response.ok) {
-          const error = new Error(`Jev HTTP ${response.status}`);
+          // A rejected credential is distinguishable from an outage in every diagnostic.
+          const error = new Error(
+            response.status === 401 || response.status === 403
+              ? `Jev authentication rejected (HTTP ${response.status})`
+              : `Jev unavailable (HTTP ${response.status})`,
+          );
           if (response.status !== 429 && response.status < 500) throw new AbortError(error);
           throw error;
         }
@@ -100,7 +106,7 @@ export function jevAdapter(options: {
         answers.push(await ask(questions, batch, c));
       } catch (error) {
         if (!fallback || c.signal.aborted) throw error;
-        console.warn("Margot: Jev unavailable; falling back to the Haiku decider");
+        console.warn(`Margot: ${errorMessage(error)}; using the fallback decider`);
         answers.push(
           await (options.fallback ?? decisionFallback)(
             questions,
@@ -162,7 +168,10 @@ export function jevAdapter(options: {
     let a: Record<string, unknown>;
     try {
       a = (await decide(nouls(questions), evidence, c)).answers;
-    } catch {
+    } catch (error) {
+      console.warn(
+        `Margot: classification unavailable (${errorMessage(error)}); assuming functional`,
+      );
       return { source: "jev_unreachable", functional: 1, documentation: 0, mechanical: 0 };
     }
     return classificationSchema.parse({
@@ -181,6 +190,7 @@ export function jevAdapter(options: {
       );
     } catch (error) {
       if (_classification !== "documentation") throw error;
+      console.warn(`Margot: routing unavailable (${errorMessage(error)}); routing to every card`);
       return {
         source: "jev_unreachable",
         cards: Object.fromEntries(cardNames.map((name) => [name, 1])),

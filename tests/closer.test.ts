@@ -78,7 +78,7 @@ async function wire(mode: string) {
             mode === "other-run" ? `${ownRuns}2` : mode === "no-run" ? "" : `${ownRuns}1`,
         },
       ];
-      if (mode === "legacy") {
+      if (mode === "pre-rename") {
         checkRuns = name === "margot" ? checkRuns : [];
       } else if (mode === "no-open") {
         checkRuns = checkRuns.map((check) => ({ ...check, status: "completed" }));
@@ -158,7 +158,7 @@ it("The open review slash margot check closes without passing", async () => {
   });
 });
 it("The pre-rename margot check is the fallback", async () => {
-  const result = await wire("legacy");
+  const result = await wire("pre-rename");
   expect({ action: result.decision.action, read: result.reads.at(-2) }).toMatchObject({
     action: "closed",
     read: expect.stringContaining("check_name=margot"),

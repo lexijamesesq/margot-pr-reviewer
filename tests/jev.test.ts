@@ -15,6 +15,7 @@ import {
   routeSchema,
 } from "../src/schemas.js";
 import measuredP1 from "./p1-questions.json" with { type: "json" };
+import { present } from "./present.js";
 
 const recording = JSON.parse(
   readFileSync(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
@@ -335,13 +336,13 @@ describe("fallback decisions", () => {
         context(),
       );
       const forbidden = flags.indexOf("--tools");
-      const schema = JSON.parse(flags[flags.indexOf("--json-schema") + 1]!);
+      const schema = JSON.parse(present(flags[flags.indexOf("--json-schema") + 1]));
       return expect({
         answers,
         model: flags[flags.indexOf("--model") + 1],
         tools: flags[forbidden + 1],
         strict: flags.includes("--strict-mcp-config"),
-        state: flags[1]!.includes(JSON.stringify({ diff: facts.diff })),
+        state: present(flags[1]).includes(JSON.stringify({ diff: facts.diff })),
         required: schema.required,
       }).toMatchObject({
         answers: { lens: { noul: 0.9 }, exposure: { confidence: 0, probabilities: { "2": 1 } } },
@@ -367,6 +368,66 @@ describe("fallback decisions", () => {
       await expect(decisionFallback({ lens: { type: "noul" } }, {}, context())).rejects.toThrow();
     } finally {
       spy.mockRestore();
+    }
+  });
+});
+describe("Jev failure diagnostics", () => {
+  async function classifyDuring(status: number) {
+    const warnings: string[] = [];
+    const warn = vi.spyOn(console, "warn").mockImplementation((message) => {
+      warnings.push(String(message));
+    });
+    try {
+      const j = jev({}, { failures: 99, status });
+      const result = await j.adapter.classify(facts, classificationQuestions, context());
+      return { result, warnings: warnings.join("\n"), attempts: j.attempts() };
+    } finally {
+      warn.mockRestore();
+    }
+  }
+  it.each([401, 403])(
+    "reports a rejected credential (HTTP %i) as authentication",
+    async (status) => {
+      const { result, warnings } = await classifyDuring(status);
+      expect(result).toMatchObject({ source: "jev_unreachable", functional: 1 });
+      expect(warnings).toContain(`Jev authentication rejected (HTTP ${status})`);
+      expect(warnings).not.toContain("Jev unavailable");
+    },
+  );
+  it("reports a server error as an outage, not an authentication failure", async () => {
+    const { result, warnings } = await classifyDuring(503);
+    expect(result).toMatchObject({ source: "jev_unreachable", functional: 1 });
+    expect(warnings).toContain("Jev unavailable (HTTP 503)");
+    expect(warnings).not.toContain("authentication");
+  });
+  it("reports a transport failure with its cause", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const adapter = jevAdapter({
+        key: "test-only",
+        model: "test-model",
+        retries: 0,
+        fetch: async () => {
+          throw new Error("connect ETIMEDOUT");
+        },
+      });
+      await adapter.classify(facts, classificationQuestions, context());
+      expect(String(warn.mock.calls[0]?.[0])).toContain(
+        "Jev transport unavailable: connect ETIMEDOUT",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+  it("names the authentication cause when documentation routing degrades", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const j = jev({}, { failures: 99, status: 401 });
+      const answer = await j.adapter.route(facts, "documentation", routeQuestions, context());
+      expect(answer).toMatchObject({ source: "jev_unreachable" });
+      expect(String(warn.mock.calls[0]?.[0])).toContain("Jev authentication rejected (HTTP 401)");
+    } finally {
+      warn.mockRestore();
     }
   });
 });

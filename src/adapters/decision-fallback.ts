@@ -3,7 +3,7 @@ import type { CallContext } from "../types.js";
 import { claudeEnvironment } from "./claude.js";
 import { execute } from "./process.js";
 
-/** The tool-free Haiku decider uses exactly the questions and state Jev saw. */
+/** The tool-free fallback decider uses exactly the questions and state Jev saw. */
 export async function decisionFallback(
   questions: object,
   state: unknown,
@@ -58,7 +58,7 @@ export async function decisionFallback(
   );
   const envelope = JSON.parse(raw);
   if (envelope.is_error || String(envelope.subtype ?? "").startsWith("error"))
-    throw new Error("Haiku fallback envelope reported an error");
+    throw new Error("Fallback decider envelope reported an error");
   const answers = z
     .record(z.string(), z.unknown())
     .parse(typeof envelope.result === "string" ? JSON.parse(envelope.result) : envelope.result);

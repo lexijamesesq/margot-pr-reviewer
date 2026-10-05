@@ -1,6 +1,7 @@
 # Store trusted runner files outside the pull-request checkout. Configure the same
 # deployment JSON as a GitHub variable for the hosted closer. Provision the pinned
-# Claude CLI, ticketing server, and publish-skills at the configured runtime paths.
+# Claude CLI, ticketing server, and the card bundle (publish-skills,
+# https://github.com/lexijamesesq/publish-skills) at the configured runtime paths.
 name: Margot review
 on:
   workflow_dispatch:

@@ -15,6 +15,7 @@ import { mandatory, validateVoice } from "../src/policy.js";
 import { review } from "../src/review.js";
 import { configSchema, factsSchema, requestSchema } from "../src/schemas.js";
 import type { Card, Ledger, ReviewCore, RoundScope, Voice } from "../src/types.js";
+import { present } from "./present.js";
 
 const source = JSON.parse(
   readFileSync(new URL("../recordings/council-clear.json", import.meta.url), "utf8"),
@@ -128,12 +129,12 @@ it("Forged author cannot supply ledger history", () => {
 });
 it("Ledger head must match GitHub review commit", () => {
   const f = history();
-  f.history.reviews[0]!.head = "f".repeat(40);
+  present(f.history.reviews[0]).head = "f".repeat(40);
   expect(selectLedger(f, config) === null).toBe(true);
 });
 it("holds for the operator when the trusted ledger is corrupt", async () => {
   const f = history();
-  f.history.reviews[0]!.body = "review\n<!-- margot-ledger:v1 garbage -->";
+  present(f.history.reviews[0]).body = "review\n<!-- margot-ledger:v1 garbage -->";
   const services = recordedServices({ ...source, facts: f });
   expect(await review(source.request, config, services)).toEqual({
     kind: "held",
@@ -185,7 +186,7 @@ it("Duplicate ledger keys are rejected", () => {
 });
 it("Quoted nonterminal ledger is skipped", () => {
   const f = history();
-  f.history.reviews[0]!.body += "\nquoted text";
+  present(f.history.reviews[0]).body += "\nquoted text";
   expect(selectLedger(f, config) === null).toBe(true);
 });
 const diff = (path = "a.ts") =>
@@ -301,7 +302,7 @@ it("Card cannot forge Margot advisory annotations", () => {
 it("Silent MAJOR returns to voice for confirmation", () => {
   const cards = [card()];
   prepareFindings(cards, scope([entry()]));
-  expect({ findings: cards[0]!.findings }).toMatchObject({
+  expect({ findings: present(cards[0]).findings }).toMatchObject({
     findings: [{ id: "verify-R1-F1", unconfirmed: true, confidence: "LOW" }],
   });
 });
@@ -420,7 +421,7 @@ it("Standing card defeats mechanical shortcut", async () => {
 });
 it("holds for the operator when a trusted ledger marker has malformed encoding", async () => {
   const f = history();
-  f.history.reviews[0]!.body = "review\n<!-- margot-ledger:v1 !!! -->";
+  present(f.history.reviews[0]).body = "review\n<!-- margot-ledger:v1 !!! -->";
   const services = recordedServices({ ...source, facts: f });
   expect(await review(source.request, config, services)).toEqual({
     kind: "held",
@@ -447,7 +448,7 @@ it("Card receives only its own standing and dismissed history", async () => {
   r.facts = f;
   const s = recordedServices(r);
   await review(r.request, r.config, s);
-  const input = s.calls.find((c) => c.name === "card:safety")!.input as {
+  const input = present(s.calls.find((c) => c.name === "card:safety")).input as {
     round: RoundScope;
     facts: typeof facts;
   };
@@ -529,14 +530,14 @@ it("Same-head retry revalidates required checks", async () => {
   if (result.kind !== "reviewed") throw new Error("baseline");
   const f = factsSchema.parse(r.facts);
   f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
-  f.checks[0]!.conclusion = "failure";
+  present(f.checks[0]).conclusion = "failure";
   r.facts = f;
   expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
     kind: "error",
     stage: "checks",
   });
 });
-it("Legacy same-head round one retries fresh", async () => {
+it("A receiptless same-head round one ledger retries fresh", async () => {
   const { r } = await margot();
   r.facts = history({ ...prior(), head: facts.head });
   expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
@@ -607,7 +608,9 @@ for (const [name, pageTwoFails] of [
 it("An info-tagged repeat cannot silently close a MAJOR", () => {
   const cards = [card([finding("MAJOR", { ledger: "R1-F1", tag: "info" })])];
   prepareFindings(cards, scope());
-  expect({ unconfirmed: cards[0]!.findings.filter((f) => f.unconfirmed).length }).toMatchObject({
+  expect({
+    unconfirmed: present(cards[0]).findings.filter((f) => f.unconfirmed).length,
+  }).toMatchObject({
     unconfirmed: 1,
   });
 });
@@ -820,9 +823,9 @@ describe("history retention and retries", () => {
       ...(i === 129 ? { advisory_round: 2 } : {}),
     }));
     const block = ledgerBlock({ ...ledger(2), entries: entries });
-    const decoded = JSON.parse(Buffer.from(block.split(" ")[2]!, "base64").toString());
+    const decoded = JSON.parse(Buffer.from(present(block.split(" ")[2]), "base64").toString());
     expect({
-      fits: block.split(" ")[2]!.length <= 24000,
+      fits: present(block.split(" ")[2]).length <= 24000,
       standing: decoded.entries[0].key,
       oldestDropped: !decoded.entries.some((e: { key: string }) => e.key === "R1-F2"),
       advisoryKept: decoded.entries.some((e: { key: string }) => e.key === "R1-F130"),

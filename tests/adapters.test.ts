@@ -14,6 +14,7 @@ import { cliServices, configuredTicketingEnvironment } from "../src/cli-services
 import { changedLineCount } from "../src/diff.js";
 import type { Recording } from "../src/index.js";
 import { cardNames, factsSchema, requestSchema } from "../src/schemas.js";
+import { present } from "./present.js";
 
 const recording = JSON.parse(
   readFileSync(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
@@ -935,7 +936,7 @@ describe("bound evidence", () => {
         const content = response.content as {
           text: string;
         }[];
-        const chunk = JSON.parse(content[0]!.text);
+        const chunk = JSON.parse(present(content[0]).text);
         out += chunk.text;
         offset = chunk.end;
         if (offset === chunk.total) break;

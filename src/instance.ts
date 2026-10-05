@@ -142,7 +142,7 @@ function classifyPull(
   if (pull.head.repo?.full_name !== repository)
     return {
       stopReason: "fork",
-      message: `margot-review refused: PR head repository (${pull.head.repo?.full_name ?? "null"}) is not ${repository} (fork). Forks are operator-only; Margot never looks.`,
+      message: `margot-review refused: PR head repository (${pull.head.repo?.full_name ?? "null"}) is not ${repository} (fork). Margot does not review forks.`,
     };
   if (pull.mergeable === false)
     return {

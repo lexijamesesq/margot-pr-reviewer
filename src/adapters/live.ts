@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { z } from "zod";
+import { ConfigurationError } from "../errors.js";
 import { review } from "../review.js";
 import { liveConfigSchema, requestSchema } from "../schemas.js";
 import type { ReviewRequest, Services } from "../types.js";
@@ -26,16 +27,18 @@ export function liveServices(
   const config = liveConfigSchema.parse(configInput);
   let costUsd = 0;
   const authority = config.review.publication === "github";
-  if (
-    authority &&
-    (!config.publisher ||
-      !credentials.writeToken ||
-      config.github.freshShadow ||
-      config.github.shadowBeforeHead)
-  )
-    throw new Error(
-      "GitHub publication requires publisher configuration, a separate write token and complete history",
-    );
+  if (authority) {
+    const missing = [
+      ...(config.publisher ? [] : ["the `publisher` configuration"]),
+      ...(credentials.writeToken ? [] : ["the MARGOT_WRITE_TOKEN environment variable"]),
+      ...(config.github.freshShadow ? ["`github.freshShadow` must be false"] : []),
+      ...(config.github.shadowBeforeHead ? ["`github.shadowBeforeHead` must be false"] : []),
+    ];
+    if (missing.length)
+      throw new ConfigurationError(
+        `GitHub publication (review.publication "github") needs: ${missing.join("; ")}`,
+      );
+  }
   const publisher =
     authority && config.publisher
       ? githubPublisher(
