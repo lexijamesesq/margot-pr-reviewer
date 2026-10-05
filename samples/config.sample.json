@@ -33,7 +33,8 @@
     "freshShadow": false
   },
   "jev": {
-    "model": "YOUR_JEV_VERSION"
+    "model": "YOUR_JEV_VERSION",
+    "url": "https://api.typesafe.ai/v1/systemone"
   },
   "claude": {
     "executable": "${MARGOT_ROOT}/node_modules/.bin/claude",

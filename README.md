@@ -18,9 +18,9 @@ instead of clearing it for merge.
 
 ## Terms
 
-- **Jev** — the external decision service Margot asks for classification, routing
-  and risk. It is reached at the configured `jev.url` with the `JEV_KEY`
-  credential.
+- **Jev** — [TypeSafe](https://typesafe.ai)'s scoring model, which Margot uses to
+  classify changes and score risk. Its API key goes in `JEV_KEY`, and `jev.model`
+  pins a Jev model version, for example `jev-1.13.0`.
 - **The council** — the review cards.
 - **A card** — one review standard, run by a model against the diff.
 - **The voice** — the model that rules the verdict when code cannot clear the
@@ -36,18 +36,16 @@ instead of clearing it for merge.
 
 Margot requires Node 22 or later (see `engines` in `package.json`).
 
-Install a released tarball by URL, verifying it before use:
+Margot is not on the npm registry. GitHub shows each release asset's SHA-256
+digest on the repository's
+[Releases page](https://github.com/lexijamesesq/margot-pr-reviewer/releases); pin it
+when you choose a release, and verify every install against the pin:
 
 ```sh
 curl --fail --location --silent --show-error "$PACKAGE_URL" --output margot-pr-reviewer.tgz
 echo "$PACKAGE_SHA256  margot-pr-reviewer.tgz" | sha256sum --check
 npm install --ignore-scripts --save-exact ./margot-pr-reviewer.tgz
 ```
-
-The SHA-256 check against the downloaded bytes is the integrity control. A
-deployment file's `packageIntegrity` field (an npm-style `sha512-…` string) is
-validated only for shape; see [Instance commands](#instance-commands) for the
-`validate-deployment` command that checks the rest of a deployment pin.
 
 A live (non-recorded) review needs more than Node: the exact Claude Code CLI
 pinned at the configuration's `claude.executable` (its version is checked
@@ -69,13 +67,8 @@ A review run takes two JSON files: a request and a configuration.
   `review.mergeActor` is optional: the name shown on a held pull request as who
   merges it once approved; unset, the hold says only "approve it to merge it".
 
-The configuration's `claude.executable`, `claude.pluginDirectory`, and
-`claude.ticketing.command` (when set) may contain the placeholder
-`${MARGOT_ROOT}`. Only `margot-instance bind-request` resolves it, replacing it
-with the absolute Margot root it was given; it rejects any of those three
-values left with an unresolved `${...}` after substitution. The request file
-never contains the placeholder, and `margot-review` itself reads whatever
-configuration it is given unchanged, without resolving `${MARGOT_ROOT}`.
+`claude.executable`, `claude.pluginDirectory` and `claude.ticketing.command` may use
+`${MARGOT_ROOT}`, which `margot-instance bind-request` resolves.
 
 ### Environment variables
 
@@ -83,13 +76,13 @@ configuration it is given unchanged, without resolving `${MARGOT_ROOT}`.
 
 | Variable | Meaning |
 | --- | --- |
-| `JEV_KEY` | API key for the Jev risk model. Required by `margot-review`. |
-| `GH_TOKEN` | GitHub token read by `margot-review` (facts, checks, review history) and by `margot-instance bind-request`/`close-stranded-check`. For `margot-review` and `bind-request` it only needs read access; `close-stranded-check` also uses it to update a check run, so it needs `checks: write` there. |
-| `MARGOT_WRITE_TOKEN` | Separate token with checks and pull-request write access. Required for GitHub publication; never forwarded to a model or evidence server. |
-| `MARGOT_OWNED_TIER` | Caller-computed protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing, blank, or invalid holds the review. |
-| `MARGOT_CLASSIFICATION` | Overrides the request's classification (`functional`, `documentation`, or `mechanical`). |
-| `MARGOT_TRIAGE` | Carries an earlier triage result into the request when no classification is set; only the value `mechanical` has any effect. |
-| names listed in `claude.ticketing.env` | Forwarded only to the configured ticketing MCP server, never to the model environment generally. |
+| `JEV_KEY` | API key for Jev. Required by `margot-review`. |
+| `GH_TOKEN` | GitHub token. Read access for `margot-review` and `bind-request`; `checks: write` for `close-stranded-check`. |
+| `MARGOT_WRITE_TOKEN` | Token with checks and pull-request write access. Required for GitHub publication. |
+| `MARGOT_OWNED_TIER` | Protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing or invalid holds the review. |
+| `MARGOT_CLASSIFICATION` | The request's dispatched classification (`functional`, `documentation`, or `mechanical`). It can only make the review stricter than the verified triage's class. |
+| `MARGOT_TRIAGE` | Used only when no classification is set: `mechanical` leaves the verified triage's class in place, and any other non-empty value makes the review functional. |
+| names listed in `claude.ticketing.env` | Forwarded only to the ticketing MCP server. |
 
 ## Running `margot-review`
 
@@ -97,14 +90,8 @@ configuration it is given unchanged, without resolving `${MARGOT_ROOT}`.
 margot-review REQUEST.json CONFIG.json OUTPUT.json
 ```
 
-It writes `OUTPUT.json` (mode 0600) with `{ result, actions, responses }`:
-`result` is the review outcome described under
-[Library API](#library-api) (`classified`, `reviewed`, `held`, or `error`);
-`actions` lists the shadow-mode local actions it recorded instead of actually
-publishing (empty once GitHub publication is configured); `responses` are the
-raw model responses captured during the run. It exits 1 when `result.kind` is
-`"error"`, and 0 otherwise — a `held`, `classified`, or non-merge-eligible
-`reviewed` result all still exit 0.
+It writes the result to `OUTPUT.json`. It exits 1 when the result is an error and 0
+otherwise, including for held results.
 
 ## Running it in GitHub Actions
 
@@ -129,9 +116,6 @@ runner of your own to hold trusted files.
 
 ## Instance commands
 
-`margot-instance` ships three commands so a consumer does not need its own
-implementation of routing and request admission.
-
 ### `validate-deployment`
 
 Checks a trusted deployment file's version, exact GitHub release asset URL, and
@@ -152,11 +136,11 @@ margot-instance validate-deployment \
 
 Reads the PR through the GitHub API using `GH_TOKEN`. Before writing any
 configuration it classifies a merged, closed, superseded, draft, fork-head,
-conflicted, or empty request and stops instead. Otherwise it writes mode-0600
+conflicted, or empty request and stops instead. Otherwise it writes
 `request.json` and `config.json` under the given Margot root, with the supplied
 required checks, protected paths, allowed skipped checks, and authority applied.
-Authority selects GitHub publication and requires a nonempty, run-unique
-`--run-url`; without it, the configuration is a before-head shadow run.
+With `--authority true` the review publishes to GitHub, and `--run-url` must name
+this run; without authority it runs in shadow mode and publishes nothing.
 
 Every classified stop exits **75** and prints `stop_reason=<reason>` (one of
 `superseded`, `merged`, `closed`, `draft`, `fork`, `conflict`, `empty`); a
@@ -174,12 +158,9 @@ margot-instance bind-request \
 
 ### `close-stranded-check`
 
-Closes a review check left open when routing failed, review failed, or
-publication did not happen. It checks that the given head belongs to the named
-PR, that the PR isn't still open on that head under another run, that the open
-`review / margot` check (or the pre-rename check name `margot`) belongs to this run, and
-only then closes it with a reason-specific conclusion. Exits 0 after closing or
-finding nothing to close, and 2 on a GitHub read or write failure.
+Closes a review check this run left open when routing failed, review failed, or
+publication did not happen. Exits 0 after closing or finding nothing to close, and
+2 on a GitHub read or write failure.
 
 ```sh
 margot-instance close-stranded-check \
@@ -198,12 +179,9 @@ or the council's per-card results — a status icon, the card name, and its
 finding, if any — followed by a round summary (new, open, and closed findings)
 and the PR's author, ticket, commit, and run links.
 
-In GitHub mode this comment is accompanied by a check run — conventionally
-named `review / margot`, the name `close-stranded-check` looks for. Its text
-carries plain-text lines meant for automation to parse, including
-`outcome: <OUTCOME> | band: <BAND>` and `decision_source: <source>`, alongside
-the classification, which cards were summoned, the convergence counters, and
-whether the result is auto-merge eligible.
+In GitHub mode it is accompanied by a check run named `review / margot`. Its text
+has machine-readable `outcome: <OUTCOME> | band: <BAND>` and `decision_source:
+<source>` lines.
 
 A PR is held for the operator — not cleared for merge, even on an outcome of
 APPROVED — when any of the following holds: risk is above LOW; the
@@ -216,20 +194,11 @@ could not be completed at all and is always held.
 
 ## Library API
 
-The package's main entry also exports a programmatic API for driving a review
-without a host process:
+The package's main entry exports:
 
-- `review(request, config, services)` — runs a review against a `Services`
-  implementation and returns a `ReviewResult` whose `kind` is one of:
-  `"classified"` (the request's `phase` was `triage`: classification decided,
-  no council or verdict run), `"reviewed"` (a verdict, with rendered `report`
-  text), `"held"` (the review could not proceed; `reason` names why), or
-  `"error"` (`stage` and `diagnostic` describe what failed).
-- `recordedServices(recording)` — builds a `Services` implementation from a
-  plain JSON `Recording` object, such as the files under `recordings/`, for
-  review offline without live GitHub, Jev, or Claude calls.
-- `liveServices(config, credentials, onResponse?)` and `liveConfigSchema` — the
-  live GitHub/Jev/Claude-backed implementation `margot-review` itself runs on.
+- `review(request, config, services)` — runs a review and returns a `ReviewResult` (`classified`, `reviewed`, `held` or `error`).
+- `recordedServices(recording)` — builds `Services` from a JSON recording such as those under `recordings/`, for offline review.
+- `liveServices(config, credentials, onResponse?)` and `liveConfigSchema` — the live implementation `margot-review` runs on.
 
 Minimal recorded-review example:
 
@@ -250,17 +219,4 @@ console.log(result.kind === "reviewed" ? result.report : result);
 
 ## Development
 
-```sh
-npm ci
-npm run build
-npm run typecheck
-npm test
-node scripts/package-smoke.mjs <tarball>
-```
-
-`npm test` runs the Vitest suite with no live network calls and no paid models.
-`scripts/package-smoke.mjs` installs a packed tarball into an empty directory
-and exercises both installed executables.
-
-This repository uses pre-commit hooks (`pre-commit install`). Fix findings
-rather than bypassing them.
+See [CONTRIBUTING.md](CONTRIBUTING.md).

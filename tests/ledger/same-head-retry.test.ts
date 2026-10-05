@@ -5,7 +5,7 @@ import { review } from "../../src/review.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
 import type { RoundScope } from "../../src/types.js";
 import { entry, facts, history, margot, posted, prior } from "../helpers/ledger.js";
-import { present } from "../present.js";
+import { present } from "../helpers/present.js";
 
 it("reviews a mechanical change fully when a card is standing", async () => {
   const { result } = await margot();

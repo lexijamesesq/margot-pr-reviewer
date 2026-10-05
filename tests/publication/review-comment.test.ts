@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, renderCheckText } from "../../src/render.js";
+import { present } from "../helpers/present.js";
 import { authorChangesReview, mechanicalReview } from "../helpers/publication.js";
-import { present } from "../present.js";
 
 it("shows an incomplete card's completion and reason instead of clear", () => {
   const value = structuredClone(authorChangesReview);

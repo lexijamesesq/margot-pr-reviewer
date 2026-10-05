@@ -1,8 +1,8 @@
 import { expect, it, vi } from "vitest";
-import { liveServices } from "../src/adapters/live.js";
-import { cliServices } from "../src/cli-services.js";
+import { liveServices } from "../../src/adapters/live.js";
+import { cliServices } from "../../src/cli-services.js";
 
-vi.mock("../src/adapters/live.js", () => ({ liveServices: vi.fn() }));
+vi.mock("../../src/adapters/live.js", () => ({ liveServices: vi.fn() }));
 it.each([
   [undefined, "unknown"],
   ["", "unknown"],

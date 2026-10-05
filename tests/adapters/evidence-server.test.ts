@@ -7,7 +7,7 @@ import { createEvidenceServer } from "../../src/adapters/evidence-server.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import type { Recording } from "../../src/index.js";
 import { connectEvidence, github, request } from "../helpers/adapters.js";
-import { present } from "../present.js";
+import { present } from "../helpers/present.js";
 
 describe("the evidence server's repository tools", () => {
   it("keeps a caller-supplied repository and SHA out of evidence routing", async () => {

@@ -209,10 +209,16 @@ export async function review(
         classification = "functional";
         classSource = "diff_too_large";
       }
-      const dispatched =
-        classNames.find((name) => name === request.classification) ??
-        (!request.classification && request.triage === "mechanical" ? "mechanical" : "functional");
-      if (classNames.indexOf(dispatched) < classNames.indexOf(classification)) {
+      // Nothing dispatched (no class and no triage) means no override: the verified triage's
+      // class stands. A dispatched class only ever makes the review stricter.
+      const dispatched = request.classification
+        ? (classNames.find((name) => name === request.classification) ?? "functional")
+        : request.triage === "mechanical"
+          ? "mechanical"
+          : request.triage
+            ? "functional"
+            : undefined;
+      if (dispatched && classNames.indexOf(dispatched) < classNames.indexOf(classification)) {
         classification = dispatched;
         classSource = "dispatch";
       }
