@@ -50,7 +50,11 @@ export type PublicationMode =
   | "error"
   | "council-error"
   | "facts-error"
-  | "token-error";
+  | "token-error"
+  | "stage-error"
+  | "moved-error"
+  | "comment-fail"
+  | "published-then-error";
 
 export const mechanicalBump = readRecording("mechanical-bump");
 export const mechanicalRequest = requestSchema.parse(mechanicalBump.request);
@@ -79,7 +83,7 @@ export const publisherOptions = {
   appId: 42,
   runUrl: "https://github.com/example/instance/actions/runs/1",
 };
-export async function runPublication(mode: PublicationMode = "clear") {
+export async function runPublication(mode: PublicationMode = "clear", errorStage = "voice") {
   const writes: {
     method: string;
     path: string;
@@ -149,8 +153,8 @@ export async function runPublication(mode: PublicationMode = "clear") {
       writes.push({ method, path, body });
       if (
         (defect("start-fail") && body.status === "in_progress") ||
-        (defect("review-fail") && path.endsWith("/reviews")) ||
-        (defect("final-fail") &&
+        ((defect("review-fail") || defect("comment-fail")) && path.endsWith("/reviews")) ||
+        ((defect("final-fail") || defect("published-then-error")) &&
           body.name === publisherOptions.checks.review &&
           body.conclusion === "success")
       )
@@ -245,6 +249,31 @@ export async function runPublication(mode: PublicationMode = "clear") {
     }
     if (defect("error"))
       return { kind: "error", stage: "card", diagnostic: "Recorded timeout", mergeEligible: false };
+    if (mode === "stage-error" || mode === "moved-error" || mode === "comment-fail") {
+      if (mode === "moved-error") moved = true;
+      return {
+        kind: "error",
+        stage: errorStage,
+        diagnostic: "Distinctive diagnostic detail.",
+        mergeEligible: false,
+      };
+    }
+    if (mode === "published-then-error") {
+      const value = structuredClone(mechanicalReview);
+      try {
+        await publisher.publish(
+          { expectedHead: mechanicalRequest.head, review: value, report: render(value) },
+          { signal: AbortSignal.timeout(3000) },
+        );
+      } catch (error) {
+        return {
+          kind: "error",
+          stage: "publication",
+          diagnostic: String(error),
+          mergeEligible: false,
+        };
+      }
+    }
     if (mode === "council-error")
       return {
         kind: "error",

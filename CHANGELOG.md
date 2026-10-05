@@ -2,7 +2,7 @@
 
 ## 0.6.9
 
-- A review that fails after the council has begun now also tells the author in the pull request. Margot posts a short comment, "Not reviewed: (the stage that failed). The review check has the details. Held for the operator.", alongside the `not reviewed (error)` check. The comment names the stage and points to the check instead of quoting the reason, as the previous reviewer did. Errors before the review began (facts, history, binding, required checks) still end as a check only.
+- A review that fails after the council has begun now also tells the author in the pull request. Margot posts a short comment, "Not reviewed: (the stage that failed). The review check has the details. Held for the operator.", alongside the `not reviewed (error)` check. The comment names the stage and points to the check instead of quoting the reason, as the previous reviewer did. Errors before the review began (facts, history, binding, required checks) still end as a check only. Nothing is posted when the head has moved, the run was superseded, or the review itself was already posted.
 - New `samples/github-hosted.sample.yml`: the workflow for a team that uses GitHub-hosted runners only.
 
 ## 0.6.8

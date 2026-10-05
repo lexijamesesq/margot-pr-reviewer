@@ -36,6 +36,7 @@ import {
   shaSchema,
   voiceSchema,
 } from "./schemas.js";
+import { type CardStage, cardStage, type Stage, stages } from "./stages.js";
 import type {
   Bundle,
   Card,
@@ -74,13 +75,13 @@ export async function review(
   services: Services,
 ): Promise<ReviewResult> {
   const startedAt = Date.now();
-  let stage = "input";
+  let stage = stages.input as Stage | CardStage;
   let emergencyDisable: (() => Promise<boolean>) | undefined;
   try {
     const request = requestSchema.parse(requestInput);
     const config = configSchema.parse(configInput);
     const call = async <T>(
-      name: string,
+      name: Stage | CardStage,
       run: (context: { signal: AbortSignal }) => Promise<T>,
     ): Promise<T> => {
       stage = name;
@@ -100,13 +101,13 @@ export async function review(
         clearTimeout(timer);
       }
     };
-    const disableAutoMerge = async (name: string): Promise<boolean> =>
+    const disableAutoMerge = async (name: Stage): Promise<boolean> =>
       disableAutoMergeSchema.parse(await call(name, (c) => services.disableAutoMerge(request, c)));
     const progress = async (title: ReviewPhaseTitle): Promise<void> => {
       const reportProgress = services.progress;
       if (reportProgress) {
         try {
-          await call("publication-progress", (context) => reportProgress(title, context));
+          await call(stages.publicationProgress, (context) => reportProgress(title, context));
         } catch (error) {
           console.warn(
             `Margot: phase-title update failed (${errorMessage(error)}); continuing review`,
@@ -114,9 +115,9 @@ export async function review(
         }
       }
     };
-    const facts = factsSchema.parse(await call("facts", (c) => services.facts(request, c)));
+    const facts = factsSchema.parse(await call(stages.facts, (c) => services.facts(request, c)));
     if (facts.autoMergeArmed)
-      emergencyDisable = () => disableAutoMerge("disable-auto-merge-after-error");
+      emergencyDisable = () => disableAutoMerge(stages.disableAutoMergeAfterError);
     if (
       !facts.complete ||
       facts.files.length !== facts.fileCount ||
@@ -130,7 +131,7 @@ export async function review(
       facts.head !== request.head
     )
       throw new Error("Facts do not match requested revision");
-    stage = "history";
+    stage = stages.history;
     const historyUnavailable =
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
     const ledgerWarnings: string[] = [];
@@ -148,13 +149,14 @@ export async function review(
         : null;
     if (historyReason) {
       if (
-        shaSchema.parse(await call("hold-head", (c) => services.head(request, c))) !== request.head
+        shaSchema.parse(await call(stages.holdHead, (c) => services.head(request, c))) !==
+        request.head
       )
         throw new Error("Head moved before holding review");
       if (
         config.publication !== "none" &&
         facts.autoMergeArmed &&
-        !(await disableAutoMerge("disable-auto-merge"))
+        !(await disableAutoMerge(stages.disableAutoMerge))
       )
         throw new Error("Auto-merge disable was not confirmed");
       return { kind: "held", request, reason: historyReason, recovery, mergeEligible: false };
@@ -171,7 +173,7 @@ export async function review(
         cached.review.request.base !== request.base)
     )
       cached = undefined;
-    stage = "triage";
+    stage = stages.triage;
     const oversized = changedLineCount(facts.diff) > config.mechanicalDiffLineCap;
     let classification: (typeof classNames)[number] = "functional";
     let classSource = "diff_too_large";
@@ -180,7 +182,9 @@ export async function review(
       // The triage is the one classification: it asks Jev.
       if (!oversized) {
         const answer = classificationSchema.parse(
-          await call("classification", (c) => services.classify(facts, classificationQuestions, c)),
+          await call(stages.classification, (c) =>
+            services.classify(facts, classificationQuestions, c),
+          ),
         );
         classification = classify(answer, { ...facts, triage: null }, config);
         classSource = answer.source;
@@ -222,7 +226,7 @@ export async function review(
         decision_source: classSource,
         mechanical_probability: mechanicalProbability,
       };
-    stage = "checks";
+    stage = stages.checks;
     for (const name of config.requiredChecks) {
       // One name can carry several runs on one head: a workflow's concurrency cancels a
       // superseded run and the cancelled one stays in the list beside the current one.
@@ -244,7 +248,7 @@ export async function review(
     const compare = services.compare;
     if (prior && prior.head !== request.head && !cached && compare) {
       try {
-        comparison = await call("compare", (c) => compare(request, prior.head, c));
+        comparison = await call(stages.compare, (c) => compare(request, prior.head, c));
       } catch (error) {
         // Complete full-PR evidence above is the recovery path.
         console.warn(
@@ -272,7 +276,7 @@ export async function review(
       const loadBundle = async (): Promise<Bundle> => {
         if (!bundle) {
           const loaded = bundleSchema.parse(
-            await call("bundle", (c) => services.bundle(config.cardBundle.commit, c)),
+            await call(stages.bundle, (c) => services.bundle(config.cardBundle.commit, c)),
           );
           if (loaded.commit !== config.cardBundle.commit)
             throw new Error("Card bundle pin mismatch");
@@ -293,7 +297,9 @@ export async function review(
           fileCount: scope.files.length,
         };
         routeAnswer = routeSchema.parse(
-          await call("route", (c) => services.route(scopedFacts, classification, questions, c)),
+          await call(stages.route, (c) =>
+            services.route(scopedFacts, classification, questions, c),
+          ),
         );
         const path = reviewPath(classification, routeAnswer, config);
         if (path.council || recalled.length > 0) {
@@ -309,7 +315,7 @@ export async function review(
             const completed = await Promise.allSettled(
               selected.map(async (name) => {
                 const card = cardSchema.parse(
-                  await call(`card:${name}`, (c) =>
+                  await call(cardStage(name), (c) =>
                     services.card(
                       {
                         facts: {
@@ -339,12 +345,12 @@ export async function review(
             );
             for (const [index, completion] of completed.entries()) {
               if (completion.status === "rejected") {
-                stage = `card:${selected[index]}`;
+                stage = cardStage(String(selected[index]));
                 throw completion.reason;
               }
               cards.push(completion.value);
             }
-            stage = "cards";
+            stage = stages.cards;
             assignFindingIds(cards);
             prepareFindings(cards, scope);
             const ids = cards.flatMap((c) => c.findings.flatMap((f) => (f.id ? [f.id] : [])));
@@ -352,14 +358,14 @@ export async function review(
           }
           if (path.risk) {
             riskAnswer = riskSchema.parse(
-              await call("risk", (c) => services.risk(facts, cards, riskQuestions, c)),
+              await call(stages.risk, (c) => services.risk(facts, cards, riskQuestions, c)),
             );
             rating = rate(riskAnswer, cards.length === 0, config);
           }
           if (needsVoice(cards, rating, routeAnswer.confidence, config)) {
             const resolved = await loadBundle();
             voice = voiceSchema.parse(
-              await call("voice", (c) =>
+              await call(stages.voice, (c) =>
                 services.voice(
                   {
                     facts: { ...facts, history: { complete: true, priorLedger: prior !== null } },
@@ -424,13 +430,13 @@ export async function review(
         ...(config.mergeActor ? { mergeActor: config.mergeActor } : {}),
       },
     };
-    stage = "render";
+    stage = stages.render;
     if (result.voice) validateVoice(result.cards, result.voice);
     const report = render(result);
     await progress("Margot: posting the verdict");
     let publication = null;
     if (
-      shaSchema.parse(await call("publication-head", (c) => services.head(request, c))) !==
+      shaSchema.parse(await call(stages.publicationHead, (c) => services.head(request, c))) !==
       request.head
     )
       throw new Error("Head moved before publication");
@@ -439,11 +445,11 @@ export async function review(
         config.publication !== "github" &&
         !result.decision.mergeEligible &&
         facts.autoMergeArmed &&
-        !(await disableAutoMerge("disable-auto-merge"))
+        !(await disableAutoMerge(stages.disableAutoMerge))
       )
         throw new Error("Auto-merge disable was not confirmed");
       publication = publicationSchema.parse(
-        await call("publication", (c) =>
+        await call(stages.publication, (c) =>
           services.publish({ expectedHead: request.head, review: result, report }, c),
         ),
       );
