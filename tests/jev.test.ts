@@ -118,10 +118,13 @@ it("treats Jev authentication failures as terminal", async () => {
 });
 it("requests functional review during a classifier outage", async () => {
   const j = jev(classes, { failures: 3 });
-  const unverified = { ...recording, facts: { ...(recording.facts as object), triage: null } };
-  const services = { ...recordedServices(unverified), classify: j.adapter.classify };
-  const result = await review(request, recording.config, services);
-  expect(result.kind === "reviewed" && result.classification === "functional").toBe(true);
+  const services = { ...recordedServices(recording), classify: j.adapter.classify };
+  const result = await review({ ...request, phase: "triage" }, recording.config, services);
+  expect(result).toMatchObject({
+    kind: "classified",
+    classification: "functional",
+    decision_source: "jev_unreachable",
+  });
 });
 it("preserves risk levels in Jev score distributions", async () => {
   const answers = Object.fromEntries(

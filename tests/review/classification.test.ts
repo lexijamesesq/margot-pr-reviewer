@@ -49,6 +49,35 @@ describe("classification precedence", () => {
   });
 });
 
+describe("the triage phase's class", () => {
+  const triaged = async (...changes: Parameters<typeof recorded>[1][]) =>
+    (
+      await reviewRecording(
+        recorded("mechanical-bump", withRequest({ phase: "triage" }), ...changes),
+      )
+    ).result;
+
+  it("classifies as functional when functional is confident alongside other classes", async () => {
+    expect(await triaged(withClassification({ functional: 1, documentation: 1 }))).toMatchObject({
+      kind: "classified",
+      classification: "functional",
+    });
+  });
+
+  it("classifies as documentation when documentation and mechanical are both confident", async () => {
+    expect(
+      await triaged(withClassification({ functional: 0, documentation: 1, mechanical: 1 })),
+    ).toMatchObject({ kind: "classified", classification: "documentation" });
+  });
+
+  it("classifies as functional when no class is confident", async () => {
+    expect(await triaged(withClassification(classifiedAs(0.2, 0.2, 0.2)))).toMatchObject({
+      kind: "classified",
+      classification: "functional",
+    });
+  });
+});
+
 describe("trusted triage", () => {
   it("does not ask Jev to classify again when the triage is verified", async () => {
     const { result, calls } = await reviewed(
@@ -243,8 +272,9 @@ describe("classification provenance and availability", () => {
       confidence: 0,
       cards: Object.fromEntries(cardNames.map((name) => [name, 1])),
     };
-    const { result } = await reviewed(
+    const { result, calls } = await reviewed(
       mechanical(withClassification(classifiedAs(0, 1, 0)), (draft) => {
+        Object.assign(draft.facts.triage as object, { classification: "documentation" });
         draft.route = outageRoute as Draft["route"];
         draft.cards = Object.fromEntries(
           cardNames.map((name) => [
@@ -254,6 +284,9 @@ describe("classification provenance and availability", () => {
         );
       }),
     );
+    expect(calls).toContain("route");
+    expect(result.routeAnswer?.source).toBe("jev_unreachable");
+    expect(result.classification).toBe("documentation");
     expect(result.decision.mergeEligible).toBe(true);
     expect(result.provenance.decision_source).toBe("jev");
   });

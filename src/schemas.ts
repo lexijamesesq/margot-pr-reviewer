@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const text = z.string().min(1);
-const probability = z.number().min(0).max(1);
+export const probability = z.number().min(0).max(1);
 export const repositorySchema = z
   .string()
   .regex(/^[\w.-]+\/[\w.-]+$/, "Repository must be owner/name");

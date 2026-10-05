@@ -3,11 +3,9 @@ import parseDiff from "parse-diff";
 import { z } from "zod";
 import { diffIsComplete } from "../diff.js";
 import { errorMessage } from "../errors.js";
-import { classNames, factsSchema, requestSchema } from "../schemas.js";
+import { classNames, factsSchema, probability, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
-
-const probability = z.number().min(0).max(1);
 
 /** Optional credential broker bridge; Octokit still owns requests and pagination. GET only. */
 export function ghFetch(executable: string): typeof fetch {
