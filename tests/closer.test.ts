@@ -273,7 +273,7 @@ it("closes as cancelled when the package stop is cancelled", async () => {
     write: { conclusion: "cancelled" },
   });
 });
-it("uses the preflight title for a floor stop", async () => {
+it("uses the not-reviewed-yet title for a floor stop", async () => {
   expect({ write: (await wire("floor")).writes[0] }).toMatchObject({
     write: {
       output: {
