@@ -62,6 +62,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     }
   }
   async function guard(r: ReviewRequest, c: CallContext, allowMerged = false) {
+    refused = undefined;
     const { data } = await client.rest.pulls.get(params(r, c));
     await assertCurrentRun(r, c);
     const merged = allowMerged && data.merged;
@@ -290,7 +291,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       );
       const result = await evaluate();
       if (result.kind === "error") {
-        if (refused) throw refused;
+        if (refused && result.stage === stages.publication) throw refused;
         notReviewed = notReviewedReason(result.stage);
         throw new Error(`${result.stage}: ${result.diagnostic}`);
       }
