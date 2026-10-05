@@ -9,6 +9,7 @@ export type CloseStrandedCheckInput = {
   pr: number;
   head: string;
   appId: number;
+  checkName: string;
   ownRuns: string;
   ownRunId: string;
   routeResult: string;
@@ -142,31 +143,25 @@ export async function closeStrandedCheck(
     }
   }
 
-  let check:
-    | Awaited<ReturnType<CheckClient["rest"]["checks"]["listForRef"]>>["data"]["check_runs"][number]
-    | undefined;
-  for (const name of ["review / margot", "margot"]) {
-    let checks: Checks;
-    try {
-      checks = (
-        await client.rest.checks.listForRef({
-          owner,
-          repo,
-          ref: head,
-          check_name: name,
-          app_id: input.appId,
-          filter: "latest",
-        })
-      ).data.check_runs;
-    } catch (error) {
-      return {
-        action: "error",
-        message: `could not read check-runs on ${short} — left untouched (${errorMessage(error)})`,
-      };
-    }
-    check = checks.find((candidate) => openStates.has(candidate.status));
-    if (check) break;
+  let checks: Checks;
+  try {
+    checks = (
+      await client.rest.checks.listForRef({
+        owner,
+        repo,
+        ref: head,
+        check_name: input.checkName,
+        app_id: input.appId,
+        filter: "latest",
+      })
+    ).data.check_runs;
+  } catch (error) {
+    return {
+      action: "error",
+      message: `could not read check-runs on ${short} — left untouched (${errorMessage(error)})`,
+    };
   }
+  const check = checks.find((candidate) => openStates.has(candidate.status));
   if (!check)
     return {
       action: "left",

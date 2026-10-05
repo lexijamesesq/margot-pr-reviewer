@@ -4,7 +4,7 @@ import { type CloseStrandedCheckInput, closeStrandedCheck } from "../src/closer.
 
 const head = "a".repeat(40);
 const ownRuns = "https://github.com/example/control/actions/runs/";
-async function wire(mode: string) {
+async function wire(mode: string, checkName = "review / margot") {
   const writes: Record<string, unknown>[] = [];
   const reads: string[] = [];
   const input: CloseStrandedCheckInput = {
@@ -12,6 +12,7 @@ async function wire(mode: string) {
     pr: 7,
     head,
     appId: 42,
+    checkName,
     ownRuns,
     ownRunId: "1",
     routeResult: "failure",
@@ -79,8 +80,8 @@ async function wire(mode: string) {
             mode === "other-run" ? `${ownRuns}2` : mode === "no-run" ? "" : `${ownRuns}1`,
         },
       ];
-      if (mode === "pre-rename") {
-        checkRuns = name === "margot" ? checkRuns : [];
+      if (mode === "other-name") {
+        checkRuns = name === "custom / review" ? checkRuns : [];
       } else if (mode === "no-open") {
         checkRuns = checkRuns.map((check) => ({ ...check, status: "completed" }));
       }
@@ -158,12 +159,10 @@ it("closes the open review/margot check without passing it", async () => {
     write: { status: "completed", conclusion: "action_required" },
   });
 });
-it("falls back to the pre-rename margot check", async () => {
-  const result = await wire("pre-rename");
-  expect({ action: result.decision.action, read: result.reads.at(-2) }).toMatchObject({
-    action: "closed",
-    read: expect.stringContaining("check_name=margot"),
-  });
+it("closes the check named by --check-name and no other", async () => {
+  const result = await wire("other-name", "custom / review");
+  expect(result.decision.action).toBe("closed");
+  expect((await wire("other-name")).decision.action).toBe("left");
 });
 it("touches nothing when the check list is unreadable", async () => {
   expect((await wire("check-error")).decision).toMatchObject({

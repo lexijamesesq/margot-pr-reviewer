@@ -275,6 +275,7 @@ jobs:
         run: |
           "$MARGOT_ROOT/node_modules/.bin/margot-instance" close-stranded-check \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
-            --app-id "$MARGOT_APP_ID" --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
+            --app-id "$MARGOT_APP_ID" --check-name "review / margot" \
+            --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
             --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
             --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"
