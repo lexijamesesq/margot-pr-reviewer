@@ -19,6 +19,31 @@ it("preserves the voice's risk statement, clarification and setting finding", ()
 function cardText() {
   return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
 }
+// The parser's stated tolerance covers a card's labels and completion value too.
+it.each([
+  ["a bolded label", "card: safety\n**Completion:** completed\nChecked:\n- Looked.\n"],
+  ["a bolded value", "card: safety\ncompletion: **completed**\nChecked:\n- Looked.\n"],
+  ["a trailing period", "card: safety\nCompletion: completed.\nChecked:\n- Looked.\n"],
+  ["a bolded Checked heading", "card: safety\ncompletion: completed\n**Checked:**\n- Looked.\n"],
+])("parses a card with %s", (_, raw) => {
+  expect(parseCard(raw, "safety")).toMatchObject({ completion: "completed", checked: ["Looked."] });
+});
+it("reads a decorated multi-word section heading", () => {
+  expect(
+    parseCard("card: safety\ncompletion: completed\n**Not covered:**\n- Runtime.\n", "safety")
+      .notCovered,
+  ).toEqual(["Runtime."]);
+});
+it("reads `*` bullets under the voice's established and dismissed labels", () => {
+  expect(
+    parseVoice(
+      "outcome: APPROVED\nband: LOW\nband_reason: Bounded.\nsummary: Clear.\nestablished:\n* F1 \u00B7 a.ts:1 \u00B7 Guard missing.\ndismissed:\n* F2 \u00B7 Covered.\n",
+    ).dispositions,
+  ).toEqual([
+    { id: "F1", status: "established", reason: "a.ts:1 \u00B7 Guard missing." },
+    { id: "F2", status: "dismissed", reason: "Covered." },
+  ]);
+});
 it("preserves a real mandatory finding in card prose", () => {
   const raw =
     cardText() +

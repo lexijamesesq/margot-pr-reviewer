@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.15
+
+- Security fix: the GitHub token and ticketing secrets no longer appear on the `claude` command line, where any process on the host could read them; the MCP configuration is now passed as a 0600 file in the run's private temporary directory.
+- A card's labels and completion value tolerate markdown decoration as the voice's do (`**Completion:** completed`, `completion: **completed**`, `Completion: completed.`, a bolded `**Checked:**` heading), and the voice's established and dismissed lists accept `*` bullets as card sections do.
+- The Claude settings no longer name one plugin to disable; an empty setting-sources list already keeps installed plugins out of the run.
+
 ## 0.6.14
 
 - A fallback (or unreachable-Jev) routing or risk answer now holds a documentation change as it does any other class, with `decision_source: fallback`; this restores the previous reviewer's fail-closed rule, which 0.6.13 had relaxed for documentation.

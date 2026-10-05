@@ -4,6 +4,22 @@ import type { Card } from "../types.js";
 // Every shape below follows the same rule: labels at line start, first match wins, tolerated
 // markdown decoration, and no refusal beyond what that rule requires.
 
+/** `**Label:** value` / `_label_: value` → `Label: value`; labels may hold spaces. */
+function undecorateKey(line: string): string {
+  return line.replace(/^(\s*)[*_`]+([A-Za-z][A-Za-z_ ]*?)[*_`]*:[*_`]*/, "$1$2:");
+}
+
+/** A value without emphasis or trailing punctuation, upper-cased when it is in the vocabulary. */
+function voiceToken(value: string | undefined, vocabulary: readonly string[]): string {
+  const raw = value?.trim() ?? "";
+  const stripped = raw
+    .replace(/^[*_`]+|[*_`]+$/g, "")
+    .replace(/[.!]+$/, "")
+    .replace(/^[*_`]+|[*_`]+$/g, "")
+    .trim();
+  return vocabulary.includes(stripped.toUpperCase()) ? stripped.toUpperCase() : raw;
+}
+
 /** The first `name: value` line, or undefined; a later mention in free text never matters. */
 function firstField(prose: string, name: string): string | undefined {
   return prose.match(new RegExp(`^\\s*${name}:\\s*(.*?)\\s*$`, "mi"))?.[1];
@@ -60,10 +76,11 @@ function subFields(lines: string[], index: number): Map<string, string[]> {
 
 /** One card's prose. Findings carry no ids yet: the council assigns a global F1…Fn once
  * every card has parsed (`assignFindingIds` in policy). */
-export function parseCard(raw: string, name: Card["name"]): Card {
+export function parseCard(prose: string, name: Card["name"]): Card {
+  const raw = prose.split(/\r?\n/).map(undecorateKey).join("\n");
   const completionLine = firstField(raw, "completion");
   const [token = "", ...reason] = (completionLine ?? "").split(":");
-  const completion = token.trim().toLowerCase();
+  const completion = voiceToken(token, ["COMPLETED", "INCOMPLETE", "SKIPPED"]).toLowerCase();
   if (completion !== "completed" && completion !== "incomplete" && completion !== "skipped")
     throw new Error("Card did not complete");
   const completionReason = reason.join(":").trim();
@@ -124,20 +141,6 @@ const voiceOutcomes = [
 ] as const;
 const voiceBands = ["LOW", "MEDIUM", "HIGH"] as const;
 
-function undecorateKey(line: string): string {
-  return line.replace(/^(\s*)[*_`]+([A-Za-z][A-Za-z_]*?)[*_`]*:[*_`]*/, "$1$2:");
-}
-
-function voiceToken(value: string | undefined, vocabulary: readonly string[]): string {
-  const raw = value?.trim() ?? "";
-  const stripped = raw
-    .replace(/^[*_`]+|[*_`]+$/g, "")
-    .replace(/[.!]+$/, "")
-    .replace(/^[*_`]+|[*_`]+$/g, "")
-    .trim();
-  return vocabulary.includes(stripped.toUpperCase()) ? stripped.toUpperCase() : raw;
-}
-
 function voiceDisposition(line: string, status: "established" | "dismissed") {
   const match = line.match(
     /^((?:\*\*[\w-]+\*\*|__[\w-]+__|\*[\w-]+\*|_[\w-]+_|`[\w-]+`|[\w-]+))(?=\s*(?:·|—|:|$))/,
@@ -192,8 +195,8 @@ export function parseVoice(raw: string) {
       status = null;
       continue;
     }
-    if (status && trimmed.startsWith("-")) {
-      const disposition = voiceDisposition(trimmed.replace(/^-\s+/, ""), status);
+    if (status && /^[-*]\s/.test(trimmed)) {
+      const disposition = voiceDisposition(trimmed.replace(/^[-*]\s+/, ""), status);
       if (disposition) dispositions.push(disposition);
     } else if (status && trimmed) {
       status = null;
