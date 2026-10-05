@@ -108,10 +108,7 @@ function cardRows(review: Review): { rows: string[]; findings: number } {
   const rendered = new Set<string>();
   const rows = cardNames.map((name) => {
     const card = cards.get(name);
-    if (!card) {
-      const reason = review.presentation?.skipReasons?.[name] ?? "not selected";
-      return `* ❓ \`${name}\` — skipped: ${firstClause(reason)}`;
-    }
+    if (!card) return `* ❓ \`${name}\` — skipped: not selected`;
     const findings = visible.get(name) ?? [];
     const first = findings[0];
     // A card that did not complete shows its completion, never "clear".

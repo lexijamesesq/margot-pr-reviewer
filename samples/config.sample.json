@@ -12,6 +12,7 @@
     "requiredChecks": [
       "YOUR_REQUIRED_CHECK"
     ],
+    "allowedSkippedChecks": [],
     "cardBundle": {
       "commit": "0000000000000000000000000000000000000000"
     },
@@ -30,7 +31,19 @@
     ]
   },
   "github": {
-    "freshShadow": false
+    "gh": "YOUR_GH_EXECUTABLE",
+    "freshShadow": false,
+    "shadowBeforeHead": false
+  },
+  "publisher": {
+    "checks": {
+      "triage": "review / triage",
+      "review": "review / margot",
+      "authority": "review / self-instrument"
+    },
+    "actor": "YOUR_REVIEW_APP[bot]",
+    "appId": 1,
+    "runUrl": "https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/1"
   },
   "jev": {
     "model": "YOUR_JEV_VERSION",
@@ -47,6 +60,12 @@
     },
     "version": "0.0.0",
     "pluginDirectory": "${MARGOT_ROOT}/publish-skills",
-    "reviewerModel": "YOUR_REVIEWER_MODEL"
+    "reviewerModel": "YOUR_REVIEWER_MODEL",
+    "references": {
+      "YOUR_REFERENCE_NAME": {
+        "repository": "YOUR_ORG/YOUR_REFERENCE_REPOSITORY",
+        "head": "0000000000000000000000000000000000000000"
+      }
+    }
   }
 }

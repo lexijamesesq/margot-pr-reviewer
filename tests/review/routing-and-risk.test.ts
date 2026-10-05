@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  asDocumentation,
   type Change,
   confidentLow,
   councilClearCalls,
@@ -183,6 +184,15 @@ describe("a risk answer from the fallback", () => {
     const draft = recorded("council-clear");
     draft.route.source = "fallback";
     const { result } = await reviewed(draft);
+    expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
+  });
+  it("holds an editorial documentation change whose routing answer came from the fallback", async () => {
+    const draft = recorded("council-clear", asDocumentation(0));
+    draft.route.source = "fallback";
+    const { result } = await reviewed(draft);
+    expect(result.classification).toBe("documentation");
+    expect(result.provenance.decision_source).toBe("fallback");
+    expect(result.decision.mergeEligible).toBe(false);
     expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
   });
 });

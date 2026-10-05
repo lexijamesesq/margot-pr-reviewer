@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.14
+
+- A fallback (or unreachable-Jev) routing or risk answer now holds a documentation change as it does any other class, with `decision_source: fallback`; this restores the previous reviewer's fail-closed rule, which 0.6.13 had relaxed for documentation.
+- The ledger size budget drops this round's fixed entries, which nothing reads later, before any dismissal; the 0.6.13 note above said dismissals outlast only the receipt, but fixed entries were dropped after them.
+- `samples/config.sample.json` carries a placeholder `publisher` block and every optional key, so the samples' first `--authority true` run no longer fails with "Authority requires publisher configuration"; the README describes GitHub mode.
+- `margot-instance close-stranded-check` takes `--check-name` (default `review / margot`) for the review check to close; the legacy bare `margot` name is no longer tried.
+- A card Margot did not run always renders as "skipped: not selected"; the unused per-card skip reason is gone.
+
 ## 0.6.13
 
 - A large review no longer loses its dismissals to the size budget: the ledger drops its replay receipt before any dismissal, so the next round does not re-raise a dismissed finding as new.

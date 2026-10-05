@@ -407,9 +407,8 @@ export async function review(
               !selectCards(routeAnswer, classification, config).includes(name),
           ),
           decision_source:
-            classification !== "documentation" &&
-            ((routeAnswer && routeAnswer.source !== "jev") ||
-              (riskAnswer && riskAnswer.source !== "jev"))
+            (routeAnswer && routeAnswer.source !== "jev") ||
+            (riskAnswer && riskAnswer.source !== "jev")
               ? "fallback"
               : "jev",
           services: services.provenance,
