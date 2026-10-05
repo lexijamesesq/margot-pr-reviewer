@@ -370,7 +370,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
               checkName(r),
               "action_required",
               "Margot: not reviewed (error)",
-              "Publication or evaluation failed; no clearance.",
+              "Publication or evaluation failed; no clearance. The review run's log has the diagnostic.",
               // Overwrite any verdict text already written for this head: with no
               // `outcome:` line a reader sees "held without a verdict", never "approved".
               "no verdict: publication or evaluation failed after the check was opened",
@@ -405,7 +405,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
               ...params(r, context()),
               commit_id: r.head,
               event: "COMMENT",
-              body: `Not reviewed: ${notReviewed}. The review check has the details. Held for the operator.`,
+              body: `Not reviewed: ${notReviewed}. The review run has the details. Held for the operator.`,
             });
           } catch (commentError) {
             failures.push(`not-reviewed comment unconfirmed: ${errorMessage(commentError)}`);

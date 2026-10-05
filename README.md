@@ -90,8 +90,8 @@ A review run takes two JSON files: a request and a configuration.
 margot-review REQUEST.json CONFIG.json OUTPUT.json
 ```
 
-It writes the result to `OUTPUT.json`. It exits 1 when the result is an error and 0
-otherwise, including for held results.
+It writes the result to `OUTPUT.json`. It exits 1 when the result is an error, printing the
+failed stage and diagnostic to stderr, and 0 otherwise, including for held results.
 
 ## Running it in GitHub Actions
 

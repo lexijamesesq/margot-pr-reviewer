@@ -2,6 +2,7 @@
 
 ## 0.6.12
 
+- When a review ends in an error, `margot-review` prints the failed stage and diagnostic to stderr, so the reason survives in the run log after the output file is removed. The check summary and the not-reviewed comment point to the review run for it.
 - A MAJOR finding that a card re-raises with `late=delta-reach: <reason>` no longer drops to a late advisory when its earlier ledger entry was an advisory; it blocks at its honest severity, as the prompt promises.
 - A held review names one reason, in the same words, in the review comment and in the check title. A protected-path hold says "it touches a protected path"; holds from a fallback-scored risk, uncomputed ownership, calibration, an error and a pending author each get a plain sentence in the comment too.
 - The shipped recordings, including `recordings/prose`, are synthetic and describe `example/project`; their commit hashes are placeholders.
