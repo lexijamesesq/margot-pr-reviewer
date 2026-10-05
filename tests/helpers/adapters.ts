@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,12 +5,10 @@ import { Octokit } from "octokit";
 import { claudeAdapter } from "../../src/adapters/claude.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { cliServices } from "../../src/cli-services.js";
-import type { Recording } from "../../src/index.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
+import { readRecording } from "./recordings.js";
 
-export const recording = JSON.parse(
-  readFileSync(new URL("../../recordings/mechanical-bump.json", import.meta.url), "utf8"),
-) as Recording;
+export const recording = readRecording("mechanical-bump");
 export const request = requestSchema.parse(recording.request);
 export const facts = factsSchema.parse(recording.facts);
 export const context = () => ({ signal: AbortSignal.timeout(3000) });

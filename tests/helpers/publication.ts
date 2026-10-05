@@ -1,11 +1,11 @@
-import { readFileSync } from "node:fs";
 import { Octokit } from "octokit";
 import { githubPublisher } from "../../src/adapters/publish.js";
-import { type Recording, recordedServices } from "../../src/adapters/recorded.js";
+import { recordedServices } from "../../src/adapters/recorded.js";
 import { render } from "../../src/render.js";
 import { review } from "../../src/review.js";
 import { requestSchema } from "../../src/schemas.js";
 import type { Review, ReviewResult } from "../../src/types.js";
+import { readRecording } from "./recordings.js";
 
 // Shared fakes for the publication tests. `runPublication(mode)` runs the GitHub publisher against an
 // in-memory GitHub whose `mode` names the one thing that is different about this run:
@@ -49,9 +49,7 @@ export type PublicationMode =
   | "order"
   | "error";
 
-export const mechanicalBump = JSON.parse(
-  readFileSync("recordings/mechanical-bump.json", "utf8"),
-) as Recording;
+export const mechanicalBump = readRecording("mechanical-bump");
 export const mechanicalRequest = requestSchema.parse(mechanicalBump.request);
 const clean = await review(
   mechanicalRequest,
@@ -60,9 +58,7 @@ const clean = await review(
 );
 if (clean.kind !== "reviewed") throw new Error("Invalid test source");
 export const mechanicalReview: Review = clean;
-export const authorChangesRecording = JSON.parse(
-  readFileSync("recordings/author-changes.json", "utf8"),
-) as Recording;
+export const authorChangesRecording = readRecording("author-changes");
 const authorChangesResult = await review(
   authorChangesRecording.request,
   authorChangesRecording.config,

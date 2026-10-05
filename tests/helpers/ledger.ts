@@ -1,13 +1,11 @@
-import { readFileSync } from "node:fs";
-import { type Recording, recordedServices } from "../../src/adapters/recorded.js";
+import { recordedServices } from "../../src/adapters/recorded.js";
 import { ledgerBlock } from "../../src/ledger.js";
 import { review } from "../../src/review.js";
-import { configSchema, factsSchema, requestSchema } from "../../src/schemas.js";
+import { cardNames, configSchema, factsSchema, requestSchema } from "../../src/schemas.js";
 import type { Card, Ledger, ReviewCore, RoundScope, Voice } from "../../src/types.js";
+import { readRecording } from "./recordings.js";
 
-export const source = JSON.parse(
-  readFileSync(new URL("../../recordings/council-clear.json", import.meta.url), "utf8"),
-) as Recording;
+export const source = readRecording("council-clear");
 export const facts = factsSchema.parse(source.facts);
 export const config = configSchema.parse({
   ...(source.config as object),
@@ -129,16 +127,7 @@ export async function margot(classification = "mechanical", editorial = false) {
   };
   r.route = {
     source: "jev",
-    cards: Object.fromEntries(
-      [
-        "safety",
-        "works-and-proven",
-        "principal-engineer",
-        "achieves-the-objective",
-        "maintainable-no-slop",
-        "house-style",
-      ].map((n) => [n, 0]),
-    ),
+    cards: Object.fromEntries(cardNames.map((n) => [n, 0])),
     confidence: 1,
     documentationSubstantive: editorial ? 0 : null,
   };

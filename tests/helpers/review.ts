@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
 import { type Recording, recordedServices } from "../../src/adapters/recorded.js";
 import { review } from "../../src/review.js";
-import { cardNames } from "../../src/schemas.js";
+import { cardNames, dimensions } from "../../src/schemas.js";
 import type { ReviewResult } from "../../src/types.js";
+import { readRecording } from "./recordings.js";
 
 /*
  * Builders for review tests. A test starts from a recording in `recordings/` and applies
@@ -41,9 +41,7 @@ export const missingHead = "b".repeat(40);
 export const currentHead = "0000000000000000000000000000000000000002";
 
 export function loadRecording(name: RecordingName): Draft {
-  return JSON.parse(
-    readFileSync(new URL(`../../recordings/${name}.json`, import.meta.url), "utf8"),
-  ) as Draft;
+  return readRecording(name) as unknown as Draft;
 }
 
 /** Loads a recording and applies each change in order. */
@@ -161,13 +159,7 @@ export const withNoCouncil = (): Change => withRoutedCards({});
 export const withRouteConfidence = (confidence: number): Change => withRoute({ confidence });
 
 export type Dimension = { probabilities: number[]; confidence: number };
-export const riskDimensions = [
-  "blast_radius",
-  "reversibility",
-  "data_security",
-  "operations",
-  "verification_gap",
-] as const;
+export const riskDimensions = dimensions;
 /** A risk answer that gives every dimension the same distribution. */
 export const uniformRisk = (dimension: Dimension): Obj => ({
   source: "jev",
