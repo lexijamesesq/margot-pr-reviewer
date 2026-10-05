@@ -1,6 +1,7 @@
 import type { Octokit } from "octokit";
 import type { z } from "zod";
 import { errorMessage } from "../errors.js";
+import { holdReason } from "../policy.js";
 import { checkText } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
 import { type Stage, stages } from "../stages.js";
@@ -37,13 +38,18 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
   let active: ReviewRequest | undefined;
   // Set once the native review is on the pull request, so a later failure never says "not reviewed".
   let reviewPosted = false;
+  // The refusal the guard last raised, so a review that failed on it is refused, not errored.
+  let refused: PublicationRefusal | undefined;
+  const refuse = (reason: RefusalReason) => (refused = new PublicationRefusal(reason));
+  const checkName = (r?: Pick<ReviewRequest, "phase">) =>
+    r?.phase === "triage" ? config.checks.triage : config.checks.review;
   const params = (r: ReviewRequest, c: CallContext) => {
     requestSchema.parse(r);
     const [owner = "", repo = ""] = r.repository.split("/");
     return { owner, repo, pull_number: r.pr, request: { signal: c.signal } };
   };
   async function assertCurrentRun(r: ReviewRequest, c: CallContext) {
-    const primary = active?.phase === "triage" ? config.checks.triage : config.checks.review;
+    const primary = checkName(active);
     const id = ids.get(primary);
     if (id) {
       const owned = (await client.rest.checks.get({ ...params(r, c), check_run_id: id })).data;
@@ -59,11 +65,10 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     const { data } = await client.rest.pulls.get(params(r, c));
     await assertCurrentRun(r, c);
     const merged = allowMerged && data.merged;
-    if (!merged && data.state !== "open") throw new PublicationRefusal("closed");
-    if (data.draft) throw new PublicationRefusal("draft");
-    if (data.head.repo?.full_name !== r.repository) throw new PublicationRefusal("fork");
-    if (data.head.sha !== r.head || (!merged && data.base.sha !== r.base))
-      throw new PublicationRefusal("stale");
+    if (!merged && data.state !== "open") throw refuse("closed");
+    if (data.draft) throw refuse("draft");
+    if (data.head.repo?.full_name !== r.repository) throw refuse("fork");
+    if (data.head.sha !== r.head || (!merged && data.base.sha !== r.base)) throw refuse("stale");
     return data;
   }
   async function writeCheck(
@@ -191,16 +196,6 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       c,
     );
   };
-  const heldReason = (decision: { holdReasons: string[]; rating: { band: string } }) =>
-    decision.holdReasons.includes("review-authority")
-      ? "a change to Margot's own machinery"
-      : decision.holdReasons.includes("fallback")
-        ? "the risk was scored by the fallback (reduced confidence)"
-        : decision.holdReasons.includes("ownership-uncomputed")
-          ? "ownership could not be established"
-          : decision.holdReasons.includes("calibration")
-            ? "calibration mode"
-            : `risk is ${decision.rating.band}`;
   const publish: Services["publish"] = async ({ expectedHead, review, report }, c) => {
     const r = review.request;
     if (!active || JSON.stringify(active) !== JSON.stringify(r) || expectedHead !== r.head)
@@ -261,7 +256,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       decision.mergeEligible
         ? "Margot: approved"
         : decision.outcome === "APPROVED"
-          ? `held for the operator: ${heldReason(decision)}`
+          ? `held for the operator: ${holdReason(decision).sentence}`
           : decision.outcome === "ERROR"
             ? "not reviewed (error)"
             : `Margot: ${decision.outcome}`,
@@ -284,7 +279,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     try {
       await check(
         r,
-        r.phase === "triage" ? config.checks.triage : config.checks.review,
+        checkName(r),
         null,
         r.phase === "review"
           ? "Margot: preflight complete — setting up the review runner"
@@ -295,10 +290,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       );
       const result = await evaluate();
       if (result.kind === "error") {
-        const refusal = result.diagnostic.match(
-          /Margot: not reviewed: (draft|fork|closed|stale)/,
-        )?.[1] as RefusalReason | undefined;
-        if (refusal) throw new PublicationRefusal(refusal);
+        if (refused) throw refused;
         notReviewed = notReviewedReason(result.stage);
         throw new Error(`${result.stage}: ${result.diagnostic}`);
       }
@@ -308,7 +300,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           throw new Error("Auto-merge disable was not confirmed");
         await check(
           r,
-          r.phase === "triage" ? config.checks.triage : config.checks.review,
+          checkName(r),
           "action_required",
           `held for the operator: ${result.reason}`.slice(0, 255),
           capCheckText(result.recovery ? `${result.reason}\n\n${result.recovery}` : result.reason),
@@ -342,7 +334,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         try {
           await writeCheck(
             r,
-            r.phase === "triage" ? config.checks.triage : config.checks.review,
+            checkName(r),
             "neutral",
             error.message,
             "Clearance has not been established.",
@@ -374,7 +366,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           () =>
             check(
               r,
-              r.phase === "triage" ? config.checks.triage : config.checks.review,
+              checkName(r),
               "action_required",
               "Margot: not reviewed (error)",
               "Publication or evaluation failed; no clearance.",

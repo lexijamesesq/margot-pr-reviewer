@@ -20,16 +20,10 @@ import type {
 
 export function classify(
   answer: z.infer<typeof classificationSchema>,
-  facts: Facts,
   config: ReviewConfig,
 ): Classification {
   if (answer.source !== "jev") return "functional";
-  const fresh =
-    classNames.find((name) => answer[name] >= config.classificationThreshold) ?? "functional";
-  const earlier = facts.triage?.classification ?? fresh;
-  return (
-    classNames[Math.min(classNames.indexOf(fresh), classNames.indexOf(earlier))] ?? "functional"
-  );
+  return classNames.find((name) => answer[name] >= config.classificationThreshold) ?? "functional";
 }
 export function reviewPath(
   classification: Classification,
@@ -233,4 +227,27 @@ export function decide(
     authorityPaths,
     ownedPathTier: typeof facts.ownedPathTier === "string" ? facts.ownedPathTier : "unknown",
   };
+}
+
+/** Every hold reason, most telling first; a missing "risk" sentence is filled with the band. */
+const holdSentences: [string, string][] = [
+  ["review-authority", "it touches a protected path"],
+  ["fallback", "the risk was scored by the fallback (reduced confidence)"],
+  ["ownership-uncomputed", "ownership could not be established"],
+  ["calibration", "calibration mode is on"],
+  ["risk", ""],
+  ["error", "the review hit an error"],
+  ["author-action", "the author has to act first"],
+];
+
+/** The one reason a held review is held, for the comment and the check title alike. */
+export function holdReason(decision: { holdReasons: string[]; rating: { band: string } }): {
+  reason: string;
+  sentence: string;
+} {
+  const [reason, sentence] = holdSentences.find(([r]) => decision.holdReasons.includes(r)) ?? [
+    "risk",
+    "",
+  ];
+  return { reason, sentence: sentence || `risk is ${decision.rating.band}` };
 }

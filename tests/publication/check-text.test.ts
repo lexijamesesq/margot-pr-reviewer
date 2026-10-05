@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { capCheckText } from "../../src/adapters/publish.js";
-import { renderCheckText } from "../../src/render.js";
+import { checkText } from "../../src/render.js";
 import { authorChangesReview } from "../helpers/publication.js";
 
 it("preserves convergence as machine-readable JSON in the check text", () => {
   const value = structuredClone(authorChangesReview);
   value.convergence.round = 3;
   expect(
-    renderCheckText(value)
+    checkText(value)
       .split("\n")
       .find((line) => line.startsWith("convergence: ")),
   ).toBe(`convergence: ${JSON.stringify(value.convergence)}`);
@@ -15,10 +15,10 @@ it("preserves convergence as machine-readable JSON in the check text", () => {
 it("names cards summoned by the prior ledger in the check text", () => {
   const value = structuredClone(authorChangesReview);
   value.provenance.summonedByLedger = ["safety", "principal-engineer"];
-  expect(renderCheckText(value)).toContain("summoned by ledger: safety, principal-engineer");
+  expect(checkText(value)).toContain("summoned by ledger: safety, principal-engineer");
 });
 it("keeps machine fields first and full finding detail in the review check text", () => {
-  const text = renderCheckText(authorChangesReview);
+  const text = checkText(authorChangesReview);
   expect(text.split("\n").slice(0, 3)).toEqual([
     "outcome: CHANGES_REQUESTED | band: MEDIUM",
     "decision_source: jev",

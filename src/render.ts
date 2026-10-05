@@ -1,4 +1,5 @@
 import { ledgerBlock } from "./ledger.js";
+import { holdReason } from "./policy.js";
 import { cardNames } from "./schemas.js";
 import type { Card, Review, ReviewPresentation } from "./types.js";
 
@@ -52,15 +53,17 @@ function fallbackRationale(review: Review): string {
   return "The selected review path completed without unresolved findings.";
 }
 
-function authorityReason(review: Review): string | null {
+function authorityLine(review: Review): string | null {
   if (review.decision.outcome !== "APPROVED" || review.decision.mergeEligible) return null;
-  if (review.decision.holdReasons.includes("risk")) return `risk is ${review.decision.rating.band}`;
-  if (review.decision.holdReasons.includes("review-authority"))
-    return review.presentation?.mergeActor
-      ? `it changes Margot's own machinery; approve it and ${review.presentation.mergeActor} merges it`
-      : "it changes Margot's own machinery; approve it to merge it";
-  if (review.decision.holdReasons.includes("calibration")) return "calibration requires review";
-  return "the review is held";
+  const { reason, sentence } = holdReason(review.decision);
+  const { mergeActor } = review.presentation ?? {};
+  const next =
+    reason !== "review-authority"
+      ? "Yours to merge."
+      : mergeActor
+        ? `Approve it and ${mergeActor} merges it.`
+        : "Approve it to merge it.";
+  return `Above my authority: ${sentence}. ${next}`;
 }
 
 function duration(value: number): string {
@@ -151,7 +154,7 @@ export function render(review: Review): string {
   const tally = findingTally(review);
   const presentation = defaultPresentation(review);
   const cards = cardRows(review);
-  const authority = authorityReason(review);
+  const authority = authorityLine(review);
   const cost = presentation.costUsd === null ? "$—" : `$${presentation.costUsd.toFixed(2)}`;
   const run = presentation.runUrl
     ? `[${presentation.runUrl.replace(/\/$/, "").split("/").at(-1)}](${presentation.runUrl})`
@@ -176,7 +179,7 @@ export function render(review: Review): string {
           "> ⚠️ _The risk model was unavailable — this risk was scored by a fallback at reduced confidence, so nothing was auto-merged._",
         ]
       : []),
-    ...(authority ? ["", `Above my authority: ${authority}. Yours to merge.`] : []),
+    ...(authority ? ["", authority] : []),
     ...(decision.outcome === "CLARIFICATION_REQUESTED" && clarification
       ? [
           "",
@@ -266,6 +269,3 @@ export function checkText(review: Review): string {
   if (details.length) lines.push("finding details:", ...details);
   return lines.join("\n");
 }
-
-/** Backward-compatible name introduced with the visible comment contract. */
-export const renderCheckText = checkText;

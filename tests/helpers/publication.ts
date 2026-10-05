@@ -84,7 +84,11 @@ export const publisherOptions = {
   appId: 42,
   runUrl: "https://github.com/example/instance/actions/runs/1",
 };
-export async function runPublication(mode: PublicationMode = "clear", errorStage = "voice") {
+export async function runPublication(
+  mode: PublicationMode = "clear",
+  errorStage = "voice",
+  holdReasons?: string[],
+) {
   const writes: {
     method: string;
     path: string;
@@ -331,7 +335,7 @@ export async function runPublication(mode: PublicationMode = "clear", errorStage
       mode === "disarm-fail"
     ) {
       value.decision.mergeEligible = false;
-      value.decision.holdReasons = [
+      value.decision.holdReasons = holdReasons ?? [
         mode.startsWith("authority")
           ? "review-authority"
           : mode === "calibration"
