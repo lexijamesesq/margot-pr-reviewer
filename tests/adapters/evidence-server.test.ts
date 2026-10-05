@@ -1,13 +1,12 @@
-import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { Octokit } from "octokit";
 import { describe, expect, it } from "vitest";
 import { createEvidenceServer } from "../../src/adapters/evidence-server.js";
 import { githubAdapter } from "../../src/adapters/github.js";
-import type { Recording } from "../../src/index.js";
 import { connectEvidence, github, request } from "../helpers/adapters.js";
 import { present } from "../helpers/present.js";
+import { readRecording } from "../helpers/recordings.js";
 
 describe("the evidence server's repository tools", () => {
   it("keeps a caller-supplied repository and SHA out of evidence routing", async () => {
@@ -104,9 +103,7 @@ describe("the evidence server's repository tools", () => {
 });
 
 describe("bound evidence", () => {
-  const source = JSON.parse(
-    readFileSync(new URL("../../recordings/council-clear.json", import.meta.url), "utf8"),
-  ) as Recording;
+  const source = readRecording("council-clear");
   const oldHead = "b".repeat(40);
 
   it("returns the complete bound diff through the paged read_diff tool", async () => {

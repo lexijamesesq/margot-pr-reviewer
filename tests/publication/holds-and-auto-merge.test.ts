@@ -137,7 +137,7 @@ it("names every failed cleanup operation and its cause in the diagnostic", async
       "Invalid native review receipt; disable auto-merge cleanup unconfirmed: Disarm denied; write error check cleanup unconfirmed: Check denied",
   });
 });
-it("refuses to publish a held verdict when the auto-merge disable is unconfirmed", async () => {
+it("errors after the held comment when the auto-merge disable is unconfirmed", async () => {
   const run = await runPublication("disarm-fail");
   expect({
     kind: run.result.kind,

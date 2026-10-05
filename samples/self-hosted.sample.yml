@@ -2,6 +2,16 @@
 # deployment JSON as a GitHub variable for the hosted closer. Provision the pinned
 # Claude CLI, ticketing server, and the card bundle (publish-skills,
 # https://github.com/lexijamesesq/publish-skills) at the configured runtime paths.
+#
+# Tokens: github.token reaches only the repository this workflow runs in, so every
+# GitHub call uses a token minted from the review GitHub App, scoped to the target
+# repository and to the permissions the step needs. YOUR_MARGOT_APP_CLIENT_ID is a
+# variable and EXAMPLE_MARGOT_APP_KEY a secret. Minted tokens last an hour, so each job
+# mints its own. GH_TOKEN is the read token, MARGOT_WRITE_TOKEN the publication token
+# (it must come from the App, whose bot is publisher.actor), and the closer's GH_TOKEN
+# is a checks-write token. The jobs' own permissions stay at contents: read. The read
+# token also covers YOUR_REFERENCE_REPOSITORY, which must belong to the same owner as
+# the target, since one installation token is scoped to one owner.
 name: Margot review
 on:
   workflow_dispatch:
@@ -35,8 +45,6 @@ on:
         default: ""
 permissions:
   contents: read
-  pull-requests: read
-  checks: read
 jobs:
   route:
     runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
@@ -80,8 +88,6 @@ jobs:
     runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
     permissions:
       contents: read
-      pull-requests: write
-      checks: write
     outputs:
       published: ${{ steps.review.outputs.published }}
       stop_reason: ${{ steps.bind.outputs.stop_reason }}
@@ -104,10 +110,30 @@ jobs:
           echo "$sha256  $archive" | sha256sum --check
           npm install --prefix "$MARGOT_ROOT" --ignore-scripts --save-exact "$archive"
           echo "MARGOT_ROOT=$MARGOT_ROOT" >> "$GITHUB_ENV"
+      - name: Name the target repository
+        id: target
+        env:
+          TARGET_REPO: ${{ inputs.repo }}
+        run: |
+          echo "owner=${TARGET_REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "name=${TARGET_REPO#*/}" >> "$GITHUB_OUTPUT"
+      - name: Mint the read token (target repository)
+        id: read
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.YOUR_MARGOT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.EXAMPLE_MARGOT_APP_KEY }}
+          owner: ${{ steps.target.outputs.owner }}
+          repositories: |
+            ${{ steps.target.outputs.name }}
+            YOUR_REFERENCE_REPOSITORY
+          permission-contents: read
+          permission-pull-requests: read
+          permission-checks: read
       - name: Bind trusted configuration to the requested PR
         id: bind
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read.outputs.token }}
           TARGET_REPO: ${{ inputs.repo }}
           PR_NUMBER: ${{ inputs.pr }}
           HEAD_SHA: ${{ inputs.sha }}
@@ -120,11 +146,24 @@ jobs:
             --required-checks '["YOUR_REQUIRED_CHECK"]' \
             --protected-paths '["YOUR_AUTHORITY_PATH/**"]' \
             --allowed-skipped-checks '[]' --run-url "$RUN_URL"
+      - name: Mint the publication token (target repository)
+        id: write
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.YOUR_MARGOT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.EXAMPLE_MARGOT_APP_KEY }}
+          owner: ${{ steps.target.outputs.owner }}
+          repositories: |
+            ${{ steps.target.outputs.name }}
+          # contents: write is for disablePullRequestAutoMerge, which a held verdict calls.
+          permission-contents: write
+          permission-pull-requests: write
+          permission-checks: write
       - name: Review the bound request
         id: review
         env:
-          GH_TOKEN: ${{ github.token }}
-          MARGOT_WRITE_TOKEN: ${{ secrets.EXAMPLE_MARGOT_WRITE_TOKEN }}
+          GH_TOKEN: ${{ steps.read.outputs.token }}
+          MARGOT_WRITE_TOKEN: ${{ steps.write.outputs.token }}
           MARGOT_OWNED_TIER: ${{ inputs.owned_tier }}
           MARGOT_CLASSIFICATION: ${{ inputs.classification }}
           MARGOT_TRIAGE: ${{ inputs.triage }}
@@ -144,8 +183,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      checks: write
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -164,9 +201,28 @@ jobs:
           echo "$sha256  $archive" | sha256sum --check
           npm install --prefix "$MARGOT_ROOT" --ignore-scripts --save-exact "$archive"
           echo "MARGOT_ROOT=$MARGOT_ROOT" >> "$GITHUB_ENV"
+      - name: Name the target repository
+        id: target
+        env:
+          TARGET_REPO: ${{ inputs.repo }}
+        run: |
+          echo "owner=${TARGET_REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "name=${TARGET_REPO#*/}" >> "$GITHUB_OUTPUT"
+      - name: Mint the check-write token (target repository)
+        id: closer
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.YOUR_MARGOT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.EXAMPLE_MARGOT_APP_KEY }}
+          owner: ${{ steps.target.outputs.owner }}
+          repositories: |
+            ${{ steps.target.outputs.name }}
+          permission-checks: write
+          permission-pull-requests: read
+          permission-contents: read
       - name: Close a review check left in progress
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.closer.outputs.token }}
           TARGET_REPO: ${{ inputs.repo }}
           PR_NUMBER: ${{ inputs.pr }}
           HEAD_SHA: ${{ inputs.sha }}

@@ -1,8 +1,7 @@
-import { readFileSync } from "node:fs";
 import { Octokit } from "octokit";
 import { describe, expect, it, vi } from "vitest";
 import { githubAdapter } from "../../src/adapters/github.js";
-import { type Recording, recordedServices } from "../../src/adapters/recorded.js";
+import { recordedServices } from "../../src/adapters/recorded.js";
 import { ledgerBlock, selectLedger } from "../../src/ledger.js";
 import { review } from "../../src/review.js";
 import { configSchema, factsSchema, requestSchema } from "../../src/schemas.js";
@@ -18,6 +17,7 @@ import {
   source,
 } from "../helpers/ledger.js";
 import { present } from "../helpers/present.js";
+import { readRecording } from "../helpers/recordings.js";
 
 it("ignores ledger history posted by an untrusted author", () => {
   expect(
@@ -173,9 +173,7 @@ describe("history warnings", () => {
   it.each(["corrupt", "revision"])(
     "holds for the operator when a newer %s ledger obscures valid history",
     async (defect) => {
-      const recording = JSON.parse(
-        readFileSync("recordings/mechanical-bump.json", "utf8"),
-      ) as Recording;
+      const recording = readRecording("mechanical-bump");
       const facts = factsSchema.parse(recording.facts);
       const config = configSchema.parse({
         ...(recording.config as object),

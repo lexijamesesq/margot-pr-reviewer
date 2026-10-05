@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.16
+
+- The decision fallback, which answers Jev's classification, routing and risk questions when Jev is unavailable, runs on `claude.reviewerModel`, the model the council uses, instead of a fixed `claude-haiku-4-5`. Its answers are judgment calls, and no model name stays hard-coded in the package.
+- The samples now work across repositories: each job mints its GitHub tokens from the review App with `actions/create-github-app-token`, scoped to the target repository (a read token for `GH_TOKEN`, a checks, contents and pull-requests write token for `MARGOT_WRITE_TOKEN`, a checks-write token for the closer), and the jobs' own `permissions` are `contents: read`. The README's environment table says which token each variable needs. The hosted sample installs the configured ticketing server in a placeholder step.
+- A review is rejected unless Claude reports exactly the requested tools and every MCP server connected; before, a missing tool or a server that failed to start was accepted and a card could finish without reading the diff.
+- The evidence and ticketing MCP servers run with `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` blanked, so a configured ticketing server cannot read the model credential.
+- A same-head re-run that reuses the saved review now carries the current request, so a re-run whose dispatch fields differ (such as `triage` or `classification`) no longer fails publication with a false "Not reviewed: The review could not be published".
+- A saved review that fell back, or whose voice ruled ERROR, is no longer reused on a same-head re-run; the head is reviewed afresh once the service answers.
+
+## 0.6.15
+
+- Security fix: the GitHub token and ticketing secrets no longer appear on the `claude` command line, where any process on the host could read them; the MCP configuration is now passed as a 0600 file in the run's private temporary directory.
+- A card's labels and completion value tolerate markdown decoration as the voice's do (`**Completion:** completed`, `completion: **completed**`, `Completion: completed.`, a bolded `**Checked:**` heading), and the voice's established and dismissed lists accept `*` bullets as card sections do.
+- The Claude settings no longer name one plugin to disable; an empty setting-sources list already keeps installed plugins out of the run.
+
 ## 0.6.14
 
 - A fallback (or unreachable-Jev) routing or risk answer now holds a documentation change as it does any other class, with `decision_source: fallback`; this restores the previous reviewer's fail-closed rule, which 0.6.13 had relaxed for documentation.

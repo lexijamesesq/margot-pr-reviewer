@@ -82,8 +82,8 @@ Without `--authority true` the review runs in shadow mode and publishes nothing.
 | Variable | Meaning |
 | --- | --- |
 | `JEV_KEY` | API key for Jev. Required by `margot-review`. |
-| `GH_TOKEN` | GitHub token. Read access for `margot-review` and `bind-request`; `checks: write` for `close-stranded-check`. |
-| `MARGOT_WRITE_TOKEN` | Token with checks and pull-request write access. Required for GitHub publication. |
+| `GH_TOKEN` | GitHub token that reaches the target repository (the workflow's own `github.token` does not, when it runs in a review repository). Read access for `margot-review` and `bind-request`. For `close-stranded-check` it is the review App's `checks: write` token. |
+| `MARGOT_WRITE_TOKEN` | The review App's installation token, minted for the target repository with checks, contents and pull-request write access, so publication is made as the App. Required for GitHub publication. |
 | `MARGOT_OWNED_TIER` | Protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing or invalid holds the review. |
 | `MARGOT_CLASSIFICATION` | The request's dispatched classification (`functional`, `documentation`, or `mechanical`). It can only make the review stricter than the verified triage's class. |
 | `MARGOT_TRIAGE` | Used only when no classification is set: `mechanical` leaves the verified triage's class in place, and any other non-empty value makes the review functional. |
@@ -187,8 +187,8 @@ finding, if any — followed by a round summary (new, open, and closed findings)
 and the PR's author, ticket, commit, and run links.
 
 In GitHub mode it is accompanied by a check run named `review / margot`. Its text
-has machine-readable `outcome: <OUTCOME> | band: <BAND>` and `decision_source:
-<source>` lines.
+has two machine-readable lines: `outcome: <OUTCOME> | band: <BAND>` and
+`decision_source: <source>`.
 
 A PR is held for the operator — not cleared for merge, even on an outcome of
 APPROVED — when any of the following holds: risk is above LOW; routing or the

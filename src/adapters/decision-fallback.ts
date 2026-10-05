@@ -3,12 +3,12 @@ import type { CallContext } from "../types.js";
 import { assertClaudeVersion, claudeEnvironment } from "./claude.js";
 import { execute } from "./process.js";
 
-/** The tool-free fallback decider uses exactly the questions and state Jev saw. */
+/** The tool-free fallback decider uses exactly the questions and state Jev saw, on the reviewer model. */
 export async function decisionFallback(
   questions: object,
   state: unknown,
   context: CallContext,
-  claude: { executable: string; version: string },
+  claude: { executable: string; version: string; reviewerModel: string },
 ): Promise<Record<string, unknown>> {
   const properties = Object.fromEntries(
     Object.entries(questions).map(([name, question]) => {
@@ -45,7 +45,7 @@ export async function decisionFallback(
       "--output-format",
       "json",
       "--model",
-      "claude-haiku-4-5",
+      claude.reviewerModel,
       "--no-session-persistence",
       "--setting-sources",
       "",

@@ -31,7 +31,7 @@ export function jevAdapter(options: {
   fetch?: typeof fetch;
   retries?: number;
   minTimeout?: number;
-  fallbackClaude: { executable: string; version: string };
+  fallbackClaude: { executable: string; version: string; reviewerModel: string };
   fallback?: typeof decisionFallback;
 }) {
   const transport = options.fetch ?? fetch;

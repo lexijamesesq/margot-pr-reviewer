@@ -64,6 +64,7 @@ export function claudeAdapter(options: ClaudeOptions) {
       base: input.facts.base,
       phase: "review",
     };
+    const mcpPath = join(cwd, "mcp.json");
     const card = "name" in input ? input : null;
     const ticketing = options.ticketing;
     const ticketingEnvironment = ticketing
@@ -85,6 +86,8 @@ export function claudeAdapter(options: ClaudeOptions) {
         ? { cardPath: card.cardPath, commonPath: join(dirname(dirname(card.cardPath)), "SKILL.md") }
         : {}),
     };
+    // Claude Code passes the model credential through to MCP servers; neither needs it.
+    const modelCredentialsBlanked = { ANTHROPIC_API_KEY: "", CLAUDE_CODE_OAUTH_TOKEN: "" };
     const mcp = {
       mcpServers: {
         evidence: {
@@ -93,6 +96,7 @@ export function claudeAdapter(options: ClaudeOptions) {
           env: {
             MARGOT_EVIDENCE: JSON.stringify(evidence),
             ...(options.githubToken ? { GH_TOKEN: options.githubToken } : {}),
+            ...modelCredentialsBlanked,
           },
         },
         ...(ticketingReady && ticketing
@@ -100,7 +104,7 @@ export function claudeAdapter(options: ClaudeOptions) {
               [ticketing.server]: {
                 command: ticketing.command,
                 args: ticketing.args,
-                env: ticketingEnvironment,
+                env: { ...ticketingEnvironment, ...modelCredentialsBlanked },
               },
             }
           : {}),
@@ -176,6 +180,9 @@ export function claudeAdapter(options: ClaudeOptions) {
     ].join("\n");
     try {
       await writeFile(evidence.diffPath, input.round.diff, { mode: 0o600 });
+      // The config carries the GitHub token and ticketing secrets; argv is readable by every
+      // process on the host, so it goes to a private file and only its path is passed.
+      await writeFile(mcpPath, JSON.stringify(mcp), { mode: 0o600 });
       const stdout = await execute(
         options.executable,
         [
@@ -198,11 +205,10 @@ export function claudeAdapter(options: ClaudeOptions) {
             disableAllHooks: true,
             autoMemoryEnabled: false,
             claudeMdExcludes: ["**"],
-            enabledPlugins: { "publish@publish": false },
           }),
           "--strict-mcp-config",
           "--mcp-config",
-          JSON.stringify(mcp),
+          mcpPath,
           "--tools",
           "",
           "--allowedTools",
@@ -218,8 +224,14 @@ export function claudeAdapter(options: ClaudeOptions) {
         .map((line) => JSON.parse(line) as Record<string, unknown>);
       const init = events.find((e) => e.type === "system" && e.subtype === "init");
       const granted = z.array(z.string()).parse(init?.tools);
-      if (granted.some((name) => !tools.includes(name)))
-        throw new Error("Claude exposed an unexpected tool");
+      if (granted.length !== tools.length || tools.some((name) => !granted.includes(name)))
+        throw new Error("Claude did not expose exactly the requested tools");
+      const servers = z
+        .array(z.object({ name: z.string(), status: z.string() }))
+        .parse(init?.mcp_servers);
+      const down = servers.filter((server) => server.status !== "connected");
+      if (down.length)
+        throw new Error(`Claude MCP server did not connect: ${down.map((s) => s.name).join(", ")}`);
       const evidenceEvents = events.filter((e) => e.type === "assistant" || e.type === "user");
       const envelope = z
         .object({

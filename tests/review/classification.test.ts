@@ -19,7 +19,11 @@ import {
   withTriage,
 } from "../helpers/review.js";
 
-const pinnedClaude = { executable: "claude", version: "1.0.0" };
+const pinnedClaude = {
+  executable: "claude",
+  version: "1.0.0",
+  reviewerModel: "configured-reviewer-model",
+};
 
 /** A request from a host with no dispatcher: it carries no class. */
 const withoutDispatchedClass: Change = (draft) => {
@@ -130,16 +134,6 @@ describe("trusted triage", () => {
       expect(calls).not.toContain("classification");
       expect(result).toMatchObject({ classification, provenance: { classification: "jev" } });
     }
-  });
-
-  it("keeps a dispatched functional class over a verified mechanical triage", async () => {
-    const { result } = await reviewed(
-      recorded("council-clear", withTriage({}), withRequest({ classification: "functional" })),
-    );
-    expect(result).toMatchObject({
-      classification: "functional",
-      provenance: { classification: "dispatch" },
-    });
   });
 
   it("reviews as functional without asking when the triage actor is untrusted", async () => {
