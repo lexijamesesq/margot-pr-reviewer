@@ -187,8 +187,8 @@ finding, if any — followed by a round summary (new, open, and closed findings)
 and the PR's author, ticket, commit, and run links.
 
 In GitHub mode it is accompanied by a check run named `review / margot`. Its text
-has machine-readable `outcome: <OUTCOME> | band: <BAND>` and `decision_source:
-<source>` lines.
+has two machine-readable lines: `outcome: <OUTCOME> | band: <BAND>` and
+`decision_source: <source>`.
 
 A PR is held for the operator — not cleared for merge, even on an outcome of
 APPROVED — when any of the following holds: risk is above LOW; routing or the
