@@ -1,5 +1,5 @@
 {
-  "provenance": "Historical capture 5; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication.",
+  "provenance": "Synthetic fixture 5 about example/project; card, risk and voice outputs written for the tests; complete inputs and publication reconstructed",
   "request": {
     "repository": "example/project",
     "pr": 5,
@@ -20,7 +20,7 @@
       "ci"
     ],
     "cardBundle": {
-      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+      "commit": "dddddddddddddddddddddddddddddddddddddddd"
     },
     "classificationThreshold": 0.6,
     "routeThreshold": 0.35,
@@ -36,10 +36,10 @@
     "pr": 5,
     "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "0000000000000000000000000000000000000005",
-    "title": "ci: drop the aggregator job; the required checks name the jobs directly",
+    "title": "ci: remove the summary job; the required checks name the jobs directly",
     "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
     "author": "contributor",
-    "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex b355f6a..b01089f 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -30,34 +30,6 @@ jobs:\n       project_ref: v1\n       check_name: checks\n \n-  all-checks-passed:\n-    name: ci / all-passed\n-    needs: [floor, ruff, shellcheck]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Require every dependency to have succeeded (a job skipped on a mechanical PR is satisfied)\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-          MECHANICAL: ${{ needs.floor.outputs.mechanical }}\n-          EVENT: ${{ github.event_name }}\n-        run: |\n-          set -euo pipefail\n-          # A skipped job is satisfied on a mechanical PR (the floor skipped\n-          # it) and on any non-PR event (a push to the default branch, where\n-          # any job skipped by its own `if:` is not a PR's failure); on a\n-          # functional PR a skipped job is a failure.\n-          bad=\"$(jq -r --arg mech \"$MECHANICAL\" --arg event \"$EVENT\" '\n-            to_entries[]\n-            | select(.value.result == \"failure\" or .value.result == \"cancelled\"\n-                     or (.value.result == \"skipped\" and $mech != \"true\" and $event == \"pull_request\"))\n-            | .key' <<<\"$RESULTS\")\"\n-          if [[ -n \"$bad\" ]]; then\n-            echo \"required job(s) not satisfied: $bad\"\n-            exit 1\n-          fi\n-          echo \"all checks passed (event=${EVENT} mechanical=${MECHANICAL:-false})\"\n-\n   ruff:\n     name: ci / ruff\n     needs: [floor]\n",
+    "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 1111111..2222222 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -30,22 +30,6 @@ jobs:\n     name: ci / checks\n     uses: example/shared/.github/workflows/shared-ci.yml@v1\n \n-  summary:\n-    name: ci / summary\n-    needs: [checks, build, lint]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Fail when a needed job did not succeed\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-        run: |\n-          set -euo pipefail\n-          # A job skipped on a documentation-only PR counts as satisfied.\n-          if jq -e 'to_entries[] | select(.value.result == \"failure\")' <<<\"$RESULTS\"; then\n-            exit 1\n-          fi\n-\n   build:\n     name: ci / build\n     needs: [checks]\n",
     "complete": true,
     "fileCount": 1,
     "files": [
@@ -138,7 +138,7 @@
     }
   },
   "bundle": {
-    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "commit": "dddddddddddddddddddddddddddddddddddddddd",
     "reviewerAgent": "publish:pr-reviewer",
     "voiceAgent": "publish:margot",
     "cardPaths": {
@@ -155,7 +155,7 @@
       "name": "safety",
       "completion": "completed",
       "checked": [
-        "Weakened-guard clause. I checked whether removing the `ci / all-passed` job (`.github/workflows/ci.yml`, formerly lines 33–59 on base) takes away a live protection. I read the live branch rules with `gh api repos/example/project/rules/branches/main` (ruleset 23658240). The required checks are exactly `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff` and `ci / shellcheck`, and `ci / all-passed` is not one of them. The aggregator was not enforcing anything, so the protection was already off before this PR, and the PR body's claim checks out. I also compared what the aggregator did with what the required checks still enforce, using the head workflow at lines 16–57:"
+        "Weakened-guard clause. I checked whether removing the `ci / summary` job (`.github/workflows/ci.yml`, formerly lines 33-48 on base) takes away a live protection. The branch protection settings require `ci / checks`, `ci / build` and `ci / lint`, and `ci / summary` is not one of them. The summary job was not enforcing anything, so the protection was already off before this PR, and the PR body's claim checks out. I also compared what the summary job did with what the required checks still enforce, using the head workflow at lines 16-57."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -166,7 +166,7 @@
       "name": "works-and-proven",
       "completion": "completed",
       "checked": [
-        "Compared the removed aggregator (`.github/workflows/ci.yml`, removed `all-checks-passed`) with the jobs left at head (`ci.yml:33-57`). The aggregator did one thing the direct checks might not: it failed when a job was skipped on a functional PR. At head, `ruff` (`ci.yml:36`) and `shellcheck` (`ci.yml:49`) only skip when `needs.floor.outputs.mechanical == 'true'`, or when `floor` did not succeed. A failed or cancelled `floor` makes `ci / checks` fail or cancel, and that check is still required, so the merge stays blocked. The mechanical output is the same one the aggregator already trusted, so no gating is lost. This would have caught a regression where a functional PR merges with its lint jobs skipped and no required check failing."
+        "Compared the removed summary job (`.github/workflows/ci.yml`, removed `summary`) with the jobs left at head (`ci.yml:33-57`). The summary job did one thing the direct checks might not: it failed when a job was skipped on a functional PR. At head, `build` (`ci.yml:36`) and `lint` (`ci.yml:49`) only skip when `needs.checks.outputs.mechanical == 'true'`, or when `checks` did not succeed. A failed or cancelled `checks` job makes `ci / checks` fail or cancel, and that check is still required, so the merge stays blocked. This would have caught a regression where a functional PR merges with its lint job skipped and no required check failing."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -177,7 +177,7 @@
       "name": "principal-engineer",
       "completion": "completed",
       "checked": [
-        "Traced what the removed `ci / all-passed` job used to catch against what the live ruleset now requires (`gh api repos/example/project/rules/branches/main`: `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck`) — would have caught the aggregator's one extra rule being lost: it failed a functional PR when a dependent job was skipped. I followed the only ways `ruff` or `shellcheck` can be skipped (.github/workflows/ci.yml:35 and :48, `needs: [floor]` plus `if: mechanical != 'true'`). (a) The floor fails, times out or is cancelled. The dependent jobs are then skipped, but `ci / checks` is itself required and not green, so the merge stays blocked. (b) The floor says the PR is mechanical, which is the intended skip and works the same as before. (c) The called workflow never starts, so `ci / checks` is never posted and the required check stays pending. That also fails closed. No path lets a functional PR merge with nothing run."
+        "Traced what the removed `ci / summary` job used to catch against what the branch protection settings now require (`ci / checks`, `ci / build`, `ci / lint`). I followed the only ways `build` or `lint` can be skipped (`.github/workflows/ci.yml:35` and `:48`, `needs: [checks]` plus `if: mechanical != 'true'`). (a) The shared job fails, times out or is cancelled. The dependent jobs are then skipped, but `ci / checks` is itself required and not green, so the merge stays blocked. (b) The shared job says the PR is mechanical, which is the intended skip and works the same as before. (c) The called workflow never starts, so `ci / checks` is never posted and the required check stays pending. That also fails closed. No path lets a functional PR merge with nothing run."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -197,7 +197,7 @@
       "name": "maintainable-no-slop",
       "completion": "completed",
       "checked": [
-        "Read the full diff at head e5ee16d for `.github/workflows/ci.yml`. It is a pure deletion of the `all-checks-passed` job and its inline comment, with no added lines. This would have caught any new helper, abstraction layer, API call, or error-swallowing construct the change introduced."
+        "Read the full diff at head 1234abc for `.github/workflows/ci.yml`. It is a pure deletion of the `summary` job, with no added lines. This would have caught any new helper, abstraction layer, API call, or error-swallowing construct the change introduced."
       ],
       "notCovered": [
         "Other repositories and live service behavior."

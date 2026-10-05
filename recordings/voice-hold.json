@@ -1,5 +1,5 @@
 {
-  "provenance": "Historical capture 3; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication.",
+  "provenance": "Synthetic fixture 3 about example/project; card, risk and voice outputs written for the tests; complete inputs and publication reconstructed",
   "request": {
     "repository": "example/project",
     "pr": 3,
@@ -20,7 +20,7 @@
       "ci"
     ],
     "cardBundle": {
-      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+      "commit": "dddddddddddddddddddddddddddddddddddddddd"
     },
     "classificationThreshold": 0.6,
     "routeThreshold": 0.35,
@@ -36,10 +36,10 @@
     "pr": 3,
     "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "0000000000000000000000000000000000000003",
-    "title": "ci: drop the aggregator job; the required checks name the jobs directly",
+    "title": "ci: remove the summary job; the required checks name the jobs directly",
     "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
     "author": "contributor",
-    "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 396b814..d9be46f 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -43,34 +43,6 @@ jobs:\n       project_ref: v1\n       check_name: checks\n \n-  all-checks-passed:\n-    name: ci / all-passed\n-    needs: [floor, validate-and-test, drift-check, standalone-check]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Require every dependency to have succeeded (a job skipped on a mechanical PR is satisfied)\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-          MECHANICAL: ${{ needs.floor.outputs.mechanical }}\n-          EVENT: ${{ github.event_name }}\n-        run: |\n-          set -euo pipefail\n-          # A skipped job is satisfied on a mechanical PR (the floor skipped\n-          # it) and on any non-PR event (a push to the default branch, where\n-          # any job skipped by its own `if:` is not a PR's failure); on a\n-          # functional PR a skipped job is a failure.\n-          bad=\"$(jq -r --arg mech \"$MECHANICAL\" --arg event \"$EVENT\" '\n-            to_entries[]\n-            | select(.value.result == \"failure\" or .value.result == \"cancelled\"\n-                     or (.value.result == \"skipped\" and $mech != \"true\" and $event == \"pull_request\"))\n-            | .key' <<<\"$RESULTS\")\"\n-          if [[ -n \"$bad\" ]]; then\n-            echo \"required job(s) not satisfied: $bad\"\n-            exit 1\n-          fi\n-          echo \"all checks passed (event=${EVENT} mechanical=${MECHANICAL:-false})\"\n-\n   validate-and-test:\n     name: ci / validate-and-test\n     needs: [floor]\n",
+    "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 3333333..4444444 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -30,22 +30,6 @@ jobs:\n     name: ci / checks\n     uses: example/shared/.github/workflows/shared-ci.yml@v1\n \n-  summary:\n-    name: ci / summary\n-    needs: [checks, build, lint, docs-check]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Fail when a needed job did not succeed\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-        run: |\n-          set -euo pipefail\n-          # A job skipped on a documentation-only PR counts as satisfied.\n-          if jq -e 'to_entries[] | select(.value.result == \"failure\")' <<<\"$RESULTS\"; then\n-            exit 1\n-          fi\n-\n   build:\n     name: ci / build\n     needs: [checks]\n",
     "complete": true,
     "fileCount": 1,
     "files": [
@@ -138,7 +138,7 @@
     }
   },
   "bundle": {
-    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "commit": "dddddddddddddddddddddddddddddddddddddddd",
     "reviewerAgent": "publish:pr-reviewer",
     "voiceAgent": "publish:margot",
     "cardPaths": {
@@ -155,7 +155,7 @@
       "name": "safety",
       "completion": "completed",
       "checked": [
-        "Weakened-guard probe. I read the live rules for the default branch with `gh api repos/example/project/rules/branches/main` and the active rulesets. Ruleset 23658219 (\"Protect main — checks\", active, updated 2026-09-27) requires exactly these checks: `trusted-scan / trusted-scan`, `ci / release-check`, `ci / checks`, `ci / validate-and-test`, `ci / drift-check`, `ci / standalone-check`. `ci / all-passed` is not on that list. So the check this PR removes was not a live required check at head, and the ruleset's own required-check list permits removing it. This probe would have caught the removal of a required check that still gates merges."
+        "Weakened-guard probe. I read the branch protection settings for the default branch. They require exactly these checks: `ci / checks`, `ci / package-check`, `ci / build`, `ci / lint` and `ci / docs-check`. `ci / summary` is not on that list. So the check this PR removes was not a live required check at head, and the required-check list permits removing it. This probe would have caught the removal of a required check that still gates merges."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -166,7 +166,7 @@
       "name": "works-and-proven",
       "completion": "completed",
       "checked": [
-        "Compared the PR body's verification claims with the live ruleset from `gh api repos/example/project/rules/branches/main`. It requires exactly `trusted-scan / trusted-scan`, `ci / release-check`, `ci / checks`, `ci / validate-and-test`, `ci / drift-check` and `ci / standalone-check`, and `ci / all-passed` is not among them. This would have caught a false claim that nothing requires the aggregator: if it were still required, removing it would leave every PR stuck on \"Pending\" forever."
+        "Compared the PR body's verification claims with the branch protection settings. They require exactly `ci / checks`, `ci / package-check`, `ci / build`, `ci / lint` and `ci / docs-check`, and `ci / summary` is not among them. This would have caught a false claim that nothing requires the summary job: if it were still required, removing it would leave every PR stuck on \"Pending\" forever."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -177,7 +177,7 @@
       "name": "principal-engineer",
       "completion": "completed",
       "checked": [
-        "Edge case the change allows: what happens to the checks that depend on the floor when the floor fails or is cancelled on a functional PR. Those checks are `validate-and-test`, `drift-check` and `standalone-check`, all gated by `needs: [floor]` and `if: mechanical != 'true'` (`.github/workflows/ci.yml:46-115` at head). In that case they report \"skipped\", and a skipped check satisfies a required check. Catching that case was the one thing the removed aggregator did that nothing else did. I traced it. The only way those jobs skip on a functional PR is for the floor itself to fail or be cancelled. The floor reports as `ci / checks`, and the live ruleset on `main` requires `ci / checks` (fetched read-only via `gh api repos/.../rules/branches/main`). A red or cancelled floor therefore still blocks the merge. This probe would have caught a functional PR merging with its real checks skipped and no required check failing. It is not present."
+        "Edge case the change allows: what happens to the checks that depend on the shared job when it fails or is cancelled on a functional PR. Those checks are `build`, `lint` and `docs-check`, all gated by `needs: [checks]` and `if: mechanical != 'true'` (`.github/workflows/ci.yml:46-115` at head). In that case they report \"skipped\", and a skipped check satisfies a required check. Catching that case was the one thing the removed summary job did that nothing else did. I traced it. The only way those jobs skip on a functional PR is for the shared job itself to fail or be cancelled. It reports as `ci / checks`, and the branch protection settings require `ci / checks`, so the merge stays blocked."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -188,7 +188,7 @@
       "name": "maintainable-no-slop",
       "completion": "completed",
       "checked": [
-        "Fetched the diff at head 21a18c6c. It changes one file, `.github/workflows/ci.yml`, with 0 additions and 28 deletions: the `all-checks-passed` job and its inline comment. Checking the file list and the add/delete counts would have caught any new helper, abstraction layer, dependency, or try/except added alongside the removal."
+        "Fetched the diff at head 3456cde. It changes one file, `.github/workflows/ci.yml`, with 0 additions and 16 deletions: the `summary` job and its inline comment. Checking the file list and the add/delete counts would have caught any new helper, abstraction layer, dependency, or try block added alongside the removal."
       ],
       "notCovered": [
         "Other repositories and live service behavior."

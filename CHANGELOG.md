@@ -4,7 +4,7 @@
 
 - A MAJOR finding that a card re-raises with `late=delta-reach: <reason>` no longer drops to a late advisory when its earlier ledger entry was an advisory; it blocks at its honest severity, as the prompt promises.
 - A held review names one reason, in the same words, in the review comment and in the check title. A protected-path hold says "it touches a protected path"; holds from a fallback-scored risk, uncomputed ownership, calibration, an error and a pending author each get a plain sentence in the comment too.
-- The shipped `recordings/prose` texts are synthetic and describe `example/project`.
+- The shipped recordings, including `recordings/prose`, are synthetic and describe `example/project`; their commit hashes are placeholders.
 - The ledger reader no longer accepts a `margot-ledger:v2` marker; nothing has ever written one.
 - `samples/deployment.sample.json` carries placeholder values instead of a stale release.
 - The check closer words each stop as its own sentence, titles every stop with "Margot:", and gives an unexplained stop its own summary.

@@ -1,5 +1,5 @@
 {
-  "provenance": "Historical capture 1; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication.",
+  "provenance": "Synthetic fixture 1 about example/project; card, risk and voice outputs written for the tests; complete inputs and publication reconstructed",
   "request": {
     "repository": "example/project",
     "pr": 1,
@@ -20,7 +20,7 @@
       "ci"
     ],
     "cardBundle": {
-      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+      "commit": "dddddddddddddddddddddddddddddddddddddddd"
     },
     "classificationThreshold": 0.6,
     "routeThreshold": 0.35,
@@ -36,10 +36,10 @@
     "pr": 1,
     "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "0000000000000000000000000000000000000001",
-    "title": "Update pre-commit hook example/project to v2026.09.27-16",
+    "title": "Update pre-commit hook example/hooks to v1.2.4",
     "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
     "author": "contributor",
-    "diff": "diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml\nindex 2437c48..629a1a0 100644\n--- a/.pre-commit-config.yaml\n+++ b/.pre-commit-config.yaml\n@@ -5,7 +5,7 @@ default_stages: [pre-commit]\n \n repos:\n   - repo: [external reference removed]\n-    rev: v2026.09.27-15\n+    rev: v2026.09.27-16\n     hooks:\n       - id: gitleaks-staged\n       - id: gitleaks-pre-push\n",
+    "diff": "diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml\nindex 1111111..2222222 100644\n--- a/.pre-commit-config.yaml\n+++ b/.pre-commit-config.yaml\n@@ -5,7 +5,7 @@ default_stages: [pre-commit]\n \n repos:\n   - repo: https://github.com/example/hooks\n-    rev: v1.2.3\n+    rev: v1.2.4\n     hooks:\n       - id: secret-scan\n       - id: secret-scan-pre-push\n",
     "complete": true,
     "fileCount": 1,
     "files": [
@@ -138,7 +138,7 @@
     }
   },
   "bundle": {
-    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "commit": "dddddddddddddddddddddddddddddddddddddddd",
     "reviewerAgent": "publish:pr-reviewer",
     "voiceAgent": "publish:margot",
     "cardPaths": {
@@ -155,7 +155,7 @@
     "outcome": "APPROVED",
     "band": "LOW",
     "rationale": "Recorded risk judgment",
-    "summary": "A mechanical change (dependency bump, or linter/formatter output) with no functional change \u2014 no review was required.",
+    "summary": "A mechanical change (dependency bump, or linter/formatter output) with no functional change — no review was required.",
     "dispositions": []
   },
   "head": "0000000000000000000000000000000000000001",

@@ -1,5 +1,5 @@
 {
-  "provenance": "Historical capture 4; normalized card/risk/voice outputs; reconstructed complete inputs and publication; recorded first-round behavior",
+  "provenance": "Synthetic fixture 4 about example/project; card, risk and voice outputs written for the tests; complete inputs and publication reconstructed",
   "request": {
     "repository": "example/project",
     "pr": 4,
@@ -20,7 +20,7 @@
       "ci"
     ],
     "cardBundle": {
-      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+      "commit": "dddddddddddddddddddddddddddddddddddddddd"
     },
     "classificationThreshold": 0.6,
     "routeThreshold": 0.35,
@@ -36,7 +36,7 @@
     "pr": 4,
     "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "0000000000000000000000000000000000000004",
-    "title": "biome: exclude generated and non-JS config files",
+    "title": "ci: remove the summary job; the required checks name the jobs directly",
     "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
     "author": "contributor",
     "diff": "Reconstructed evidence: Add file exclusions to the shared linter configuration.",
@@ -138,7 +138,7 @@
     }
   },
   "bundle": {
-    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "commit": "dddddddddddddddddddddddddddddddddddddddd",
     "reviewerAgent": "publish:pr-reviewer",
     "voiceAgent": "publish:margot",
     "cardPaths": {
@@ -155,7 +155,7 @@
       "name": "works-and-proven",
       "completion": "completed",
       "checked": [
-        "Mapped the one changed behavior, the new `files.includes` in `biome.json` (lines 4–16), against every eval that reads `biome.json`: `.claude/eval/web-lint-configs.test.sh`, `new-repo.test.sh` and `provision-public-repo.test.sh:4540-4545`. The goal was to find the assertion that would fail if the `dist`/`build`/`coverage` skip or the JSON/`.vue`/`.svelte`/`.astro` skip stopped working. None of them asserts it. `web-lint-configs.test.sh` only runs `biome lint`/`check`/`format` on files named explicitly (`bad.ts`, `good.ts`, `ugly.ts`). The scaffold eval only diffs the written bytes against project's copy, and those bytes change together with the file. This probe would have caught a changed behavior with no automated pin; it found one (see finding)."
+        "Mapped the one changed behavior, the new `files.includes` in `biome.json` (lines 4-16), against every test that reads `biome.json`: `tests/lint-config.test.sh` and `tests/scaffold.test.sh:120-128`. The goal was to find the assertion that would fail if the `dist`/`build`/`coverage` skip or the JSON/`.vue`/`.svelte`/`.astro` skip stopped working. None of them asserts it. `tests/lint-config.test.sh` only runs the linter on files named explicitly (`bad.ts`, `good.ts`, `ugly.ts`). The scaffold test only compares the written bytes with the project's copy, and those bytes change together with the file. This probe would have caught a changed behavior with no automated pin; it found one (see finding)."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -175,7 +175,7 @@
       "name": "principal-engineer",
       "completion": "completed",
       "checked": [
-        "Fetched `biome.json` at head sha c966c5d and compared its new `files.includes` (lines 4–16) with the hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` in `.pre-commit-config.yaml:180` and `.github/scripts/pre-commit-merge.py:171`. This would have caught a context bug where the config and the hook disagree about which extensions are in scope. They agree: json, jsonc, vue, svelte and astro are excluded in both places. The list also starts with `\"**\"`, so the negations have something to subtract from, and all other files stay in scope."
+        "Fetched `biome.json` at head sha 1234abc and compared its new `files.includes` (lines 4-16) with the hook's `exclude: '\\\\.(jsonc?|vue|svelte|astro)$'` in `.pre-commit-config.yaml:42`. This would have caught a context bug where the config and the hook disagree about which extensions are in scope. They agree: json, jsonc, vue, svelte and astro are excluded in both places. The list also starts with `\"**\"`, so the negations have something to subtract from, and all other files stay in scope."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -195,7 +195,7 @@
       "name": "maintainable-no-slop",
       "completion": "completed",
       "checked": [
-        "Fetched the diff at c966c5d. The whole PR is one hunk: `biome.json:4-16` adds a `files.includes` block. I read it for comments, code paths or dependencies. That would have caught comment drift, an error-swallowing path or a new package name. There are none: the file is pure JSON config with no comments, no logic and no dependency."
+        "Fetched the diff at 1234abc. The whole PR is one hunk: `biome.json:4-16` adds a `files.includes` block. I read it for comments, code paths or dependencies. That would have caught comment drift, an error-swallowing path or a new package name. There are none: the file is pure JSON config with no comments, no logic and no dependency."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -206,7 +206,7 @@
       "name": "house-style",
       "completion": "completed",
       "checked": [
-        "Held the new `files.includes` block in `biome.json` (lines 4–16 at c966c5d) against the biome-check hook's `exclude: '\\.(jsonc?|vue|svelte|astro)$'` (`.pre-commit-config.yaml:180`). I also compared it with the suite generator's copy of that exclude (`.github/scripts/pre-commit-merge.py:171`) and the eval's copy (`.claude/eval/provision-public-repo.test.sh:4173`). This would have caught a file-type exclusion list that differs from the organization's one existing statement of what Biome must skip (for example, `.jsonc` or one of the three framework extensions missing, or an extra type). The five types match exactly."
+        "Held the new `files.includes` block in `biome.json` (lines 4-16 at 1234abc) against the lint hook's `exclude: '\\\\.(jsonc?|vue|svelte|astro)$'` (`.pre-commit-config.yaml:42`). I also compared it with the scaffold template's copy of that exclude (`templates/pre-commit-config.yaml:18`). This would have caught a file-type exclusion list that differs from the project's one existing statement of what the linter must skip (for example, `.jsonc` or one of the three framework extensions missing, or an extra type). The five types match exactly."
       ],
       "notCovered": [
         "Other repositories and live service behavior."

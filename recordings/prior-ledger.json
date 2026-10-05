@@ -1,5 +1,5 @@
 {
-  "provenance": "Historical capture 6; exact base/head diff retrieved from public GitHub; normalized captured card/risk/voice outputs; reconstructed three-class answer, check receipt and recorded publication. Prior MINOR ledger entries are normalized from the captured first round; actor and revision identifiers are neutral reconstructions. Delta is the guide hunk from the retrieved full comparison.",
+  "provenance": "Synthetic fixture 6 about example/project; card, risk and voice outputs written for the tests; complete inputs and publication reconstructed",
   "request": {
     "repository": "example/project",
     "pr": 6,
@@ -20,7 +20,7 @@
       "ci"
     ],
     "cardBundle": {
-      "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045"
+      "commit": "dddddddddddddddddddddddddddddddddddddddd"
     },
     "classificationThreshold": 0.6,
     "routeThreshold": 0.35,
@@ -39,10 +39,10 @@
     "pr": 6,
     "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "0000000000000000000000000000000000000006",
-    "title": "ci: drop the aggregator job; the required checks name the jobs directly",
+    "title": "ci: remove the summary job; the required checks name the jobs directly",
     "body": "Recorded review of a bounded repository change. Original identifying metadata removed.",
     "author": "contributor",
-    "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex b355f6a..b01089f 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -30,34 +30,6 @@ jobs:\n       project_ref: v1\n       check_name: checks\n \n-  all-checks-passed:\n-    name: ci / all-passed\n-    needs: [floor, ruff, shellcheck]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Require every dependency to have succeeded (a job skipped on a mechanical PR is satisfied)\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-          MECHANICAL: ${{ needs.floor.outputs.mechanical }}\n-          EVENT: ${{ github.event_name }}\n-        run: |\n-          set -euo pipefail\n-          # A skipped job is satisfied on a mechanical PR (the floor skipped\n-          # it) and on any non-PR event (a push to the default branch, where\n-          # any job skipped by its own `if:` is not a PR's failure); on a\n-          # functional PR a skipped job is a failure.\n-          bad=\"$(jq -r --arg mech \"$MECHANICAL\" --arg event \"$EVENT\" '\n-            to_entries[]\n-            | select(.value.result == \"failure\" or .value.result == \"cancelled\"\n-                     or (.value.result == \"skipped\" and $mech != \"true\" and $event == \"pull_request\"))\n-            | .key' <<<\"$RESULTS\")\"\n-          if [[ -n \"$bad\" ]]; then\n-            echo \"required job(s) not satisfied: $bad\"\n-            exit 1\n-          fi\n-          echo \"all checks passed (event=${EVENT} mechanical=${MECHANICAL:-false})\"\n-\n   ruff:\n     name: ci / ruff\n     needs: [floor]\ndiff --git a/GUIDE.md b/GUIDE.md\nindex a597119..c1907e7 100644\n--- a/GUIDE.md\n+++ b/GUIDE.md\n@@ -37,7 +37,7 @@ pre-commit run --all-files  # gitleaks-staged + the standard hook set\n \n ## CI\n \n-`.github/workflows/ci.yml`, required via the \"Protect main\" ruleset through `all-checks-passed`: the organization's shared `floor` job, plus this repo's own `ruff` (Python lint) and `shellcheck` (`ludeeus/action-shellcheck`, no-op today — no `.sh` files yet, kept for when scripts are added). PR-time secret scanning is the trusted lane's `trusted-scan` (`gate.yml`), a separate required check.\n+`.github/workflows/ci.yml`, required via the \"Protect main\" ruleset: the organization's shared `floor` job (`ci / checks`), plus this repo's own `ruff` (`ci / ruff`, Python lint) and `shellcheck` (`ci / shellcheck`, `ludeeus/action-shellcheck`, no-op today — no `.sh` files yet, kept for when scripts are added). The ruleset requires each job's check directly; a new job needs its check added to the ruleset in project's `rulesets/default-branch.json`. PR-time secret scanning is the trusted lane's `trusted-scan` (`gate.yml`), a separate required check.\n \n ## Conventions\n \n",
+    "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 1111111..2222222 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -30,22 +30,6 @@ jobs:\n     name: ci / checks\n     uses: example/shared/.github/workflows/shared-ci.yml@v1\n \n-  summary:\n-    name: ci / summary\n-    needs: [checks, build, lint]\n-    if: always()\n-    runs-on: ubuntu-latest\n-    steps:\n-      - name: Fail when a needed job did not succeed\n-        env:\n-          RESULTS: ${{ toJSON(needs) }}\n-        run: |\n-          set -euo pipefail\n-          # A job skipped on a documentation-only PR counts as satisfied.\n-          if jq -e 'to_entries[] | select(.value.result == \"failure\")' <<<\"$RESULTS\"; then\n-            exit 1\n-          fi\n-\n   build:\n     name: ci / build\n     needs: [checks]\ndiff --git a/GUIDE.md b/GUIDE.md\nindex 1234567..7654321 100644\n--- a/GUIDE.md\n+++ b/GUIDE.md\n@@ -37,7 +37,7 @@ Run the checks locally before you push.\n \n ## CI\n \n-`.github/workflows/ci.yml`, required through the `summary` job: the shared `checks` job, plus this repo's own `build` and `lint` jobs. Secret scanning is a separate required check.\n+`.github/workflows/ci.yml`, with each job's check required directly: the shared `checks` job (`ci / checks`), plus this repo's own `build` (`ci / build`) and `lint` (`ci / lint`). A new job needs its check added to the branch protection settings. Secret scanning is a separate required check.\n \n ## Conventions\n \n",
     "complete": true,
     "fileCount": 2,
     "files": [
@@ -71,7 +71,7 @@
           "actorType": "Bot",
           "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "submittedAt": "2026-09-01T00:00:00Z",
-          "body": "Recorded prior review\n<!-- margot-ledger:v1 eyJ2IjogMSwgInJvdW5kIjogMSwgImhlYWQiOiAiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsICJlbnRyaWVzIjogW3sia2V5IjogIlIxLUYxIiwgImNhcmQiOiAicHJpbmNpcGFsLWVuZ2luZWVyIiwgInJvdW5kX3JhaXNlZCI6IDEsICJsb2NhdGlvbiI6ICJHVUlERS5tZDo0MCIsICJzZXZlcml0eSI6ICJNSU5PUiIsICJ3aGF0IjogIlRoZSByZXBvJ3Mgb3duIGd1aWRlIHN0aWxsIHNheXMgdGhlIG1lcmdlIGdhdGUgcnVucyB0aHJvdWdoIHRoZSBqb2IgdGhpcyBQUiBkZWxldGVzLCBzbyBhbnlvbmUgcmVhZGluZyBpdCBnZXRzIHRoZSB3cm9uZyBwaWN0dXJlIG9mIHdoYXQgcHJvdGVjdHMgdGhlIG1haW4gYnJhbmNoLiIsICJzdGF0dXMiOiAic3RhbmRpbmcifSwgeyJrZXkiOiAiUjEtRjIiLCAiY2FyZCI6ICJtYWludGFpbmFibGUtbm8tc2xvcCIsICJyb3VuZF9yYWlzZWQiOiAxLCAibG9jYXRpb24iOiAiR1VJREUubWQ6NDAiLCAic2V2ZXJpdHkiOiAiTUlOT1IiLCAid2hhdCI6ICJUaGUgcmVwbydzIGd1aWRlIHN0aWxsIHNheXMgdGhlIHByb3RlY3RlZCBicmFuY2ggaXMgZ2F0ZWQgYnkgdGhlIHN1bW1hcnkgY2hlY2sgdGhpcyBjaGFuZ2UgZGVsZXRlcywgc28gaXQgbm93IGRlc2NyaWJlcyBhIHNldHVwIHRoYXQgbm8gbG9uZ2VyIGV4aXN0cy4iLCAic3RhdHVzIjogInN0YW5kaW5nIn1dfQ== -->"
+          "body": "Recorded prior review\n<!-- margot-ledger:v1 eyJ2IjogMSwgInJvdW5kIjogMSwgImhlYWQiOiAiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsICJlbnRyaWVzIjogW3sia2V5IjogIlIxLUYxIiwgImNhcmQiOiAicHJpbmNpcGFsLWVuZ2luZWVyIiwgInJvdW5kX3JhaXNlZCI6IDEsICJsb2NhdGlvbiI6ICJHVUlERS5tZDo0MCIsICJzZXZlcml0eSI6ICJNSU5PUiIsICJ3aGF0IjogIlRoZSBndWlkZSBzdGlsbCBzYXlzIHRoZSBtZXJnZSBnYXRlIHJ1bnMgdGhyb3VnaCB0aGUgam9iIHRoaXMgUFIgZGVsZXRlcywgc28gYSByZWFkZXIgZ2V0cyB0aGUgd3JvbmcgcGljdHVyZSBvZiB3aGF0IHByb3RlY3RzIHRoZSBtYWluIGJyYW5jaC4iLCAic3RhdHVzIjogInN0YW5kaW5nIn0sIHsia2V5IjogIlIxLUYyIiwgImNhcmQiOiAibWFpbnRhaW5hYmxlLW5vLXNsb3AiLCAicm91bmRfcmFpc2VkIjogMSwgImxvY2F0aW9uIjogIkdVSURFLm1kOjQwIiwgInNldmVyaXR5IjogIk1JTk9SIiwgIndoYXQiOiAiVGhlIGd1aWRlIHN0aWxsIHNheXMgdGhlIHByb3RlY3RlZCBicmFuY2ggaXMgZ2F0ZWQgYnkgdGhlIHN1bW1hcnkgY2hlY2sgdGhpcyBjaGFuZ2UgZGVsZXRlcywgc28gaXQgZGVzY3JpYmVzIGEgc2V0dXAgdGhhdCBubyBsb25nZXIgZXhpc3RzLiIsICJzdGF0dXMiOiAic3RhbmRpbmcifV19 -->"
         }
       ]
     },
@@ -154,7 +154,7 @@
     }
   },
   "bundle": {
-    "commit": "dc82ec72eea97ae6b0e161dd2ec909cb75033045",
+    "commit": "dddddddddddddddddddddddddddddddddddddddd",
     "reviewerAgent": "publish:pr-reviewer",
     "voiceAgent": "publish:margot",
     "cardPaths": {
@@ -171,7 +171,7 @@
       "name": "safety",
       "completion": "completed",
       "checked": [
-        "Secret-scan coverage: the floor's receipt shows `trusted-scan / trusted-scan` succeeded on head 0682d5d, which runs gitleaks over the PR diff. The only file in the delta is `GUIDE.md`, and a skim of its one changed hunk (line 40) found no key-, token- or credential-shaped content. This would have caught a secret committed in the doc edit."
+        "Secret-scan coverage: the receipt shows the secret-scan check succeeded on head 3456cde, which runs over the PR diff. The only file in the delta is `GUIDE.md`, and a skim of its one changed hunk (line 40) found no key-, token- or credential-shaped content. This would have caught a secret committed in the doc edit."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -182,7 +182,7 @@
       "name": "works-and-proven",
       "completion": "completed",
       "checked": [
-        "Compared the documented check names in the delta (`GUIDE.md:40`) with the job `name:` values in `.github/workflows/ci.yml` at head 0682d5d. The docs list `ci / checks` (floor job `name: ci` + `check_name: checks`), `ci / ruff` and `ci / shellcheck`, and the workflow produces exactly those. This would have caught docs naming a check the workflow no longer reports, such as a leftover mention of `all-checks-passed` or `ci / all-passed`, or a wrong composite name for the floor job."
+        "Compared the documented check names in the delta (`GUIDE.md:40`) with the job `name:` values in `.github/workflows/ci.yml` at head 3456cde. The docs list `ci / checks`, `ci / build` and `ci / lint`, and the workflow produces exactly those. This would have caught docs naming a check the workflow no longer reports, such as a leftover mention of `summary` or `ci / summary`."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -193,7 +193,7 @@
       "name": "principal-engineer",
       "completion": "completed",
       "checked": [
-        "Compared the reviewed head e5ee16d with head 0682d5d (only `GUIDE.md` changed) and read `GUIDE.md:40` at the head sha. This would have caught the R1-F1 stale reference to `all-checks-passed` still being there, or a new wrong description of the gate. The line no longer names the aggregator. It now describes the gate as each job's check, required directly."
+        "Compared the reviewed head 2345bcd with head 3456cde (only `GUIDE.md` changed) and read `GUIDE.md:40` at the head sha. This would have caught the R1-F1 stale reference to the `summary` job still being there, or a new wrong description of the gate. The line no longer names the summary job. It now describes the gate as each job's check, required directly."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -204,7 +204,7 @@
       "name": "maintainable-no-slop",
       "completion": "completed",
       "checked": [
-        "Compared the delta `e5ee16d...0682d5d` (GUIDE.md only) and read `GUIDE.md:40` at the head sha against `.github/workflows/ci.yml` at the head sha. Each check name the guide gives must match what the workflow reports: `floor` job `name: ci` plus `check_name: checks` gives `ci / checks`, and the other two jobs are `ci / ruff` and `ci / shellcheck`. This would have caught comment drift, where the rewritten guide names a check or job the workflow does not report."
+        "Compared the delta between the two heads (`GUIDE.md` only) and read `GUIDE.md:40` at the head sha against `.github/workflows/ci.yml` at the head sha. Each check name the guide gives must match what the workflow reports: `ci / checks`, `ci / build` and `ci / lint`. This would have caught comment drift, where the rewritten guide names a check or job the workflow does not report."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -231,6 +231,6 @@
     "head": "0000000000000000000000000000000000000006",
     "status": "ahead",
     "complete": true,
-    "diff": "diff --git a/GUIDE.md b/GUIDE.md\nindex a597119..c1907e7 100644\n--- a/GUIDE.md\n+++ b/GUIDE.md\n@@ -37,7 +37,7 @@ pre-commit run --all-files  # gitleaks-staged + the standard hook set\n \n ## CI\n \n-`.github/workflows/ci.yml`, required via the \"Protect main\" ruleset through `all-checks-passed`: the organization's shared `floor` job, plus this repo's own `ruff` (Python lint) and `shellcheck` (`ludeeus/action-shellcheck`, no-op today — no `.sh` files yet, kept for when scripts are added). PR-time secret scanning is the trusted lane's `trusted-scan` (`gate.yml`), a separate required check.\n+`.github/workflows/ci.yml`, required via the \"Protect main\" ruleset: the organization's shared `floor` job (`ci / checks`), plus this repo's own `ruff` (`ci / ruff`, Python lint) and `shellcheck` (`ci / shellcheck`, `ludeeus/action-shellcheck`, no-op today — no `.sh` files yet, kept for when scripts are added). The ruleset requires each job's check directly; a new job needs its check added to the ruleset in project's `rulesets/default-branch.json`. PR-time secret scanning is the trusted lane's `trusted-scan` (`gate.yml`), a separate required check.\n \n ## Conventions\n \n"
+    "diff": "diff --git a/GUIDE.md b/GUIDE.md\nindex 1234567..7654321 100644\n--- a/GUIDE.md\n+++ b/GUIDE.md\n@@ -37,7 +37,7 @@ Run the checks locally before you push.\n \n ## CI\n \n-`.github/workflows/ci.yml`, required through the `summary` job: the shared `checks` job, plus this repo's own `build` and `lint` jobs. Secret scanning is a separate required check.\n+`.github/workflows/ci.yml`, with each job's check required directly: the shared `checks` job (`ci / checks`), plus this repo's own `build` (`ci / build`) and `lint` (`ci / lint`). A new job needs its check added to the branch protection settings. Secret scanning is a separate required check.\n \n ## Conventions\n \n"
   }
 }
