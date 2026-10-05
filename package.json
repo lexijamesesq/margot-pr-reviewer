@@ -2,6 +2,23 @@
   "name": "margot-pr-reviewer",
   "version": "0.6.6",
   "description": "Margot, the PR reviewer: review, convergence and GitHub publication",
+  "author": "lexijamesesq",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lexijamesesq/margot-pr-reviewer.git"
+  },
+  "homepage": "https://github.com/lexijamesesq/margot-pr-reviewer#readme",
+  "bugs": {
+    "url": "https://github.com/lexijamesesq/margot-pr-reviewer/issues"
+  },
+  "keywords": [
+    "pull-request",
+    "code-review",
+    "github",
+    "ai-review",
+    "review-bot",
+    "ci"
+  ],
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -12,7 +29,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./recordings/*": "./recordings/*"
+    "./recordings/*": "./recordings/*",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -24,6 +42,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
     "test": "vitest run",
     "prepack": "npm run build"
   },

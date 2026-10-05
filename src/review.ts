@@ -1,4 +1,5 @@
 import { changedLineCount } from "./diff.js";
+import { errorMessage } from "./errors.js";
 import {
   configHash,
   evidenceHash,
@@ -106,8 +107,10 @@ export async function review(
       if (reportProgress) {
         try {
           await call("publication-progress", (context) => reportProgress(title, context));
-        } catch {
-          console.warn("Margot: phase-title update failed; continuing review");
+        } catch (error) {
+          console.warn(
+            `Margot: phase-title update failed (${errorMessage(error)}); continuing review`,
+          );
         }
       }
     };
@@ -224,9 +227,13 @@ export async function review(
     if (prior && prior.head !== request.head && !cached && compare) {
       try {
         comparison = await call("compare", (c) => compare(request, prior.head, c));
-      } catch {
+      } catch (error) {
+        // Complete full-PR evidence above is the recovery path.
+        console.warn(
+          `Margot: compare since the prior head failed (${errorMessage(error)}); reviewing the full PR`,
+        );
         comparison = undefined;
-      } // Complete full-PR evidence above is the recovery path.
+      }
     }
     const scope = roundScope(facts, prior, comparison, cached !== undefined);
     let result: Review;
@@ -431,7 +438,8 @@ export async function review(
     if (emergencyDisable) {
       try {
         if (!(await emergencyDisable())) diagnostic += "; auto-merge disable not confirmed";
-      } catch {
+      } catch (disableError) {
+        console.warn(`Margot: auto-merge disable failed (${errorMessage(disableError)})`);
         diagnostic += "; auto-merge disable failed";
       }
     }

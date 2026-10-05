@@ -4,7 +4,8 @@ import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } fr
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const tarball = resolve(process.argv[2] ?? "margot-pr-reviewer-0.6.1.tgz");
+const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+const tarball = resolve(process.argv[2] ?? `margot-pr-reviewer-${version}.tgz`);
 const consumer = mkdtempSync(join(tmpdir(), "margot-consumer-"));
 const run = (file, args, options = {}) =>
   spawnSync(file, args, { cwd: consumer, encoding: "utf8", ...options });
@@ -53,9 +54,8 @@ const output = join(consumer, "output");
 writeFileSync(
   deployment,
   JSON.stringify({
-    version: "0.6.1",
-    packageReference:
-      "https://github.com/example/margot-pr-reviewer/releases/download/v0.6.1/margot-pr-reviewer-0.6.1.tgz",
+    version,
+    packageReference: `https://github.com/example/margot-pr-reviewer/releases/download/v${version}/margot-pr-reviewer-${version}.tgz`,
     packageIntegrity: `sha512-${"A".repeat(86)}==`,
     packageSha256: "0".repeat(64),
   }),
@@ -85,6 +85,9 @@ assert.equal(readFileSync(output, "utf8"), "authority=true\nrepositoryName=proje
 const checkCli = () =>
   assert.equal(run(cli, []).status, 1, "Installed CLI must execute argument validation");
 checkCli();
+const printedVersion = run(cli, ["--version"]);
+assert.equal(printedVersion.status, 0, "Installed CLI must print its version");
+assert.equal(printedVersion.stdout, `${version}\n`);
 assert.equal(smoke().status, 0);
 console.log(
   JSON.stringify({

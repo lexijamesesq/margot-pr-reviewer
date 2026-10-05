@@ -9,6 +9,7 @@ import { findingTally, render, renderCheckText } from "../src/render.js";
 import { review } from "../src/review.js";
 import { configSchema, factsSchema, requestSchema } from "../src/schemas.js";
 import type { Card, Review, ReviewResult, RoundScope } from "../src/types.js";
+import { present } from "./present.js";
 
 const recording = JSON.parse(readFileSync("recordings/mechanical-bump.json", "utf8")) as Recording;
 const r = requestSchema.parse(recording.request);
@@ -372,7 +373,7 @@ it("Unreadable history disarms auto-merge before holding the check without a rat
   expect(output.text).not.toMatch(/outcome:|band:/u);
 });
 // Merge automation reads these lines from the check text and requests the
-// operator's review on a held PR. Without them a hold is invisible to her, so these
+// operator's review on a held PR. Without them a hold is invisible to the operator, so these
 // lines must always be present on a hold.
 function parseVerdictText(text: string | undefined) {
   const out = { outcome: "", band: "", source: "" };
@@ -460,7 +461,7 @@ it("names every matched file in the authority hold summary", async () => {
     matched:
       protectedResult.kind === "reviewed" ? protectedResult.decision.authorityPaths : undefined,
   }).toMatchObject({
-    held: "This PR changes Margot's own config, the ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n- `.github/workflows/review.yml`\n- `config/review.json`",
+    held: "This PR changes files Margot's own review depends on (the configured protected paths). Margot does not approve such a change by itself; it waits for a maintainer's approval.\n\nMatched:\n- `.github/workflows/review.yml`\n- `config/review.json`",
     clear: "No functional change to a protected path (class: mechanical).",
     matched: [".github/workflows/ci.yml"],
   });
@@ -825,10 +826,12 @@ it("A new workflow run keeps same-head review compatibility but a policy change 
     compatible: before === liveServices(config, { jevKey: "unused" }).services.provenance,
   }).toMatchObject({ compatible: true });
 });
-it("The posted ledger is readable by unchanged Python and retains the exact TypeScript receipt", () => {
+it("The posted ledger stays readable in its version 1 format, with the receipt in its compressed field", () => {
   const body = render(baseReview);
   const block = body.match(/<!-- margot-ledger:v1 ([A-Za-z0-9+/=]+) -->$/);
-  const legacy = block ? JSON.parse(Buffer.from(block[1] ?? "", "base64").toString("utf8")) : null;
+  const plainLedger = block
+    ? JSON.parse(Buffer.from(block[1] ?? "", "base64").toString("utf8"))
+    : null;
   const config = configSchema.parse({
     ...(recording.config as object),
     trustedLedgerActors: [options.actor],
@@ -859,9 +862,10 @@ it("The posted ledger is readable by unchanged Python and retains the exact Type
     restored = null;
   }
   expect({
-    legacyReadable: legacy?.v === 1 && legacy?.head === r.head && Array.isArray(legacy?.entries),
+    version1Readable:
+      plainLedger?.v === 1 && plainLedger?.head === r.head && Array.isArray(plainLedger?.entries),
     restored,
-  }).toMatchObject({ legacyReadable: true, restored: baseReview.ledger });
+  }).toMatchObject({ version1Readable: true, restored: baseReview.ledger });
 });
 it("Recalling a late advisory cannot silently turn it into a blocker", () => {
   const scope: RoundScope = {
@@ -1111,12 +1115,12 @@ describe("merge actor in the authority hold", () => {
     const value = structuredClone(baseReview);
     value.decision.mergeEligible = false;
     value.decision.holdReasons = ["review-authority"];
-    value.presentation = { ...value.presentation!, ...(mergeActor ? { mergeActor } : {}) };
+    value.presentation = { ...present(value.presentation), ...(mergeActor ? { mergeActor } : {}) };
     return render(value);
   }
   it("names the configured merge actor", () => {
-    expect(authorityHold("Ollie")).toContain(
-      "Above my authority: it changes Margot's own machinery; approve it and Ollie merges it. Yours to merge.",
+    expect(authorityHold("merge-bot")).toContain(
+      "Above my authority: it changes Margot's own machinery; approve it and merge-bot merges it. Yours to merge.",
     );
   });
   it("names no merger when none is configured", () => {
@@ -1129,12 +1133,12 @@ describe("merge actor in the authority hold", () => {
   it("carries the configured value from the configuration to the presentation", async () => {
     const withActor = await review(
       r,
-      { ...(recording.config as object), mergeActor: "Ollie" },
+      { ...(recording.config as object), mergeActor: "merge-bot" },
       recordedServices(recording),
     );
     expect({
       configured: withActor.kind === "reviewed" && withActor.presentation?.mergeActor,
       unset: baseReview.presentation?.mergeActor,
-    }).toEqual({ configured: "Ollie", unset: undefined });
+    }).toEqual({ configured: "merge-bot", unset: undefined });
   });
 });

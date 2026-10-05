@@ -2,5 +2,3 @@ node_modules/
 dist/
 *.tgz
 coverage/
-.break-results.json
-.adapter-break-results.json

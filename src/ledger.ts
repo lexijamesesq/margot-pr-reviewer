@@ -64,13 +64,13 @@ export function selectLedger(
         ).toString("utf8"),
       );
       let version = Number(match[1]);
-      // The legacy reader ignores this extension and sees the same plain entries.
-      // Margot restores her saved receipt without maintaining a second ledger.
+      // A version 1 reader ignores this extension and sees the same plain entries.
+      // The saved receipt is restored from the compressed field without a second ledger.
       if (version === 1 && decoded && typeof decoded.receipt_v2 === "string") {
-        const { receipt_v2, ...legacy } = decoded;
-        if (legacy.v !== 1 || "receipt" in legacy) throw new Error("Invalid rollback ledger");
+        const { receipt_v2, ...plain } = decoded;
+        if (plain.v !== 1 || "receipt" in plain) throw new Error("Invalid rollback ledger");
         decoded = {
-          ...legacy,
+          ...plain,
           v: 2,
           receipt: JSON.parse(
             inflateSync(Buffer.from(receipt_v2, "base64"), { maxOutputLength: 1048576 }).toString(

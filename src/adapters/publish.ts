@@ -189,7 +189,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         ? "self-instrument: held for the operator's approval"
         : "self-instrument: clear",
       authorityHold
-        ? "This PR changes Margot's own config, the ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n" +
+        ? "This PR changes files Margot's own review depends on (the configured protected paths). Margot does not approve such a change by itself; it waits for a maintainer's approval.\n\nMatched:\n" +
             (decision.authorityPaths ?? []).map((path) => `- \`${path}\``).join("\n")
         : `No functional change to a protected path (class: ${review.classification}).`,
       undefined,

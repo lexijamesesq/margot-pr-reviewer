@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
+import { present } from "./present.js";
 
 it("preserves the voice's risk statement, clarification and setting finding", () => {
   expect(
@@ -202,7 +203,7 @@ describe("captured reviewer output", () => {
       // Margot's return (outcome and band_reason). Labels alone, check text and JSON are neither.
       const card = /^card:\s*([\w-]+)/.exec(text);
       if (card && /^\s*completion:/m.test(text))
-        out.push({ source, kind: "card", card: card[1]!, text: value });
+        out.push({ source, kind: "card", card: present(card[1]), text: value });
       else if (
         /^\s*(?:\*\*|__)?outcome(?:\*\*|__)?:/im.test(text) &&
         /^\s*(?:\*\*|__)?band_reason(?:\*\*|__)?:/im.test(text) &&

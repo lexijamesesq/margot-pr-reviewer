@@ -2,6 +2,7 @@ import { Octokit } from "octokit";
 import parseDiff from "parse-diff";
 import { z } from "zod";
 import { diffIsComplete } from "../diff.js";
+import { errorMessage } from "../errors.js";
 import { classNames, factsSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
@@ -107,7 +108,10 @@ export function githubAdapter(
           per_page: 100,
           filter: "latest",
         }),
-        client.paginate(client.rest.pulls.listReviews, { ...p, per_page: 100 }).catch(() => {
+        client.paginate(client.rest.pulls.listReviews, { ...p, per_page: 100 }).catch((error) => {
+          console.warn(
+            `Margot: review history unreadable (${errorMessage(error)}); treating it as incomplete`,
+          );
           historyComplete = false;
           return [];
         }),
@@ -197,8 +201,11 @@ export function githubAdapter(
               head: r.head,
               classification,
             };
-        } catch {
-          /* Unreadable triage conservatively requires functional review. */
+        } catch (error) {
+          // Unreadable triage conservatively requires functional review.
+          console.warn(
+            `Margot: triage check output unreadable (${errorMessage(error)}); requiring functional review`,
+          );
         }
       }
       return factsSchema.parse({

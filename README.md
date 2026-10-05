@@ -16,6 +16,22 @@ CLARIFICATION_REQUESTED, or ERROR. Margot renders that verdict as a PR comment
 and, in GitHub mode, as a check run; some outcomes hold the PR for the operator
 instead of clearing it for merge.
 
+## Terms
+
+- **Jev** — the external decision service Margot asks for classification, routing
+  and risk. It is reached at the configured `jev.url` with the `JEV_KEY`
+  credential.
+- **The council** — the review cards.
+- **A card** — one review standard, run by a model against the diff.
+- **The voice** — the model that rules the verdict when code cannot clear the
+  change.
+- **The operator** — the person who owns the repositories and approves held pull
+  requests.
+- **The card bundle** — the public repository
+  [publish-skills](https://github.com/lexijamesesq/publish-skills). Margot loads
+  the card and voice definitions from a checkout of it at `claude.pluginDirectory`,
+  pinned to the commit in `review.cardBundle.commit`.
+
 ## Requirements and install
 
 Margot requires Node 22 or later (see `engines` in `package.json`).
@@ -72,7 +88,7 @@ configuration it is given unchanged, without resolving `${MARGOT_ROOT}`.
 | `MARGOT_WRITE_TOKEN` | Separate token with checks and pull-request write access. Required for GitHub publication; never forwarded to a model or evidence server. |
 | `MARGOT_OWNED_TIER` | Caller-computed protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing, blank, or invalid holds the review. |
 | `MARGOT_CLASSIFICATION` | Overrides the request's classification (`functional`, `documentation`, or `mechanical`). |
-| `MARGOT_TRIAGE` | Legacy override; only the value `mechanical` has any effect. |
+| `MARGOT_TRIAGE` | Carries an earlier triage result into the request when no classification is set; only the value `mechanical` has any effect. |
 | names listed in `claude.ticketing.env` | Forwarded only to the configured ticketing MCP server, never to the model environment generally. |
 
 ## Running `margot-review`
@@ -155,7 +171,7 @@ margot-instance bind-request \
 Closes a review check left open when routing failed, review failed, or
 publication did not happen. It checks that the given head belongs to the named
 PR, that the PR isn't still open on that head under another run, that the open
-`review / margot` check (or the legacy name `margot`) belongs to this run, and
+`review / margot` check (or the pre-rename check name `margot`) belongs to this run, and
 only then closes it with a reason-specific conclusion. Exits 0 after closing or
 finding nothing to close, and 2 on a GitHub read or write failure.
 
