@@ -24,6 +24,7 @@ const recording = JSON.parse(
 ) as Recording;
 const request = requestSchema.parse(recording.request);
 const facts = factsSchema.parse(recording.facts);
+const pinnedClaude = { executable: "claude", version: "1.0.0" };
 const context = () => ({ signal: AbortSignal.timeout(3000) });
 function jev(
   answer: unknown,
@@ -37,6 +38,7 @@ function jev(
   const adapter = jevAdapter({
     key: "test-only",
     model: "test-model",
+    fallbackClaude: pinnedClaude,
     retries: 1,
     minTimeout: 1,
     fetch: async (_input, init) => {
@@ -168,6 +170,7 @@ describe("bound evidence batching", () => {
       const client = jevAdapter({
         key: "test",
         model: "test",
+        fallbackClaude: pinnedClaude,
         fetch: (async (_url, init) => {
           const request = JSON.parse(String(init?.body));
           requests.push(request.state);
@@ -215,6 +218,7 @@ describe("bound evidence batching", () => {
     const client = jevAdapter({
       key: "test",
       model: "test",
+      fallbackClaude: pinnedClaude,
       fetch: (async (_url, init) => {
         const r = JSON.parse(String(init?.body));
         const last = r.state.evidencePart === r.state.totalParts;
@@ -249,6 +253,7 @@ describe("fallback decisions", () => {
     jevAdapter({
       key: "test",
       model: "test",
+      fallbackClaude: pinnedClaude,
       retries: 0,
       fetch: async () => new Response("{}", { status: 503 }),
       fallback,
@@ -318,6 +323,7 @@ describe("fallback decisions", () => {
     const spy = vi.spyOn(processAdapter, "execute");
     let flags: string[] = [];
     spy.mockImplementation(async (_file, args) => {
+      if (args[0] === "--version") return "1.0.0 (Claude Code)";
       flags = args;
       return JSON.stringify({
         result: JSON.stringify({ lens: { noul: 0.9 }, exposure: { score: 2 } }),
@@ -331,6 +337,7 @@ describe("fallback decisions", () => {
         },
         { diff: facts.diff },
         context(),
+        pinnedClaude,
       );
       const forbidden = flags.indexOf("--tools");
       const schema = JSON.parse(present(flags[flags.indexOf("--json-schema") + 1]));
@@ -339,6 +346,7 @@ describe("fallback decisions", () => {
         model: flags[flags.indexOf("--model") + 1],
         tools: flags[forbidden + 1],
         strict: flags.includes("--strict-mcp-config"),
+        sources: flags[flags.indexOf("--setting-sources") + 1],
         state: present(flags[1]).includes(JSON.stringify({ diff: facts.diff })),
         required: schema.required,
       }).toMatchObject({
@@ -346,6 +354,7 @@ describe("fallback decisions", () => {
         model: "claude-haiku-4-5",
         tools: "",
         strict: true,
+        sources: "",
         state: true,
         required: ["lens", "exposure"],
       });
@@ -353,16 +362,35 @@ describe("fallback decisions", () => {
       spy.mockRestore();
     }
   });
+  it("refuses a Claude CLI that is not the pinned version", async () => {
+    const calls: string[][] = [];
+    const spy = vi.spyOn(processAdapter, "execute").mockImplementation(async (_file, args) => {
+      calls.push(args);
+      return args[0] === "--version" ? "9.9.9 (Claude Code)" : "{}";
+    });
+    try {
+      await expect(
+        decisionFallback({ lens: { type: "noul" } }, {}, context(), pinnedClaude),
+      ).rejects.toThrow("pin mismatch");
+      expect(calls).toEqual([["--version"]]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
   it("rejects an error-marked fallback response", async () => {
-    const spy = vi.spyOn(processAdapter, "execute").mockResolvedValue(
-      JSON.stringify({
-        is_error: true,
-        subtype: "error_max_turns",
-        result: { lens: { noul: 0.8 } },
-      }),
+    const spy = vi.spyOn(processAdapter, "execute").mockImplementation(async (_file, args) =>
+      args[0] === "--version"
+        ? "1.0.0 (Claude Code)"
+        : JSON.stringify({
+            is_error: true,
+            subtype: "error_max_turns",
+            result: { lens: { noul: 0.8 } },
+          }),
     );
     try {
-      await expect(decisionFallback({ lens: { type: "noul" } }, {}, context())).rejects.toThrow();
+      await expect(
+        decisionFallback({ lens: { type: "noul" } }, {}, context(), pinnedClaude),
+      ).rejects.toThrow("envelope reported an error");
     } finally {
       spy.mockRestore();
     }
@@ -403,6 +431,7 @@ describe("Jev failure diagnostics", () => {
       const adapter = jevAdapter({
         key: "test-only",
         model: "test-model",
+        fallbackClaude: pinnedClaude,
         retries: 0,
         fetch: async () => {
           throw new Error("connect ETIMEDOUT");

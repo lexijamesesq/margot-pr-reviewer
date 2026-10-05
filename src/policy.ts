@@ -229,15 +229,16 @@ export function decide(
   };
 }
 
-/** Every hold reason, most telling first; a missing "risk" sentence is filled with the band. */
+/** Every reason an approved review is held, most telling first; a missing "risk" sentence is filled with the band. */
 const holdSentences: [string, string][] = [
   ["review-authority", "it touches a protected path"],
-  ["fallback", "the risk was scored by the fallback (reduced confidence)"],
+  ["fallback-risk", "the risk was scored by a fallback (reduced confidence)"],
+  ["fallback-routing", "routing fell back to a simpler model (reduced confidence)"],
+  // Saved by 0.6.12, before the step was recorded; a replayed receipt still carries it.
+  ["fallback", "a model step fell back (reduced confidence)"],
   ["ownership-uncomputed", "ownership could not be established"],
   ["calibration", "calibration mode is on"],
   ["risk", ""],
-  ["error", "the review hit an error"],
-  ["author-action", "the author has to act first"],
 ];
 
 /** The one reason a held review is held, for the comment and the check title alike. */
@@ -245,9 +246,33 @@ export function holdReason(decision: { holdReasons: string[]; rating: { band: st
   reason: string;
   sentence: string;
 } {
+  if (
+    decision.holdReasons.includes("fallback-routing") &&
+    decision.holdReasons.includes("fallback-risk") &&
+    !decision.holdReasons.includes("review-authority")
+  )
+    return {
+      reason: "fallback-risk",
+      sentence: "routing and risk both fell back (reduced confidence)",
+    };
   const [reason, sentence] = holdSentences.find(([r]) => decision.holdReasons.includes(r)) ?? [
     "risk",
     "",
   ];
   return { reason, sentence: sentence || `risk is ${decision.rating.band}` };
+}
+
+/** Which model step fell back, for the review comment; null when none did. */
+export function fallbackNotice(holdReasons: string[]): string | null {
+  const routing = holdReasons.includes("fallback-routing");
+  const risk = holdReasons.includes("fallback-risk");
+  if (routing && risk)
+    return "The risk model was unavailable — routing and risk were both decided by a fallback at reduced confidence";
+  if (risk)
+    return "The risk model was unavailable — this risk was scored by a fallback at reduced confidence";
+  if (routing)
+    return "The routing model was unavailable — routing fell back to a simpler model at reduced confidence";
+  if (holdReasons.includes("fallback"))
+    return "A model step was unavailable — a fallback decided it at reduced confidence";
+  return null;
 }

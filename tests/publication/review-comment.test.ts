@@ -64,9 +64,30 @@ it("tells the pull request author which decision is needed on a clarification", 
 it("warns that confidence is reduced and nothing was auto-merged on a fallback-scored review", () => {
   const value = structuredClone(authorChangesReview);
   value.provenance.decision_source = "fallback";
+  value.decision.holdReasons = ["fallback-risk"];
   expect(render(value)).toContain(
     "> ⚠️ _The risk model was unavailable — this risk was scored by a fallback at reduced confidence, so nothing was auto-merged._",
   );
+});
+it("says only routing fell back when the risk was not scored by a fallback", () => {
+  const value = structuredClone(authorChangesReview);
+  value.provenance.decision_source = "fallback";
+  value.decision.holdReasons = ["fallback-routing"];
+  const text = render(value);
+  expect({
+    routing: text.includes("routing fell back to a simpler model at reduced confidence"),
+    risk: text.includes("scored by a fallback"),
+  }).toEqual({ routing: true, risk: false });
+});
+it("says both steps fell back when routing and risk both did", () => {
+  const value = structuredClone(authorChangesReview);
+  value.decision.holdReasons = ["fallback-routing", "fallback-risk"];
+  expect(render(value)).toContain("routing and risk were both decided by a fallback");
+});
+it("shows the generic fallback notice for a receipt saved with the legacy reason", () => {
+  const value = structuredClone(authorChangesReview);
+  value.decision.holdReasons = ["fallback"];
+  expect(render(value)).toContain("A model step was unavailable");
 });
 it("renders the first two sentences of a long rationale", () => {
   const value = structuredClone(authorChangesReview);

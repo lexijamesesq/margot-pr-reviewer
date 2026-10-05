@@ -54,7 +54,6 @@ function ticket(body: string): { label: string; url: string } | null {
   return match?.[0] && match[1] ? { label: match[1], url: match[0] } : null;
 }
 
-/** Validate all external data, including data returned by a typed adapter. */
 type CheckFact = Facts["checks"][number];
 function currentCheck(runs: CheckFact[]): CheckFact | undefined {
   let current: CheckFact | undefined;
@@ -418,7 +417,10 @@ export async function review(
       };
       if (core.provenance.decision_source !== "jev") {
         core.decision.mergeEligible = false;
-        core.decision.holdReasons.push("fallback");
+        if (routeAnswer && routeAnswer.source !== "jev")
+          core.decision.holdReasons.push("fallback-routing");
+        if (riskAnswer && riskAnswer.source !== "jev")
+          core.decision.holdReasons.push("fallback-risk");
       }
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }

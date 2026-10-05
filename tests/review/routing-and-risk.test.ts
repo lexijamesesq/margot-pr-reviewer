@@ -177,6 +177,12 @@ describe("a risk answer from the fallback", () => {
     draft.risk.source = "fallback";
     const { result } = await reviewed(draft);
     expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["fallback"]);
+    expect(result.decision.holdReasons).toEqual(["fallback-risk"]);
+  });
+  it("names only routing when the routing answer alone came from the fallback", async () => {
+    const draft = recorded("council-clear");
+    draft.route.source = "fallback";
+    const { result } = await reviewed(draft);
+    expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
   });
 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { CallContext } from "../types.js";
-import { claudeEnvironment } from "./claude.js";
+import { assertClaudeVersion, claudeEnvironment } from "./claude.js";
 import { execute } from "./process.js";
 
 /** The tool-free fallback decider uses exactly the questions and state Jev saw. */
@@ -8,7 +8,7 @@ export async function decisionFallback(
   questions: object,
   state: unknown,
   context: CallContext,
-  executable = "claude",
+  claude: { executable: string; version: string },
 ): Promise<Record<string, unknown>> {
   const properties = Object.fromEntries(
     Object.entries(questions).map(([name, question]) => {
@@ -34,8 +34,9 @@ export async function decisionFallback(
     additionalProperties: false,
   };
   const prompt = `You are Margot's FALLBACK decider. Jev is unavailable. Judge ONLY the supplied change description. Answer every question. A noul is the probability [0,1] that review is needed. A score is an integer 0–3 against the supplied anchors. Your degraded decision cannot auto-merge. When uncertain prefer review and the higher score. Return only the required JSON.\n\n=== CHANGE DESCRIPTION (state) ===\n${JSON.stringify(state)}\n\n=== QUESTIONS ===\n${JSON.stringify(questions)}`;
+  await assertClaudeVersion(claude.executable, claude.version, context);
   const raw = await execute(
-    executable,
+    claude.executable,
     [
       "-p",
       prompt,
@@ -47,7 +48,7 @@ export async function decisionFallback(
       "claude-haiku-4-5",
       "--no-session-persistence",
       "--setting-sources",
-      "user",
+      "",
       "--settings",
       '{"disableAllHooks":true}',
       "--strict-mcp-config",

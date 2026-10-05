@@ -37,19 +37,25 @@ export function claudeEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv 
     ].flatMap((key) => (source[key] ? [[key, source[key]]] : [])),
   );
 }
+/** Refuses a Claude CLI other than the pinned version. */
+export async function assertClaudeVersion(
+  executable: string,
+  version: string,
+  c: CallContext,
+): Promise<void> {
+  const reported = await execute(executable, ["--version"], {
+    ...c,
+    env: claudeEnvironment(process.env),
+  });
+  if (!reported.startsWith(`${version} `)) throw new Error("Claude CLI pin mismatch");
+}
 export function claudeAdapter(options: ClaudeOptions) {
   async function run(
     role: string,
     input: Parameters<Services["card"]>[0] | Parameters<Services["voice"]>[0],
     c: CallContext,
   ) {
-    const probeEnvironment = claudeEnvironment(process.env);
-    if (
-      !(
-        await execute(options.executable, ["--version"], { ...c, env: probeEnvironment })
-      ).startsWith(`${options.version} `)
-    )
-      throw new Error("Claude CLI pin mismatch");
+    await assertClaudeVersion(options.executable, options.version, c);
     const cwd = await mkdtemp(join(tmpdir(), "margot-claude-"));
     const request = {
       repository: input.facts.repository,

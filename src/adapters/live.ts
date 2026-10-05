@@ -73,7 +73,7 @@ export function liveServices(
       key: credentials.jevKey,
       model: config.jev.model,
       ...(config.jev.url ? { url: config.jev.url } : {}),
-      fallbackExecutable: config.claude.executable,
+      fallbackClaude: config.claude,
     }),
     ...claudeAdapter({
       ...config.claude,
