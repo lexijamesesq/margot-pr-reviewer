@@ -50,3 +50,27 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  package:
+    name: ci / package
+    needs: [floor]
+    if: ${{ (github.event_name == 'pull_request') && needs.floor.outputs.mechanical != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Packed outside the checkout: `attw --pack .` packs and removes a tarball
+      # of the same name in the working directory.
+      - id: pack
+        run: echo "tarball=$(npm pack --silent --pack-destination "$RUNNER_TEMP")" >> "$GITHUB_OUTPUT"
+      - run: npx --yes publint@0.3.25 "$RUNNER_TEMP/${{ steps.pack.outputs.tarball }}"
+      # The package is ESM-only by design: ignore the two rules that flag a
+      # CommonJS or node10 consumer, the only resolutions it does not support.
+      - run: npx --yes @arethetypeswrong/cli@0.18.5 --pack . --ignore-rules no-resolution cjs-resolves-to-esm
+      - run: node scripts/package-smoke.mjs "$RUNNER_TEMP/${{ steps.pack.outputs.tarball }}"
