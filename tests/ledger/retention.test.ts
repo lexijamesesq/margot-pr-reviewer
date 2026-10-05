@@ -28,6 +28,29 @@ it("drops the replay receipt before any dismissal when the ledger is over budget
     keys: decoded.entries.map((e: { key: string }) => e.key),
   }).toEqual({ receipt: false, keys: ["R1-F1", "R1-F2"] });
 });
+it("drops this round's fixed entries before any dismissal when the ledger is over budget", () => {
+  const bulky = (i: number, status: "dismissed" | "fixed"): Ledger["entries"][number] => ({
+    ...entry(),
+    status,
+    key: `R1-F${i}`,
+    what: "detail ".repeat(40),
+    reason: "evidence ".repeat(20),
+    ...(status === "fixed" ? { fixed_round: 2 } : {}),
+  });
+  const dismissed = Array.from({ length: 30 }, (_, i) => bulky(i + 1, "dismissed"));
+  const fixed = Array.from({ length: 30 }, (_, i) => bulky(i + 31, "fixed"));
+  const keys = (list: { key: string }[]) => list.map((e) => e.key);
+  const decoded = JSON.parse(
+    Buffer.from(
+      present(
+        ledgerBlock({ ...prior([]), round: 2, entries: [...fixed, ...dismissed] }).split(" ")[2],
+      ),
+      "base64",
+    ).toString(),
+  );
+  const kept = decoded.entries as { key: string; status: string }[];
+  expect(keys(kept.filter((e) => e.status === "dismissed"))).toEqual(keys(dismissed));
+});
 describe("history retention and retries", () => {
   const recording = () =>
     JSON.parse(readFileSync("recordings/mechanical-bump.json", "utf8")) as Recording;

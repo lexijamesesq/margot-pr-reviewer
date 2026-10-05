@@ -379,10 +379,14 @@ function encodeLedger(ledger: Ledger): string {
   return `<!-- margot-ledger:v1 ${encoded} -->`;
 }
 
-/** Drop the replay receipt first, then oldest dismissals, then current fixed/advisory entries; never standing. */
+/** Drop the replay receipt first, then this round's fixed entries, then oldest dismissals, then advisory entries; never standing. */
 export function ledgerBlock(ledger: Ledger): string {
   const trimmed = structuredClone(ledger);
   const size = () => encodeLedger(trimmed).split(" ")[2]?.length ?? 0;
+  // Nothing reads a fixed entry later (a card cannot cite one, the next round drops it and cards
+  // are shown only standing, dismissed and advisory entries), so it goes before any dismissal.
+  const dropOrder = (e: Ledger["entries"][number]) =>
+    e.status === "fixed" ? 0 : e.status === "dismissed" ? 1 : 2;
   // The optional replay receipt goes before any entry: dismissals and standing findings are
   // the review's memory, and losing them re-raises a dismissed finding as new.
   if (size() > 24000 && trimmed.receipt) {
@@ -391,11 +395,7 @@ export function ledgerBlock(ledger: Ledger): string {
   }
   const droppable = trimmed.entries
     .filter((e) => e.status !== "standing")
-    .sort(
-      (a, b) =>
-        Number(a.status !== "dismissed") - Number(b.status !== "dismissed") ||
-        a.round_raised - b.round_raised,
-    );
+    .sort((a, b) => dropOrder(a) - dropOrder(b) || a.round_raised - b.round_raised);
   while (size() > 24000 && droppable.length) {
     const gone = droppable.shift();
     trimmed.entries = trimmed.entries.filter((e) => e !== gone);
