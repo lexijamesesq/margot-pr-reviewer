@@ -135,8 +135,8 @@ configuration it classifies a merged, closed, superseded, draft, fork-head,
 conflicted, or empty request and stops instead. Otherwise it writes
 `request.json` and `config.json` under the given Margot root, with the supplied
 required checks, protected paths, allowed skipped checks, and authority applied.
-Authority selects GitHub publication and requires a nonempty, run-unique
-`--run-url`; without it, the configuration is a before-head shadow run.
+With `--authority true` the review publishes to GitHub, and `--run-url` must name
+this run; without authority it runs in shadow mode and publishes nothing.
 
 Every classified stop exits **75** and prints `stop_reason=<reason>` (one of
 `superseded`, `merged`, `closed`, `draft`, `fork`, `conflict`, `empty`); a
