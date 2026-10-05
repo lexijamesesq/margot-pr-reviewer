@@ -1,0 +1,4 @@
+# The self-hosted sample names a placeholder runner label.
+self-hosted-runner:
+  labels:
+    - YOUR_REVIEW_RUNNER

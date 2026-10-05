@@ -121,6 +121,12 @@ raw model responses captured during the run. It exits 1 when `result.kind` is
    closes any review check this run owns so the PR is not left with a check
    stuck in progress.
 
+`samples/github-hosted.sample.yml` is the same workflow for a team that has only
+GitHub-hosted runners: it keeps the deployment and configuration in GitHub
+variables, installs the pinned Claude CLI, fetches the card bundle at its pinned
+commit, and adds a `triage` job ahead of `review`. Choose it when you have no
+runner of your own to hold trusted files.
+
 ## Instance commands
 
 `margot-instance` ships three commands so a consumer does not need its own

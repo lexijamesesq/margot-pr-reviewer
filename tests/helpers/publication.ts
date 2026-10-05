@@ -47,7 +47,10 @@ export type PublicationMode =
   | "retry"
   | "superseded"
   | "order"
-  | "error";
+  | "error"
+  | "council-error"
+  | "facts-error"
+  | "token-error";
 
 export const mechanicalBump = readRecording("mechanical-bump");
 export const mechanicalRequest = requestSchema.parse(mechanicalBump.request);
@@ -242,6 +245,28 @@ export async function runPublication(mode: PublicationMode = "clear") {
     }
     if (defect("error"))
       return { kind: "error", stage: "card", diagnostic: "Recorded timeout", mergeEligible: false };
+    if (mode === "council-error")
+      return {
+        kind: "error",
+        stage: "voice",
+        diagnostic: "The voice did not account for every mandatory finding. Card safety is open.",
+        mergeEligible: false,
+      };
+    if (mode === "facts-error")
+      return {
+        kind: "error",
+        stage: "facts",
+        diagnostic: "Incomplete facts",
+        mergeEligible: false,
+      };
+    if (mode === "token-error")
+      return {
+        kind: "error",
+        stage: "card:safety",
+        diagnostic:
+          "Card safety failed with ghp_abcdefghijklmnopqrstuvwxyz0123 and a distinctive-detail-canary.",
+        mergeEligible: false,
+      };
     if (mode === "triage")
       return {
         kind: "classified",

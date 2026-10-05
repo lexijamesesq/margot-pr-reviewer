@@ -5,6 +5,20 @@ import { checkText } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
 
+// What the pull request is told when an error comes once the council has begun. An error
+// at an earlier stage ends as a check only. The sentence is fixed per stage: the check
+// carries the diagnostic, which the conversation never repeats.
+function notReviewedReason(stage: string): string | undefined {
+  if (stage.startsWith("card:") || stage === "cards")
+    return "A council reviewer could not complete its review";
+  if (stage === "risk") return "The risk could not be scored";
+  if (stage === "voice") return "The verdict could not be written";
+  if (stage === "render") return "The review comment could not be rendered";
+  if (stage === "publication" || stage === "publication-head")
+    return "The review could not be published";
+  return undefined;
+}
+
 type RefusalReason = "draft" | "fork" | "closed" | "stale";
 
 class PublicationRefusal extends Error {
@@ -259,6 +273,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
   ): Promise<ReviewResult> {
     if (active) throw new Error("Publisher is single-use");
     active = requestSchema.parse(r);
+    let notReviewed: string | undefined;
     const context = () => ({ signal: AbortSignal.timeout(60000) });
     try {
       await check(
@@ -278,6 +293,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           /Margot: not reviewed: (draft|fork|closed|stale)/,
         )?.[1] as RefusalReason | undefined;
         if (refusal) throw new PublicationRefusal(refusal);
+        notReviewed = notReviewedReason(result.stage);
         throw new Error(`${result.stage}: ${result.diagnostic}`);
       }
       if (result.kind === "held") {
@@ -368,6 +384,19 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           await cleanup();
         } catch (cleanupError) {
           failures.push(`${label} cleanup unconfirmed: ${errorMessage(cleanupError)}`);
+        }
+      }
+      // The check is closed first; the author then gets the reason in the conversation too.
+      if (notReviewed !== undefined) {
+        try {
+          await client.rest.pulls.createReview({
+            ...params(r, context()),
+            commit_id: r.head,
+            event: "COMMENT",
+            body: `Not reviewed: ${notReviewed}. The review check has the details. Held for the operator.`,
+          });
+        } catch (commentError) {
+          failures.push(`not-reviewed comment unconfirmed: ${errorMessage(commentError)}`);
         }
       }
       return {
