@@ -45,6 +45,7 @@ async function wire(mode: string) {
   if (mode === "superseded") input.liveSha = "f".repeat(40);
   if (mode === "live-superseded") input.stopReason = "superseded";
   if (mode === "floor") input.stopReason = "floor";
+  if (mode === "prototype-key") input.stopReason = "toString";
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     const target = new URL(String(url));
     const method = init?.method ?? "GET";
@@ -307,5 +308,13 @@ it("reports a failed close as an error rather than a false receipt", async () =>
   expect((await wire("patch-error")).decision).toMatchObject({
     action: "error",
     message: expect.stringContaining("could not close check 88"),
+  });
+});
+it("treats a stop reason that is only an inherited object key as unknown", async () => {
+  expect({ write: (await wire("prototype-key")).writes[0] }).toMatchObject({
+    write: {
+      conclusion: "action_required",
+      output: { summary: expect.stringContaining("read the run for the cause") },
+    },
   });
 });

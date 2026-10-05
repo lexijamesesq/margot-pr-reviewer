@@ -184,7 +184,9 @@ has machine-readable `outcome: <OUTCOME> | band: <BAND>` and `decision_source:
 <source>` lines.
 
 A PR is held for the operator — not cleared for merge, even on an outcome of
-APPROVED — when any of the following holds: risk is above LOW; the
+APPROVED — when any of the following holds: risk is above LOW; routing or the
+risk score came from the fallback model rather than Jev; the review history
+could not be read or a trusted ledger in it is corrupt; the
 protected-path ownership tier could not be computed; calibration mode is on; the
 voice's outcome is anything other than APPROVED; a rename touches a protected
 path on either its old or new path; or the change is classified `functional`

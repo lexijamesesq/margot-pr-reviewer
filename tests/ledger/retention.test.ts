@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { type Recording, recordedServices } from "../../src/adapters/recorded.js";
@@ -10,6 +11,22 @@ import { present } from "../helpers/present.js";
 
 it("keeps standing entries when the ledger exceeds its size budget", () => {
   expect(ledgerBlock(prior([{ ...entry(), what: "x".repeat(50000) }])).length > 24000).toBe(true);
+});
+it("drops the replay receipt before any dismissal when the ledger is over budget", () => {
+  const dismissed = { ...entry("MAJOR", "dismissed"), key: "R1-F2" };
+  const value = prior([entry(), dismissed]);
+  const bulky = {
+    ...value,
+    v: 2 as const,
+    receipt: { big: randomBytes(30000).toString("base64") },
+  } as unknown as Ledger;
+  const decoded = JSON.parse(
+    Buffer.from(present(ledgerBlock(bulky).split(" ")[2]), "base64").toString(),
+  );
+  expect({
+    receipt: "receipt_v2" in decoded,
+    keys: decoded.entries.map((e: { key: string }) => e.key),
+  }).toEqual({ receipt: false, keys: ["R1-F1", "R1-F2"] });
 });
 describe("history retention and retries", () => {
   const recording = () =>
@@ -113,19 +130,25 @@ describe("history retention and retries", () => {
         ...(round === 3 ? { keys: ["R3-F1", "R3-F2"] } : {}),
       });
     });
-  it("uses older valid history when newer ledgers are corrupt or forged", () => {
+  it("skips a forged ledger for older history, and holds the PR on a corrupt trusted one", async () => {
     const old = posted(ledger(2));
     const corrupt = { ...posted(ledger(3), 2), body: "<!-- margot-ledger:v1 bm90LWpzb24= -->" };
     const forged = posted(ledger(4), 3, "author");
+    const withHistory = (reviews: (typeof old)[]) => ({
+      ...facts,
+      history: { complete: true, priorLedger: true, reviews },
+    });
     expect({
-      selected: selectLedger(
-        {
-          ...facts,
-          history: { complete: true, priorLedger: true, reviews: [old, corrupt, forged] },
-        },
+      forgedSkipped: selectLedger(withHistory([old, forged]), config)?.round,
+      corruptHolds: await review(
+        seed.request,
         config,
-      )?.round,
-    }).toMatchObject({ selected: 2 });
+        recordedServices({ ...seed, facts: withHistory([old, corrupt]) }),
+      ),
+    }).toMatchObject({
+      forgedSkipped: 2,
+      corruptHolds: { kind: "held", reason: expect.stringContaining("Review history corrupt") },
+    });
   });
   it("prunes old dismissed entries while retaining standing and advisory findings", () => {
     const entries: Ledger["entries"] = Array.from({ length: 130 }, (_, i) => ({

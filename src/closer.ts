@@ -190,7 +190,9 @@ export async function closeStrandedCheck(
   const cancelled =
     stopped[1] === "cancelled" || (stopped[0] === "package" && input.stopReason === "cancelled");
   const context = { liveSha: input.liveSha ?? ownPull.head.sha, stopped };
-  const mapped = stopChecks[input.stopReason as keyof typeof stopChecks];
+  const mapped = Object.hasOwn(stopChecks, input.stopReason)
+    ? stopChecks[input.stopReason as keyof typeof stopChecks]
+    : undefined;
   const output = mapped
     ? mapped(context)
     : cancelled

@@ -5,7 +5,8 @@ import { mechanicalReview, runPublication } from "../helpers/publication.js";
 // Each case is [hold reasons, the one sentence the comment and the check title share].
 const cases = [
   [["review-authority"], "it touches a protected path"],
-  [["fallback"], "the risk was scored by the fallback (reduced confidence)"],
+  [["fallback-risk"], "the risk was scored by a fallback (reduced confidence)"],
+  [["fallback-routing"], "routing fell back to a simpler model (reduced confidence)"],
   [["ownership-uncomputed"], "ownership could not be established"],
   [["calibration"], "calibration mode is on"],
   [["risk"], "risk is HIGH"],

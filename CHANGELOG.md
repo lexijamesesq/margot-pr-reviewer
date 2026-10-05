@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.13
+
+- A large review no longer loses its dismissals to the size budget: the ledger drops its replay receipt before any dismissal, so the next round does not re-raise a dismissed finding as new.
+- The fallback wording says which step fell back. A routing-only fallback no longer claims the risk was scored by a fallback; the comment and the check title name routing, risk, or both.
+- The hold-reason sentences cover only the reasons a held approval can carry. The 0.6.12 line below that gives an error and a pending author a sentence overstated it: those outcomes are not approvals, so they are never held under that wording.
+- The fallback decider runs the Claude CLI without loading the runner's own settings and refuses a CLI that is not the pinned `claude.version`, as the council reviewers already do.
+- A stop reason that is only an inherited object key, such as `toString`, is treated as an unknown stop by the check closer.
+
 ## 0.6.12
 
 - When a review ends in an error, `margot-review` prints the failed stage and diagnostic to stderr, so the reason survives in the run log after the output file is removed. The check summary and the not-reviewed comment point to the review run for it.

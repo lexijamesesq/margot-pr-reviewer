@@ -1,5 +1,5 @@
 import { ledgerBlock } from "./ledger.js";
-import { holdReason } from "./policy.js";
+import { fallbackNotice, holdReason } from "./policy.js";
 import { cardNames } from "./schemas.js";
 import type { Card, Review, ReviewPresentation } from "./types.js";
 
@@ -174,10 +174,8 @@ export function render(review: Review): string {
     `### ${outcomeIcons[decision.outcome]} ${decision.outcome}`,
     `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}**${risk ? ` — ${risk}` : ""}`,
     `> ${firstSentences(rationale, 2)}`,
-    ...(review.provenance.decision_source && review.provenance.decision_source !== "jev"
-      ? [
-          "> ⚠️ _The risk model was unavailable — this risk was scored by a fallback at reduced confidence, so nothing was auto-merged._",
-        ]
+    ...(fallbackNotice(review.decision.holdReasons)
+      ? [`> ⚠️ _${fallbackNotice(review.decision.holdReasons)}, so nothing was auto-merged._`]
       : []),
     ...(authority ? ["", authority] : []),
     ...(decision.outcome === "CLARIFICATION_REQUESTED" && clarification

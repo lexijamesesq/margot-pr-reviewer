@@ -40,7 +40,8 @@ export const evidenceHash = (facts: Facts): string =>
     .digest("hex");
 
 /** Only trailing blocks claim history; prose mentions cannot hide the App's ledger.
- * Untrusted or undecodable blocks are skipped, preserving older App history.
+ * Blocks from untrusted actors are skipped, preserving older App history. An undecodable
+ * block from a trusted actor is reported through `onWarning`, and the review holds on it.
  */
 export function selectLedger(
   facts: Facts,
@@ -378,9 +379,16 @@ function encodeLedger(ledger: Ledger): string {
   return `<!-- margot-ledger:v1 ${encoded} -->`;
 }
 
-/** Drop oldest dismissals, then current fixed/advisory entries; never standing. */
+/** Drop the replay receipt first, then oldest dismissals, then current fixed/advisory entries; never standing. */
 export function ledgerBlock(ledger: Ledger): string {
   const trimmed = structuredClone(ledger);
+  const size = () => encodeLedger(trimmed).split(" ")[2]?.length ?? 0;
+  // The optional replay receipt goes before any entry: dismissals and standing findings are
+  // the review's memory, and losing them re-raises a dismissed finding as new.
+  if (size() > 24000 && trimmed.receipt) {
+    delete trimmed.receipt;
+    trimmed.v = 1;
+  }
   const droppable = trimmed.entries
     .filter((e) => e.status !== "standing")
     .sort(
@@ -388,14 +396,9 @@ export function ledgerBlock(ledger: Ledger): string {
         Number(a.status !== "dismissed") - Number(b.status !== "dismissed") ||
         a.round_raised - b.round_raised,
     );
-  while ((encodeLedger(trimmed).split(" ")[2]?.length ?? 0) > 24000 && droppable.length) {
+  while (size() > 24000 && droppable.length) {
     const gone = droppable.shift();
     trimmed.entries = trimmed.entries.filter((e) => e !== gone);
-  }
-  // The optional replay receipt must not consume the standing-entry budget.
-  if ((encodeLedger(trimmed).split(" ")[2]?.length ?? 0) > 24000 && trimmed.receipt) {
-    delete trimmed.receipt;
-    trimmed.v = 1;
   }
   return encodeLedger(trimmed);
 }

@@ -20,6 +20,7 @@ import {
 } from "../helpers/review.js";
 
 /** A request from a host with no dispatcher: it carries no class. */
+const pinnedClaude = { executable: "claude", version: "1.0.0" };
 const withoutDispatchedClass: Change = (draft) => {
   delete draft.request.classification;
 };
@@ -326,6 +327,7 @@ describe("classification provenance and availability", () => {
     const outage = jevAdapter({
       key: "test",
       model: "test",
+      fallbackClaude: pinnedClaude,
       retries: 0,
       fetch: async () => new Response("{}", { status: 503 }),
       fallback: async (questions) =>

@@ -31,7 +31,7 @@ export function jevAdapter(options: {
   fetch?: typeof fetch;
   retries?: number;
   minTimeout?: number;
-  fallbackExecutable?: string;
+  fallbackClaude: { executable: string; version: string };
   fallback?: typeof decisionFallback;
 }) {
   const transport = options.fetch ?? fetch;
@@ -108,12 +108,7 @@ export function jevAdapter(options: {
         if (!fallback || c.signal.aborted) throw error;
         console.warn(`Margot: ${errorMessage(error)}; using the fallback decider`);
         answers.push(
-          await (options.fallback ?? decisionFallback)(
-            questions,
-            batch,
-            c,
-            options.fallbackExecutable,
-          ),
+          await (options.fallback ?? decisionFallback)(questions, batch, c, options.fallbackClaude),
         );
         source = "fallback";
       }
