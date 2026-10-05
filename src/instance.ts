@@ -18,7 +18,10 @@ const versionSchema = z
 const deploymentSchema = z.object({
   version: versionSchema,
   packageReference: z.url(),
-  packageIntegrity: z.string().regex(/^sha512-[A-Za-z0-9+/]{86}==$/),
+  packageIntegrity: z
+    .string()
+    .regex(/^sha512-[A-Za-z0-9+/]{86}==$/)
+    .optional(),
   packageSha256: z.string().regex(/^[a-f0-9]{64}$/),
 });
 const pullSchema = z.object({
@@ -251,7 +254,10 @@ async function resolveReferences(config: unknown, github: Pick<Octokit, "rest">)
   if (!claude?.references) return config;
   const references: Record<string, { repository: string; head: string }> = {};
   for (const [name, value] of Object.entries(claude.references)) {
-    const reference = referenceInputSchema.parse(value);
+    const parsed = referenceInputSchema.safeParse(value);
+    if (!parsed.success)
+      throw new Error(`Reference ${name} is invalid: ${errorMessage(parsed.error)}`);
+    const reference = parsed.data;
     if (reference.head !== undefined) {
       references[name] = { repository: reference.repository, head: reference.head };
       continue;

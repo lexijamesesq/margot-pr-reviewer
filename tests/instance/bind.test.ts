@@ -296,6 +296,14 @@ it("fails bind-request naming the reference and ref that does not resolve", asyn
     /Reference dotty \(example\/dotty\) ref gone did not resolve/,
   );
 });
+it("names the reference whose entry is malformed", async () => {
+  const fixture = await referenceFixture({
+    dotty: { repository: "example/dotty", head: "f".repeat(40) },
+    broken: { repository: "example/broken" },
+  });
+  const error = await captureError(fixture.bind);
+  expect((error as Error).message).toMatch(/^Reference broken is invalid: /);
+});
 it("rejects a reference that gives both head and ref, or neither", async () => {
   for (const reference of [
     { repository: "example/dotty", head: "f".repeat(40), ref: "v1" },

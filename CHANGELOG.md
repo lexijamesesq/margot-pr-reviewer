@@ -9,6 +9,8 @@
 - `samples/deployment.sample.json` carries placeholder values instead of a stale release.
 - The check closer words each stop as its own sentence, titles every stop with "Margot:", and gives an unexplained stop its own summary.
 - The package entry exports only the library API the README documents (`review`, `recordedServices`, `liveServices`, `liveConfigSchema` and their types). `githubAdapter`, `githubClient`, `githubPublisher`, `render`, `renderCheckText` and `findingTally` are no longer exported.
+- `packageIntegrity` in the deployment is now optional; when present it is still checked for its `sha512-` form. The SHA-256 remains required.
+- `margot-instance bind-request` names the reference in the error when a `claude.references` entry is malformed.
 - `margot-instance`: a malformed JSON flag names the flag, `--help` prints the usage and exits 0, and its refusal messages say `margot-instance`.
 
 ## 0.6.11
