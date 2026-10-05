@@ -64,6 +64,7 @@ export function claudeAdapter(options: ClaudeOptions) {
       base: input.facts.base,
       phase: "review",
     };
+    const mcpPath = join(cwd, "mcp.json");
     const card = "name" in input ? input : null;
     const ticketing = options.ticketing;
     const ticketingEnvironment = ticketing
@@ -176,6 +177,9 @@ export function claudeAdapter(options: ClaudeOptions) {
     ].join("\n");
     try {
       await writeFile(evidence.diffPath, input.round.diff, { mode: 0o600 });
+      // The config carries the GitHub token and ticketing secrets; argv is readable by every
+      // process on the host, so it goes to a private file and only its path is passed.
+      await writeFile(mcpPath, JSON.stringify(mcp), { mode: 0o600 });
       const stdout = await execute(
         options.executable,
         [
@@ -198,11 +202,10 @@ export function claudeAdapter(options: ClaudeOptions) {
             disableAllHooks: true,
             autoMemoryEnabled: false,
             claudeMdExcludes: ["**"],
-            enabledPlugins: { "publish@publish": false },
           }),
           "--strict-mcp-config",
           "--mcp-config",
-          JSON.stringify(mcp),
+          mcpPath,
           "--tools",
           "",
           "--allowedTools",

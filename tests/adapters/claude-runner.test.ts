@@ -1,3 +1,4 @@
+import { access } from "node:fs/promises";
 import { expect, it } from "vitest";
 import { configuredTicketingEnvironment } from "../../src/cli-services.js";
 import { facts, fakeClaude, ticketing } from "../helpers/adapters.js";
@@ -56,6 +57,28 @@ it("grants configured ticket evidence only to card runs", async () => {
     voiceServer: null,
     voiceTicketingTools: [],
   });
+});
+it("keeps every credential off the Claude command line and in a private file", async () => {
+  const secrets = {
+    TICKETING_TOKEN: "test-only-argv-ticket-token",
+    TICKETING_TENANT: "test-only-argv-tenant",
+  };
+  const githubToken = "test-only-argv-github-token";
+  const invocation = await fakeClaude({
+    ticketing,
+    ticketingEnvironment: secrets,
+    githubToken,
+  });
+  const file = JSON.stringify(invocation.mcp);
+  expect({
+    argvLeaks: [githubToken, ...Object.values(secrets)].filter((secret) =>
+      invocation.args.some((arg) => arg.includes(secret)),
+    ),
+    fileHolds: [githubToken, ...Object.values(secrets)].every((secret) => file.includes(secret)),
+    mode: invocation.mcpMode,
+    pathPassed: invocation.args[invocation.args.indexOf("--mcp-config") + 1] === invocation.mcpPath,
+  }).toEqual({ argvLeaks: [], fileHolds: true, mode: 0o600, pathPassed: true });
+  await expect(access(invocation.mcpPath)).rejects.toThrow();
 });
 it("forwards exactly the configured environment variables from the CLI", async () => {
   const environment = {

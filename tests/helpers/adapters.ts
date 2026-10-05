@@ -126,6 +126,7 @@ export async function fakeClaude(
       tools: string[];
     };
     ticketingEnvironment?: Record<string, string>;
+    githubToken?: string;
     cliEnvironment?: NodeJS.ProcessEnv;
     role?: "card" | "voice";
   } = {},
@@ -161,11 +162,15 @@ if (process.argv.includes("--version")) {
 } else {
   console.log(JSON.stringify(${JSON.stringify({ type: "system", subtype: "init", tools: options.tools ?? [] })}));
   const args = process.argv.slice(2);
-  const mcp = JSON.parse(args[args.indexOf("--mcp-config") + 1]);
+  const mcpPath = args[args.indexOf("--mcp-config") + 1];
+  const mcpText = fs.readFileSync(mcpPath, "utf8");
+  const mcp = JSON.parse(mcpText);
   const evidence = JSON.parse(mcp.mcpServers.evidence.env.MARGOT_EVIDENCE);
   fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({
     args,
     mcp,
+    mcpMode: fs.statSync(mcpPath).mode & 0o777,
+    mcpPath,
     stdin: fs.readFileSync(0, "utf8"),
     diff: fs.readFileSync(evidence.diffPath, "utf8"),
   }));
@@ -195,6 +200,7 @@ if (process.argv.includes("--version")) {
           ...(options.ticketingEnvironment
             ? { ticketingEnvironment: options.ticketingEnvironment }
             : {}),
+          ...(options.githubToken ? { githubToken: options.githubToken } : {}),
         });
     const round = {
       round: options.delta === undefined ? 1 : 2,
@@ -231,6 +237,8 @@ if (process.argv.includes("--version")) {
     return {
       ...(JSON.parse(await readFile(capture, "utf8")) as {
         args: string[];
+        mcpMode: number;
+        mcpPath: string;
         mcp: {
           mcpServers: Record<
             string,
