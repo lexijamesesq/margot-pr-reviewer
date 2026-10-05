@@ -115,6 +115,8 @@ export async function fakeClaude(
   options: {
     version?: string;
     tools?: string[];
+    /** Report the requested tools with the first one replaced by this name. */
+    replaceFirstTool?: string;
     mcpServers?: { name: string; status: string }[];
     envelope?: Record<string, unknown>;
     facts?: typeof facts;
@@ -170,7 +172,8 @@ if (process.argv.includes("--version")) {
   console.log(JSON.stringify({
     type: "system",
     subtype: "init",
-    tools: ${JSON.stringify(options.tools ?? null)} ?? requested,
+    tools: ${JSON.stringify(options.tools ?? null)} ??
+      requested.map((tool, index) => (index === 0 ? ${JSON.stringify(options.replaceFirstTool ?? null)} ?? tool : tool)),
     mcp_servers: ${JSON.stringify(options.mcpServers ?? null)} ??
       Object.keys(mcp.mcpServers).map((name) => ({ name, status: "connected" })),
   }));

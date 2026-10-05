@@ -203,6 +203,11 @@ it("rejects a requested tool Claude did not report", async () => {
     "exactly the requested tools",
   );
 });
+it("rejects a reported tool list of the right length with one tool swapped", async () => {
+  await expect(fakeClaude({ replaceFirstTool: "Bash" })).rejects.toThrow(
+    "exactly the requested tools",
+  );
+});
 it("rejects an MCP server that did not connect", async () => {
   await expect(
     fakeClaude({ mcpServers: [{ name: "evidence", status: "failed" }] }),
