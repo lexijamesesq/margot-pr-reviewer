@@ -42,7 +42,7 @@ it("gives each card only its own standing and dismissed history", async () => {
     rawHistory: input.facts.history.reviews ?? [],
   }).toMatchObject({ keys: ["R1-F1"], rawHistory: [] });
 });
-it("rechecks classification and reuses the council result on the same head", async () => {
+it("reuses the council result on the same head without classifying again", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");
   const f = factsSchema.parse(r.facts);
@@ -53,7 +53,7 @@ it("rechecks classification and reuses the council result on the same head", asy
   expect({
     equal: JSON.stringify(result) === JSON.stringify(retry),
     calls: s.calls.map((c) => c.name),
-  }).toMatchObject({ equal: true, calls: ["facts", "classification", "head"] });
+  }).toMatchObject({ equal: true, calls: ["facts", "head"] });
 });
 it("reviews afresh in the same round when the PR body changed on the same head", async () => {
   // A same-head re-run is reviewed as the same round; a body edit between runs changes the

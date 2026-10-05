@@ -24,7 +24,7 @@ describe("reviews replayed from recordings", () => {
     const { result, calls } = await reviewed(recorded("mechanical-bump"));
     expect(result.cards).toEqual([]);
     expect(result.voice).toBeNull();
-    expect(calls).toEqual(["facts", "classification", "head", "publish"]);
+    expect(calls).toEqual(["facts", "head", "publish"]);
   });
 
   it("publishes once when the council clears the change", async () => {

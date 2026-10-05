@@ -3,7 +3,7 @@ import parseDiff from "parse-diff";
 import { z } from "zod";
 import { diffIsComplete } from "../diff.js";
 import { errorMessage } from "../errors.js";
-import { classNames, factsSchema, requestSchema } from "../schemas.js";
+import { classNames, factsSchema, probability, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
 
@@ -200,6 +200,9 @@ export function githubAdapter(
               base: r.base,
               head: r.head,
               classification,
+              ...(probability.safeParse(machine.mechanical_probability).success
+                ? { mechanicalProbability: machine.mechanical_probability }
+                : {}),
             };
         } catch (error) {
           // Unreadable triage conservatively requires functional review.

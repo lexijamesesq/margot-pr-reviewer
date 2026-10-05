@@ -173,24 +173,37 @@ export async function review(
       cached = undefined;
     stage = "triage";
     const oversized = changedLineCount(facts.diff) > config.mechanicalDiffLineCap;
-    const answer = oversized
-      ? null
-      : classificationSchema.parse(
+    let classification: (typeof classNames)[number] = "functional";
+    let classSource = "diff_too_large";
+    let mechanicalProbability: number | null = null;
+    if (request.phase === "triage") {
+      // The triage is the one classification: it asks Jev.
+      if (!oversized) {
+        const answer = classificationSchema.parse(
           await call("classification", (c) => services.classify(facts, classificationQuestions, c)),
         );
-    const fresh = answer ? classify(answer, { ...facts, triage: null }, config) : "functional";
-    let classification = fresh;
-    let classSource = answer?.source ?? "diff_too_large";
-    if (request.phase !== "triage") {
-      const trusted =
+        classification = classify(answer, { ...facts, triage: null }, config);
+        classSource = answer.source;
+        if (answer.source === "jev") mechanicalProbability = answer.mechanical;
+      }
+    } else {
+      // The review never asks again: it takes the class from the verified triage for this
+      // head, and is functional without one.
+      const verified =
         facts.triage &&
         config.trustedTriageActors.includes(facts.triage.actor) &&
-        facts.triage.head === request.head;
-      classification = trusted && facts.triage ? facts.triage.classification : "functional";
-      classSource = trusted ? "jev" : "triage_unavailable";
-      if (classNames.indexOf(fresh) < classNames.indexOf(classification)) {
-        classification = fresh;
-        classSource = answer?.source ?? "diff_too_large";
+        facts.triage.head === request.head
+          ? facts.triage
+          : null;
+      if (verified) {
+        classification = verified.classification;
+        classSource = "jev";
+        mechanicalProbability = verified.mechanicalProbability ?? null;
+      } else classSource = "triage_unavailable";
+      // An oversized diff is never lowered below functional.
+      if (oversized && classification !== "functional") {
+        classification = "functional";
+        classSource = "diff_too_large";
       }
       const dispatched =
         classNames.find((name) => name === request.classification) ??
@@ -202,8 +215,13 @@ export async function review(
     }
     if (cached && classification !== cached.review.classification) cached = undefined;
     if (request.phase === "triage")
-      return { kind: "classified", request, classification, decision_source: classSource };
-    await progress("Margot: preflight complete — setting up the review runner");
+      return {
+        kind: "classified",
+        request,
+        classification,
+        decision_source: classSource,
+        mechanical_probability: mechanicalProbability,
+      };
     stage = "checks";
     for (const name of config.requiredChecks) {
       // One name can carry several runs on one head: a workflow's concurrency cancels a
@@ -370,7 +388,7 @@ export async function review(
         provenance: {
           cardBundle: config.cardBundle.commit,
           classification: classSource,
-          mechanicalProbability: answer?.source === "jev" ? answer.mechanical : null,
+          mechanicalProbability,
           summonedByLedger: recalled.filter(
             (name) =>
               !routeAnswer ||

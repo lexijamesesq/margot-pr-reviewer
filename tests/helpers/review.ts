@@ -137,6 +137,8 @@ export const withTriage =
 
 // --- Changes to what the services answered ---
 
+/** No verified triage for this head, so the review asks Jev to classify. */
+export const withoutTriage = (): Change => withFacts({ triage: null });
 export const withClassification =
   (fields: Obj): Change =>
   (draft) => {
@@ -205,13 +207,14 @@ export const withCardFields =
   };
 
 /**
- * A documentation change whose lens answers are recorded: routing selects no lens, Jev
- * says whether the documentation changes meaning, and the proof card is available.
+ * A documentation change, as the verified triage classified it, whose lens answers are
+ * recorded: routing selects no lens, Jev says whether the documentation changes meaning,
+ * and the proof card is available.
  */
 export const asDocumentation =
   (substantive: 1 | 0 | null, ...changes: Change[]): Change =>
   (draft) => {
-    withClassification(classifiedAs(0, 1, 0))(draft);
+    withTriage({ classification: "documentation" })(draft);
     withNoCouncil()(draft);
     withRoute({ documentationSubstantive: substantive })(draft);
     withCard("works-and-proven", completedCard("works-and-proven"))(draft);
@@ -290,7 +293,6 @@ export const councilClearCards = [
 ] as const;
 export const councilClearCalls = [
   "facts",
-  "classification",
   "route",
   "bundle",
   ...councilClearCards.map((name) => `card:${name}`),

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.8
+
+- The review no longer asks Jev to classify. It takes its class from the verified triage for the head, or reviews as functional when there is none; the dispatcher's class still applies on top and an oversized diff is still reviewed as functional.
+- The triage check's machine JSON carries a new `mechanical_probability` field, and a verified triage hands it to the review, so the mechanical comment keeps its confidence figure. Older triage checks without the field render no figure.
+- The review check opens as "Margot: preflight complete — setting up the review runner" when the run starts, replacing "Margot: preflight — mechanical checks", which belongs to the host's wait for required checks.
+
 ## 0.6.7
 
 - Errors keep their cause: the CLI names the file, field, variable or configuration setting that failed, and Jev authentication failures are distinguishable from outages.

@@ -63,7 +63,7 @@
       "actor": "triage-app",
       "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "head": "0000000000000000000000000000000000000007",
-      "classification": "mechanical"
+      "classification": "functional"
     },
     "autoMergeArmed": true,
     "ownedPathTier": "none"

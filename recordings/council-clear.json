@@ -63,7 +63,7 @@
       "actor": "triage-app",
       "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "head": "0000000000000000000000000000000000000002",
-      "classification": "mechanical"
+      "classification": "functional"
     },
     "autoMergeArmed": true,
     "ownedPathTier": "none"
@@ -155,7 +155,7 @@
       "name": "safety",
       "completion": "completed",
       "checked": [
-        "Weakened-guard probe. The only change is that `.github/workflows/ci.yml` at the head sha removes the `all-checks-passed` job (`ci / all-passed`) and its comment block. I fetched the live branch rules for `main` (`gh api repos/example/project/rules/branches/main`). Ruleset 23658235 requires `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck` and `ci / release-check`. It does not require `ci / all-passed`. So the removed check was not gating merges, and its protection was already off. That is not a finding under the card. Its extra rule (a skipped job counts as a failure on a non-mechanical PR) was not enforced by the ruleset either. The required checks still hold: if the floor fails, the required `ci / checks` fails; `ruff` and `shellcheck` still depend on `floor` (lines 39\u201340, 52\u201353); `release-check` still always runs (lines 63\u201384). This probe would have caught a required check or aggregator removed while the ruleset still enforced it, which would let a red PR merge."
+        "Weakened-guard probe. The only change is that `.github/workflows/ci.yml` at the head sha removes the `all-checks-passed` job (`ci / all-passed`) and its comment block. I fetched the live branch rules for `main` (`gh api repos/example/project/rules/branches/main`). Ruleset 23658235 requires `trusted-scan / trusted-scan`, `ci / checks`, `ci / ruff`, `ci / shellcheck` and `ci / release-check`. It does not require `ci / all-passed`. So the removed check was not gating merges, and its protection was already off. That is not a finding under the card. Its extra rule (a skipped job counts as a failure on a non-mechanical PR) was not enforced by the ruleset either. The required checks still hold: if the floor fails, the required `ci / checks` fails; `ruff` and `shellcheck` still depend on `floor` (lines 39–40, 52–53); `release-check` still always runs (lines 63–84). This probe would have caught a required check or aggregator removed while the ruleset still enforced it, which would let a red PR merge."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -166,7 +166,7 @@
       "name": "works-and-proven",
       "completion": "completed",
       "checked": [
-        "Compared the gating logic that was removed with what the ruleset now requires. At `.github/workflows/ci.yml` (head, lines 37\u201384), `ruff` and `shellcheck` are skipped only when the floor sets `mechanical=true` (lines 40, 53), which is the same condition under which the old aggregator let a skip through. `release-check` always runs. If the floor fails, the dependent jobs are skipped, but `ci / checks` itself fails and still blocks the merge. This would have caught a gap the aggregator used to close, where a skipped job on a functional PR passes a required check. There is no such path."
+        "Compared the gating logic that was removed with what the ruleset now requires. At `.github/workflows/ci.yml` (head, lines 37–84), `ruff` and `shellcheck` are skipped only when the floor sets `mechanical=true` (lines 40, 53), which is the same condition under which the old aggregator let a skip through. `release-check` always runs. If the floor fails, the dependent jobs are skipped, but `ci / checks` itself fails and still blocks the merge. This would have caught a gap the aggregator used to close, where a skipped job on a functional PR passes a required check. There is no such path."
       ],
       "notCovered": [
         "Other repositories and live service behavior."
@@ -188,7 +188,7 @@
       "name": "maintainable-no-slop",
       "completion": "completed",
       "checked": [
-        "Read the diff at head 26033f1 and the whole `.github/workflows/ci.yml` at the head sha. The change only deletes the `all-checks-passed` job (base lines 37\u201363), with no line added or changed. This would have caught any new API, package, helper, abstraction layer or error-handling path. The diff has none."
+        "Read the diff at head 26033f1 and the whole `.github/workflows/ci.yml` at the head sha. The change only deletes the `all-checks-passed` job (base lines 37–63), with no line added or changed. This would have caught any new API, package, helper, abstraction layer or error-handling path. The diff has none."
       ],
       "notCovered": [
         "Other repositories and live service behavior."

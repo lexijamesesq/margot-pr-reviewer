@@ -118,7 +118,11 @@ export const comparison = (text = diff()) => ({
 export async function margot(classification = "mechanical", editorial = false) {
   const r = structuredClone(source);
   r.config = { ...config, publication: "none" };
-  r.facts = history();
+  // The verified triage carries the class under test.
+  r.facts = {
+    ...history(),
+    triage: { ...(source.facts as { triage: object }).triage, classification },
+  };
   r.classification = {
     source: "jev",
     functional: classification === "functional" ? 1 : 0,

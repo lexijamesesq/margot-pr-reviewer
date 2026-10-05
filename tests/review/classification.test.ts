@@ -11,7 +11,9 @@ import {
   reviewed,
   reviewRecording,
   withClassification,
+  withConfig,
   withFacts,
+  withoutTriage,
   withRequest,
   withTriage,
 } from "../helpers/review.js";
@@ -23,76 +25,131 @@ async function classificationQuestion(draft: Draft, key: string) {
 }
 
 describe("classification precedence", () => {
-  it("reviews as functional when functional is confident alongside other classes", async () => {
-    const { result } = await reviewed(
-      recorded("mechanical-bump", withClassification({ functional: 1, documentation: 1 })),
-    );
-    expect(result.classification).toBe("functional");
+  it("takes the class from a verified triage", async () => {
+    for (const classification of ["functional", "documentation", "mechanical"]) {
+      const { result } = await reviewed(
+        recorded("council-clear", asDocumentation(1), withTriage({ classification })),
+      );
+      expect(result).toMatchObject({
+        classification,
+        provenance: { classification: "jev" },
+      });
+    }
   });
 
-  it("reviews as documentation when documentation and mechanical are both confident", async () => {
-    const { result } = await reviewed(
-      recorded("mechanical-bump", asDocumentation(1), withClassification({ mechanical: 1 })),
+  it("reviews as functional without asking when there is no verified triage", async () => {
+    const { result, calls } = await reviewed(
+      recorded("mechanical-bump", withoutTriage(), withClassification(classifiedAs(0, 0, 1))),
     );
-    expect(result.classification).toBe("documentation");
+    expect(calls).not.toContain("classification");
+    expect(result).toMatchObject({
+      classification: "functional",
+      provenance: { classification: "triage_unavailable" },
+    });
+  });
+});
+
+describe("the triage phase's class", () => {
+  const triaged = async (...changes: Parameters<typeof recorded>[1][]) =>
+    (
+      await reviewRecording(
+        recorded("mechanical-bump", withRequest({ phase: "triage" }), ...changes),
+      )
+    ).result;
+
+  it("classifies as functional when functional is confident alongside other classes", async () => {
+    expect(await triaged(withClassification({ functional: 1, documentation: 1 }))).toMatchObject({
+      kind: "classified",
+      classification: "functional",
+    });
   });
 
-  it("reviews as functional when no class is confident", async () => {
-    const { result } = await reviewed(
-      recorded("council-clear", withClassification(classifiedAs(0.2, 0.2, 0.2))),
-    );
-    expect(result.classification).toBe("functional");
+  it("classifies as documentation when documentation and mechanical are both confident", async () => {
+    expect(
+      await triaged(withClassification({ functional: 0, documentation: 1, mechanical: 1 })),
+    ).toMatchObject({ kind: "classified", classification: "documentation" });
+  });
+
+  it("classifies as functional when no class is confident", async () => {
+    expect(await triaged(withClassification(classifiedAs(0.2, 0.2, 0.2)))).toMatchObject({
+      kind: "classified",
+      classification: "functional",
+    });
   });
 });
 
 describe("trusted triage", () => {
-  it("keeps the fresh functional classification over a trusted mechanical receipt", async () => {
-    const { result } = await reviewed(recorded("council-clear", withTriage({})));
-    expect(result.classification).toBe("functional");
-  });
-
-  it("raises a mechanical classification when the trusted receipt says functional", async () => {
-    const { result } = await reviewed(
-      recorded(
-        "council-clear",
-        withClassification(classifiedAs(0, 0, 1)),
-        withTriage({ classification: "functional" }),
-      ),
+  it("does not ask Jev to classify again when the triage is verified", async () => {
+    const { result, calls } = await reviewed(
+      recorded("council-clear", withTriage({ classification: "functional" })),
     );
+    expect(calls).not.toContain("classification");
     expect(result.classification).toBe("functional");
   });
 
-  it("does not lower a review on the word of an untrusted triage actor", async () => {
-    const { result } = await reviewed(
+  it("uses a verified mechanical triage without asking Jev, even if Jev would say functional", async () => {
+    const { result, calls } = await reviewed(
+      recorded("council-clear", withTriage({}), withClassification(classifiedAs(1, 0, 0))),
+    );
+    expect(calls).not.toContain("classification");
+    expect(result).toMatchObject({
+      classification: "mechanical",
+      provenance: { classification: "jev" },
+    });
+  });
+
+  it("keeps the dispatcher's stricter class over a verified mechanical triage", async () => {
+    const { result, calls } = await reviewed(
+      recorded("council-clear", withTriage({}), withRequest({ classification: "functional" })),
+    );
+    expect(calls).not.toContain("classification");
+    expect(result).toMatchObject({
+      classification: "functional",
+      provenance: { classification: "dispatch" },
+    });
+  });
+
+  it("reviews as functional without asking when the triage actor is untrusted", async () => {
+    const { result, calls } = await reviewed(
       recorded(
         "council-clear",
         withTriage({ actor: "forger" }),
         withClassification(classifiedAs(0, 0, 1)),
       ),
     );
+    expect(calls).not.toContain("classification");
     expect(result.classification).toBe("functional");
   });
 
-  it("does not lower a review on a triage receipt for a different head", async () => {
-    const { result } = await reviewed(
+  it("reviews as functional without asking when the triage is for a different head", async () => {
+    const { result, calls } = await reviewed(
       recorded(
         "council-clear",
         withTriage({ head: "b".repeat(40) }),
         withClassification(classifiedAs(0, 0, 1)),
       ),
     );
+    expect(calls).not.toContain("classification");
     expect(result.classification).toBe("functional");
   });
 
   it("binds a triage receipt to the head, not the base", async () => {
-    const { result } = await reviewed(
-      recorded(
-        "council-clear",
-        withTriage({ base: "b".repeat(40) }),
-        withClassification(classifiedAs(0, 0, 1)),
-      ),
+    const { result, calls } = await reviewed(
+      recorded("council-clear", withTriage({ base: "b".repeat(40) })),
     );
+    expect(calls).not.toContain("classification");
     expect(result.classification).toBe("mechanical");
+  });
+
+  it("reviews an oversized diff as functional without asking, even with a verified triage", async () => {
+    const { result, calls } = await reviewed(
+      recorded("council-clear", withTriage({}), withConfig({ mechanicalDiffLineCap: 1 })),
+    );
+    expect(calls).not.toContain("classification");
+    expect(result).toMatchObject({
+      classification: "functional",
+      provenance: { classification: "diff_too_large" },
+    });
   });
 
   it("classifies without publishing an approval in the triage phase", async () => {
@@ -109,6 +166,7 @@ describe("the classification question", () => {
     const question = await classificationQuestion(
       recorded(
         "mechanical-bump",
+        withRequest({ phase: "triage" }),
         withFacts({ author: "human", diff: "Formatting only: indentation changes." }),
       ),
       "mechanical",
@@ -123,6 +181,7 @@ describe("the classification question", () => {
     const question = await classificationQuestion(
       recorded(
         "council-clear",
+        withRequest({ phase: "triage" }),
         withFacts({
           files: [{ path: "AGENTS.md" }],
           diff: "Change the agent instructions to run a different command.",
@@ -137,9 +196,7 @@ describe("the classification question", () => {
   });
 
   it("asks Jev whether documentation changes meaning", async () => {
-    const { callInput } = await reviewRecording(
-      recorded("council-clear", withClassification(classifiedAs(0, 1, 0))),
-    );
+    const { callInput } = await reviewRecording(recorded("council-clear", asDocumentation(1)));
     const questions = callInput("route").questions as Record<string, unknown>;
     expect(typeof questions.documentationSubstantive).toBe("string");
   });
@@ -155,15 +212,36 @@ describe("classification provenance and availability", () => {
   const mechanical = (...changes: Parameters<typeof recorded>[1][]) =>
     recorded("mechanical-bump", ...changes);
 
-  it("carries measured mechanical confidence into the comment and saved result", async () => {
+  it("renders the measured confidence the verified triage carried", async () => {
     const { result } = await reviewed(
-      mechanical(withClassification({ functional: 0, documentation: 0, mechanical: 0.87 })),
+      mechanical((draft) => {
+        Object.assign(draft.facts.triage as object, { mechanicalProbability: 0.87 });
+      }),
     );
     expect(result).toMatchObject({
       provenance: { mechanicalProbability: 0.87 },
-      ledger: { receipt: { review: { provenance: { mechanicalProbability: 0.87 } } } },
       report: expect.stringContaining("Mechanical change (confidence 87%)"),
     });
+  });
+
+  it("omits the confidence when the verified triage carries none", async () => {
+    const { result } = await reviewed(mechanical());
+    expect(result).toMatchObject({
+      provenance: { mechanicalProbability: null },
+      report: expect.stringContaining("Mechanical change"),
+    });
+    expect(result.report).not.toContain("confidence");
+  });
+
+  it("hands the triage's confidence to the triage check in the triage phase", async () => {
+    const { result } = await reviewRecording(
+      recorded(
+        "mechanical-bump",
+        withRequest({ phase: "triage" }),
+        withClassification({ functional: 0, documentation: 0, mechanical: 0.87 }),
+      ),
+    );
+    expect(result).toMatchObject({ kind: "classified", mechanical_probability: 0.87 });
   });
 
   it("uses the requested functional classification", async () => {
@@ -194,8 +272,9 @@ describe("classification provenance and availability", () => {
       confidence: 0,
       cards: Object.fromEntries(cardNames.map((name) => [name, 1])),
     };
-    const { result } = await reviewed(
+    const { result, calls } = await reviewed(
       mechanical(withClassification(classifiedAs(0, 1, 0)), (draft) => {
+        Object.assign(draft.facts.triage as object, { classification: "documentation" });
         draft.route = outageRoute as Draft["route"];
         draft.cards = Object.fromEntries(
           cardNames.map((name) => [
@@ -205,6 +284,9 @@ describe("classification provenance and availability", () => {
         );
       }),
     );
+    expect(calls).toContain("route");
+    expect(result.routeAnswer?.source).toBe("jev_unreachable");
+    expect(result.classification).toBe("documentation");
     expect(result.decision.mergeEligible).toBe(true);
     expect(result.provenance.decision_source).toBe("jev");
   });

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const text = z.string().min(1);
-const probability = z.number().min(0).max(1);
+export const probability = z.number().min(0).max(1);
 export const repositorySchema = z
   .string()
   .regex(/^[\w.-]+\/[\w.-]+$/, "Repository must be owner/name");
@@ -105,7 +105,13 @@ export const factsSchema = z.strictObject({
       .optional(),
   }),
   triage: z
-    .strictObject({ actor: text, base: shaSchema, head: shaSchema, classification: classSchema })
+    .strictObject({
+      actor: text,
+      base: shaSchema,
+      head: shaSchema,
+      classification: classSchema,
+      mechanicalProbability: probability.optional(),
+    })
     .nullable(),
   ownedPathTier: z.unknown().optional(),
   autoMergeArmed: z.boolean(),

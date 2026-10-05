@@ -73,6 +73,7 @@ export type ReviewResult =
       request: ReviewRequest;
       classification: Classification;
       decision_source?: string;
+      mechanical_probability?: number | null;
     }
   | { kind: "error"; stage: string; diagnostic: string; mergeEligible: false };
 export type CallContext = { signal: AbortSignal };
