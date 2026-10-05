@@ -12,7 +12,7 @@ const config = configSchema.parse(recording.config);
 function cardText() {
   return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
 }
-it("An incomplete card is recorded with its reason and summons the voice", () => {
+it("records an incomplete card with its reason and summons the voice", () => {
   const card = parseCard(
     cardText().replace(
       "completion: completed",

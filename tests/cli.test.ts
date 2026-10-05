@@ -92,12 +92,12 @@ describe("margot-review failure messages", () => {
 });
 
 describe("margot-review --help and --version", () => {
-  it("--help prints the usage and exits 0", async () => {
+  it("prints the usage and exits 0 for --help", async () => {
     const { code, stdout, stderr } = await invoke({ args: () => ["--help"] });
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
     expect(stdout).toContain("Usage: margot-review REQUEST.json CONFIG.json OUTPUT.json");
   });
-  it("--version prints the package version and exits 0", async () => {
+  it("prints the package version and exits 0 for --version", async () => {
     const { code, stdout, stderr } = await invoke({ args: () => ["--version"] });
     expect({ code, stdout, stderr }).toEqual({
       code: 0,

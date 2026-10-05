@@ -19,7 +19,7 @@ it("preserves the voice's risk statement, clarification and setting finding", ()
 function cardText() {
   return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
 }
-it("Card prose preserves a real mandatory finding", () => {
+it("preserves a real mandatory finding in card prose", () => {
   const raw =
     cardText() +
     "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n    consequence: Writes can escape.\n    action: Restore the guard.\n";
@@ -38,7 +38,7 @@ it("Card prose preserves a real mandatory finding", () => {
 });
 // The card parser reads the whole block for tagged bullets and never requires the
 // Checked, Not covered or Findings labels; a label mentioned again in free text is not an error.
-it("A card without its block labels still yields its tagged findings", () => {
+it("yields tagged findings from a card without its block labels", () => {
   const finding =
     "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n    action: Restore the guard.\n";
   const card = parseCard(
@@ -51,10 +51,10 @@ it("A card without its block labels still yields its tagged findings", () => {
     findings: card.findings.length,
   }).toMatchObject({ checked: [], notCovered: [], findings: 1 });
 });
-it("Malformed tagged findings cannot silently disappear", () => {
+it("keeps malformed tagged findings visible", () => {
   expect(() => parseCard(`${cardText()}- [issue] missing fields\n`, "safety")).toThrow();
 });
-it("Repeated card labels take the first match", () => {
+it("takes the first match when card labels repeat", () => {
   const card = parseCard(
     "card: safety\ncompletion: completed\n\nChecked:\n- Reviewed; completion: completed is restated here.\n\ncard: safety\ncompletion: incomplete: a draft line\n",
     "safety",
@@ -67,7 +67,7 @@ it("Repeated card labels take the first match", () => {
 // A tagged bullet tolerates emphasis around the tag and numbered bullets; its fields read
 // `k=v` in any order, ignore keys they do not know, and drop a `ledger=` value that is not
 // a ledger key. `(none)` under Findings is prose, not a finding.
-it("Tagged bullets tolerate emphasis, key order and unknown annotations", () => {
+it("tolerates emphasis, key order and unknown annotations in tagged bullets", () => {
   const card = parseCard(
     "card: safety\ncompletion: completed\nFindings:\n(none yet)\n- **[issue]** a.ts:1 \u00B7 confidence=high \u00B7 severity=**major** \u00B7 owner=reviewer \u00B7 ledger=not-a-key \u00B7 late=missed\n    what: A guard is missing.\n1. *[ info ]* b.ts:2 \u00B7 severity=MINOR \u00B7 confidence=LOW\n    what: A note.\n    note: Optional.\n",
     "safety",
@@ -87,7 +87,7 @@ it("Tagged bullets tolerate emphasis, key order and unknown annotations", () => 
 });
 // Only `what:`/`note:` feeds the finding's text; consequence and action are run-only fields
 // that are never a reason to refuse: missing is empty, a repeated label takes the last value.
-it("Missing or repeated finding sub-fields are read, never refused", () => {
+it("reads missing or repeated finding sub-fields instead of refusing them", () => {
   const card = parseCard(
     "card: safety\ncompletion: completed\nFindings:\n- [issue] a.ts:1 \u00B7 severity=MAJOR \u00B7 confidence=HIGH\n    what: A guard is missing.\n    action: Draft fix.\n    action: Restore the guard.\n- [info] b.ts:2 \u00B7 severity=MINOR \u00B7 confidence=LOW\n    note: Only a note line.\n",
     "safety",
@@ -101,7 +101,7 @@ it("Missing or repeated finding sub-fields are read, never refused", () => {
 });
 // The outcomes include ERROR: Margot's own fail-closed ruling, with a finding she could
 // not resolve legitimately in neither list.
-it("Margot's ERROR is a parsed ruling, not an exception", () => {
+it("parses Margot's ERROR as a ruling, not an exception", () => {
   const voice = parseVoice(
     "I read the council's findings against the cited lines.\n\noutcome: ERROR\nband: MEDIUM\nband_reason: the change touches one bounded behavior with a revert as its recovery\nrisk: retry-loop exposure\nsummary: The retry wraps one call and is bounded; the findings below decide it.\nfinding: F1 could not be checked: the head's file could not be read\nclarification: \nestablished:\ndismissed:\n",
   );
@@ -111,7 +111,7 @@ it("Margot's ERROR is a parsed ruling, not an exception", () => {
     dispositions: voice.dispositions.length,
   }).toMatchObject({ outcome: "ERROR", band: "MEDIUM", dispositions: 0 });
 });
-it("Voice prose preserves finding IDs and dispositions", () => {
+it("preserves finding IDs and dispositions in voice prose", () => {
   return expect(
     parseVoice(
       "outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\nestablished:\n- safety-F1 \u00B7 a.ts:1 \u00B7 The guard is missing.\ndismissed:\n- safety-F2 \u00B7 a.ts:2 \u00B7 Existing check covers this.\n",
@@ -173,8 +173,8 @@ it("parses emphasized verdicts, repeated sections and varied disposition bullets
     ],
   });
 });
-describe("bound evidence", () => {
-  it("Card prose preserves ledger marks and reads past a Resolved section", () => {
+describe("card prose ledger marks", () => {
+  it("preserves ledger marks and reads past a Resolved section in card prose", () => {
     expect(
       parseCard(
         "card: safety\ncompletion: completed\nChecked:\n- a.ts access\nNot covered:\nResolved:\n- R1-F2 \u00B7 a.ts:3 validates input\nFindings:\n- [issue] a.ts:1 \u00B7 severity=MAJOR \u00B7 confidence=HIGH \u00B7 ledger=R1-F1 \u00B7 late=delta-reach: new caller\n what: unsafe\n consequence: exposure\n action: validate\n",
@@ -235,7 +235,7 @@ describe("captured reviewer output", () => {
     const all = samples();
     const cards = all.filter((s) => s.kind === "card");
     const voices = all.filter((s) => s.kind === "voice");
-    it("recordings/ keeps at least the 7 recorded cards and 1 recorded voice", () => {
+    it("keeps at least 7 recorded cards and 1 recorded voice in recordings/", () => {
       expect(cards.length).toBeGreaterThanOrEqual(7);
       expect(voices.length).toBeGreaterThanOrEqual(1);
     });

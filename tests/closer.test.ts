@@ -110,7 +110,7 @@ function response(data: unknown, status: number, url: string | URL | Request) {
   Object.defineProperty(result, "url", { value: String(url) });
   return result;
 }
-it("An unselected package with successful jobs has nothing to close", async () => {
+it("has nothing to close for an unselected package with successful jobs", async () => {
   const result = await wire("nothing-unselected");
   expect({ ...result.decision, reads: result.reads.length }).toMatchObject({
     action: "left",
@@ -118,7 +118,7 @@ it("An unselected package with successful jobs has nothing to close", async () =
     reads: 0,
   });
 });
-it("A published package has nothing to close", async () => {
+it("has nothing to close for a published package", async () => {
   const result = await wire("nothing-published");
   expect({ ...result.decision, reads: result.reads.length }).toMatchObject({
     action: "left",
@@ -126,63 +126,63 @@ it("A published package has nothing to close", async () => {
     reads: 0,
   });
 });
-it("An unreadable commit-to-PR binding touches nothing", async () => {
+it("touches nothing when the commit-to-PR binding is unreadable", async () => {
   expect((await wire("commit-error")).decision).toMatchObject({
     action: "error",
     message: expect.stringContaining("pull requests"),
   });
 });
-it("A SHA outside the requested PR is left alone", async () => {
+it("leaves alone a SHA outside the requested PR", async () => {
   expect((await wire("wrong-pr")).decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("not a commit of PR #7"),
   });
 });
-it("A superseded claim cannot close the requested PR's still-live head", async () => {
+it("refuses to close the requested PR's still-live head from a superseded claim", async () => {
   expect((await wire("live-superseded")).decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("live head of open PR #7"),
   });
 });
-it("A SHA that is another open PR's live head is left to that review", async () => {
+it("leaves a SHA that is another open PR's live head to that review", async () => {
   expect((await wire("other-live")).decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("open PR #9"),
   });
 });
-it("The open review slash margot check closes without passing", async () => {
+it("closes the open review/margot check without passing it", async () => {
   const result = await wire("primary");
   expect({ action: result.decision.action, write: result.writes[0] }).toMatchObject({
     action: "closed",
     write: { status: "completed", conclusion: "action_required" },
   });
 });
-it("The pre-rename margot check is the fallback", async () => {
+it("falls back to the pre-rename margot check", async () => {
   const result = await wire("pre-rename");
   expect({ action: result.decision.action, read: result.reads.at(-2) }).toMatchObject({
     action: "closed",
     read: expect.stringContaining("check_name=margot"),
   });
 });
-it("An unreadable check list touches nothing", async () => {
+it("touches nothing when the check list is unreadable", async () => {
   expect((await wire("check-error")).decision).toMatchObject({
     action: "error",
     message: expect.stringContaining("check-runs"),
   });
 });
-it("Completed checks are left alone", async () => {
+it("leaves completed checks alone", async () => {
   expect((await wire("no-open")).decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("no open margot check"),
   });
 });
-it("A check adopted by another run is left to that run", async () => {
+it("leaves a check adopted by another run to that run", async () => {
   expect((await wire("other-run")).decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("belongs to run 2"),
   });
 });
-it("A caller check with no run owner can be closed", async () => {
+it("closes a caller check that has no run owner", async () => {
   const result = await wire("no-run");
   expect({ action: result.decision.action, writes: result.writes.length }).toMatchObject({
     action: "closed",
@@ -191,38 +191,43 @@ it("A caller check with no run owner can be closed", async () => {
 });
 for (const [name, reason, conclusion, title] of [
   [
-    "A superseded head closes skipped with the hosted wording",
+    "closes a superseded head as skipped with the hosted wording",
     "superseded",
     "skipped",
     `Margot: superseded by a newer push (${"f".repeat(7)})`,
   ],
   [
-    "A merged PR closes skipped with the hosted wording",
+    "closes a merged PR as skipped with the hosted wording",
     "merged",
     "skipped",
     "Margot: not reviewed — the PR was merged first",
   ],
   [
-    "A closed unmerged PR closes cancelled with the hosted wording",
+    "closes a closed unmerged PR as cancelled with the hosted wording",
     "closed",
     "cancelled",
     "Margot: not reviewed — the PR was closed first",
   ],
-  ["A draft PR closes failure with the hosted wording", "draft", "failure", "not reviewed: draft"],
   [
-    "A fork-head PR closes failure with the hosted wording",
+    "closes a draft PR as failure with the hosted wording",
+    "draft",
+    "failure",
+    "not reviewed: draft",
+  ],
+  [
+    "closes a fork-head PR as failure with the hosted wording",
     "fork",
     "failure",
     "not reviewed: fork head",
   ],
   [
-    "A conflicted PR closes failure with the hosted wording",
+    "closes a conflicted PR as failure with the hosted wording",
     "conflict",
     "failure",
     "not reviewed: merge conflict (resolve before review)",
   ],
   [
-    "An empty PR closes failure with the hosted wording",
+    "closes an empty PR as failure with the hosted wording",
     "empty",
     "failure",
     "not reviewed: empty (no changed files)",
@@ -235,40 +240,40 @@ for (const [name, reason, conclusion, title] of [
       write: { conclusion, output: { title } },
     });
   });
-it("A cancelled route closes cancelled", async () => {
+it("closes as cancelled when the route is cancelled", async () => {
   expect({ write: (await wire("route-cancelled")).writes[0] }).toMatchObject({
     write: { conclusion: "cancelled" },
   });
 });
-it("The first stopped job determines a non-stale conclusion", async () => {
+it("takes a non-stale conclusion from the first stopped job", async () => {
   expect({ write: (await wire("route-failed-review-cancelled")).writes[0] }).toMatchObject({
     write: { conclusion: "action_required" },
   });
 });
-it("A cancelled review closes cancelled", async () => {
+it("closes as cancelled when the review is cancelled", async () => {
   expect({ write: (await wire("review-cancelled")).writes[0] }).toMatchObject({
     write: { conclusion: "cancelled" },
   });
 });
-it("A failed review names the stopped job", async () => {
+it("names the stopped job when the review fails", async () => {
   const result = await wire("review-failed");
   expect({ write: result.writes[0] }).toMatchObject({
     write: { output: { title: expect.stringContaining("review job failure") } },
   });
 });
-it("A selected package that did not publish is closed", async () => {
+it("closes a selected package that did not publish", async () => {
   const result = await wire("selected");
   expect({ action: result.decision.action, write: result.writes[0] }).toMatchObject({
     action: "closed",
     write: { output: { title: expect.stringContaining("package job did not publish") } },
   });
 });
-it("A cancelled package stop closes cancelled", async () => {
+it("closes as cancelled when the package stop is cancelled", async () => {
   expect({ write: (await wire("package-cancelled")).writes[0] }).toMatchObject({
     write: { conclusion: "cancelled" },
   });
 });
-it("A floor stop uses the preflight title", async () => {
+it("uses the preflight title for a floor stop", async () => {
   expect({ write: (await wire("floor")).writes[0] }).toMatchObject({
     write: {
       output: {
@@ -277,12 +282,12 @@ it("A floor stop uses the preflight title", async () => {
     },
   });
 });
-it("Other failures say Margot stopped before a verdict", async () => {
+it("says Margot stopped before a verdict for other failures", async () => {
   expect({ write: (await wire("stopped")).writes[0] }).toMatchObject({
     write: { output: { title: expect.stringContaining("stopped before a verdict") } },
   });
 });
-it("A failed close is an error rather than a false receipt", async () => {
+it("reports a failed close as an error rather than a false receipt", async () => {
   expect((await wire("patch-error")).decision).toMatchObject({
     action: "error",
     message: expect.stringContaining("could not close check 88"),

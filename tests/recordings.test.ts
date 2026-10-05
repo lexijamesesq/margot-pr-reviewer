@@ -17,7 +17,6 @@ const proseTokens = new Set([
   "card/risk/voice",
   "JS/TS",
   "linter/formatter",
-  "ludeeus/action-shellcheck",
   "packages/app",
   "pass/fail",
   "shfmt/yamllint/markdownlint",
@@ -25,6 +24,14 @@ const proseTokens = new Set([
   "try/except",
   "repos/...",
 ]);
+// Public third-party repositories a recording may name, because the change under review
+// really does pin or call them. Each is a published project, not a private identity.
+const publicThirdPartyRepositories = new Set(["ludeeus/action-shellcheck"]);
+// A repository reference in any spelling: `repos/<owner>/<name>` as an API path, or
+// `github.com/<owner>/<name>`. It is judged on its owner before any file-path exemption,
+// because an API path ending in `README.md` is still a repository reference. An owner
+// that is an ellipsis (`repos/.../rules`) is a prose placeholder and falls through.
+const repositoryReference = /(?:^|\/)(?:repos|github\.com)\/(\w[\w.-]*)\/([\w.-]+)/;
 const filePath = /\.(?:md|json|ya?ml|sh|py|ts|js|txt|toml)(?:@[\w.-]+)?$/;
 
 /** Everything in a recording that could identify a real repository, host, credential or machine. */
@@ -39,9 +46,16 @@ function leaks(contents: string): string[] {
   }
   for (const raw of contents.replace(url, " ").match(slashToken) ?? []) {
     const token = raw.replace(/[.]+$/, "");
+    const reference = token.match(repositoryReference);
+    if (reference) {
+      const [, owner = "", name = ""] = reference;
+      if (owner !== "example" && !publicThirdPartyRepositories.has(`${owner}/${name}`))
+        found.push(`repository outside example/: ${token}`);
+      continue;
+    }
     const allowed =
       token.startsWith("example/") ||
-      token.startsWith("repos/example/") ||
+      publicThirdPartyRepositories.has(token) ||
       proseTokens.has(token) ||
       proseTokens.has(token.replace(/\/\.\.\..*$/, "/...")) ||
       filePath.test(token);
@@ -94,7 +108,7 @@ describe("shipped recordings carry no identifying residue", () => {
 });
 
 describe("the recordings audit", () => {
-  it("passes an example repository and example hosts", () => {
+  it("accepts an example repository and example hosts", () => {
     expect(
       leaks('{"repository":"example/project","u":"https://github.com/example/project/pull/1"}'),
     ).toEqual([]);
@@ -107,11 +121,19 @@ describe("the recordings audit", () => {
     ],
     ["Prose sample mentions acme-corp/billing-service here.", "repository outside example/"],
     ['"/repos/acme-corp/billing-service/pulls/3"', "repository outside example/"],
+    [
+      '"/repos/acme-corp/billing-service/contents/README.md"',
+      "repository outside example/: repos/acme-corp/billing-service",
+    ],
+    [
+      "see github.com/acme-corp/billing-service/blob/main/README.md",
+      "repository outside example/: github.com/acme-corp/billing-service",
+    ],
     ["see https://github.com/acme-corp/billing-service", "URL outside"],
     ["see https://ci.acme-corp.dev/run/9", "URL outside"],
     ["token ghp_abcdefghijklmnop", "credential"],
     ["/Users/someone/work", "machine path"],
-  ])("fails on a planted real-looking value: %s", (planted, expected) => {
+  ])("flags a planted real-looking value: %s", (planted, expected) => {
     expect(leaks(planted).join("\n")).toContain(expected);
   });
 });
