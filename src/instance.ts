@@ -3,7 +3,14 @@ import { isAbsolute, join } from "node:path";
 import type { Octokit } from "octokit";
 import { z } from "zod";
 import { githubClient } from "./adapters/github.js";
-import { liveConfigSchema, repositorySchema, requestSchema, shaSchema } from "./schemas.js";
+import { errorMessage } from "./errors.js";
+import {
+  liveConfigSchema,
+  referenceInputSchema,
+  repositorySchema,
+  requestSchema,
+  shaSchema,
+} from "./schemas.js";
 
 const versionSchema = z
   .string()
@@ -239,6 +246,30 @@ export async function bindRequest(input: BindRequestInput, readPull: PullReader)
   return bindPrepared(input, prepareRequest(input, pull, identity));
 }
 
+async function resolveReferences(config: unknown, github: Pick<Octokit, "rest">) {
+  const claude = (config as { claude?: { references?: Record<string, unknown> } } | null)?.claude;
+  if (!claude?.references) return config;
+  const references: Record<string, { repository: string; head: string }> = {};
+  for (const [name, value] of Object.entries(claude.references)) {
+    const reference = referenceInputSchema.parse(value);
+    if (reference.head !== undefined) {
+      references[name] = { repository: reference.repository, head: reference.head };
+      continue;
+    }
+    const [owner = "", repo = ""] = reference.repository.split("/");
+    const ref = reference.ref ?? "";
+    try {
+      const { data } = await github.rest.repos.getCommit({ owner, repo, ref });
+      references[name] = { repository: reference.repository, head: shaSchema.parse(data.sha) };
+    } catch (error) {
+      throw new Error(
+        `Reference ${name} (${reference.repository}) ref ${ref} did not resolve to a commit: ${errorMessage(error)}`,
+      );
+    }
+  }
+  return { ...(config as object), claude: { ...claude, references } };
+}
+
 export async function bindRequestFiles(
   input: Omit<BindRequestInput, "config"> & { configFile: string },
   token: string | undefined,
@@ -250,7 +281,10 @@ export async function bindRequestFiles(
   const [owner = "", repo = ""] = identity.repository.split("/");
   const pull = (await github.rest.pulls.get({ owner, repo, pull_number: input.pr })).data;
   const prepared = prepareRequest(input, pull, identity);
-  const config = JSON.parse(await readFile(input.configFile, "utf8"));
+  const config = await resolveReferences(
+    JSON.parse(await readFile(input.configFile, "utf8")),
+    github,
+  );
   const bound = bindPrepared({ ...input, config }, prepared);
   await Promise.all([
     writeFile(join(input.margotRoot, "request.json"), `${JSON.stringify(bound.request)}\n`, {

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, it } from "vitest";
 import { bindRequest, bindRequestFiles } from "../../src/instance.js";
 import { instanceExitCode, runInstanceCommand } from "../../src/instance-cli.js";
+import { liveConfigSchema } from "../../src/schemas.js";
 import {
   base,
   bindCommandFixture,
@@ -246,4 +247,84 @@ it("rejects an explicitly empty bind-request run URL", async () => {
   );
   expect(error).toBeInstanceOf(Error);
   expect((error as Error).message).toMatch(/run-url/);
+});
+const referenceFixture = async (references: unknown) => {
+  const directory = await mkdtemp(join(tmpdir(), "margot-bind-references-"));
+  directories.push(directory);
+  const configFile = join(directory, "trusted.json");
+  await writeFile(
+    configFile,
+    JSON.stringify({ ...config, claude: { ...config.claude, references } }),
+  );
+  const lookups: unknown[] = [];
+  const github = {
+    rest: {
+      pulls: { get: async () => ({ data: pull }) },
+      repos: {
+        getCommit: async (parameters: { ref: string }) => {
+          lookups.push(parameters);
+          if (parameters.ref !== "v1") throw new Error("Not Found");
+          return { data: { sha: "e".repeat(40) } };
+        },
+      },
+    },
+  };
+  const bind = () =>
+    bindRequestFiles(
+      { ...bindInput({ margotRoot: directory }), configFile },
+      "read-token",
+      github as never,
+    );
+  return { directory, lookups, bind };
+};
+it("resolves a reference ref to its commit and writes only head", async () => {
+  const fixture = await referenceFixture({ dotty: { repository: "example/dotty", ref: "v1" } });
+  const result = await fixture.bind();
+  const expected = { dotty: { repository: "example/dotty", head: "e".repeat(40) } };
+  expect(fixture.lookups).toEqual([{ owner: "example", repo: "dotty", ref: "v1" }]);
+  expect(result.config.claude.references).toEqual(expected);
+  expect(
+    JSON.parse(await readFile(join(fixture.directory, "config.json"), "utf8")).claude.references,
+  ).toEqual(expected);
+});
+it("fails bind-request naming the reference and ref that does not resolve", async () => {
+  const fixture = await referenceFixture({ dotty: { repository: "example/dotty", ref: "gone" } });
+  const error = await captureError(fixture.bind);
+  expect(error).toBeInstanceOf(Error);
+  expect(instanceExitCode(error)).toBe(1);
+  expect((error as Error).message).toMatch(
+    /Reference dotty \(example\/dotty\) ref gone did not resolve/,
+  );
+});
+it("rejects a reference that gives both head and ref, or neither", async () => {
+  for (const reference of [
+    { repository: "example/dotty", head: "f".repeat(40), ref: "v1" },
+    { repository: "example/dotty" },
+  ]) {
+    const fixture = await referenceFixture({ dotty: reference });
+    const error = await captureError(fixture.bind);
+    expect((error as Error).message).toMatch(/exactly one of head or ref/);
+    expect(fixture.lookups).toEqual([]);
+  }
+});
+it("rejects a reference ref that is not a conservative name", async () => {
+  for (const ref of ["a b", "a..b", "-v1", ""]) {
+    const fixture = await referenceFixture({ dotty: { repository: "example/dotty", ref } });
+    expect(((await captureError(fixture.bind)) as Error).message).toMatch(/must not contain/);
+    expect(fixture.lookups).toEqual([]);
+  }
+});
+it("passes a reference that already gives head through untouched", async () => {
+  const references = { dotty: { repository: "example/dotty", head: "f".repeat(40) } };
+  const fixture = await referenceFixture(references);
+  const result = await fixture.bind();
+  expect(fixture.lookups).toEqual([]);
+  expect(result.config.claude.references).toEqual(references);
+});
+it("keeps the live schema requiring head on every reference", () => {
+  const live = {
+    ...config,
+    claude: { ...config.claude, references: { dotty: { repository: "example/dotty", ref: "v1" } } },
+  };
+  expect(liveConfigSchema.safeParse(live).success).toBe(false);
 });
