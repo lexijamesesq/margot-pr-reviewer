@@ -179,7 +179,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     const { decision } = review;
     // The review run never writes `review / triage`; that check is the triage run's alone.
     // Rewriting it here replaced Jev's answer with the review's merged class, which
-    // the estate's readers reject unless it came from Jev, so a mechanical PR read as functional.
+    // readers of that check reject unless it came from Jev, so a mechanical PR read as functional.
     const authorityHold = decision.holdReasons.includes("review-authority");
     await check(
       r,
@@ -189,14 +189,14 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         ? "self-instrument: held for the operator's approval"
         : "self-instrument: clear",
       authorityHold
-        ? "This PR changes Margot's own config, the estate ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n" +
+        ? "This PR changes Margot's own config, the ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n" +
             (decision.authorityPaths ?? []).map((path) => `- \`${path}\``).join("\n")
         : `No functional change to a protected path (class: ${review.classification}).`,
       undefined,
       c,
     );
     // Margot never dismisses her own earlier approvals: a new head gets a new review, and
-    // the estate's ruleset handles stale approvals.
+    // branch protection handles stale approvals.
     await guard(r, c);
     const { data } = await client.rest.pulls.createReview({
       ...params(r, c),
@@ -226,8 +226,8 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       r,
       config.checks.review,
       reviewConclusion,
-      // Titles the estate's readers already know: a held title becomes the ask the
-      // estate's merge tooling surfaces, so the title names the reason the PR is actually held.
+      // A held title is what merge automation surfaces to the operator, so it names the
+      // reason the PR is actually held.
       decision.mergeEligible
         ? "Margot: approved"
         : decision.outcome === "APPROVED"

@@ -132,9 +132,10 @@ export async function review(
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
     const ledgerWarnings: string[] = [];
     const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
-    // Holding over unreadable history, rather than approving past it, is a deliberate choice
-    // recorded in the charter. The reason names the way out, because the hold recurs on every
-    // run until the history is fixed or the operator merges.
+    // Unreadable history holds rather than approves: without the earlier ledger Margot cannot
+    // know whether findings from earlier rounds were resolved, so an approval would be a guess.
+    // The reason names the way out, because the hold recurs on every run until the history is
+    // fixed or the operator merges.
     const recovery =
       "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.";
     const historyReason = historyUnavailable
@@ -204,7 +205,7 @@ export async function review(
     for (const name of config.requiredChecks) {
       // One name can carry several runs on one head: a workflow's concurrency cancels a
       // superseded run and the cancelled one stays in the list beside the current one.
-      // The current run decides (most recent start, then id), as the estate's floor
+      // The current run decides (most recent start, then id), as the required-check floor
       // gate does; with no recency recorded, the first listed wins.
       const check = currentCheck(facts.checks.filter((c) => c.name === name));
       if (

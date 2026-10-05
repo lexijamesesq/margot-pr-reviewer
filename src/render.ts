@@ -213,9 +213,9 @@ export function render(review: Review): string {
 }
 
 /**
- * The verdict check's text: the lines the estate's readers consume. The estate's merge
- * tooling reads `outcome: X | band: Y` and `decision_source:` to decide whether a held PR
- * is waiting on the operator and to request her review. These lines are the contract, not
+ * The verdict check's text: the lines downstream automation consumes. Merge automation
+ * reads `outcome: X | band: Y` and `decision_source:` to decide whether a held PR is
+ * waiting on the operator and to request their review. These lines are the contract, not
  * decoration.
  */
 export function checkText(review: Review): string {
