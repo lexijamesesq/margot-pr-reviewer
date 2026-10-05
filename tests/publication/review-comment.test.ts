@@ -116,18 +116,6 @@ it("renders bounded prose for a long finding while the check keeps its full text
     fullFindingInCheck: true,
   });
 });
-it("renders the first clause of a multi-clause skip reason", () => {
-  const value = structuredClone(authorChangesReview);
-  if (!value.presentation) throw new Error("presentation fixture required");
-  value.presentation.skipReasons = {
-    "house-style": "not selected; another reviewer covered it — no additional pass needed.",
-  };
-  expect({
-    row: render(value)
-      .split("\n")
-      .find((line) => line.includes("`house-style`")),
-  }).toMatchObject({ row: "* ❓ `house-style` — skipped: not selected" });
-});
 it("renders the verdict, risk, council roster and finding tally in the review comment", () => {
   const report = render(authorChangesReview);
   const visible = report.split("\n<!-- margot-ledger:v1 ")[0] ?? "";

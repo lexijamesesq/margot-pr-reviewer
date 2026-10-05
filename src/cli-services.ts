@@ -17,13 +17,11 @@ export function cliServices(
   environment: NodeJS.ProcessEnv,
   onResponse?: Parameters<typeof liveServices>[2],
 ) {
-  const jevKey = environment.JEV_KEY;
-  if (!jevKey) throw new Error("JEV_KEY is required");
   const ticketingEnvironment = configuredTicketingEnvironment(config.claude.ticketing, environment);
   return liveServices(
     config,
     {
-      jevKey,
+      jevKey: environment.JEV_KEY ?? "",
       ownedPathTier: environment.MARGOT_OWNED_TIER?.trim() || "unknown",
       ...(environment.GH_TOKEN ? { githubToken: environment.GH_TOKEN } : {}),
       ...(environment.MARGOT_WRITE_TOKEN ? { writeToken: environment.MARGOT_WRITE_TOKEN } : {}),
