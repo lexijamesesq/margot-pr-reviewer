@@ -298,7 +298,7 @@ describe("classification provenance and availability", () => {
     expect(result.classification).toBe("functional");
   });
 
-  it("allows a clear documentation review after conservative outage routing", async () => {
+  it("holds a clear documentation review after conservative outage routing", async () => {
     const outageRoute = {
       source: "jev_unreachable",
       documentationSubstantive: 1,
@@ -320,8 +320,9 @@ describe("classification provenance and availability", () => {
     expect(calls).toContain("route");
     expect(result.routeAnswer?.source).toBe("jev_unreachable");
     expect(result.classification).toBe("documentation");
-    expect(result.decision.mergeEligible).toBe(true);
-    expect(result.provenance.decision_source).toBe("jev");
+    expect(result.decision.mergeEligible).toBe(false);
+    expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
+    expect(result.provenance.decision_source).toBe("fallback");
   });
 
   it("holds approval and records fallback provenance when risk uses the fallback", async () => {
