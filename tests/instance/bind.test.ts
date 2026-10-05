@@ -328,3 +328,18 @@ it("keeps the live schema requiring head on every reference", () => {
   };
   expect(liveConfigSchema.safeParse(live).success).toBe(false);
 });
+it("names the flag whose value is not valid JSON", async () => {
+  const fixture = await bindCommandFixture("false");
+  fixture.args[fixture.args.indexOf("--protected-paths") + 1] = "[protected/**";
+  const error = await captureError(() =>
+    runInstanceCommand(fixture.args, { GH_TOKEN: "read-token" }, fixture.client as never),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/^--protected-paths is not valid JSON: /);
+  expect(instanceExitCode(error)).toBe(1);
+});
+it("prints the usage for --help without failing", async () => {
+  expect(await runInstanceCommand(["--help"], {})).toEqual({
+    help: expect.stringMatching(/^Usage: margot-instance /),
+  });
+});

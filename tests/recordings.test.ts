@@ -19,8 +19,6 @@ const proseTokens = new Set([
   "linter/formatter",
   "packages/app",
   "pass/fail",
-  "shfmt/yamllint/markdownlint",
-  "shfmt/yamllint/markdownlint/biome-check/prettier",
   "try/except",
   "repos/...",
 ]);

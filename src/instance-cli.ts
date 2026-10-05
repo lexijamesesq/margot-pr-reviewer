@@ -69,7 +69,13 @@ function required(input: Options, name: string) {
 }
 
 function list(input: Options, name: string) {
-  const value = JSON.parse(required(input, name));
+  let value: unknown;
+  try {
+    value = JSON.parse(required(input, name));
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw new Error(`--${name} is not valid JSON: ${error.message}`);
+  }
   if (!Array.isArray(value) || !value.every((item) => typeof item === "string"))
     throw new Error(`--${name} must be a JSON string array`);
   return value as string[];
@@ -87,12 +93,16 @@ function positiveInteger(input: Options, name: string) {
   return value;
 }
 
+const usage =
+  "Usage: margot-instance <validate-deployment|bind-request|close-stranded-check> [named arguments]";
+
 export async function runInstanceCommand(
   args: string[],
   environment: NodeJS.ProcessEnv,
   client?: Pick<Octokit, "rest">,
 ) {
   const [command, ...rest] = args;
+  if (args.length === 1 && (command === "--help" || command === "-h")) return { help: usage };
   if (command === "validate-deployment") {
     const input = named(rest, [
       "deployment",
@@ -196,15 +206,14 @@ export async function runInstanceCommand(
     if (decision.action === "error") throw new CommandError(decision.message, 2);
     return decision;
   }
-  throw new Error(
-    "Usage: margot-instance <validate-deployment|bind-request|close-stranded-check> [named arguments]",
-  );
+  throw new Error(usage);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href)
   runInstanceCommand(process.argv.slice(2), process.env)
     .then((result) => {
       if ("action" in result) process.stdout.write(`${result.message}\n`);
+      else if ("help" in result) process.stdout.write(`${result.help}\n`);
     })
     .catch((error: unknown) => {
       if (error instanceof StopRequestError) process.stdout.write(stopOutput(error.stop));

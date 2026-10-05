@@ -131,35 +131,35 @@ function classifyPull(
   if (pull.merged)
     return {
       stopReason: "merged",
-      message: `margot-review: PR #${pr} was merged before its review started — exiting without a review. Every later step is skipped.`,
+      message: `margot-instance: PR #${pr} was merged before its review started — exiting without a review. Every later step is skipped.`,
     };
   if (pull.state !== "open")
     return {
       stopReason: "closed",
-      message: `margot-review: PR #${pr} was closed before its review started — exiting without a review. Every later step is skipped.`,
+      message: `margot-instance: PR #${pr} was closed before its review started — exiting without a review. Every later step is skipped.`,
     };
   if (pull.head.sha !== expectedHead)
     return {
       stopReason: "superseded",
       liveSha: pull.head.sha,
-      message: `margot-review: dispatched sha ${expectedHead} is superseded by current head ${pull.head.sha} — exiting; the newer dispatch owns this PR's verdict. Every later step is skipped.`,
+      message: `margot-instance: dispatched sha ${expectedHead} is superseded by current head ${pull.head.sha} — exiting; the newer dispatch owns this PR's verdict. Every later step is skipped.`,
     };
   if (pull.draft)
-    return { stopReason: "draft", message: "margot-review refused: not reviewed: draft" };
+    return { stopReason: "draft", message: "margot-instance refused: not reviewed: draft" };
   if (pull.head.repo?.full_name !== repository)
     return {
       stopReason: "fork",
-      message: `margot-review refused: PR head repository (${pull.head.repo?.full_name ?? "null"}) is not ${repository} (fork). Margot does not review forks.`,
+      message: `margot-instance refused: PR head repository (${pull.head.repo?.full_name ?? "null"}) is not ${repository} (fork). Margot does not review forks.`,
     };
   if (pull.mergeable === false)
     return {
       stopReason: "conflict",
-      message: "margot-review refused: not reviewed: merge conflict (resolve before review)",
+      message: "margot-instance refused: not reviewed: merge conflict (resolve before review)",
     };
   if (pull.changed_files === 0)
     return {
       stopReason: "empty",
-      message: "margot-review refused: not reviewed: empty (no changed files)",
+      message: "margot-instance refused: not reviewed: empty (no changed files)",
     };
   return undefined;
 }

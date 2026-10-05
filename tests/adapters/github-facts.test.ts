@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as githubModule from "../../src/adapters/github.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { liveServices } from "../../src/adapters/live.js";
-import { changedLineCount } from "../../src/diff.js";
+import { diffLineCount } from "../../src/diff.js";
 import type { Recording } from "../../src/index.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
 import { context, github, request } from "../helpers/adapters.js";
@@ -301,7 +301,7 @@ describe("GitHub triage and diff size", () => {
   });
   it("counts diff headers and context toward the review size limit", () => {
     expect({
-      lines: changedLineCount(
+      lines: diffLineCount(
         "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n context\n+a\n-b\nlast",
       ),
     }).toMatchObject({ lines: 7 });

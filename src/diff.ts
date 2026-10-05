@@ -22,6 +22,6 @@ export function diffIsComplete(diff: string, files = parseDiff(diff)): boolean {
 }
 
 /** Every newline counts, including headers and context. */
-export function changedLineCount(diff: string): number {
+export function diffLineCount(diff: string): number {
   return diff.split("\n").length - 1;
 }

@@ -187,9 +187,9 @@ describe("card prose ledger marks", () => {
   });
 });
 describe("captured reviewer output", () => {
-  // Every card and voice Margot has actually written and that the repository keeps
-  // (recordings) must parse. The reviewer and the voice write prose; a parser that
-  // refuses a shape they really produce takes the review down for the operator.
+  // Every card and voice the repository keeps (recordings) must parse. The reviewer and the
+  // voice write prose; a parser that refuses a shape they produce takes the review down for the
+  // operator.
   type Sample = {
     source: string;
     kind: "card" | "voice";
@@ -229,8 +229,9 @@ describe("captured reviewer output", () => {
     }
     return out;
   }
-  // recordings/prose/ holds the sanitized card and voice texts the reviewer actually wrote;
-  // recordings/*.json hold structured fixtures and contribute any raw prose they carry.
+  // recordings/prose/ holds synthetic card and voice texts about example/project, written in the
+  // shapes the reviewer produces; recordings/*.json hold structured fixtures and contribute any raw
+  // prose they carry.
   describe("recorded prose", () => {
     const all = samples();
     const cards = all.filter((s) => s.kind === "card");

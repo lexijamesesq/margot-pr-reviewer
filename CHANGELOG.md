@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.12
+
+- A MAJOR finding that a card re-raises with `late=delta-reach: <reason>` no longer drops to a late advisory when its earlier ledger entry was an advisory; it blocks at its honest severity, as the prompt promises.
+- A held review names one reason, in the same words, in the review comment and in the check title. A protected-path hold says "it touches a protected path"; holds from a fallback-scored risk, uncomputed ownership, calibration, an error and a pending author each get a plain sentence in the comment too.
+- The shipped `recordings/prose` texts are synthetic and describe `example/project`.
+- The ledger reader no longer accepts a `margot-ledger:v2` marker; nothing has ever written one.
+- `samples/deployment.sample.json` carries placeholder values instead of a stale release.
+- The check closer words each stop as its own sentence, titles every stop with "Margot:", and gives an unexplained stop its own summary.
+- The package entry exports only the library API the README documents (`review`, `recordedServices`, `liveServices`, `liveConfigSchema` and their types). `githubAdapter`, `githubClient`, `githubPublisher`, `render`, `renderCheckText` and `findingTally` are no longer exported.
+- `margot-instance`: a malformed JSON flag names the flag, `--help` prints the usage and exits 0, and its refusal messages say `margot-instance`.
+
 ## 0.6.11
 
 - A `claude.references` entry may give `ref`, a branch or tag name, instead of `head`. `margot-instance bind-request` resolves it to its commit with `GET /repos/{owner}/{repo}/commits/{ref}` (using `GH_TOKEN`) and writes only `head` to the bound `config.json`, so a reference no longer goes stale between hand-edited pins. An entry gives exactly one of `head` or `ref`; one that gives `head` is passed through unchanged. A ref that does not resolve fails `bind-request` (exit 1) naming the reference and ref. The runtime still requires `head`, so reads stay immutable within a run.

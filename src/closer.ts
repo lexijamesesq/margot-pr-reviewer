@@ -31,8 +31,6 @@ type Checks = Awaited<
   ReturnType<CheckClient["rest"]["checks"]["listForRef"]>
 >["data"]["check_runs"];
 
-const diagnostic = errorMessage;
-
 type CheckConclusion = "skipped" | "cancelled" | "failure" | "action_required";
 type CheckOutput = { conclusion: CheckConclusion; title: string; summary: string };
 type StopContext = { liveSha: string; stopped: [string, string] };
@@ -55,23 +53,24 @@ const stopChecks = {
   }),
   draft: (): CheckOutput => ({
     conclusion: "failure",
-    title: "not reviewed: draft",
-    summary: "Margot does not review draft PRs.",
+    title: "Margot: not reviewed: draft",
+    summary: "This PR is a draft, and Margot does not review drafts. Mark it ready for review.",
   }),
   fork: (): CheckOutput => ({
     conclusion: "failure",
-    title: "not reviewed: fork head",
-    summary: "Margot does not review fork head PRs.",
+    title: "Margot: not reviewed: fork head",
+    summary: "This PR's head is in a fork, and Margot does not review fork heads.",
   }),
   conflict: (): CheckOutput => ({
     conclusion: "failure",
-    title: "not reviewed: merge conflict (resolve before review)",
-    summary: "Margot does not review merge conflict (resolve before review) PRs.",
+    title: "Margot: not reviewed: merge conflict (resolve before review)",
+    summary:
+      "This PR has a merge conflict, so Margot did not review it. Resolve the conflict and push.",
   }),
   empty: (): CheckOutput => ({
     conclusion: "failure",
-    title: "not reviewed: empty (no changed files)",
-    summary: "Margot does not review empty (no changed files) PRs.",
+    title: "Margot: not reviewed: empty (no changed files)",
+    summary: "This PR changes no files, so Margot has nothing to review.",
   }),
   floor: (): CheckOutput => ({
     conclusion: "action_required",
@@ -82,12 +81,12 @@ const stopChecks = {
   cancelled: ({ stopped }: StopContext): CheckOutput => ({
     conclusion: "cancelled",
     title: `Margot: stopped before a verdict (${stopped[0]} job ${stopped[1]}) — see the run`,
-    summary: `The ${stopped[0]} job ended without posting a verdict (job result: ${stopped[1]}). A cancelled run is taken over by the newer dispatch of the same head, or the next push re-dispatches her; otherwise Margot did not clear this head.`,
+    summary: `The ${stopped[0]} job was cancelled before it posted a verdict (job result: ${stopped[1]}). A newer dispatch of the same head takes it over, or the next push re-dispatches Margot; until then she has not cleared this head.`,
   }),
   unknown: ({ stopped }: StopContext): CheckOutput => ({
     conclusion: "action_required",
     title: `Margot: stopped before a verdict (${stopped[0]} job ${stopped[1]}) — see the run`,
-    summary: `The ${stopped[0]} job ended without posting a verdict (job result: ${stopped[1]}). A cancelled run is taken over by the newer dispatch of the same head, or the next push re-dispatches her; otherwise Margot did not clear this head.`,
+    summary: `The ${stopped[0]} job ended without posting a verdict (job result: ${stopped[1]}). Margot has not cleared this head; read the run for the cause. The next push re-dispatches her.`,
   }),
 } satisfies Record<string, (context: StopContext) => CheckOutput>;
 
@@ -122,7 +121,7 @@ export async function closeStrandedCheck(
   } catch (error) {
     return {
       action: "error",
-      message: `could not read the pull requests of ${short} — left untouched (${diagnostic(error)})`,
+      message: `could not read the pull requests of ${short} — left untouched (${errorMessage(error)})`,
     };
   }
   const ownPull = pulls.find((pull) => pull.number === input.pr);
@@ -162,7 +161,7 @@ export async function closeStrandedCheck(
     } catch (error) {
       return {
         action: "error",
-        message: `could not read check-runs on ${short} — left untouched (${diagnostic(error)})`,
+        message: `could not read check-runs on ${short} — left untouched (${errorMessage(error)})`,
       };
     }
     check = checks.find((candidate) => openStates.has(candidate.status));
@@ -182,7 +181,7 @@ export async function closeStrandedCheck(
       message: `check ${checkId} belongs to run ${details.slice(input.ownRuns.length)} — left to that run`,
     };
 
-  const stopped =
+  const stopped: [string, string] =
     input.routeResult !== "success"
       ? ["route", input.routeResult]
       : input.reviewResult !== "success"
@@ -190,7 +189,7 @@ export async function closeStrandedCheck(
         : ["package", "did not publish"];
   const cancelled =
     stopped[1] === "cancelled" || (stopped[0] === "package" && input.stopReason === "cancelled");
-  const context = { liveSha: input.liveSha ?? ownPull.head.sha, stopped } as StopContext;
+  const context = { liveSha: input.liveSha ?? ownPull.head.sha, stopped };
   const mapped = stopChecks[input.stopReason as keyof typeof stopChecks];
   const output = mapped
     ? mapped(context)
@@ -209,7 +208,7 @@ export async function closeStrandedCheck(
   } catch (error) {
     return {
       action: "error",
-      message: `could not close check ${checkId} (${diagnostic(error)})`,
+      message: `could not close check ${checkId} (${errorMessage(error)})`,
     };
   }
   return {
