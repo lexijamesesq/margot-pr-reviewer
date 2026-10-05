@@ -152,3 +152,14 @@ it("runs the council again when live service configuration changed", async () =>
   expect(await review(r.request, r.config, s)).toMatchObject({ kind: "reviewed" });
   expect(s.calls.map((c) => c.name)).toContain("route");
 });
+it("runs the council again when Margot's review configuration changed", async () => {
+  const { result, r } = await margot();
+  if (result.kind !== "reviewed") throw new Error("baseline");
+  const f = factsSchema.parse(r.facts);
+  f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
+  r.facts = f;
+  r.config = { ...r.config, mechanicalDiffLineCap: r.config.mechanicalDiffLineCap + 1 };
+  const s = recordedServices(r);
+  expect(await review(r.request, r.config, s)).toMatchObject({ kind: "reviewed" });
+  expect(s.calls.map((c) => c.name)).toContain("route");
+});
