@@ -43,12 +43,12 @@ const stopChecks = {
   }),
   merged: (): CheckOutput => ({
     conclusion: "skipped",
-    title: "Margot: not reviewed — the PR was merged first",
+    title: "Margot: not reviewed: the PR was merged first",
     summary: "The PR was merged before a review runner picked it up, so Margot skipped the review.",
   }),
   closed: (): CheckOutput => ({
     conclusion: "cancelled",
-    title: "Margot: not reviewed — the PR was closed first",
+    title: "Margot: not reviewed: the PR was closed first",
     summary: "The PR was closed before a review runner picked it up, so Margot skipped the review.",
   }),
   draft: (): CheckOutput => ({

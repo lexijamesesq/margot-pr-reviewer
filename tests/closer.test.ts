@@ -200,13 +200,13 @@ for (const [name, reason, conclusion, title] of [
     "closes a merged PR as skipped with the hosted wording",
     "merged",
     "skipped",
-    "Margot: not reviewed — the PR was merged first",
+    "Margot: not reviewed: the PR was merged first",
   ],
   [
     "closes a closed unmerged PR as cancelled with the hosted wording",
     "closed",
     "cancelled",
-    "Margot: not reviewed — the PR was closed first",
+    "Margot: not reviewed: the PR was closed first",
   ],
   [
     "closes a draft PR as failure with the hosted wording",
