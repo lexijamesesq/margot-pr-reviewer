@@ -2,7 +2,7 @@ import { deflateSync } from "node:zlib";
 import { expect, it } from "vitest";
 import { recordedServices } from "../../src/adapters/recorded.js";
 import { review } from "../../src/review.js";
-import { factsSchema } from "../../src/schemas.js";
+import { configSchema, factsSchema } from "../../src/schemas.js";
 import type { RoundScope } from "../../src/types.js";
 import { entry, facts, history, margot, posted, prior } from "../helpers/ledger.js";
 import { present } from "../present.js";
@@ -158,7 +158,8 @@ it("runs the council again when Margot's review configuration changed", async ()
   const f = factsSchema.parse(r.facts);
   f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
   r.facts = f;
-  r.config = { ...r.config, mechanicalDiffLineCap: r.config.mechanicalDiffLineCap + 1 };
+  const config = configSchema.parse(r.config);
+  r.config = { ...config, mechanicalDiffLineCap: config.mechanicalDiffLineCap + 1 };
   const s = recordedServices(r);
   expect(await review(r.request, r.config, s)).toMatchObject({ kind: "reviewed" });
   expect(s.calls.map((c) => c.name)).toContain("route");
