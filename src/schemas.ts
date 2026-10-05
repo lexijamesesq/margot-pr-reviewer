@@ -203,6 +203,22 @@ export const referencesSchema = z.record(
   z.string(),
   z.strictObject({ repository: requestSchema.shape.repository, head: shaSchema }),
 );
+const referenceRepositorySchema = requestSchema.shape.repository;
+export const referenceInputSchema = z
+  .strictObject({
+    repository: referenceRepositorySchema,
+    head: shaSchema.optional(),
+    ref: z
+      .string()
+      .regex(
+        /^(?!-)(?!.*\.\.)\S+$/,
+        "A reference ref must not contain whitespace or .., or start with -",
+      )
+      .optional(),
+  })
+  .refine((reference) => (reference.head === undefined) !== (reference.ref === undefined), {
+    message: "A reference gives exactly one of head or ref",
+  });
 export const publisherSchema = z.strictObject({
   checks: z.strictObject({ triage: text, review: text, authority: text }),
   actor: text,

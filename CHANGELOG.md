@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.11
+
+- A `claude.references` entry may give `ref`, a branch or tag name, instead of `head`. `margot-instance bind-request` resolves it to its commit with `GET /repos/{owner}/{repo}/commits/{ref}` (using `GH_TOKEN`) and writes only `head` to the bound `config.json`, so a reference no longer goes stale between hand-edited pins. An entry gives exactly one of `head` or `ref`; one that gives `head` is passed through unchanged. A ref that does not resolve fails `bind-request` (exit 1) naming the reference and ref. The runtime still requires `head`, so reads stay immutable within a run.
+
 ## 0.6.10
 
 - A host that dispatches no class no longer turns every review functional. With no `classification` and no `triage` in the request, nothing is dispatched and the verified triage's class stands (functional, as `triage_unavailable`, when there is none). A dispatched class that is stricter still wins, recorded as `dispatch`.

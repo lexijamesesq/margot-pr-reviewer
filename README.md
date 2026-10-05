@@ -68,7 +68,7 @@ A review run takes two JSON files: a request and a configuration.
   merges it once approved; unset, the hold says only "approve it to merge it".
 
 `claude.executable`, `claude.pluginDirectory` and `claude.ticketing.command` may use
-`${MARGOT_ROOT}`, which `margot-instance bind-request` resolves.
+`${MARGOT_ROOT}`, which `margot-instance bind-request` resolves. A `claude.references` entry may name a `ref` (a branch or tag) in place of `head`; `bind-request` resolves it to its commit for each run.
 
 ### Environment variables
 
