@@ -67,6 +67,11 @@ A review run takes two JSON files: a request and a configuration.
   `review.mergeActor` is optional: the name shown on a held pull request as who
   merges it once approved; unset, the hold says only "approve it to merge it".
 
+GitHub mode: with `margot-instance bind-request --authority true` the review publishes
+its comment and check runs to the pull request. That needs the `publisher` block (the three check
+names, the review app's actor and id, and the run URL); `bind-request` fails without it.
+Without `--authority true` the review runs in shadow mode and publishes nothing.
+
 `claude.executable`, `claude.pluginDirectory` and `claude.ticketing.command` may use
 `${MARGOT_ROOT}`, which `margot-instance bind-request` resolves. A `claude.references` entry may name a `ref` (a branch or tag) in place of `head`; `bind-request` resolves it to its commit for each run.
 
@@ -159,13 +164,15 @@ margot-instance bind-request \
 ### `close-stranded-check`
 
 Closes a review check this run left open when routing failed, review failed, or
-publication did not happen. Exits 0 after closing or finding nothing to close, and
-2 on a GitHub read or write failure.
+publication did not happen. `--check-name` names the review check to close (your
+`publisher.checks.review`); it defaults to `review / margot`. Exits 0 after closing or
+finding nothing to close, and 2 on a GitHub read or write failure.
 
 ```sh
 margot-instance close-stranded-check \
   --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
-  --app-id "$MARGOT_APP_ID" --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
+  --app-id "$MARGOT_APP_ID" --check-name "review / margot" \
+  --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
   --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
   --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"
 ```

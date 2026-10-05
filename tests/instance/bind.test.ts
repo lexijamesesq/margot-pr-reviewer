@@ -200,6 +200,22 @@ it("writes the two bound files privately under the Margot root", async () => {
   expect((await stat(join(directory, "request.json"))).mode & 0o777).toBe(0o600);
   expect((await stat(join(directory, "config.json"))).mode & 0o777).toBe(0o600);
 });
+it("binds the shipped sample configuration for authority", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "margot-bind-"));
+  directories.push(directory);
+  const configFile = join(directory, "sample.json");
+  await writeFile(
+    configFile,
+    await readFile(new URL("../../samples/config.sample.json", import.meta.url), "utf8"),
+  );
+  const result = await bindRequestFiles(
+    { ...bindInput({ margotRoot: directory }), configFile },
+    "read-token",
+    { rest: { pulls: { get: async () => ({ data: pull }) } } } as never,
+  );
+  expect(result.config.review.publication).toBe("github");
+  expect(result.config.publisher?.checks.review).toBe("review / margot");
+});
 it("requires GH_TOKEN before reading configuration or GitHub", async () => {
   const error = await captureError(() =>
     bindRequestFiles({ ...bindInput(), configFile: "/not-read" }, undefined),
@@ -234,7 +250,7 @@ it("binds the sample config as a shadow when a run URL is supplied", async () =>
     );
     if (!("config" in result)) throw new Error("Expected bound request");
     expect(result.config.review.publication).toBe("none");
-    expect(result.config.publisher).toBeUndefined();
+    expect(result.config.github.shadowBeforeHead).toBe(true);
   });
   expect(error).toBeUndefined();
 });
