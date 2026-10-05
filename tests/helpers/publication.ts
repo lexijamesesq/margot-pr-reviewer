@@ -47,7 +47,15 @@ export type PublicationMode =
   | "retry"
   | "superseded"
   | "order"
-  | "error";
+  | "error"
+  | "council-error"
+  | "facts-error"
+  | "token-error"
+  | "stage-error"
+  | "moved-error"
+  | "comment-fail"
+  | "published-then-error"
+  | "unconfirmed-error";
 
 export const mechanicalBump = readRecording("mechanical-bump");
 export const mechanicalRequest = requestSchema.parse(mechanicalBump.request);
@@ -76,7 +84,7 @@ export const publisherOptions = {
   appId: 42,
   runUrl: "https://github.com/example/instance/actions/runs/1",
 };
-export async function runPublication(mode: PublicationMode = "clear") {
+export async function runPublication(mode: PublicationMode = "clear", errorStage = "voice") {
   const writes: {
     method: string;
     path: string;
@@ -110,6 +118,7 @@ export async function runPublication(mode: PublicationMode = "clear") {
   let merged = false;
   let evaluated = false;
   let moved = false;
+  let unconfirmed = false;
   let sequence = 0;
   const defect = (name: string) => mode === name;
   if (defect("order") || defect("error"))
@@ -125,6 +134,8 @@ export async function runPublication(mode: PublicationMode = "clear") {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     let data: unknown;
     if (method === "GET") {
+      if (unconfirmed && /\/pulls\/\d+$/.test(path))
+        return new Response(JSON.stringify({ message: "Recorded outage" }), { status: 502 });
       if (path.endsWith("/reviews")) data = reviews;
       else if (path.endsWith("/check-runs"))
         data = { check_runs: [...stored.values()], total_count: stored.size };
@@ -146,8 +157,8 @@ export async function runPublication(mode: PublicationMode = "clear") {
       writes.push({ method, path, body });
       if (
         (defect("start-fail") && body.status === "in_progress") ||
-        (defect("review-fail") && path.endsWith("/reviews")) ||
-        (defect("final-fail") &&
+        ((defect("review-fail") || defect("comment-fail")) && path.endsWith("/reviews")) ||
+        ((defect("final-fail") || defect("published-then-error")) &&
           body.name === publisherOptions.checks.review &&
           body.conclusion === "success")
       )
@@ -242,6 +253,59 @@ export async function runPublication(mode: PublicationMode = "clear") {
     }
     if (defect("error"))
       return { kind: "error", stage: "card", diagnostic: "Recorded timeout", mergeEligible: false };
+    if (
+      mode === "stage-error" ||
+      mode === "moved-error" ||
+      mode === "comment-fail" ||
+      mode === "unconfirmed-error"
+    ) {
+      if (mode === "moved-error") moved = true;
+      if (mode === "unconfirmed-error") unconfirmed = true;
+      return {
+        kind: "error",
+        stage: errorStage,
+        diagnostic: "Distinctive diagnostic detail.",
+        mergeEligible: false,
+      };
+    }
+    if (mode === "published-then-error") {
+      const value = structuredClone(mechanicalReview);
+      try {
+        await publisher.publish(
+          { expectedHead: mechanicalRequest.head, review: value, report: render(value) },
+          { signal: AbortSignal.timeout(3000) },
+        );
+      } catch (error) {
+        return {
+          kind: "error",
+          stage: "publication",
+          diagnostic: String(error),
+          mergeEligible: false,
+        };
+      }
+    }
+    if (mode === "council-error")
+      return {
+        kind: "error",
+        stage: "voice",
+        diagnostic: "The voice did not account for every mandatory finding. Card safety is open.",
+        mergeEligible: false,
+      };
+    if (mode === "facts-error")
+      return {
+        kind: "error",
+        stage: "facts",
+        diagnostic: "Incomplete facts",
+        mergeEligible: false,
+      };
+    if (mode === "token-error")
+      return {
+        kind: "error",
+        stage: "card:safety",
+        diagnostic:
+          "Card safety failed with ghp_abcdefghijklmnopqrstuvwxyz0123 and a distinctive-detail-canary.",
+        mergeEligible: false,
+      };
     if (mode === "triage")
       return {
         kind: "classified",

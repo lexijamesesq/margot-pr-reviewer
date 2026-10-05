@@ -3,7 +3,24 @@ import type { z } from "zod";
 import { errorMessage } from "../errors.js";
 import { checkText } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
+import { type Stage, stages } from "../stages.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
+
+// What the pull request is told when an error comes once the council has begun. An error
+// at any other stage ends as a check only; "publication-head" is a stale-head stop, which
+// stays check-only like every stale refusal. The sentence is fixed per stage: the check
+// carries the diagnostic, which the conversation never repeats.
+const councilReason = "A council reviewer could not complete its review";
+const notReviewedReasons: Partial<Record<Stage, string>> = {
+  [stages.cards]: councilReason,
+  [stages.risk]: "The risk could not be scored",
+  [stages.voice]: "The verdict could not be written",
+  [stages.render]: "The review comment could not be rendered",
+  [stages.publication]: "The review could not be published",
+};
+export function notReviewedReason(stage: string): string | undefined {
+  return stage.startsWith("card:") ? councilReason : notReviewedReasons[stage as Stage];
+}
 
 type RefusalReason = "draft" | "fork" | "closed" | "stale";
 
@@ -18,6 +35,8 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
   const config = publisherSchema.parse(input);
   const ids = new Map<string, number>();
   let active: ReviewRequest | undefined;
+  // Set once the native review is on the pull request, so a later failure never says "not reviewed".
+  let reviewPosted = false;
   const params = (r: ReviewRequest, c: CallContext) => {
     requestSchema.parse(r);
     const [owner = "", repo = ""] = r.repository.split("/");
@@ -214,6 +233,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       event: decision.mergeEligible ? "APPROVE" : "COMMENT",
       body: report,
     });
+    reviewPosted = true;
     if (
       !Number.isSafeInteger(data.id) ||
       data.id <= 0 ||
@@ -259,6 +279,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
   ): Promise<ReviewResult> {
     if (active) throw new Error("Publisher is single-use");
     active = requestSchema.parse(r);
+    let notReviewed: string | undefined;
     const context = () => ({ signal: AbortSignal.timeout(60000) });
     try {
       await check(
@@ -278,6 +299,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           /Margot: not reviewed: (draft|fork|closed|stale)/,
         )?.[1] as RefusalReason | undefined;
         if (refusal) throw new PublicationRefusal(refusal);
+        notReviewed = notReviewedReason(result.stage);
         throw new Error(`${result.stage}: ${result.diagnostic}`);
       }
       if (result.kind === "held") {
@@ -369,6 +391,32 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         } catch (cleanupError) {
           failures.push(`${label} cleanup unconfirmed: ${errorMessage(cleanupError)}`);
         }
+      }
+      // The check is closed first; the author then gets the reason in the conversation too.
+      // Nothing is said when the review is already on the pull request, or when the head
+      // has moved, the pull request has closed or this run has been superseded.
+      if (notReviewed !== undefined && !reviewPosted) {
+        // A deliberate refusal (closed, draft, fork, stale) skips the comment quietly; any
+        // other failure to confirm the pull request is recorded, so a skip is never silent.
+        const stillCurrent = await guard(r, context()).then(
+          () => true,
+          (guardError: unknown) => {
+            if (!(guardError instanceof PublicationRefusal))
+              failures.push(`not-reviewed comment skipped: ${errorMessage(guardError)}`);
+            return false;
+          },
+        );
+        if (stillCurrent)
+          try {
+            await client.rest.pulls.createReview({
+              ...params(r, context()),
+              commit_id: r.head,
+              event: "COMMENT",
+              body: `Not reviewed: ${notReviewed}. The review check has the details. Held for the operator.`,
+            });
+          } catch (commentError) {
+            failures.push(`not-reviewed comment unconfirmed: ${errorMessage(commentError)}`);
+          }
       }
       return {
         kind: "error",
