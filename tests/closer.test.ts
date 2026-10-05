@@ -277,7 +277,7 @@ it("uses the preflight title for a floor stop", async () => {
   expect({ write: (await wire("floor")).writes[0] }).toMatchObject({
     write: {
       output: {
-        title: "Margot: preflight — required checks not green — not reviewed yet",
+        title: "Margot: not reviewed yet: required checks not green",
       },
     },
   });
