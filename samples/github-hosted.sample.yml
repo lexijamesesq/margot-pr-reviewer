@@ -10,7 +10,9 @@
 # variable and YOUR_MARGOT_APP_KEY a secret. Minted tokens last an hour, so each job
 # mints its own. GH_TOKEN is the read token, MARGOT_WRITE_TOKEN the publication token
 # (it must come from the App, whose bot is publisher.actor), and the closer's GH_TOKEN
-# is a checks-write token. The jobs' own permissions stay at contents: read.
+# is a checks-write token. The jobs' own permissions stay at contents: read. The read
+# token also covers YOUR_REFERENCE_REPOSITORY, which must belong to the same owner as
+# the target, since one installation token is scoped to one owner.
 #
 # Nothing here triggers on its own: a workflow in the target repository, on
 # pull_request, dispatches this one through the API with the pull request it is about:
