@@ -19,8 +19,9 @@ import {
   withTriage,
 } from "../helpers/review.js";
 
-/** A request from a host with no dispatcher: it carries no class. */
 const pinnedClaude = { executable: "claude", version: "1.0.0" };
+
+/** A request from a host with no dispatcher: it carries no class. */
 const withoutDispatchedClass: Change = (draft) => {
   delete draft.request.classification;
 };

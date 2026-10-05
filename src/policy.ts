@@ -234,6 +234,8 @@ const holdSentences: [string, string][] = [
   ["review-authority", "it touches a protected path"],
   ["fallback-risk", "the risk was scored by a fallback (reduced confidence)"],
   ["fallback-routing", "routing fell back to a simpler model (reduced confidence)"],
+  // Saved by 0.6.12, before the step was recorded; a replayed receipt still carries it.
+  ["fallback", "a model step fell back (reduced confidence)"],
   ["ownership-uncomputed", "ownership could not be established"],
   ["calibration", "calibration mode is on"],
   ["risk", ""],
@@ -244,6 +246,15 @@ export function holdReason(decision: { holdReasons: string[]; rating: { band: st
   reason: string;
   sentence: string;
 } {
+  if (
+    decision.holdReasons.includes("fallback-routing") &&
+    decision.holdReasons.includes("fallback-risk") &&
+    !decision.holdReasons.includes("review-authority")
+  )
+    return {
+      reason: "fallback-risk",
+      sentence: "routing and risk both fell back (reduced confidence)",
+    };
   const [reason, sentence] = holdSentences.find(([r]) => decision.holdReasons.includes(r)) ?? [
     "risk",
     "",
@@ -261,5 +272,7 @@ export function fallbackNotice(holdReasons: string[]): string | null {
     return "The risk model was unavailable — this risk was scored by a fallback at reduced confidence";
   if (routing)
     return "The routing model was unavailable — routing fell back to a simpler model at reduced confidence";
+  if (holdReasons.includes("fallback"))
+    return "A model step was unavailable — a fallback decided it at reduced confidence";
   return null;
 }

@@ -79,6 +79,16 @@ it("says only routing fell back when the risk was not scored by a fallback", () 
     risk: text.includes("scored by a fallback"),
   }).toEqual({ routing: true, risk: false });
 });
+it("says both steps fell back when routing and risk both did", () => {
+  const value = structuredClone(authorChangesReview);
+  value.decision.holdReasons = ["fallback-routing", "fallback-risk"];
+  expect(render(value)).toContain("routing and risk were both decided by a fallback");
+});
+it("shows the generic fallback notice for a receipt saved with the legacy reason", () => {
+  const value = structuredClone(authorChangesReview);
+  value.decision.holdReasons = ["fallback"];
+  expect(render(value)).toContain("A model step was unavailable");
+});
 it("renders the first two sentences of a long rationale", () => {
   const value = structuredClone(authorChangesReview);
   if (!value.voice) throw new Error("voice fixture required");
