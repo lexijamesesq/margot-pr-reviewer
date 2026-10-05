@@ -278,30 +278,38 @@ const referenceFixture = async (references: unknown) => {
   return { directory, lookups, bind };
 };
 it("resolves a reference ref to its commit and writes only head", async () => {
-  const fixture = await referenceFixture({ dotty: { repository: "example/dotty", ref: "v1" } });
+  const fixture = await referenceFixture({ shared: { repository: "example/shared", ref: "v1" } });
   const result = await fixture.bind();
-  const expected = { dotty: { repository: "example/dotty", head: "e".repeat(40) } };
-  expect(fixture.lookups).toEqual([{ owner: "example", repo: "dotty", ref: "v1" }]);
+  const expected = { shared: { repository: "example/shared", head: "e".repeat(40) } };
+  expect(fixture.lookups).toEqual([{ owner: "example", repo: "shared", ref: "v1" }]);
   expect(result.config.claude.references).toEqual(expected);
   expect(
     JSON.parse(await readFile(join(fixture.directory, "config.json"), "utf8")).claude.references,
   ).toEqual(expected);
 });
 it("fails bind-request naming the reference and ref that does not resolve", async () => {
-  const fixture = await referenceFixture({ dotty: { repository: "example/dotty", ref: "gone" } });
+  const fixture = await referenceFixture({ shared: { repository: "example/shared", ref: "gone" } });
   const error = await captureError(fixture.bind);
   expect(error).toBeInstanceOf(Error);
   expect(instanceExitCode(error)).toBe(1);
   expect((error as Error).message).toMatch(
-    /Reference dotty \(example\/dotty\) ref gone did not resolve/,
+    /Reference shared \(example\/shared\) ref gone did not resolve/,
   );
+});
+it("names the reference whose entry is malformed", async () => {
+  const fixture = await referenceFixture({
+    shared: { repository: "example/shared", head: "f".repeat(40) },
+    broken: { repository: "example/broken" },
+  });
+  const error = await captureError(fixture.bind);
+  expect((error as Error).message).toMatch(/^Reference broken is invalid: /);
 });
 it("rejects a reference that gives both head and ref, or neither", async () => {
   for (const reference of [
-    { repository: "example/dotty", head: "f".repeat(40), ref: "v1" },
-    { repository: "example/dotty" },
+    { repository: "example/shared", head: "f".repeat(40), ref: "v1" },
+    { repository: "example/shared" },
   ]) {
-    const fixture = await referenceFixture({ dotty: reference });
+    const fixture = await referenceFixture({ shared: reference });
     const error = await captureError(fixture.bind);
     expect((error as Error).message).toMatch(/exactly one of head or ref/);
     expect(fixture.lookups).toEqual([]);
@@ -309,13 +317,13 @@ it("rejects a reference that gives both head and ref, or neither", async () => {
 });
 it("rejects a reference ref that is not a conservative name", async () => {
   for (const ref of ["a b", "a..b", "-v1", ""]) {
-    const fixture = await referenceFixture({ dotty: { repository: "example/dotty", ref } });
+    const fixture = await referenceFixture({ shared: { repository: "example/shared", ref } });
     expect(((await captureError(fixture.bind)) as Error).message).toMatch(/must not contain/);
     expect(fixture.lookups).toEqual([]);
   }
 });
 it("passes a reference that already gives head through untouched", async () => {
-  const references = { dotty: { repository: "example/dotty", head: "f".repeat(40) } };
+  const references = { shared: { repository: "example/shared", head: "f".repeat(40) } };
   const fixture = await referenceFixture(references);
   const result = await fixture.bind();
   expect(fixture.lookups).toEqual([]);
@@ -324,7 +332,25 @@ it("passes a reference that already gives head through untouched", async () => {
 it("keeps the live schema requiring head on every reference", () => {
   const live = {
     ...config,
-    claude: { ...config.claude, references: { dotty: { repository: "example/dotty", ref: "v1" } } },
+    claude: {
+      ...config.claude,
+      references: { shared: { repository: "example/shared", ref: "v1" } },
+    },
   };
   expect(liveConfigSchema.safeParse(live).success).toBe(false);
+});
+it("names the flag whose value is not valid JSON", async () => {
+  const fixture = await bindCommandFixture("false");
+  fixture.args[fixture.args.indexOf("--protected-paths") + 1] = "[protected/**";
+  const error = await captureError(() =>
+    runInstanceCommand(fixture.args, { GH_TOKEN: "read-token" }, fixture.client as never),
+  );
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/^--protected-paths is not valid JSON: /);
+  expect(instanceExitCode(error)).toBe(1);
+});
+it("prints the usage for --help without failing", async () => {
+  expect(await runInstanceCommand(["--help"], {})).toEqual({
+    help: expect.stringMatching(/^Usage: margot-instance /),
+  });
 });

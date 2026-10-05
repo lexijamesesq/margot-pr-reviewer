@@ -17,6 +17,10 @@ it("accepts the exact configured release and records authority", () => {
   }).not.toThrow();
   expect(selected).toEqual({ authority: true, repositoryName: "project" });
 });
+it("accepts a deployment that carries no npm integrity", () => {
+  const { packageIntegrity: _integrity, ...bare } = deployment;
+  expect(() => validateDeployment(route({ deployment: bare }))).not.toThrow();
+});
 it.each([
   [
     "rejects a release asset from a different repository",
@@ -31,7 +35,10 @@ it.each([
       },
     },
   ],
-  ["requires npm integrity", { deployment: { ...deployment, packageIntegrity: "missing" } }],
+  [
+    "rejects a malformed npm integrity",
+    { deployment: { ...deployment, packageIntegrity: "missing" } },
+  ],
   ["requires the bootstrap SHA-256", { deployment: { ...deployment, packageSha256: "missing" } }],
   ["rejects an unenrolled target", { repository: "example/outside" }],
   ["rejects authority outside enrolment", { authorityRepositories: ["example/outside"] }],

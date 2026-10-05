@@ -51,6 +51,8 @@ export type PublicationMode =
   | "council-error"
   | "facts-error"
   | "token-error"
+  | "progress-refusal"
+  | "mid-draft"
   | "stage-error"
   | "moved-error"
   | "comment-fail"
@@ -84,7 +86,11 @@ export const publisherOptions = {
   appId: 42,
   runUrl: "https://github.com/example/instance/actions/runs/1",
 };
-export async function runPublication(mode: PublicationMode = "clear", errorStage = "voice") {
+export async function runPublication(
+  mode: PublicationMode = "clear",
+  errorStage = "voice",
+  holdReasons?: string[],
+) {
   const writes: {
     method: string;
     path: string;
@@ -119,6 +125,7 @@ export async function runPublication(mode: PublicationMode = "clear", errorStage
   let evaluated = false;
   let moved = false;
   let unconfirmed = false;
+  let draftNow = false;
   let sequence = 0;
   const defect = (name: string) => mode === name;
   if (defect("order") || defect("error"))
@@ -145,7 +152,7 @@ export async function runPublication(mode: PublicationMode = "clear", errorStage
           node_id: "PR_1",
           state: defect("closed") || merged ? "closed" : "open",
           merged,
-          draft: defect("draft"),
+          draft: defect("draft") || draftNow,
           head: {
             sha: moved ? "f".repeat(40) : mechanicalRequest.head,
             repo: { full_name: defect("fork") ? "other/repo" : mechanicalRequest.repository },
@@ -284,6 +291,42 @@ export async function runPublication(mode: PublicationMode = "clear", errorStage
         };
       }
     }
+    if (mode === "progress-refusal") {
+      // The PR is briefly a draft while a phase title is written; the review logs that and
+      // carries on, and a card then fails for an unrelated reason.
+      draftNow = true;
+      await publisher
+        .progress("Margot: council is reviewing the changes", { signal: AbortSignal.timeout(3000) })
+        .catch(() => undefined);
+      draftNow = false;
+      return {
+        kind: "error",
+        stage: "card:safety",
+        diagnostic: "Card safety failed with a distinctive card failure.",
+        mergeEligible: false,
+      };
+    }
+    if (mode === "mid-draft") {
+      // The PR becomes a draft while the review is being published.
+      draftNow = true;
+      try {
+        await publisher.publish(
+          {
+            expectedHead: mechanicalRequest.head,
+            review: structuredClone(mechanicalReview),
+            report: render(mechanicalReview),
+          },
+          { signal: AbortSignal.timeout(3000) },
+        );
+      } catch (error) {
+        return {
+          kind: "error",
+          stage: "publication",
+          diagnostic: String(error),
+          mergeEligible: false,
+        };
+      }
+    }
     if (mode === "council-error")
       return {
         kind: "error",
@@ -331,7 +374,7 @@ export async function runPublication(mode: PublicationMode = "clear", errorStage
       mode === "disarm-fail"
     ) {
       value.decision.mergeEligible = false;
-      value.decision.holdReasons = [
+      value.decision.holdReasons = holdReasons ?? [
         mode.startsWith("authority")
           ? "review-authority"
           : mode === "calibration"

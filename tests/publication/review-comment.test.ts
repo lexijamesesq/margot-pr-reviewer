@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, renderCheckText } from "../../src/render.js";
+import { checkText, render } from "../../src/render.js";
 import { present } from "../helpers/present.js";
 import { authorChangesReview, mechanicalReview } from "../helpers/publication.js";
 
@@ -84,7 +84,7 @@ it("renders bounded prose for a long finding while the check keeps its full text
   finding.what = `${first}. This second sentence belongs only in the check details.`;
   const report = render(value);
   const row = report.split("\n").find((line) => line.includes("`principal-engineer`"));
-  const check = renderCheckText(value);
+  const check = checkText(value);
   expect({
     row,
     fullFindingInComment: report.includes(finding.what),
@@ -159,13 +159,13 @@ describe("merge actor in the authority hold", () => {
   }
   it("names the configured merge actor", () => {
     expect(authorityHold("merge-bot")).toContain(
-      "Above my authority: it changes Margot's own machinery; approve it and merge-bot merges it. Yours to merge.",
+      "Above my authority: it touches a protected path. Approve it and merge-bot merges it.",
     );
   });
   it("names no merger when none is configured", () => {
     const report = authorityHold();
     expect(report).toContain(
-      "Above my authority: it changes Margot's own machinery; approve it to merge it. Yours to merge.",
+      "Above my authority: it touches a protected path. Approve it to merge it.",
     );
     expect(report).not.toContain("merges it");
   });

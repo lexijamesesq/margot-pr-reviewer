@@ -1,4 +1,4 @@
-import { changedLineCount } from "./diff.js";
+import { diffLineCount } from "./diff.js";
 import { errorMessage } from "./errors.js";
 import {
   configHash,
@@ -174,7 +174,7 @@ export async function review(
     )
       cached = undefined;
     stage = stages.triage;
-    const oversized = changedLineCount(facts.diff) > config.mechanicalDiffLineCap;
+    const oversized = diffLineCount(facts.diff) > config.mechanicalDiffLineCap;
     let classification: (typeof classNames)[number] = "functional";
     let classSource = "diff_too_large";
     let mechanicalProbability: number | null = null;
@@ -186,7 +186,7 @@ export async function review(
             services.classify(facts, classificationQuestions, c),
           ),
         );
-        classification = classify(answer, { ...facts, triage: null }, config);
+        classification = classify(answer, config);
         classSource = answer.source;
         if (answer.source === "jev") mechanicalProbability = answer.mechanical;
       }

@@ -6,13 +6,13 @@ import {
   cardNames,
   classificationSchema,
   dimensions,
+  probability,
   riskSchema,
   routeSchema,
 } from "../schemas.js";
 import type { CallContext, Services } from "../types.js";
 import { decisionFallback } from "./decision-fallback.js";
 
-const probability = z.number().min(0).max(1);
 const noul = z.object({ type: z.literal("noul"), noul: probability });
 const score = z.object({
   type: z.literal("score"),
@@ -179,17 +179,17 @@ export function jevAdapter(options: {
       ...Object.fromEntries(Object.keys(questions).map((k) => [k, noul.parse(a[k]).noul])),
     });
   };
-  const route: Services["route"] = async (facts, _classification, questions, c) => {
+  const route: Services["route"] = async (facts, classification, questions, c) => {
     let response: Awaited<ReturnType<typeof decide>>;
     try {
       response = await decide(
         { ...nouls(questions), exposure: routingExposureQuestion },
         facts,
         c,
-        _classification !== "documentation",
+        classification !== "documentation",
       );
     } catch (error) {
-      if (_classification !== "documentation") throw error;
+      if (classification !== "documentation") throw error;
       console.warn(`Margot: routing unavailable (${errorMessage(error)}); routing to every card`);
       return {
         source: "jev_unreachable",

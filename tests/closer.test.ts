@@ -200,37 +200,37 @@ for (const [name, reason, conclusion, title] of [
     "closes a merged PR as skipped with the hosted wording",
     "merged",
     "skipped",
-    "Margot: not reviewed — the PR was merged first",
+    "Margot: not reviewed: the PR was merged first",
   ],
   [
     "closes a closed unmerged PR as cancelled with the hosted wording",
     "closed",
     "cancelled",
-    "Margot: not reviewed — the PR was closed first",
+    "Margot: not reviewed: the PR was closed first",
   ],
   [
     "closes a draft PR as failure with the hosted wording",
     "draft",
     "failure",
-    "not reviewed: draft",
+    "Margot: not reviewed: draft",
   ],
   [
     "closes a fork-head PR as failure with the hosted wording",
     "fork",
     "failure",
-    "not reviewed: fork head",
+    "Margot: not reviewed: fork head",
   ],
   [
     "closes a conflicted PR as failure with the hosted wording",
     "conflict",
     "failure",
-    "not reviewed: merge conflict (resolve before review)",
+    "Margot: not reviewed: merge conflict (resolve before review)",
   ],
   [
     "closes an empty PR as failure with the hosted wording",
     "empty",
     "failure",
-    "not reviewed: empty (no changed files)",
+    "Margot: not reviewed: empty (no changed files)",
   ],
 ] as const)
   it(name, async () => {
@@ -273,11 +273,11 @@ it("closes as cancelled when the package stop is cancelled", async () => {
     write: { conclusion: "cancelled" },
   });
 });
-it("uses the preflight title for a floor stop", async () => {
+it("uses the not-reviewed-yet title for a floor stop", async () => {
   expect({ write: (await wire("floor")).writes[0] }).toMatchObject({
     write: {
       output: {
-        title: "Margot: preflight — required checks not green — waiting for the next push",
+        title: "Margot: not reviewed yet: required checks not green",
       },
     },
   });
@@ -285,6 +285,22 @@ it("uses the preflight title for a floor stop", async () => {
 it("says Margot stopped before a verdict for other failures", async () => {
   expect({ write: (await wire("stopped")).writes[0] }).toMatchObject({
     write: { output: { title: expect.stringContaining("stopped before a verdict") } },
+  });
+});
+it("gives an unknown stop its own summary, apart from a cancelled one", async () => {
+  const summary = async (reason: string) =>
+    (await wire(reason)).writes[0]?.output as { summary: string };
+  expect({
+    unknown: await summary("stopped"),
+    cancelled: await summary("review-cancelled"),
+  }).toMatchObject({
+    unknown: { summary: expect.stringContaining("read the run for the cause") },
+    cancelled: { summary: expect.stringContaining("was cancelled before it posted") },
+  });
+});
+it("writes a stop summary as a sentence, not a template", async () => {
+  expect((await wire("conflict")).writes[0]).toMatchObject({
+    output: { summary: expect.stringContaining("This PR has a merge conflict") },
   });
 });
 it("reports a failed close as an error rather than a false receipt", async () => {

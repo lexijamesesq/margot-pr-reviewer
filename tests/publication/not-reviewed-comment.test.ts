@@ -18,7 +18,7 @@ it("posts a fixed one-line comment and the check when the voice errors after the
     comments: [
       {
         event: "COMMENT",
-        body: "Not reviewed: The verdict could not be written. The review check has the details. Held for the operator.",
+        body: "Not reviewed: The verdict could not be written. The review run has the details. Held for the operator.",
       },
     ],
   });
@@ -26,7 +26,7 @@ it("posts a fixed one-line comment and the check when the voice errors after the
 it("names the council reviewer when a card errors", async () => {
   const run = await runPublication("token-error");
   expect(comments(run).map((w) => w.body.body)).toEqual([
-    "Not reviewed: A council reviewer could not complete its review. The review check has the details. Held for the operator.",
+    "Not reviewed: A council reviewer could not complete its review. The review run has the details. Held for the operator.",
   ]);
 });
 it("carries no text from the diagnostic in the comment", async () => {
@@ -52,7 +52,7 @@ it.each([
 ])("says exactly what a %s error means", async (stage, reason) => {
   const run = await runPublication("stage-error", stage);
   expect(comments(run).map((w) => w.body.body)).toEqual([
-    `Not reviewed: ${reason}. The review check has the details. Held for the operator.`,
+    `Not reviewed: ${reason}. The review run has the details. Held for the operator.`,
   ]);
   expect(notReviewedReason(stage)).toBe(reason);
 });

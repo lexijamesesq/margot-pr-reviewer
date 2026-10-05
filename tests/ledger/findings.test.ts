@@ -220,3 +220,10 @@ it("does not authenticate a ledger marker written by a model", async () => {
     )?.v,
   }).toMatchObject({ escaped: true, selected: 2 });
 });
+it("keeps a re-raised advisory MAJOR blocking when the card attributes it to a delta reach", () => {
+  const advisory = { ...entry(), card: "house-style", status: "advisory", late: "missed" } as const;
+  const f = finding("MAJOR", { ledger: "R1-F1", late: "delta-reach: new caller" });
+  const cards = [card([f], "house-style")];
+  prepareFindings(cards, scope([advisory], 3));
+  expect({ count: mandatory(cards).length }).toMatchObject({ count: 1 });
+});

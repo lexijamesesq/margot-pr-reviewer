@@ -100,7 +100,10 @@ export async function runCli(
     } catch (error) {
       throw new InputError(`cannot write output file ${outputFile} (${code(error)})`);
     }
-    return result.kind === "error" ? 1 : 0;
+    if (result.kind !== "error") return 0;
+    // The output file is removed with the run's working files; the run log keeps the reason.
+    out.stderr(`Review ended in an error at ${result.stage}: ${result.diagnostic}\n`);
+    return 1;
   } catch (error) {
     out.stderr(
       error instanceof InputError || error instanceof ConfigurationError
