@@ -17,7 +17,7 @@ import {
   prior,
   source,
 } from "../helpers/ledger.js";
-import { present } from "../present.js";
+import { present } from "../helpers/present.js";
 
 it("ignores ledger history posted by an untrusted author", () => {
   expect(
@@ -31,13 +31,13 @@ it("ignores ledger history posted by an untrusted author", () => {
         },
       },
       config,
-    ) === null,
-  ).toBe(true);
+    ),
+  ).toBe(null);
 });
 it("ignores a ledger whose head differs from the review commit", () => {
   const f = history();
   present(f.history.reviews[0]).head = "f".repeat(40);
-  expect(selectLedger(f, config) === null).toBe(true);
+  expect(selectLedger(f, config)).toBe(null);
 });
 it("holds for the operator when the trusted ledger is corrupt", async () => {
   const f = history();
@@ -89,12 +89,12 @@ it("selects the trusted App ledger when a newer human comment quotes a marker", 
   expect({ ledger: selectLedger(f, config) }).toMatchObject({ ledger: prior() });
 });
 it("rejects a ledger with duplicate keys", () => {
-  expect(selectLedger(history(prior([entry(), entry()])), config) === null).toBe(true);
+  expect(selectLedger(history(prior([entry(), entry()])), config)).toBe(null);
 });
 it("skips a quoted ledger that is not the terminal marker", () => {
   const f = history();
   present(f.history.reviews[0]).body += "\nquoted text";
-  expect(selectLedger(f, config) === null).toBe(true);
+  expect(selectLedger(f, config)).toBe(null);
 });
 it("holds for the operator when a trusted ledger marker has malformed encoding", async () => {
   const f = history();

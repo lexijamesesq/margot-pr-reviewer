@@ -13,7 +13,7 @@ import {
   scope,
   voice,
 } from "../helpers/ledger.js";
-import { present } from "../present.js";
+import { present } from "../helpers/present.js";
 
 for (const [behaviour, severity, name, late, expected] of [
   ["treats a round two MINOR finding as advisory", "MINOR", "safety", "new", 0],

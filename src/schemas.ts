@@ -239,7 +239,10 @@ export const liveConfigSchema = z.strictObject({
     shadowBeforeHead: z.boolean().default(false),
   }),
   publisher: publisherSchema.optional(),
-  jev: z.strictObject({ model: z.string().min(1) }),
+  jev: z.strictObject({
+    model: z.string().min(1),
+    url: z.url({ protocol: /^https$/ }).optional(),
+  }),
   claude: z.strictObject({
     executable: z.string().min(1),
     ticketing: ticketingSchema.optional(),

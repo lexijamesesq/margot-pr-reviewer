@@ -18,9 +18,9 @@ instead of clearing it for merge.
 
 ## Terms
 
-- **Jev** — the external decision service Margot asks for classification, routing
-  and risk. It is reached at the configured `jev.url` with the `JEV_KEY`
-  credential.
+- **Jev** — [TypeSafe](https://typesafe.ai)'s scoring model, which Margot uses to
+  classify changes and score risk. Its API key goes in `JEV_KEY`, and `jev.model`
+  pins a Jev model version, for example `jev-1.13.0`.
 - **The council** — the review cards.
 - **A card** — one review standard, run by a model against the diff.
 - **The voice** — the model that rules the verdict when code cannot clear the
@@ -36,16 +36,14 @@ instead of clearing it for merge.
 
 Margot requires Node 22 or later (see `engines` in `package.json`).
 
-Install a released tarball by URL, verifying it before use:
+Margot is not on the npm registry. Install a release tarball by the URL on the
+repository's [Releases page](https://github.com/lexijamesesq/margot-pr-reviewer/releases):
 
 ```sh
-curl --fail --location --silent --show-error "$PACKAGE_URL" --output margot-pr-reviewer.tgz
-echo "$PACKAGE_SHA256  margot-pr-reviewer.tgz" | sha256sum --check
-npm install --ignore-scripts --save-exact ./margot-pr-reviewer.tgz
+npm install --ignore-scripts --save-exact "$PACKAGE_URL"
 ```
 
-The SHA-256 check against the downloaded bytes is the integrity control. A
-deployment file's `packageIntegrity` field (an npm-style `sha512-…` string) is
+A deployment file's `packageIntegrity` field (an npm-style `sha512-…` string) is
 validated only for shape; see [Instance commands](#instance-commands) for the
 `validate-deployment` command that checks the rest of a deployment pin.
 
@@ -87,7 +85,7 @@ configuration it is given unchanged, without resolving `${MARGOT_ROOT}`.
 | `GH_TOKEN` | GitHub token read by `margot-review` (facts, checks, review history) and by `margot-instance bind-request`/`close-stranded-check`. For `margot-review` and `bind-request` it only needs read access; `close-stranded-check` also uses it to update a check run, so it needs `checks: write` there. |
 | `MARGOT_WRITE_TOKEN` | Separate token with checks and pull-request write access. Required for GitHub publication; never forwarded to a model or evidence server. |
 | `MARGOT_OWNED_TIER` | Caller-computed protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing, blank, or invalid holds the review. |
-| `MARGOT_CLASSIFICATION` | Overrides the request's classification (`functional`, `documentation`, or `mechanical`). |
+| `MARGOT_CLASSIFICATION` | The request's dispatched classification (`functional`, `documentation`, or `mechanical`). It can only make the review stricter than the verified triage's class. |
 | `MARGOT_TRIAGE` | Carries an earlier triage result into the request when no classification is set; only the value `mechanical` has any effect. |
 | names listed in `claude.ticketing.env` | Forwarded only to the configured ticketing MCP server, never to the model environment generally. |
 

@@ -14,8 +14,10 @@ import {
   riskSchema,
   routeSchema,
 } from "../src/schemas.js";
-import measuredP1 from "./p1-questions.json" with { type: "json" };
-import { present } from "./present.js";
+import goldenClassificationQuestions from "./classification-questions.golden.json" with {
+  type: "json",
+};
+import { present } from "./helpers/present.js";
 
 const recording = JSON.parse(
   readFileSync(new URL("../recordings/mechanical-bump.json", import.meta.url), "utf8"),
@@ -55,20 +57,14 @@ const classes = {
 it("normalizes Jev nouls into classification probabilities", async () => {
   const j = jev({ ...classes, mechanical: { type: "noul", noul: 1 } });
   const result = await j.adapter.classify(facts, classificationQuestions, context());
-  expect(classificationSchema.parse(result).mechanical === 1).toBe(true);
+  expect(classificationSchema.parse(result).mechanical).toBe(1);
 });
-it("sends the exact measured P1 questions for classification", async () => {
+it("sends the golden classification questions, in order", async () => {
   const j = jev(classes);
   await j.adapter.classify(facts, classificationQuestions, context());
-  expect(
-    JSON.stringify(
-      (
-        j.calls[0] as {
-          questions: unknown;
-        }
-      ).questions,
-    ) === JSON.stringify(measuredP1),
-  ).toBe(true);
+  expect(JSON.stringify((j.calls[0] as { questions: unknown }).questions)).toBe(
+    JSON.stringify(goldenClassificationQuestions),
+  );
 });
 it("keeps full code evidence and excludes author prose in classification", async () => {
   const j = jev(classes);
@@ -107,14 +103,15 @@ it("fails validation for a malformed Jev classification", async () => {
 it("retries a transient Jev response and recovers", async () => {
   const j = jev(classes, { failures: 1 });
   await j.adapter.classify(facts, classificationQuestions, context());
-  expect(j.attempts() === 2).toBe(true);
+  expect(j.attempts()).toBe(2);
 });
 it("treats Jev authentication failures as terminal", async () => {
   const j = jev(classes, { failures: 1, status: 401 });
   const answer = (await j.adapter.classify(facts, classificationQuestions, context())) as {
     source: string;
   };
-  expect(answer.source === "jev_unreachable" && j.attempts() === 1).toBe(true);
+  expect(answer.source).toBe("jev_unreachable");
+  expect(j.attempts()).toBe(1);
 });
 it("requests functional review during a classifier outage", async () => {
   const j = jev(classes, { failures: 3 });
@@ -138,7 +135,7 @@ it("preserves risk levels in Jev score distributions", async () => {
     ]),
   );
   const r = await jev(answers).adapter.risk(facts, [], riskQuestions, context());
-  expect(riskSchema.parse(r).dimensions.operations.probabilities[2] === 1).toBe(true);
+  expect(riskSchema.parse(r).dimensions.operations.probabilities[2]).toBe(1);
 });
 it("preserves routing uncertainty in Jev exposure confidence", async () => {
   const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0.5 }]));
@@ -151,7 +148,7 @@ it("preserves routing uncertainty in Jev exposure confidence", async () => {
       probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 },
     },
   }).adapter.route(facts, "documentation", routeQuestions, context());
-  expect(routeSchema.parse(r).confidence === 0).toBe(true);
+  expect(routeSchema.parse(r).confidence).toBe(0);
 });
 describe("bound evidence batching", () => {
   const source = JSON.parse(
@@ -208,13 +205,9 @@ describe("bound evidence batching", () => {
       const expected = { facts: { ...data } as Partial<typeof facts>, cards: [] };
       delete expected.facts.history;
       const reconstructed = requests.map((r) => r.evidence).join("");
-      expect(
-        check === "evidence"
-          ? { ok: reconstructed === JSON.stringify(expected) }
-          : check === "severity"
-            ? { ok: output.dimensions.operations.probabilities[3] === 1 }
-            : { ok: output.dimensions.operations.confidence === 0.1 },
-      ).toMatchObject({ ok: true });
+      if (check === "evidence") expect(reconstructed).toBe(JSON.stringify(expected));
+      else if (check === "severity") expect(output.dimensions.operations.probabilities[3]).toBe(1);
+      else expect(output.dimensions.operations.confidence).toBe(0.1);
     });
   it("keeps functional evidence from the final batch through aggregation", async () => {
     const { jevAdapter } = await import("../src/adapters/jev.js");

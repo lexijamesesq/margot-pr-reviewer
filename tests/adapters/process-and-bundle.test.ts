@@ -34,7 +34,12 @@ it("passes Claude only its explicit credential allowlist", () => {
     GH_TOKEN: "write-canary",
     UNRELATED_SECRET: "other",
   });
-  expect(!env.JEV_KEY && !env.GH_TOKEN && !env.UNRELATED_SECRET && env.PATH === "/bin").toBe(true);
+  expect(env.PATH).toBe("/bin");
+  expect([env.JEV_KEY, env.GH_TOKEN, env.UNRELATED_SECRET]).toEqual([
+    undefined,
+    undefined,
+    undefined,
+  ]);
 });
 it("rejects a failed subprocess", async () => {
   await expect(execute(process.execPath, ["-e", "process.exit(1)"])).rejects.toThrow();
@@ -134,5 +139,5 @@ it("delivers large CLI evidence complete through stdin", async () => {
     ["-e", "process.stdin.on('data',d=>process.stdout.write(d))"],
     { input: input },
   );
-  expect({ complete: out === input }).toMatchObject({ complete: true });
+  expect(out).toBe(input);
 });

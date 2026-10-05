@@ -5,6 +5,7 @@ import { checkText } from "../../src/render.js";
 import { cardNames, factsSchema } from "../../src/schemas.js";
 import {
   asDocumentation,
+  type Change,
   classifiedAs,
   type Draft,
   recorded,
@@ -17,6 +18,11 @@ import {
   withRequest,
   withTriage,
 } from "../helpers/review.js";
+
+/** A request from a host with no dispatcher: it carries no class. */
+const withoutDispatchedClass: Change = (draft) => {
+  delete draft.request.classification;
+};
 
 /** The question text the review sent Jev for one classification key. */
 async function classificationQuestion(draft: Draft, key: string) {
@@ -103,6 +109,31 @@ describe("trusted triage", () => {
       recorded("council-clear", withTriage({}), withRequest({ classification: "functional" })),
     );
     expect(calls).not.toContain("classification");
+    expect(result).toMatchObject({
+      classification: "functional",
+      provenance: { classification: "dispatch" },
+    });
+  });
+
+  it("keeps a verified triage's class when no class is dispatched", async () => {
+    for (const classification of ["mechanical", "documentation"]) {
+      const { result, calls } = await reviewed(
+        recorded(
+          "council-clear",
+          asDocumentation(1),
+          withTriage({ classification }),
+          withoutDispatchedClass,
+        ),
+      );
+      expect(calls).not.toContain("classification");
+      expect(result).toMatchObject({ classification, provenance: { classification: "jev" } });
+    }
+  });
+
+  it("keeps a dispatched functional class over a verified mechanical triage", async () => {
+    const { result } = await reviewed(
+      recorded("council-clear", withTriage({}), withRequest({ classification: "functional" })),
+    );
     expect(result).toMatchObject({
       classification: "functional",
       provenance: { classification: "dispatch" },

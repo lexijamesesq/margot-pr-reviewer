@@ -6,7 +6,7 @@ import { review } from "../../src/review.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
 import type { Ledger } from "../../src/types.js";
 import { entry, prior } from "../helpers/ledger.js";
-import { present } from "../present.js";
+import { present } from "../helpers/present.js";
 
 it("keeps standing entries when the ledger exceeds its size budget", () => {
   expect(ledgerBlock(prior([{ ...entry(), what: "x".repeat(50000) }])).length > 24000).toBe(true);

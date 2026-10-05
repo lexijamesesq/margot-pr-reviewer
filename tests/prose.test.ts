@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
-import { present } from "./present.js";
+import { present } from "./helpers/present.js";
 
 it("preserves the voice's risk statement, clarification and setting finding", () => {
   expect(

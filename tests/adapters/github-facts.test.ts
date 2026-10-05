@@ -12,7 +12,8 @@ import { context, github, request } from "../helpers/adapters.js";
 it("follows the second page of the file listing", async () => {
   const { adapter, calls } = github({ pageTwo: true, count: 2 });
   const facts = await adapter.facts(request, context());
-  expect(facts.files.length === 2 && calls.some((c) => c.includes("page=2"))).toBe(true);
+  expect(facts.files).toHaveLength(2);
+  expect(calls.some((c) => c.includes("page=2"))).toBe(true);
 });
 it("takes the file count from the diff when the pull request's changed_files count lags", async () => {
   // GitHub's `changed_files` lags on a fresh push and the listing is capped at 3,000; the
