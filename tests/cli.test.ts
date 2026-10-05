@@ -106,3 +106,29 @@ describe("margot-review --help and --version", () => {
     });
   });
 });
+
+describe("margot-review GitHub publication settings", () => {
+  const publishing = () => {
+    const config = structuredClone(sampleConfig);
+    config.review.publication = "github";
+    return config;
+  };
+  it("names the missing write token without printing any token", async () => {
+    const { code, stderr } = await invoke({
+      config: publishing(),
+      environment: { JEV_KEY: "test-only", GH_TOKEN: "ghp_secretvalue" },
+    });
+    expect(code).toBe(1);
+    expect(stderr).toContain("MARGOT_WRITE_TOKEN");
+    expect(stderr).not.toContain("ghp_secretvalue");
+  });
+  it("names the missing publisher configuration", async () => {
+    const config = publishing();
+    delete config.publisher;
+    const { stderr } = await invoke({
+      config,
+      environment: { JEV_KEY: "test-only", MARGOT_WRITE_TOKEN: "placeholder" },
+    });
+    expect(stderr).toContain("`publisher` configuration");
+  });
+});

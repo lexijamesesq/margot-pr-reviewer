@@ -1,4 +1,5 @@
 import type { Octokit } from "octokit";
+import { errorMessage } from "./errors.js";
 import { repositorySchema, shaSchema } from "./schemas.js";
 
 const openStates = new Set(["queued", "in_progress"]);
@@ -30,9 +31,7 @@ type Checks = Awaited<
   ReturnType<CheckClient["rest"]["checks"]["listForRef"]>
 >["data"]["check_runs"];
 
-function diagnostic(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
+const diagnostic = errorMessage;
 
 type CheckConclusion = "skipped" | "cancelled" | "failure" | "action_required";
 type CheckOutput = { conclusion: CheckConclusion; title: string; summary: string };

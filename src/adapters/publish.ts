@@ -1,5 +1,6 @@
 import type { Octokit } from "octokit";
 import type { z } from "zod";
+import { errorMessage } from "../errors.js";
 import { checkText } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
@@ -296,7 +297,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
             refusalFailures.push("disable auto-merge cleanup unconfirmed: disable unconfirmed");
         } catch (disableError) {
           refusalFailures.push(
-            `disable auto-merge cleanup unconfirmed: ${disableError instanceof Error ? disableError.message : String(disableError)}`,
+            `disable auto-merge cleanup unconfirmed: ${errorMessage(disableError)}`,
           );
         }
         try {
@@ -310,9 +311,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
             context(),
           );
         } catch (refusalError) {
-          refusalFailures.push(
-            `refusal check unconfirmed: ${refusalError instanceof Error ? refusalError.message : String(refusalError)}`,
-          );
+          refusalFailures.push(`refusal check unconfirmed: ${errorMessage(refusalError)}`);
         }
         return {
           kind: "error",
@@ -351,16 +350,14 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
         try {
           await cleanup();
         } catch (cleanupError) {
-          failures.push(
-            `${label} cleanup unconfirmed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-          );
+          failures.push(`${label} cleanup unconfirmed: ${errorMessage(cleanupError)}`);
         }
       }
       return {
         kind: "error",
         stage: "publication",
         mergeEligible: false,
-        diagnostic: `${error instanceof Error ? error.message : "Publication failed"}${failures.length ? `; ${failures.join("; ")}` : ""}`,
+        diagnostic: `${errorMessage(error)}${failures.length ? `; ${failures.join("; ")}` : ""}`,
       };
     }
   }

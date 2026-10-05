@@ -6,6 +6,7 @@ import { parseArgs } from "node:util";
 import type { Octokit } from "octokit";
 import { githubClient } from "./adapters/github.js";
 import { closeStrandedCheck, shouldCloseStrandedCheck } from "./closer.js";
+import { errorMessage } from "./errors.js";
 import {
   type BindRequestStop,
   bindRequestFiles,
@@ -55,7 +56,7 @@ function named(args: string[], names: string[]) {
     }
     return values as Options;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     const unknown = message.match(/Unknown option '([^']+)'/);
     throw new Error(unknown ? `Unknown argument: ${unknown[1]}` : message);
   }
@@ -207,8 +208,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
     })
     .catch((error: unknown) => {
       if (error instanceof StopRequestError) process.stdout.write(stopOutput(error.stop));
-      process.stderr.write(
-        `${error instanceof Error ? error.message : "Instance command failed"}\n`,
-      );
+      process.stderr.write(`${errorMessage(error)}\n`);
       process.exitCode = instanceExitCode(error);
     });

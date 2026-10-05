@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { deflateSync, inflateSync } from "node:zlib";
 import parseDiff from "parse-diff";
 import { diffIsComplete } from "./diff.js";
+import { errorMessage } from "./errors.js";
 import { comparisonSchema, ledgerSchema } from "./schemas.js";
 import type {
   Card,
@@ -91,7 +92,7 @@ export function selectLedger(
         throw new Error("Ledger belongs to another PR");
       return ledger;
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = errorMessage(error);
       const warning = `Skipped ledger from review ${review.id}: ${reason.replace(/\s+/g, " ").trim()}`;
       console.warn(warning);
       onWarning?.(warning);

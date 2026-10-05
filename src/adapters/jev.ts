@@ -106,7 +106,7 @@ export function jevAdapter(options: {
         answers.push(await ask(questions, batch, c));
       } catch (error) {
         if (!fallback || c.signal.aborted) throw error;
-        console.warn(`Margot: ${errorMessage(error)}; falling back to the fallback decider`);
+        console.warn(`Margot: ${errorMessage(error)}; using the fallback decider`);
         answers.push(
           await (options.fallback ?? decisionFallback)(
             questions,

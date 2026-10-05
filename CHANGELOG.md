@@ -2,9 +2,10 @@
 
 ## 0.6.7
 
-- Errors keep their cause: the CLI names the file, field or variable that failed, and Jev authentication failures are distinguishable from outages.
+- Errors keep their cause: the CLI names the file, field, variable or configuration setting that failed, and Jev authentication failures are distinguishable from outages.
 - A short Terms section defines Jev, the council, cards, the voice, the operator and the card bundle.
-- The self-instrument hold says it waits for a maintainer; `margot-review --help` and `--version`.
+- The self-instrument hold says it waits for a maintainer.
+- `margot-review` prints its usage with `--help` and the package version with `--version`.
 
 ## 0.6.6
 
@@ -18,7 +19,6 @@ Margot reviews a pull request and decides whether it can merge.
   GitHub when the configuration sets `publication: "github"` and a write token is
   supplied.
 - Fails closed: a missing or failed service response is an error, never an
-  empty success, and the diagnostic says which input or service failed.
-- `margot-review` prints its usage with `--help` and the package version with
-  `--version`; `margot-instance` validates deployments, binds requests and
-  closes stranded checks.
+  empty success.
+- `margot-instance` validates deployments, binds requests and closes stranded
+  checks.

@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import type { z } from "zod";
 import { liveConfigSchema } from "./adapters/live.js";
 import { cliServices } from "./cli-services.js";
+import { ConfigurationError } from "./errors.js";
 import { requestSchema } from "./schemas.js";
 
 const usage = "Usage: margot-review REQUEST.json CONFIG.json OUTPUT.json";
@@ -102,7 +103,7 @@ export async function runCli(
     return result.kind === "error" ? 1 : 0;
   } catch (error) {
     out.stderr(
-      error instanceof InputError
+      error instanceof InputError || error instanceof ConfigurationError
         ? `Review failed: ${error.message}\n`
         : `Review failed before a result could be recorded (${error instanceof Error ? error.name : "unknown error"}). Check input files and credentials.\n`,
     );

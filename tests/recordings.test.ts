@@ -6,26 +6,46 @@ const recordings = join(import.meta.dirname, "..", "recordings");
 const prose = join(recordings, "prose");
 const credentialsAndPaths =
   /\/Users\/|\/home\/|\/private\/|github_pat_|gh[pousr]_[A-Za-z0-9]|sk-ant-|\.internal\b|\.local\b|session_[A-Za-z0-9]/;
-const repositoryKey = /"(?:repository|repo|fullName|full_name|nameWithOwner)"\s*:\s*"([^"]*)"/g;
-const apiRepositoryPath = /\brepos\/([A-Za-z0-9][\w.-]*\/[\w.-]+)/g;
 const url = /https?:\/\/([^/\s"'`)]+)(\/[^\s"'`)]*)?/g;
+const slashToken = /[\w.@-]+(?:\/[\w.@-]+)+/g;
+// Slash-joined words that are prose, not repositories. Anything else slash-joined must
+// be under `example/`, a file path with a known extension, or listed here.
+const proseTokens = new Set([
+  "0.46/0.47",
+  "add/delete",
+  "base/head",
+  "card/risk/voice",
+  "JS/TS",
+  "linter/formatter",
+  "ludeeus/action-shellcheck",
+  "packages/app",
+  "pass/fail",
+  "shfmt/yamllint/markdownlint",
+  "shfmt/yamllint/markdownlint/biome-check/prettier",
+  "try/except",
+  "repos/...",
+]);
+const filePath = /\.(?:md|json|ya?ml|sh|py|ts|js|txt|toml)(?:@[\w.-]+)?$/;
 
 /** Everything in a recording that could identify a real repository, host, credential or machine. */
 function leaks(contents: string): string[] {
   const found: string[] = [];
   const credential = contents.match(credentialsAndPaths);
   if (credential) found.push(`credential or machine path: ${credential[0]}`);
-  const names = [
-    ...[...contents.matchAll(repositoryKey)].map((m) => m[1] ?? ""),
-    ...[...contents.matchAll(apiRepositoryPath)].map((m) => m[1] ?? ""),
-  ];
-  for (const name of names)
-    if (!/^example\/[A-Za-z0-9._-]+$/.test(name))
-      found.push(`repository outside example/: ${name}`);
   for (const [, host, path = ""] of contents.matchAll(url)) {
     const allowed =
       host === "example.com" || (host === "github.com" && /^\/example(\/|$)/.test(path));
     if (!allowed) found.push(`URL outside example.com or github.com/example: ${host}${path}`);
+  }
+  for (const raw of contents.replace(url, " ").match(slashToken) ?? []) {
+    const token = raw.replace(/[.]+$/, "");
+    const allowed =
+      token.startsWith("example/") ||
+      token.startsWith("repos/example/") ||
+      proseTokens.has(token) ||
+      proseTokens.has(token.replace(/\/\.\.\..*$/, "/...")) ||
+      filePath.test(token);
+    if (!allowed) found.push(`repository outside example/: ${token}`);
   }
   return found;
 }
@@ -81,6 +101,11 @@ describe("the recordings audit", () => {
   });
   it.each([
     ['{"repository":"acme-corp/billing-service"}', "repository outside example/"],
+    [
+      '{"summary":"The change in acme-corp/billing-service breaks the retry path."}',
+      "repository outside example/: acme-corp/billing-service",
+    ],
+    ["Prose sample mentions acme-corp/billing-service here.", "repository outside example/"],
     ['"/repos/acme-corp/billing-service/pulls/3"', "repository outside example/"],
     ["see https://github.com/acme-corp/billing-service", "URL outside"],
     ["see https://ci.acme-corp.dev/run/9", "URL outside"],

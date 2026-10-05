@@ -434,7 +434,7 @@ export async function review(
     return { kind: "reviewed", ...result, report, publication };
   } catch (error) {
     const failedStage = stage;
-    let diagnostic = error instanceof Error ? error.message : "Service failed";
+    let diagnostic = errorMessage(error);
     if (emergencyDisable) {
       try {
         if (!(await emergencyDisable())) diagnostic += "; auto-merge disable not confirmed";
