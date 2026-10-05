@@ -104,8 +104,15 @@ it("forwards exactly the configured environment variables from the CLI", async (
       TICKETING_TOKEN: "test-only-cli-token",
       TICKETING_TENANT: "test-only-cli-tenant",
     },
-    forwardedKeys: ["TICKETING_TENANT", "TICKETING_TOKEN"],
+    forwardedKeys: [
+      "ANTHROPIC_API_KEY",
+      "CLAUDE_CODE_OAUTH_TOKEN",
+      "TICKETING_TENANT",
+      "TICKETING_TOKEN",
+    ],
     forwardedValues: {
+      ANTHROPIC_API_KEY: "",
+      CLAUDE_CODE_OAUTH_TOKEN: "",
       TICKETING_TOKEN: "test-only-cli-token",
       TICKETING_TENANT: "test-only-cli-tenant",
     },
@@ -189,7 +196,31 @@ it("sends Claude its complete prompt on stdin and only the round delta through r
   });
 });
 it("rejects an unexpected reported tool", async () => {
-  await expect(fakeClaude({ tools: ["Bash"] })).rejects.toThrow("unexpected tool");
+  await expect(fakeClaude({ tools: ["Bash"] })).rejects.toThrow("exactly the requested tools");
+});
+it("rejects a requested tool Claude did not report", async () => {
+  await expect(fakeClaude({ tools: ["mcp__evidence__read_file"] })).rejects.toThrow(
+    "exactly the requested tools",
+  );
+});
+it("rejects an MCP server that did not connect", async () => {
+  await expect(
+    fakeClaude({ mcpServers: [{ name: "evidence", status: "failed" }] }),
+  ).rejects.toThrow("did not connect: evidence");
+});
+it("blanks the model credentials in every MCP server's environment", async () => {
+  const invocation = await fakeClaude({
+    ticketing,
+    ticketingEnvironment: { TICKETING_TOKEN: "t", TICKETING_TENANT: "x" },
+  });
+  expect(
+    Object.fromEntries(
+      Object.entries(invocation.mcp.mcpServers).map(([name, server]) => [
+        name,
+        [server.env?.ANTHROPIC_API_KEY, server.env?.CLAUDE_CODE_OAUTH_TOKEN],
+      ]),
+    ),
+  ).toEqual({ evidence: ["", ""], tickets: ["", ""] });
 });
 it("rejects a mismatched CLI version", async () => {
   await expect(fakeClaude({ version: "0.0.2 test" })).rejects.toThrow("pin mismatch");

@@ -115,6 +115,7 @@ export async function fakeClaude(
   options: {
     version?: string;
     tools?: string[];
+    mcpServers?: { name: string; status: string }[];
     envelope?: Record<string, unknown>;
     facts?: typeof facts;
     delta?: string;
@@ -160,11 +161,19 @@ if (process.argv.includes("--version")) {
   if (process.env.MARGOT_WRITE_TOKEN) process.exit(19);
   console.log(${JSON.stringify(options.version ?? "0.0.1 test")});
 } else {
-  console.log(JSON.stringify(${JSON.stringify({ type: "system", subtype: "init", tools: options.tools ?? [] })}));
   const args = process.argv.slice(2);
   const mcpPath = args[args.indexOf("--mcp-config") + 1];
   const mcpText = fs.readFileSync(mcpPath, "utf8");
   const mcp = JSON.parse(mcpText);
+  const allowed = args.slice(args.indexOf("--allowedTools") + 1);
+  const requested = allowed.slice(0, allowed.findIndex((a) => a.startsWith("--")));
+  console.log(JSON.stringify({
+    type: "system",
+    subtype: "init",
+    tools: ${JSON.stringify(options.tools ?? null)} ?? requested,
+    mcp_servers: ${JSON.stringify(options.mcpServers ?? null)} ??
+      Object.keys(mcp.mcpServers).map((name) => ({ name, status: "connected" })),
+  }));
   const evidence = JSON.parse(mcp.mcpServers.evidence.env.MARGOT_EVIDENCE);
   fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({
     args,
