@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.7
+
+- Errors keep their cause: the CLI names the file, field or variable that failed, and Jev authentication failures are distinguishable from outages.
+- A short Terms section defines Jev, the council, cards, the voice, the operator and the card bundle.
+- The self-instrument hold says it waits for a maintainer; `margot-review --help` and `--version`.
+
 ## 0.6.6
 
 Margot reviews a pull request and decides whether it can merge.
