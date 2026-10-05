@@ -396,9 +396,15 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       // Nothing is said when the review is already on the pull request, or when the head
       // has moved, the pull request has closed or this run has been superseded.
       if (notReviewed !== undefined && !reviewPosted) {
+        // A deliberate refusal (closed, draft, fork, stale) skips the comment quietly; any
+        // other failure to confirm the pull request is recorded, so a skip is never silent.
         const stillCurrent = await guard(r, context()).then(
           () => true,
-          () => false,
+          (guardError: unknown) => {
+            if (!(guardError instanceof PublicationRefusal))
+              failures.push(`not-reviewed comment skipped: ${errorMessage(guardError)}`);
+            return false;
+          },
         );
         if (stillCurrent)
           try {

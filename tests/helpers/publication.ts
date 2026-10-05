@@ -54,7 +54,8 @@ export type PublicationMode =
   | "stage-error"
   | "moved-error"
   | "comment-fail"
-  | "published-then-error";
+  | "published-then-error"
+  | "unconfirmed-error";
 
 export const mechanicalBump = readRecording("mechanical-bump");
 export const mechanicalRequest = requestSchema.parse(mechanicalBump.request);
@@ -117,6 +118,7 @@ export async function runPublication(mode: PublicationMode = "clear", errorStage
   let merged = false;
   let evaluated = false;
   let moved = false;
+  let unconfirmed = false;
   let sequence = 0;
   const defect = (name: string) => mode === name;
   if (defect("order") || defect("error"))
@@ -132,6 +134,8 @@ export async function runPublication(mode: PublicationMode = "clear", errorStage
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     let data: unknown;
     if (method === "GET") {
+      if (unconfirmed && /\/pulls\/\d+$/.test(path))
+        return new Response(JSON.stringify({ message: "Recorded outage" }), { status: 502 });
       if (path.endsWith("/reviews")) data = reviews;
       else if (path.endsWith("/check-runs"))
         data = { check_runs: [...stored.values()], total_count: stored.size };
@@ -249,8 +253,14 @@ export async function runPublication(mode: PublicationMode = "clear", errorStage
     }
     if (defect("error"))
       return { kind: "error", stage: "card", diagnostic: "Recorded timeout", mergeEligible: false };
-    if (mode === "stage-error" || mode === "moved-error" || mode === "comment-fail") {
+    if (
+      mode === "stage-error" ||
+      mode === "moved-error" ||
+      mode === "comment-fail" ||
+      mode === "unconfirmed-error"
+    ) {
       if (mode === "moved-error") moved = true;
+      if (mode === "unconfirmed-error") unconfirmed = true;
       return {
         kind: "error",
         stage: errorStage,

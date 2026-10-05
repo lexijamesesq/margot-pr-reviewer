@@ -83,6 +83,21 @@ it("posts no comment when the head moved before the comment was written", async 
     comments: [],
   });
 });
+it("records a skipped comment when the pull request cannot be confirmed as current", async () => {
+  const run = await runPublication("unconfirmed-error");
+  expect({ comments: comments(run), result: run.result }).toMatchObject({
+    comments: [],
+    result: {
+      kind: "error",
+      diagnostic: expect.stringMatching(/not-reviewed comment skipped: .*Recorded outage/u),
+    },
+  });
+});
+it("records nothing extra when the comment is skipped for a moved head", async () => {
+  const run = await runPublication("moved-error");
+  expect(run.result).toMatchObject({ kind: "error" });
+  expect(run.result.kind === "error" && run.result.diagnostic).not.toMatch(/not-reviewed comment/u);
+});
 it("posts no not-reviewed comment under a review that was already posted", async () => {
   const run = await runPublication("published-then-error");
   expect(comments(run).map((w) => w.body.event)).toEqual(["APPROVE"]);
