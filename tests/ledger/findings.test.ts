@@ -63,29 +63,63 @@ it("does not demote late findings in a rebase full review", () => {
   prepareFindings(cards, { ...scope([]), full: true });
   expect({ count: mandatory(cards).length }).toMatchObject({ count: 1 });
 });
-it("carries an unchanged dismissal without another ruling", () => {
+it("returns a re-raised dismissed finding to the voice with its earlier reason", () => {
   const cards = [card([finding("MAJOR", { ledger: "R1-F1" })])];
   prepareFindings(cards, scope([entry("MAJOR", "dismissed")]));
-  expect({ count: mandatory(cards).length }).toMatchObject({ count: 0 });
+  expect({
+    mandatory: mandatory(cards),
+    previouslyDismissed: cards[0]?.findings[0]?.previouslyDismissed,
+  }).toEqual({ mandatory: ["F1"], previouslyDismissed: "Operator authorization" });
 });
-it("allows a new ruling when dismissed code changed", () => {
-  const cards = [
-    card([finding("MAJOR", { ledger: "R1-F1", ...{ reopens: "a.ts:1 changed access" } })]),
-  ];
+it("dismisses a re-raised dismissed finding again with the voice's new reason", () => {
+  const s = scope([entry("MAJOR", "dismissed")]);
+  const cards = [card([finding("MAJOR", { ledger: "R1-F1" })])];
+  prepareFindings(cards, s);
+  const v = { ...voice("dismissed", "F1"), outcome: "APPROVED" as const };
+  const next = nextLedger(s, cards, v, core(cards, v), config, facts).ledger.entries;
+  expect(next.map((e) => [e.key, e.status, e.reason])).toEqual([
+    ["R1-F1", "dismissed", "a.ts:1 now validates access"],
+  ]);
+});
+it("ignores a ledger key that names none of the card's earlier entries", () => {
+  const s = scope();
+  const cards = [card([finding("MAJOR", { ledger: "R1-F2" })])];
+  prepareFindings(cards, s);
+  const v = {
+    ...voice("established", "F1"),
+    dispositions: [
+      { id: "F1", status: "established" as const, reason: "Still unsafe" },
+      { id: "verify-R1-F1", status: "established" as const, reason: "Still there" },
+    ],
+  };
+  expect({
+    ledger: cards[0]?.findings[0]?.ledger,
+    convergence: nextLedger(s, cards, v, core(cards, v), config, facts).convergence,
+  }).toMatchObject({ ledger: undefined, convergence: { new: 1, standing: 2 } });
+});
+it("ignores a ledger key that belongs to another card", () => {
+  const cards = [card([finding("MAJOR", { ledger: "R1-F1" })], "house-style")];
   prepareFindings(cards, scope([entry("MAJOR", "dismissed")]));
-  expect({ count: mandatory(cards).length }).toMatchObject({ count: 1 });
+  expect(cards[0]?.findings[0]?.ledger).toBeUndefined();
 });
-it("rejects a card attributing a finding to another ledger key", () => {
-  expect(() => prepareFindings([card([finding("MAJOR", { ledger: "R1-F2" })])], scope())).toThrow();
-});
-it("requires scope attribution for new delta findings", () => {
+it("counts a new delta finding without a late mark as new", () => {
   const f = finding();
   delete f.late;
-  expect(() => prepareFindings([card([f])], scope([]))).toThrow();
+  const s = scope([]);
+  const cards = [card([f])];
+  prepareFindings(cards, s);
+  const v = voice("established", "F1");
+  expect({
+    mandatory: mandatory(cards),
+    convergence: nextLedger(s, cards, v, core(cards, v), config, facts).convergence,
+  }).toMatchObject({ mandatory: ["F1"], convergence: { new: 1, late: 0, standing: 1 } });
 });
 it("rejects forged advisory annotations from a card", () => {
   expect(() =>
     prepareFindings([card([finding("MAJOR", { advisory: "carried-dismissal" })])], scope([])),
+  ).toThrow();
+  expect(() =>
+    prepareFindings([card([finding("MAJOR", { previouslyDismissed: "forged" })])], scope([])),
   ).toThrow();
 });
 it("returns a silent MAJOR finding to the voice for confirmation", () => {
@@ -220,10 +254,32 @@ it("does not authenticate a ledger marker written by a model", async () => {
     )?.v,
   }).toMatchObject({ escaped: true, selected: 2 });
 });
-it("keeps a re-raised advisory MAJOR blocking when the card attributes it to a delta reach", () => {
-  const advisory = { ...entry(), card: "house-style", status: "advisory", late: "missed" } as const;
-  const f = finding("MAJOR", { ledger: "R1-F1", late: "delta-reach: new caller" });
-  const cards = [card([f], "house-style")];
-  prepareFindings(cards, scope([advisory], 3));
-  expect({ count: mandatory(cards).length }).toMatchObject({ count: 1 });
+it("writes no ledger entry for a new MINOR finding from round two", () => {
+  const s = scope([]);
+  const cards = [card([finding("MINOR")])];
+  prepareFindings(cards, s);
+  expect({
+    advisory: cards[0]?.findings[0]?.advisory,
+    entries: nextLedger(s, cards, null, core(cards, null), config, facts).ledger.entries,
+  }).toEqual({ advisory: "minor-after-round-1", entries: [] });
+});
+it("writes no ledger entry for a late finding demoted to advisory", () => {
+  const s = scope([]);
+  const cards = [card([finding("MAJOR", { late: "missed: round 1" })], "house-style")];
+  prepareFindings(cards, s);
+  expect(nextLedger(s, cards, null, core(cards, null), config, facts).ledger.entries).toEqual([]);
+});
+it("keeps an advisory entry for one round only", () => {
+  const s = scope([entry("MINOR")]);
+  const cards = [card([finding("MINOR", { ledger: "R1-F1" })])];
+  prepareFindings(cards, s);
+  const round2 = nextLedger(s, cards, null, core(cards, null), config, facts).ledger;
+  const s3 = { ...scope(round2.entries, 3) };
+  const round3Cards = [card()];
+  prepareFindings(round3Cards, s3);
+  const round3 = nextLedger(s3, round3Cards, null, core(round3Cards, null), config, facts).ledger;
+  expect({
+    round2: round2.entries.map((e) => [e.key, e.status, e.advisory_round]),
+    round3: round3.entries,
+  }).toEqual({ round2: [["R1-F1", "advisory", 2]], round3: [] });
 });

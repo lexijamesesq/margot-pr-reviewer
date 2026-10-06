@@ -108,7 +108,6 @@ export function parseCard(prose: string, name: Card["name"]): Card {
       .join(" ");
     const ledger = fields.get("ledger") ?? "";
     const late = fields.get("late") ?? "";
-    const reopens = fields.get("reopens") ?? "";
     return [
       {
         tag,
@@ -119,7 +118,6 @@ export function parseCard(prose: string, name: Card["name"]): Card {
         ...(detail ? { detail } : {}),
         ...(/^R[1-9]\d*-F[1-9]\d*$/.test(ledger) ? { ledger } : {}),
         ...(late ? { late } : {}),
-        ...(reopens ? { reopens } : {}),
       },
     ];
   });

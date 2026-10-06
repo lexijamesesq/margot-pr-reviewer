@@ -158,8 +158,12 @@ export const findingSchema = z.strictObject({
     .optional(),
   // Any `late=` value is kept; only a `missed` prefix changes what the ledger does.
   late: text.optional(),
+  // No longer read or written; receipts saved by 0.7.0 and earlier still carry it.
   reopens: text.optional(),
   unconfirmed: z.boolean().optional(),
+  // The earlier dismissal's reason, on a dismissed finding a card raised again.
+  previouslyDismissed: text.optional(),
+  // `carried-dismissal` is no longer assigned; receipts saved by 0.7.0 and earlier carry it.
   advisory: z.enum(["minor-after-round-1", "late-non-blocking", "carried-dismissal"]).optional(),
 });
 export const cardSchema = z.strictObject({
