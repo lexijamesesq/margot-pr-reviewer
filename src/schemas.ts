@@ -15,6 +15,11 @@ export const cardNames = [
   "maintainable-no-slop",
   "house-style",
 ] as const;
+/** A risk distribution is well-formed when its levels sum to one within this tolerance. */
+export const distributionTolerance = 0.015;
+/** Whether a distribution's levels sum to one, within the tolerance. */
+export const sumsToOne = (levels: number[]) =>
+  Math.abs(levels.reduce((total, p) => total + p, 0) - 1) < distributionTolerance;
 export const dimensions = [
   "blast_radius",
   "reversibility",

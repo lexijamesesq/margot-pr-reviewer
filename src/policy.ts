@@ -6,6 +6,7 @@ import {
   classNames,
   dimensions,
   type routeSchema,
+  sumsToOne,
 } from "./schemas.js";
 import type {
   Card,
@@ -84,7 +85,7 @@ export function rate(
         .at(-1) ?? 0;
     // An irregular distribution, partial or not summing to one, is never rated below Jev's
     // own score: a deliberate upgrade on the previous reviewer, which used its tail alone.
-    const irregular = partial || Math.abs(p.reduce((a, b) => a + b, 0) - 1) >= 0.015;
+    const irregular = partial || !sumsToOne(p);
     return irregular && score !== undefined ? Math.max(tail, Math.round(score)) : tail;
   });
   const confident = dimensions.filter(

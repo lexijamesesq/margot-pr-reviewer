@@ -6,9 +6,11 @@ import {
   cardNames,
   classificationSchema,
   dimensions,
+  distributionTolerance,
   probability,
   riskSchema,
   routeSchema,
+  sumsToOne,
 } from "../schemas.js";
 import type { CallContext, Card, Facts, Services } from "../types.js";
 import { decisionFallback } from "./decision-fallback.js";
@@ -101,8 +103,9 @@ function malformedDimension(answer: unknown): string | null {
   ).data;
   if (!distribution) return "no readable distribution";
   if (Object.keys(distribution).length < 4) return "a partial distribution";
-  const sum = Object.values(distribution).reduce<number>((total, p) => total + (p ?? 0), 0);
-  return Math.abs(sum - 1) >= 0.015 ? "a sum off by 0.015 or more" : null;
+  return sumsToOne(Object.values(distribution).map((p) => p ?? 0))
+    ? null
+    : `a sum off by ${distributionTolerance} or more`;
 }
 /** A distribution as the previous reviewer read one: any non-empty set of levels, missing ones 0. */
 const partialDistribution = z
@@ -262,14 +265,13 @@ export function jevAdapter(options: {
       return { source: "jev_unreachable", functional: 1, documentation: 0, mechanical: 0 };
     }
     // An unreadable answer to any class question classifies the change as functional.
-    const answered = Object.keys(questions).map((k) => [k, noul.safeParse(a[k])] as const);
-    if (answered.some(([, parsed]) => !parsed.success)) {
+    if (unreadableNouls(a, Object.keys(questions))) {
       console.warn("Margot: Jev's classification answer is unreadable; classifying as functional");
       return { source: "jev", functional: 1, documentation: 0, mechanical: 0 };
     }
     return classificationSchema.parse({
       source: "jev",
-      ...Object.fromEntries(answered.map(([k, parsed]) => [k, parsed.data?.noul])),
+      ...Object.fromEntries(Object.keys(questions).map((k) => [k, noul.parse(a[k]).noul])),
     });
   };
   const route: Services["route"] = async (facts, classification, questions, c) => {
