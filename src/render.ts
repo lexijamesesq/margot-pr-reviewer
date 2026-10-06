@@ -1,6 +1,6 @@
 import { ledgerBlock } from "./ledger.js";
 import { fallbackNotice, holdReason } from "./policy.js";
-import { cardNames } from "./schemas.js";
+import { cardNames, dimensions } from "./schemas.js";
 import type { Card, Review, ReviewPresentation } from "./types.js";
 
 const outcomeIcons = {
@@ -47,10 +47,41 @@ function firstClause(value: string): string {
   return boundary < 0 ? text : text.slice(0, boundary);
 }
 
-function fallbackRationale(review: Review): string {
-  if (review.classification === "mechanical")
-    return "A mechanical change has no functional effect, so no council review was required.";
-  return "The selected review path completed without unresolved findings.";
+/** Whether a documentation change was editorial: it is the one class reviewed by no card. */
+const editorial = (review: Review) =>
+  review.classification === "documentation" &&
+  review.routeAnswer !== null &&
+  review.cards.length === 0;
+
+/** The risk label and summary of a review the voice did not rule. */
+function codeVerdict(review: Review): { risk: string; summary: string } {
+  if (review.classification === "mechanical" && review.routeAnswer === null)
+    return {
+      risk: "mechanical change — no functional change",
+      summary:
+        "A mechanical change (dependency bump, or linter/formatter output) with no functional change — no review was required.",
+    };
+  if (editorial(review))
+    return {
+      risk: "editorial documentation change",
+      summary: "An editorial documentation change with unchanged meaning — no review was required.",
+    };
+  // The highest-scored dimension names the kind of exposure; an all-zero score names none.
+  const expected = dimensions.map((name) => {
+    const p = review.riskAnswer?.dimensions[name]?.probabilities ?? [1, 0, 0, 0];
+    return p.reduce((sum, value, level) => sum + value * level, 0);
+  });
+  const top = expected.indexOf(Math.max(...expected));
+  return {
+    risk:
+      (expected[top] ?? 0) > 0
+        ? `low exposure — ${dimensions[top]?.replaceAll("_", " ")}`
+        : "low exposure",
+    summary:
+      review.cards.length === 0
+        ? "No review lens was required for this change."
+        : "Reviewed against the summoned lenses; no blocking findings.",
+  };
 }
 
 function authorityLine(review: Review): string | null {
@@ -147,7 +178,8 @@ function defaultPresentation(review: Review): ReviewPresentation {
 
 export function render(review: Review): string {
   const { decision, request } = review;
-  const rationale = review.voice?.summary.trim() || fallbackRationale(review);
+  const verdict = codeVerdict(review);
+  const rationale = review.voice ? review.voice.summary.trim() : verdict.summary;
   const tally = findingTally(review);
   const presentation = defaultPresentation(review);
   const cards = cardRows(review);
@@ -159,7 +191,7 @@ export function render(review: Review): string {
   const ticket = presentation.ticket
     ? `[${presentation.ticket.label}](${presentation.ticket.url})`
     : "none";
-  const risk = normalized(review.voice?.risk ?? "");
+  const risk = normalized(review.voice ? (review.voice.risk ?? "") : verdict.risk);
   const clarification = review.voice?.clarification?.trim();
   const mechanical = review.classification === "mechanical" && review.routeAnswer === null;
   const confidence =
@@ -220,9 +252,11 @@ export function checkText(review: Review): string {
       ? "mechanical"
       : review.voice
         ? "verdict_voice"
-        : review.cards.length === 0 && review.decision.rating.band !== "LOW"
-          ? "no_council"
-          : "fast_path";
+        : editorial(review)
+          ? "documentation_editorial"
+          : review.cards.length === 0 && review.decision.rating.band !== "LOW"
+            ? "no_council"
+            : "fast_path";
   const lines = [
     `outcome: ${review.decision.outcome} | band: ${review.decision.rating.band}`,
     `decision_source: ${review.provenance.decision_source ?? "jev"}`,
