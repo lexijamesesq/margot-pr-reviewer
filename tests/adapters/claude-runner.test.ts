@@ -73,13 +73,16 @@ it("runs Claude in an empty working directory away from the diff and MCP configu
     diffInCwd: diffPath.startsWith(cwd),
   }).toEqual({ cwdEntries: [], mcpInCwd: false, diffInCwd: false });
 });
-it("names the card in the prompt and leaves its tools to the pinned agent", async () => {
+it("names the card and the ledger conventions in the prompt, and leaves tools to the agent", async () => {
   const { stdin } = await fakeClaude();
   expect({
     card: stdin.includes("Your card is safety."),
+    conventions: ["late=new", "reopens=", "must not establish an advisory finding"].every((rule) =>
+      stdin.includes(rule),
+    ),
     path: stdin.includes("playbooks"),
     toolProse: /\bread_|\btools?\b|\bruntime\b/i.test(stdin.split("\n").slice(0, -1).join("\n")),
-  }).toEqual({ card: true, path: false, toolProse: false });
+  }).toEqual({ card: true, conventions: true, path: false, toolProse: false });
 });
 it("accepts exactly Skill, Read and the served evidence tools for a card", async () => {
   const card = [
