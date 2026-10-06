@@ -320,3 +320,30 @@ it("refuses GitHub write authority for a shadow history selection", async () => 
   };
   expect(() => liveServices(config, { jevKey: "unused", writeToken: "unused" })).toThrow();
 });
+it("keeps the conclusion GitHub recorded for every check run", async () => {
+  const run = (name: string, status: string, conclusion: string | null, id: number) => ({
+    id,
+    name,
+    status,
+    conclusion,
+    head_sha: request.head,
+    started_at: "2026-10-01T00:00:00Z",
+    app: { id: 1, slug: "github-actions" },
+  });
+  const facts = await github({
+    checkRuns: [
+      run("lint", "completed", "neutral", 1),
+      run("e2e", "completed", "cancelled", 2),
+      run("deploy", "completed", "timed_out", 3),
+      run("docs", "completed", "skipped", 4),
+      run("unit", "in_progress", null, 5),
+    ],
+  }).adapter.facts(request, context());
+  expect(facts.checks.map((check) => `${check.name}=${check.conclusion}`)).toEqual([
+    "lint=neutral",
+    "e2e=cancelled",
+    "deploy=timed_out",
+    "docs=skipped",
+    "unit=pending",
+  ]);
+});

@@ -11,6 +11,8 @@ import { parseCard, parseVoice } from "./prose.js";
 
 export type ClaudeOptions = z.infer<typeof liveConfigSchema>["claude"] & {
   gh?: string;
+  /** Margot's own check names, kept out of the evidence cards and the voice receive. */
+  ownChecks?: string[];
   githubToken?: string;
   ticketingEnvironment?: Record<string, string>;
   onResponse?: (response: {
@@ -187,7 +189,11 @@ export function claudeAdapter(options: ClaudeOptions) {
       ].join(" "),
       JSON.stringify({
         ...input,
-        facts: { ...input.facts, diff: "Available through read_diff" },
+        facts: {
+          ...input.facts,
+          diff: "Available through read_diff",
+          checks: input.facts.checks.filter((check) => !options.ownChecks?.includes(check.name)),
+        },
         round: { ...input.round, diff: "Available through read_diff" },
       }),
     ].join("\n");

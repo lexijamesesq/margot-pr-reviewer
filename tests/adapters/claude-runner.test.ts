@@ -398,3 +398,29 @@ it("keeps the publication credential out of the Claude version probe", async () 
     else process.env.MARGOT_WRITE_TOKEN = previous;
   }
 });
+it("keeps Margot's own checks out of the evidence a card and the voice receive", async () => {
+  const withChecks = {
+    ...facts,
+    checks: ["ci", "review / margot", "review / triage"].map((name, id) => ({
+      name,
+      actor: "example-app",
+      head: facts.head,
+      conclusion: "neutral" as const,
+      id,
+    })),
+  };
+  const names = (stdin: string) =>
+    (
+      JSON.parse(stdin.split("\n").at(-1) ?? "{}") as { facts: { checks: { name: string }[] } }
+    ).facts.checks.map((check) => `${check.name}`);
+  const ownChecks = ["review / margot", "review / triage", "review / self-instrument"];
+  const card = await fakeClaude({ facts: withChecks, ownChecks });
+  const voice = await fakeClaude({ facts: withChecks, ownChecks, role: "voice" });
+  // The configured publisher's check names are Margot's own.
+  const configured = await fakeClaude({ facts: withChecks, cliEnvironment: { JEV_KEY: "unused" } });
+  expect({
+    card: names(card.stdin),
+    voice: names(voice.stdin),
+    configured: names(configured.stdin),
+  }).toEqual({ card: ["ci"], voice: ["ci"], configured: ["ci"] });
+});

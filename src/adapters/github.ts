@@ -3,7 +3,13 @@ import parseDiff from "parse-diff";
 import { z } from "zod";
 import { diffIsComplete } from "../diff.js";
 import { errorMessage } from "../errors.js";
-import { classNames, factsSchema, probability, requestSchema } from "../schemas.js";
+import {
+  checkConclusions,
+  classNames,
+  factsSchema,
+  probability,
+  requestSchema,
+} from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
 
@@ -229,14 +235,11 @@ export function githubAdapter(
           head: check.head_sha,
           ...(check.started_at ? { startedAt: check.started_at } : {}),
           id: check.id,
+          // The conclusion GitHub recorded, never one claimed on the check's behalf.
           conclusion:
-            check.status !== "completed"
-              ? "pending"
-              : check.conclusion === "success"
-                ? "success"
-                : check.conclusion === "skipped"
-                  ? "skipped"
-                  : "failure",
+            check.status === "completed"
+              ? (checkConclusions.find((c) => c === check.conclusion) ?? "pending")
+              : "pending",
         })),
         history: {
           complete: historyComplete,
