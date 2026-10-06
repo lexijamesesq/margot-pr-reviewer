@@ -1,3 +1,3 @@
 *
 !runtime/entrypoint.sh
-!src/adapters/claude.ts
+!dist/adapters/claude.js

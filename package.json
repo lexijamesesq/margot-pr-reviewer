@@ -37,7 +37,8 @@
     "recordings",
     "README.md",
     "LICENSE",
-    "samples"
+    "samples",
+    "runtime"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

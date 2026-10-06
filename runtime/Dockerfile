@@ -9,7 +9,8 @@
 # (a read-scoped token) and MARGOT_MCP_CONFIG (the ticketing MCP config, which holds
 # its token) are passed by name at `docker run` time.
 #
-# Build from the package root: docker build -f runtime/Dockerfile .
+# Build from the installed release package root (or a checkout after `npm run build`):
+# docker build -f runtime/Dockerfile .
 # runtime/Dockerfile.dockerignore keeps the context to the two files the build reads.
 # Pin the base by digest at build time (--build-arg BASE_IMAGE=node:22-bookworm@sha256:...).
 # CLAUDE_CODE_VERSION must equal the configuration's claude.version: the package does
@@ -51,10 +52,10 @@ RUN npm install -g \
 
 # Flag-drift guard: every long flag the package passes to `claude` must exist in this
 # Claude Code's --help, so a removed flag fails the build rather than a live review.
-RUN --mount=type=bind,source=src/adapters/claude.ts,target=/tmp/claude.ts \
+RUN --mount=type=bind,source=dist/adapters/claude.js,target=/tmp/claude.js \
     set -eux; \
     help="$(claude --help 2>&1)"; \
-    flags="$(grep -oE '"--[a-zA-Z-]+"' /tmp/claude.ts | tr -d '"' | sort -u)"; \
+    flags="$(grep -oE '"--[a-zA-Z-]+"' /tmp/claude.js | tr -d '"' | sort -u)"; \
     test -n "$flags" || { echo "flag guard found no claude flags" >&2; exit 1; }; \
     for f in $flags; do \
       printf '%s\n' "$help" | grep -qF -- "$f" || { echo "claude flag '$f' is absent from 'claude --help' ($(claude --version))" >&2; exit 1; }; \

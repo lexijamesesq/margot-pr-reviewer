@@ -23,6 +23,16 @@ assert.equal(
   false,
   "Package must omit action.yml",
 );
+for (const file of [
+  "runtime/Dockerfile",
+  "runtime/Dockerfile.dockerignore",
+  "runtime/entrypoint.sh",
+])
+  assert.equal(
+    existsSync(join(installedPackage, file)),
+    true,
+    `Package must ship ${file} to build the runtime image`,
+  );
 assert.equal(run(instanceCli, []).status, 1, "Installed instance CLI must require a command");
 const closerNoop = run(instanceCli, [
   "close-stranded-check",
