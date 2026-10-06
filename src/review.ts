@@ -6,7 +6,8 @@ import {
   nextLedger,
   prepareFindings,
   roundScope,
-  selectLedger,
+  savedAdherence,
+  selectLedgerReview,
   standingCards,
 } from "./ledger.js";
 import {
@@ -21,9 +22,15 @@ import {
   validateVoice,
   verifiedTriage,
 } from "./policy.js";
-import { classificationQuestions, riskQuestions, routeQuestions } from "./questions.js";
-import { render, shownFindingGap } from "./render.js";
 import {
+  adherenceQuestions,
+  classificationQuestions,
+  riskQuestions,
+  routeQuestions,
+} from "./questions.js";
+import { mechanicalVerdict, postedSummary, render, riskLabel, shownFindingGap } from "./render.js";
+import {
+  adherenceSchema,
   bundleSchema,
   cardSchema,
   classificationSchema,
@@ -40,6 +47,7 @@ import {
 } from "./schemas.js";
 import { type CardStage, cardStage, type Stage, stages } from "./stages.js";
 import type {
+  Adherence,
   Bundle,
   Card,
   Facts,
@@ -69,6 +77,43 @@ function currentCheck(runs: CheckFact[]): CheckFact | undefined {
       current = run;
   }
   return current;
+}
+const optionalAdherence = (value: Adherence | undefined) =>
+  value === undefined ? {} : { adherence: value };
+/**
+ * The previous reviewer's advisory template-adherence check, on the verdict Margot will post.
+ * Skipped for a mechanical verdict or with no risk line; a Jev outage, a service that is not
+ * there, or any failure is `unchecked`. It never touches the decision and never throws.
+ */
+async function adherence(
+  review: ReviewCore,
+  services: Services,
+  timeoutMs: number,
+): Promise<Adherence> {
+  const risk = riskLabel(review);
+  if (mechanicalVerdict(review) || !risk) return { status: "skipped" };
+  if (!services.adherence) return { status: "unchecked" };
+  try {
+    return adherenceSchema.parse(
+      await services.adherence(
+        {
+          risk,
+          summary: postedSummary(review),
+          cards: review.cards.map((card) => ({
+            name: card.name,
+            findings: card.findings.map((finding) => ({ what: finding.what })),
+          })),
+        },
+        adherenceQuestions(
+          review.cards.filter((card) => card.findings.length > 0).map((card) => card.name),
+        ),
+        { signal: AbortSignal.timeout(timeoutMs) },
+      ),
+    );
+  } catch (error) {
+    console.warn(`Margot: adherence check unchecked (${errorMessage(error)})`);
+    return { status: "unchecked" };
+  }
 }
 export async function review(
   requestInput: unknown,
@@ -136,7 +181,10 @@ export async function review(
     const historyUnavailable =
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
     const ledgerWarnings: string[] = [];
-    const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
+    const priorReview = selectLedgerReview(facts, config, (warning) =>
+      ledgerWarnings.push(warning),
+    );
+    const prior = priorReview?.ledger ?? null;
     // Unreadable history holds rather than approves: without the earlier ledger Margot cannot
     // know whether findings from earlier rounds were resolved, so an approval would be a guess.
     // The reason names the way out, because the hold recurs on every run until the history is
@@ -271,6 +319,7 @@ export async function review(
         provenance: { ...cached.review.provenance, classification: classSource },
         ledger: prior,
         convergence: cached.counts,
+        ...(priorReview ? optionalAdherence(savedAdherence(priorReview.body)) : {}),
       };
     } else {
       const cards: Card[] = [];
@@ -422,7 +471,13 @@ export async function review(
       const gap = shownFindingGap(core);
       if (gap) throw new Error(gap);
       stage = before;
-      result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
+      // Advisory, on the final verdict; posted beside the ledger, never in its receipt.
+      const advisory = await adherence(core, services, config.timeoutMs);
+      result = {
+        ...core,
+        ...nextLedger(scope, cards, voice, core, config, facts),
+        adherence: advisory,
+      };
     }
     const metadata = services.reviewMetadata?.() ?? {};
     result = {

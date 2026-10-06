@@ -316,18 +316,6 @@ export const decisionSchema = z.strictObject({
   authorityPaths: z.array(text).optional(),
   ownedPathTier: z.string().optional(),
 });
-/** The advisory template-adherence check: it informs calibration and never gates. */
-export const adherenceSchema = z.discriminatedUnion("status", [
-  z.strictObject({ status: z.literal("skipped") }),
-  z.strictObject({ status: z.literal("unchecked") }),
-  z.strictObject({
-    status: z.literal("checked"),
-    riskClassificationOk: z.boolean(),
-    cardsRestating: z.array(z.string()),
-    ok: z.boolean(),
-    nouls: z.record(z.string(), z.number()),
-  }),
-]);
 export const reviewCoreSchema = z.strictObject({
   request: requestSchema,
   classification: classSchema,

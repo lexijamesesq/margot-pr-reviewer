@@ -69,7 +69,12 @@ it("reuses the council result on the same head without classifying again", async
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");
   const f = factsSchema.parse(r.facts);
-  f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
+  // The posted comment itself: its adherence marker sits beside the ledger.
+  f.history = {
+    complete: true,
+    priorLedger: true,
+    reviews: [posted(result.ledger, undefined, result.report)],
+  };
   r.facts = f;
   const s = recordedServices(r);
   const retry = await review(r.request, r.config, s);

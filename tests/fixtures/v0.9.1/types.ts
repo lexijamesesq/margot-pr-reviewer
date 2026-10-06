@@ -1,6 +1,5 @@
 import type { z } from "zod";
 import type {
-  adherenceSchema,
   bandSchema,
   bundleSchema,
   cardSchema,
@@ -32,12 +31,6 @@ export type Decision = z.infer<typeof decisionSchema>;
 export type Ledger = z.infer<typeof ledgerSchema>;
 export type Convergence = z.infer<typeof convergenceSchema>;
 export type ReviewCore = z.infer<typeof reviewCoreSchema>;
-export type Adherence = z.infer<typeof adherenceSchema>;
-export type AdherenceInput = {
-  risk: string;
-  summary: string;
-  cards: { name: string; findings: { what: string }[] }[];
-};
 export type ReviewPresentation = {
   author: string;
   costUsd: number | null;
@@ -51,8 +44,6 @@ export type Review = ReviewCore & {
   ledger: Ledger;
   convergence: Convergence;
   presentation?: ReviewPresentation;
-  /** Advisory; posted in its own marker, never in the ledger's receipt. */
-  adherence?: Adherence;
 };
 export type RoundScope = {
   round: number;
@@ -96,12 +87,6 @@ export interface Services {
   /** Report a phase only after the review has actually entered it. */
   progress?(title: ReviewPhaseTitle, context: CallContext): Promise<unknown>;
   facts(request: ReviewRequest, context: CallContext): Promise<unknown>;
-  /** The advisory template-adherence check over what Margot will post; it never gates. */
-  adherence?(
-    input: AdherenceInput,
-    questions: Readonly<Record<string, string>>,
-    context: CallContext,
-  ): Promise<unknown>;
   compare?(request: ReviewRequest, priorHead: string, context: CallContext): Promise<unknown>;
   classify(
     facts: Facts,

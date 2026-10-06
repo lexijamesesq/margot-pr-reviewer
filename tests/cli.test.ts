@@ -33,7 +33,7 @@ vi.mock("../src/cli-services.js", async (importOriginal) => {
               durationMs: 10,
               numTurns: 2,
             });
-          return { kind: "reviewed" };
+          return { kind: "reviewed", adherence: { status: "unchecked" } };
         },
       };
     },
@@ -199,6 +199,7 @@ it("writes diagnostics.json beside the output after a successful review", async 
         jevRetries: [
           { question: "risk", attempt: 2, reason: "operations: a partial distribution" },
         ],
+        adherence: { status: "unchecked" },
       },
     });
   } finally {

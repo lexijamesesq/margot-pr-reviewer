@@ -4,7 +4,14 @@ import { councilText, jevAdapter, jevState } from "../src/adapters/jev.js";
 import * as processAdapter from "../src/adapters/process.js";
 import { recordedServices, review } from "../src/index.js";
 import { rate } from "../src/policy.js";
-import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
+import {
+  adherenceDistinctQuestion,
+  adherenceQuestions,
+  adherenceRiskQuestion,
+  classificationQuestions,
+  riskQuestions,
+  routeQuestions,
+} from "../src/questions.js";
 import {
   cardNames,
   classificationSchema,
@@ -691,6 +698,96 @@ describe("a malformed Jev answer", () => {
       classifyCalls: 2,
       routeCalls: 2,
       routeRetry: [{ question: "route", attempt: 2, reason: "exposure: unreadable" }],
+    });
+  });
+});
+describe("the advisory template-adherence check", () => {
+  const input = {
+    risk: "workflow-injection risk",
+    summary: "The change widens a token.",
+    cards: [
+      { name: "safety", findings: [{ what: "the token is printed" }] },
+      { name: "house-style", findings: [] },
+      { name: "works-and-proven", findings: [{ what: "no test" }, { what: "no receipt" }] },
+    ],
+  };
+  const questions = adherenceQuestions(["safety", "works-and-proven"]);
+  const distinct = (card: string) => ({
+    type: "noul",
+    instructions: adherenceDistinctQuestion(card),
+  });
+  it("keeps the previous reviewer's wording, verbatim", () => {
+    expect({ risk: adherenceRiskQuestion, distinct: adherenceDistinctQuestion("safety") }).toEqual({
+      risk: "Is the risk line a SHORT CLASSIFICATION — a few-word noun phrase naming the KIND of exposure (e.g. 'workflow-injection risk' or 'dependency bump, non-behavioral') — rather than a full explanatory sentence? True = a classification; False = a sentence.",
+      distinct:
+        "Does the 'safety' card's finding state ITS OWN review lens's distinct contribution, rather than merely RESTATE in similar words the same root-cause chain another card's finding already states? Several cards independently corroborating one real defect from their own distinct angles is legitimate and is True; only a phrasing-level restatement adding no lens-specific point is False.",
+    });
+  });
+  it("asks the previous reviewer's questions over its prose state", async () => {
+    const j = jev({
+      risk_is_classification: { type: "noul", noul: 0.9 },
+      distinct__safety: { type: "noul", noul: 0.2 },
+      "distinct__works-and-proven": { type: "noul", noul: 0.8 },
+    });
+    const result = await j.adapter.adherence(input, questions, context());
+    expect({ sent: j.calls, result }).toEqual({
+      sent: [
+        {
+          model: "test-model",
+          questions: {
+            risk_is_classification: { type: "noul", instructions: adherenceRiskQuestion },
+            distinct__safety: distinct("safety"),
+            "distinct__works-and-proven": distinct("works-and-proven"),
+          },
+          state:
+            "Risk line: workflow-injection risk\nSummary: The change widens a token.\n\nCouncil findings (card: finding):\n- [safety] the token is printed\n- [works-and-proven] no test\n- [works-and-proven] no receipt",
+        },
+      ],
+      result: {
+        status: "checked",
+        riskClassificationOk: true,
+        cardsRestating: ["safety"],
+        ok: false,
+        nouls: {
+          risk_is_classification: 0.9,
+          distinct__safety: 0.2,
+          "distinct__works-and-proven": 0.8,
+        },
+      },
+    });
+  });
+  it("is unchecked on a Jev outage, with no fallback and no throw", async () => {
+    const fallback = vi.fn();
+    const adapter = jevAdapter({
+      key: "test-only",
+      model: "test-model",
+      fallbackClaude: pinnedClaude,
+      fallback,
+      retries: 0,
+      minTimeout: 1,
+      fetch: async () => new Response("{}", { status: 503 }),
+    });
+    expect({
+      result: await adapter.adherence(input, questions, context()),
+      fallback: fallback.mock.calls.length,
+    }).toEqual({ result: { status: "unchecked" }, fallback: 0 });
+  });
+  it("re-asks an unreadable answer, then reads a still-missing one as a pass", async () => {
+    const j = jev({ risk_is_classification: { type: "noul" } });
+    const result = await j.adapter.adherence(input, questions, context());
+    expect({ calls: j.attempts(), result }).toEqual({
+      calls: 3,
+      result: {
+        status: "checked",
+        riskClassificationOk: true,
+        cardsRestating: [],
+        ok: true,
+        nouls: {
+          risk_is_classification: 1,
+          distinct__safety: 1,
+          "distinct__works-and-proven": 1,
+        },
+      },
     });
   });
 });

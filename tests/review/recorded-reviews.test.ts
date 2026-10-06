@@ -87,6 +87,7 @@ describe("reviews replayed from recordings", () => {
           voice: result.voice,
           decision: result.decision,
           provenance: result.provenance,
+          adherence: result.adherence,
           ledger: result.ledger,
           convergence: result.convergence,
           presentation: result.presentation,

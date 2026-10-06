@@ -12,7 +12,7 @@ import {
   routeSchema,
   sumsToOne,
 } from "../schemas.js";
-import type { CallContext, Card, Facts, Services } from "../types.js";
+import type { AdherenceInput, CallContext, Card, Facts, Services } from "../types.js";
 import { decisionFallback } from "./decision-fallback.js";
 
 const noul = z.object({ type: z.literal("noul"), noul: probability });
@@ -60,6 +60,18 @@ export function classificationState(facts: Facts): string {
     `Changed files (${files.length}): ${files.slice(0, 60).join(", ")}`,
     `CODEOWNERS ownership tier: ${ownershipTier(facts)}`,
     `Diff:\n${facts.diff}`,
+  ].join("\n");
+}
+/** The previous reviewer's adherence state: the posted risk line, summary and findings. */
+export function adherenceState(input: AdherenceInput): string {
+  return [
+    `Risk line: ${input.risk}`,
+    `Summary: ${input.summary}`,
+    "",
+    "Council findings (card: finding):",
+    ...input.cards.flatMap((card) =>
+      card.findings.map((finding) => `- [${card.name}] ${finding.what}`),
+    ),
   ].join("\n");
 }
 /** The council's findings in the cards' own convention, one `===CARD: name===` block each. */
@@ -348,5 +360,41 @@ export function jevAdapter(options: {
       dimensions: Object.fromEntries(dimensions.map((k) => [k, riskDimension(a[k])])),
     });
   };
-  return { classify, route, risk };
+  /**
+   * The previous reviewer's advisory template-adherence check: is the risk line a short
+   * classification, and does each card with findings state its own lens's contribution. It
+   * never falls back and never throws: a Jev outage is `unchecked`, and an answer still
+   * missing after the re-asks reads as a pass, so it never spuriously flags.
+   */
+  const adherence: NonNullable<Services["adherence"]> = async (input, questions, c) => {
+    const keys = Object.keys(questions);
+    let answers: Record<string, unknown>;
+    try {
+      answers = (
+        await decide(
+          "adherence",
+          (a) => unreadableNouls(a, keys),
+          nouls(questions),
+          adherenceState(input),
+          c,
+        )
+      ).answers;
+    } catch (error) {
+      console.warn(`Margot: adherence check unchecked (${errorMessage(error)})`);
+      return { status: "unchecked" };
+    }
+    const value = (key: string) => noul.safeParse(answers[key]).data?.noul ?? 1;
+    const riskClassificationOk = value("risk_is_classification") >= 0.5;
+    const cardsRestating = keys
+      .filter((key) => key.startsWith("distinct__") && value(key) < 0.5)
+      .map((key) => key.slice("distinct__".length));
+    return {
+      status: "checked",
+      riskClassificationOk,
+      cardsRestating,
+      ok: riskClassificationOk && cardsRestating.length === 0,
+      nouls: Object.fromEntries(keys.map((key) => [key, value(key)])),
+    };
+  };
+  return { classify, route, risk, adherence };
 }

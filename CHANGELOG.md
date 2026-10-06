@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.2
+
+Margot restores the previous reviewer's advisory template-adherence check.
+
+- After the verdict is final, Margot asks Jev, in the previous reviewer's words, whether the risk line is a short classification and whether each card with findings states its own lens's contribution rather than restating another card's finding. The state is the posted risk line, the summary and each council finding as `[card] what`. It is skipped for a mechanical verdict or when there is no risk line.
+- The check is advisory: it never changes the outcome, band, holds, decision source or merge eligibility, and it never fails the review. A Jev outage gives `unchecked` without the fallback decider; a malformed answer is re-asked like any Jev answer, and an answer still missing reads as a pass.
+- The check text carries the result as the previous reviewer's poster wrote it, after `can auto-merge`: `adherence: clean`, or `adherence: flags` with `risk line reads as a sentence, not a classification` and `cards restating a shared finding: <cards>`, or `adherence: unchecked` / `adherence: skipped`. The result is in `result.json` (`adherence`), in `diagnostics.json` for a completed review, and in the posted review in its own `<!-- margot-adherence:v1 … -->` marker just before the ledger block. A same-head replay reads it back from there without asking Jev again. It is kept out of the ledger encoding, which 0.9.1 parses strictly, so a rollback to 0.9.1 still reads every ledger 0.9.2 posts.
+- This reverses the 0.8.0 deliberate difference "Jev's advisory template-adherence check is not restored"; the check is now restored.
+
 ## 0.9.1
 
 Margot restores what a regression check of 0.9.0 against the previous reviewer found changed without a record.

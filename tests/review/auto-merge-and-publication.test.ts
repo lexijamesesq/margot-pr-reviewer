@@ -28,6 +28,7 @@ describe("disarming auto-merge", () => {
       "card:maintainable-no-slop",
       "risk",
       "voice",
+      "adherence",
       "head",
       "disableAutoMerge",
       "publish",
