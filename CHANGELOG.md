@@ -14,7 +14,7 @@ Margot restores what a regression check of 0.9.0 against the previous reviewer f
 
 Deliberate differences from the previous reviewer:
 
-- A distribution that is partial or does not sum to one (off by 0.015 or more) is rated at the higher of its tail level and its rounded score when Jev gives a score; without a score, by its tail. The previous reviewer rated it by its tail alone, so `{"0": 1}` with a score of 3 was level 0. The rule is never lower than the previous reviewer and never below Jev's own score. A complete distribution that sums to one keeps the tail rule alone.
+- A malformed Jev distribution, one with levels missing or a sum off by 0.015 or more, is rated at the higher of its tail level and its rounded score when Jev gives a score, and by its tail without one. The previous reviewer rated it by its tail alone, so `{"0": 1}` with a score of 3 was level 0; the rule is never lower than the previous reviewer and never below Jev's own score. A well-formed distribution, all four levels present and summing to 1 within 0.015, keeps the previous reviewer's tail rule, since Jev's score is the expected value of that same distribution.
 - The voice's `band` and `rationale` are required, so a malformed verdict is held where the previous reviewer posted it: Margot fails closed.
 - The previous reviewer's Jev decision log was opt-in and never enabled, so it is not ported.
 - The previous reviewer's manual Colima containment script is not ported: the container's walls are the same, and its own workflow never ran the script.
