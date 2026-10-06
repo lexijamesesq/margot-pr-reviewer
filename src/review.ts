@@ -333,7 +333,6 @@ export async function review(
                         },
                         name,
                         classification,
-                        cardPath: resolved.cardPaths[name],
                         agent: resolved.reviewerAgent,
                         round: {
                           ...scope,

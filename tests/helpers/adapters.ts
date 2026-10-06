@@ -131,19 +131,30 @@ export async function fakeClaude(
     ticketingEnvironment?: Record<string, string>;
     githubToken?: string;
     cliEnvironment?: NodeJS.ProcessEnv;
+    references?: Record<string, { repository: string; head: string }>;
     role?: "card" | "voice";
   } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
   try {
     await mkdir(join(root, "agents"));
+    await mkdir(join(root, ".claude-plugin"));
+    await writeFile(join(root, ".claude-plugin/plugin.json"), '{"name":"publish"}');
+    const reviewerTools = [
+      "Skill",
+      "Read",
+      ...["read_diff", "read_file", "search_file", "list_files", "read_reference"].map(
+        (name) => `mcp__evidence__${name}`,
+      ),
+      ...ticketing.tools,
+    ];
     await writeFile(
       join(root, "agents/pr-reviewer.md"),
-      "---\ndescription: Test reviewer\nmodel: inherit\n---\nPinned test law.\n",
+      `---\ndescription: Test reviewer\nmodel: inherit\ntools:\n${reviewerTools.map((t) => `  - ${t}\n`).join("")}---\nPinned test law.\n`,
     );
     await writeFile(
       join(root, "agents/margot.md"),
-      "---\ndescription: Test voice\nmodel: inherit\n---\nPinned test voice.\n",
+      "---\ndescription: Test voice\nmodel: inherit\ntools:\n  - mcp__evidence__read_file\n  - mcp__evidence__read_diff\n---\nPinned test voice.\n",
     );
     const executable = join(root, "claude.cjs"),
       capture = join(root, "capture.json");
@@ -167,22 +178,38 @@ if (process.argv.includes("--version")) {
   const mcpPath = args[args.indexOf("--mcp-config") + 1];
   const mcpText = fs.readFileSync(mcpPath, "utf8");
   const mcp = JSON.parse(mcpText);
-  const allowed = args.slice(args.indexOf("--allowedTools") + 1);
-  const requested = allowed.slice(0, allowed.findIndex((a) => a.startsWith("--")));
+  const evidence = JSON.parse(mcp.mcpServers.evidence.env.MARGOT_EVIDENCE);
+  // Like Claude Code: the agent's frontmatter grants, --tools narrows the built-ins, and an
+  // MCP tool survives only when its server is configured and serves it.
+  const value = (flag) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
+  const agentPath = value("--plugin-dir") + "/agents/" + String(value("--agent")).split(":")[1] + ".md";
+  const listed = fs.existsSync(agentPath)
+    ? [...fs.readFileSync(agentPath, "utf8").matchAll(/^  - (.+)$/gm)].map((m) => m[1])
+    : [];
+  const builtIns = (value("--tools") ?? "").split(",");
+  const granted = listed.filter((tool) =>
+    !tool.startsWith("mcp__")
+      ? builtIns.includes(tool)
+      : tool === "mcp__evidence__read_reference"
+        ? !!evidence.references
+        : !!mcp.mcpServers[tool.split("__")[1]],
+  );
   console.log(JSON.stringify({
     type: "system",
     subtype: "init",
     tools: ${JSON.stringify(options.tools ?? null)} ??
-      requested.map((tool, index) => (index === 0 ? ${JSON.stringify(options.replaceFirstTool ?? null)} ?? tool : tool)),
+      granted.map((tool, index) => (index === 0 ? ${JSON.stringify(options.replaceFirstTool ?? null)} ?? tool : tool)),
     mcp_servers: ${JSON.stringify(options.mcpServers ?? null)} ??
       Object.keys(mcp.mcpServers).map((name) => ({ name, status: "connected" })),
   }));
-  const evidence = JSON.parse(mcp.mcpServers.evidence.env.MARGOT_EVIDENCE);
   fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({
     args,
     mcp,
     mcpMode: fs.statSync(mcpPath).mode & 0o777,
     mcpPath,
+    cwd: process.cwd(),
+    cwdEntries: fs.readdirSync(process.cwd()),
+    diffPath: evidence.diffPath,
     stdin: fs.readFileSync(0, "utf8"),
     diff: fs.readFileSync(evidence.diffPath, "utf8"),
   }));
@@ -196,6 +223,7 @@ if (process.argv.includes("--version")) {
       version: "0.0.1",
       pluginDirectory: root,
       reviewerModel: "example-model",
+      ...(options.references ? { references: options.references } : {}),
     };
     const adapter = options.cliEnvironment
       ? cliServices(
@@ -240,7 +268,6 @@ if (process.argv.includes("--version")) {
               facts: options.facts ?? facts,
               name: "safety",
               classification: "functional",
-              cardPath: join(root, "skills/pr-council/playbooks/safety.md"),
               agent: "publish:pr-reviewer",
               round,
             },
@@ -251,6 +278,9 @@ if (process.argv.includes("--version")) {
         args: string[];
         mcpMode: number;
         mcpPath: string;
+        cwd: string;
+        cwdEntries: string[];
+        diffPath: string;
         mcp: {
           mcpServers: Record<
             string,
@@ -264,6 +294,7 @@ if (process.argv.includes("--version")) {
         diff: string;
       }),
       result,
+      root,
     };
   } finally {
     await rm(root, { recursive: true, force: true });

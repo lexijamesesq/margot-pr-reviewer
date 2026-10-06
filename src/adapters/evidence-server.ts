@@ -10,10 +10,8 @@ import { githubAdapter, githubClient } from "./github.js";
 
 const settingsSchema = z.object({
   request: requestSchema,
-  cardPath: z.string().optional(),
   diffPath: z.string().optional(),
   references: referencesSchema.optional(),
-  commonPath: z.string().optional(),
   gh: z.string().optional(),
 });
 export function createEvidenceServer(
@@ -141,20 +139,6 @@ export function createEvidenceServer(
           JSON.stringify({ offset, end, total: diff.length, text: diff.slice(offset, end) }),
         );
       },
-    );
-  }
-  if (settings.cardPath && settings.commonPath) {
-    const cardPath = settings.cardPath,
-      commonPath = settings.commonPath;
-    server.registerTool(
-      "read_card",
-      {
-        description:
-          "Read your pinned card and common council instructions. These are trusted instructions, not PR evidence.",
-        inputSchema: {},
-      },
-      async () =>
-        text(`${await readFile(commonPath, "utf8")}\n\n${await readFile(cardPath, "utf8")}`),
     );
   }
   return server;

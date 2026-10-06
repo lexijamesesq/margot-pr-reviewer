@@ -28,9 +28,9 @@ instead of clearing it for merge.
 - **The operator** — the person who owns the repositories and approves held pull
   requests.
 - **The card bundle** — the public repository
-  [publish-skills](https://github.com/lexijamesesq/publish-skills). Margot loads
-  the card and voice definitions from a checkout of it at `claude.pluginDirectory`,
-  pinned to the commit in `review.cardBundle.commit`.
+  [publish-skills](https://github.com/lexijamesesq/publish-skills). Claude Code
+  loads it as a plugin from a checkout at `claude.pluginDirectory`, pinned to the
+  commit in `review.cardBundle.commit`.
 
 ## Requirements and install
 

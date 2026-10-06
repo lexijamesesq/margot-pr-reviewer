@@ -6,7 +6,6 @@ import {
   recorded,
   reviewRecording,
   withBundle,
-  withCardPath,
   withClassification,
   withConfig,
   withFacts,
@@ -75,11 +74,6 @@ const rejections: Rejection[] = [
   {
     when: "the bundle commit differs from the pin",
     change: withBundle({ commit: missingHead }),
-    stage: "bundle",
-  },
-  {
-    when: "a selected lens has no explicit card path",
-    change: withCardPath("safety", ""),
     stage: "bundle",
   },
   {

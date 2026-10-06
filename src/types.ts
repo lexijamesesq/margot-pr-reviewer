@@ -111,7 +111,6 @@ export interface Services {
       facts: Facts;
       name: Card["name"];
       classification: Classification;
-      cardPath: string;
       agent: Bundle["reviewerAgent"];
       round: RoundScope;
     },
