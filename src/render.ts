@@ -1,7 +1,7 @@
 import { ledgerBlock } from "./ledger.js";
 import { fallbackNotice, holdReason } from "./policy.js";
 import { cardNames, dimensions } from "./schemas.js";
-import type { Card, Review, ReviewPresentation } from "./types.js";
+import type { Card, Review, ReviewCore, ReviewPresentation } from "./types.js";
 
 const outcomeIcons = {
   APPROVED: "✅",
@@ -117,17 +117,32 @@ function findingKey(finding: Card["findings"][number]): string {
   return `${finding.location}\u0000${finding.what}`;
 }
 
-function cardRows(review: Review): { rows: string[]; findings: number } {
-  const cards = new Map(review.cards.map((card) => [card.name, card]));
+/** Each card's findings the comment shows: every finding the voice did not dismiss. */
+function visibleFindings(review: ReviewCore): Map<Card["name"], Card["findings"]> {
   const dismissed = new Set(
     review.voice?.dispositions.filter((d) => d.status === "dismissed").map((d) => d.id) ?? [],
   );
-  const visible = new Map(
+  return new Map(
     review.cards.map((card) => [
       card.name,
       card.findings.filter((finding) => !finding.id || !dismissed.has(finding.id)),
     ]),
   );
+}
+
+/** A card row whose shown finding has no plain sentence is not posted; null when none. */
+export function shownFindingGap(review: ReviewCore): string | null {
+  for (const [name, findings] of visibleFindings(review)) {
+    const first = findings[0];
+    if (first && !labelSentence(first.what))
+      return `Comment not template-compliant: ${name}: its shown finding has no plain-language comment`;
+  }
+  return null;
+}
+
+function cardRows(review: Review): { rows: string[]; findings: number } {
+  const cards = new Map(review.cards.map((card) => [card.name, card]));
+  const visible = visibleFindings(review);
   const owners = new Map<string, Card["name"][]>();
   for (const [name, findings] of visible)
     for (const finding of findings) {
