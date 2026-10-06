@@ -1,5 +1,6 @@
 import { lstat, realpath } from "node:fs/promises";
 import { join } from "node:path";
+import { errorMessage } from "../errors.js";
 import { bundleSchema, cardNames, shaSchema } from "../schemas.js";
 import type { CallContext } from "../types.js";
 import { execute } from "./process.js";
@@ -41,14 +42,17 @@ export async function verifyBaseCheckout(
   base: string,
   context: CallContext,
 ) {
-  const git = (args: string[]) => execute("git", ["-C", directory, ...args], context);
-  const remote = (await git(["remote", "get-url", "origin"]).catch(() => ""))
-    .trim()
-    .match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?\/?$/i)?.[1];
-  if (
-    (await git(["rev-parse", "HEAD"]).catch(() => "")).trim() !== base ||
-    (await git(["status", "--porcelain", "--untracked-files=all"]).catch(() => "x")).trim() ||
-    remote?.toLowerCase() !== repository.toLowerCase()
-  )
-    throw new Error("Base checkout mismatch");
+  const mismatch = (reason: string) => new Error(`Base checkout mismatch: ${reason}`);
+  const git = (args: string[]) =>
+    execute("git", ["-C", directory, ...args], context).catch((error: unknown) => {
+      throw mismatch(`git ${args[0]} failed: ${errorMessage(error)}`);
+    });
+  const head = (await git(["rev-parse", "HEAD"])).trim();
+  if (head !== base) throw mismatch(`HEAD ${head} is not ${base}`);
+  if ((await git(["status", "--porcelain", "--untracked-files=all"])).trim())
+    throw mismatch("uncommitted changes");
+  const url = (await git(["remote", "get-url", "origin"])).trim();
+  const remote = url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?\/?$/i)?.[1];
+  if (remote?.toLowerCase() !== repository.toLowerCase())
+    throw mismatch(`origin ${url} is not ${repository}`);
 }

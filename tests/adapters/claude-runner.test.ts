@@ -598,12 +598,14 @@ it("allows no unscoped search and denies /proc", async () => {
 });
 it("refuses a base checkout at another commit, of another repository, or dirty", async () => {
   await expect(fakeClaude({ checkout: { base: "c".repeat(40) } })).rejects.toThrow(
-    "Base checkout mismatch",
+    /^Base checkout mismatch: HEAD [0-9a-f]{40} is not /,
   );
   await expect(
     fakeClaude({ checkout: { remote: "https://github.com/someone/else.git" } }),
-  ).rejects.toThrow("Base checkout mismatch");
-  await expect(fakeClaude({ checkout: { dirty: true } })).rejects.toThrow("Base checkout mismatch");
+  ).rejects.toThrow("Base checkout mismatch: origin https://github.com/someone/else.git is not");
+  await expect(fakeClaude({ checkout: { dirty: true } })).rejects.toThrow(
+    "Base checkout mismatch: uncommitted changes",
+  );
   await expect(
     fakeClaude({ checkout: { remote: `git@github.com:${facts.repository}.git` } }),
   ).resolves.toBeDefined();
