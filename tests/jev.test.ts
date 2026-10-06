@@ -70,30 +70,31 @@ it("sends the golden classification questions, in order", async () => {
     JSON.stringify(goldenClassificationQuestions),
   );
 });
-it("keeps full code evidence and excludes author prose in classification", async () => {
+it("classifies the code change alone: files, tier and the whole diff, in one request", async () => {
   const j = jev(classes);
+  const diff = "a.ts evidence 🐱 ".repeat(8000);
   await j.adapter.classify(
     {
       ...facts,
       title: "External release changes",
       body: "New external behavior",
       author: "release-bot",
+      files: [{ path: "b.ts", previousPath: "a.ts" }],
+      ownedPathTier: "required_owned",
+      diff,
     },
     classificationQuestions,
     context(),
   );
-  const sent = (
-    j.calls[0] as {
-      state: Record<string, unknown>;
-    }
-  ).state;
-  expect(
-    j.calls.length === 1 &&
-      sent.diff === facts.diff &&
-      sent.head === facts.head &&
-      sent.base === facts.base &&
-      ["title", "body", "author", "history"].every((name) => !(name in sent)),
-  ).toBe(true);
+  expect({ requests: j.calls.length, state: (j.calls[0] as { state: unknown }).state }).toEqual({
+    requests: 1,
+    state: [
+      `Pull request #${facts.pr} in ${facts.repository}.`,
+      "Changed files (2): b.ts, a.ts",
+      "CODEOWNERS ownership tier: required_owned",
+      `Diff:\n${diff}`,
+    ].join("\n"),
+  });
 });
 it("fails validation for a malformed Jev classification", async () => {
   await expect(
@@ -278,38 +279,6 @@ describe("routing and risk state", () => {
     expect(
       String(requests[0]?.state).endsWith("\nCouncil findings:\n(no council: no_council)"),
     ).toBe(true);
-  });
-});
-describe("classification evidence batching", () => {
-  it("keeps functional evidence from the final batch through aggregation", async () => {
-    const { jevAdapter } = await import("../src/adapters/jev.js");
-    const { classificationQuestions } = await import("../src/questions.js");
-    const client = jevAdapter({
-      key: "test",
-      model: "test",
-      fallbackClaude: pinnedClaude,
-      fetch: (async (_url, init) => {
-        const r = JSON.parse(String(init?.body));
-        const last = r.state.evidencePart === r.state.totalParts;
-        return new Response(
-          JSON.stringify({
-            model: "test",
-            answers: {
-              functional: { type: "noul", noul: last ? 0.9 : 0.1 },
-              documentation: { type: "noul", noul: 0.1 },
-              mechanical: { type: "noul", noul: 0.9 },
-            },
-          }),
-        );
-      }) as typeof fetch,
-    });
-    expect(
-      await client.classify(
-        { ...facts, diff: "a.ts evidence ".repeat(4000) },
-        classificationQuestions,
-        { signal: AbortSignal.timeout(3000) },
-      ),
-    ).toMatchObject({ functional: 0.9 });
   });
 });
 describe("fallback decisions", () => {
