@@ -94,16 +94,29 @@ it("runs Claude in an empty working directory away from the diff and MCP configu
     diffInCwd: diffPath.startsWith(cwd),
   }).toEqual({ cwdEntries: [], mcpInCwd: false, diffInCwd: false });
 });
-it("names the card and the ledger conventions in the prompt, and leaves tools to the agent", async () => {
+it("names the card in the prompt, leaves the finding conventions to the bundle and tools to the agent", async () => {
   const { stdin } = await fakeClaude();
+  const instructions = stdin.split("\n").slice(0, -1).join("\n");
   expect({
     card: stdin.includes("Your card is safety."),
-    conventions: ["late=new", "reopens=", "must not establish an advisory finding"].every((rule) =>
-      stdin.includes(rule),
+    // The bundle's pr-council skill states `ledger=` and `late=`; a new finding needs no mark.
+    conventions: ["late=", "reopens=", "attribution", "ledger="].filter((rule) =>
+      instructions.includes(rule),
     ),
+    previouslyDismissed: instructions.includes(
+      "keep it dismissed unless the new changes altered it",
+    ),
+    advisory: instructions.includes("must not establish an advisory finding"),
     path: stdin.includes("playbooks"),
-    toolProse: /\bread_|\btools?\b|\bruntime\b/i.test(stdin.split("\n").slice(0, -1).join("\n")),
-  }).toEqual({ card: true, conventions: true, path: false, toolProse: false });
+    toolProse: /\bread_|\btools?\b|\bruntime\b/i.test(instructions),
+  }).toEqual({
+    card: true,
+    conventions: [],
+    previouslyDismissed: true,
+    advisory: true,
+    path: false,
+    toolProse: false,
+  });
 });
 it("accepts exactly Skill, Read and the served evidence tools for a card", async () => {
   const card = [

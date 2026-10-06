@@ -154,10 +154,9 @@ export function roundScope(
     }),
   };
 }
+/** The cards that hold a standing entry; each is summoned whether or not routing selects it. */
 export const standingCards = (scope: RoundScope): Card["name"][] => [
-  ...new Set(
-    scope.entries.filter((e) => ["standing", "advisory"].includes(e.status)).map((e) => e.card),
-  ),
+  ...new Set(scope.entries.filter((e) => e.status === "standing").map((e) => e.card)),
 ];
 
 /** A `late=` mark that starts with `missed`, with or without a reason, counts as missed. */
@@ -168,33 +167,32 @@ export function prepareFindings(cards: Card[], scope: RoundScope): void {
   for (const card of cards) {
     for (const finding of card.findings) {
       // These are Margot's own annotations, never accepted from a card.
-      if (finding.unconfirmed !== undefined || finding.advisory !== undefined)
-        throw new Error("Card supplied Margot's own annotations");
       if (
-        finding.ledger &&
-        !scope.entries.some(
-          (e) =>
-            e.key === finding.ledger &&
-            e.card === card.name &&
-            ["standing", "dismissed", "advisory"].includes(e.status),
-        )
+        finding.unconfirmed !== undefined ||
+        finding.advisory !== undefined ||
+        finding.previouslyDismissed !== undefined
       )
-        throw new Error("Unknown or foreign ledger key");
-      if (finding.tag !== "issue" || scope.round < 2) continue;
-      const entry = scope.entries.find((e) => e.key === finding.ledger);
-      if (!entry && !scope.full && !finding.late)
-        throw new Error("New finding needs delta or late attribution");
-      if (entry?.status === "dismissed" && !finding.reopens) finding.advisory = "carried-dismissal";
-      else if (finding.severity === "MINOR") finding.advisory = "minor-after-round-1";
-      else if (
-        ((!entry && !scope.full && lateMissed(finding.late)) ||
-          (entry?.status === "advisory" &&
-            lateMissed(entry.late) &&
-            !finding.late?.startsWith("delta-reach:"))) &&
-        finding.severity !== "BLOCKING" &&
-        card.name !== "safety"
-      )
-        finding.advisory = "late-non-blocking";
+        throw new Error("Card supplied Margot's own annotations");
+      // A key that names none of this card's earlier entries is ignored: the finding is new.
+      const entry = finding.ledger
+        ? scope.entries.find((e) => e.key === finding.ledger && e.card === card.name)
+        : undefined;
+      if (!entry) delete finding.ledger;
+      if (finding.tag !== "issue") continue;
+      // A dismissed finding raised again goes back to the voice, which keeps the dismissal
+      // unless the new changes altered what it cites.
+      if (entry?.status === "dismissed") finding.previouslyDismissed = entry.reason ?? "dismissed";
+      if (scope.round < 2) continue;
+      // A full review (rebase, unreadable compare) has nothing late. A late finding blocks
+      // only at BLOCKING, or at MAJOR from the safety card.
+      if (!entry && !scope.full && lateMissed(finding.late)) {
+        const floor = card.name === "safety" ? ["BLOCKING", "MAJOR"] : ["BLOCKING"];
+        if (!floor.includes(finding.severity)) {
+          finding.advisory = "late-non-blocking";
+          continue;
+        }
+      }
+      if (finding.severity === "MINOR") finding.advisory = "minor-after-round-1";
     }
     for (const entry of scope.entries.filter(
       (e) => e.card === card.name && e.status === "standing",
@@ -249,22 +247,11 @@ export function nextLedger(
     ),
   );
   for (const card of cards) {
-    // Fixed-ness is inferred from absence: no card parses a `Resolved:` section. An entry
-    // that can no longer block (advisory, or MINOR from round two) its card
-    // stops raising is fixed without a ruling.
+    // Fixed-ness is inferred from absence: no card parses a `Resolved:` section. A MINOR
+    // entry, which can no longer block from round two, is fixed without a ruling once its
+    // card stops raising it.
     const raised = (key: string) =>
       card.findings.some((f) => f.ledger === key && f.tag === "issue");
-    for (const entry of scope.entries.filter(
-      (e) => e.card === card.name && e.status === "advisory",
-    )) {
-      if (!raised(entry.key))
-        entries.set(entry.key, {
-          ...entry,
-          status: "fixed",
-          fixed_round: scope.round,
-          reason: "Card completed and no longer raised this advisory finding",
-        });
-    }
     for (const entry of scope.entries.filter(
       (e) => e.card === card.name && e.status === "standing" && e.severity === "MINOR",
     )) {
@@ -283,21 +270,11 @@ export function nextLedger(
       if (!f.ledger && !scope.full && lateMissed(f.late)) counts.late++;
       if (f.unconfirmed) counts.unconfirmed++;
       if (f.advisory) {
+        // A demoted finding writes no entry of its own. One that re-raises a standing entry
+        // turns it advisory for this round only; the next ledger drops it.
         const old = f.ledger ? entries.get(f.ledger) : undefined;
-        if (!old || (["standing", "advisory"].includes(old.status) && !upheld.has(f.ledger))) {
-          const key = old?.key ?? `R${scope.round}-F${++index}`;
-          entries.set(key, {
-            key,
-            card: card.name,
-            round_raised: old?.round_raised ?? scope.round,
-            location: f.location,
-            what: f.what,
-            severity: f.severity,
-            status: "advisory",
-            advisory_round: scope.round,
-            ...(f.late ? { late: f.late } : old?.late ? { late: old.late } : {}),
-          });
-        }
+        if (old?.status === "standing" && f.ledger && !upheld.has(f.ledger))
+          entries.set(old.key, { ...old, status: "advisory", advisory_round: scope.round });
         continue;
       }
       const ruling = f.id ? dispositions.get(f.id) : undefined;

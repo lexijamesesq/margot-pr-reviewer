@@ -337,9 +337,7 @@ export async function review(
                         round: {
                           ...scope,
                           entries: scope.entries.filter(
-                            (e) =>
-                              e.card === name &&
-                              ["standing", "dismissed", "advisory"].includes(e.status),
+                            (e) => e.card === name && ["standing", "dismissed"].includes(e.status),
                           ),
                         },
                       },
