@@ -63,11 +63,13 @@ type ModelResponse = {
   durationMs?: number;
   numTurns?: number;
 };
+type JevRetry = { question: string; attempt: number; reason: string };
 /**
  * The run's diagnostics, as the previous reviewer kept them: each card's raw block, duration,
- * turns and models, and the voice's raw prose. Tool output and the environment never go in.
+ * turns and models, and the voice's raw prose, with each re-ask of a malformed Jev answer.
+ * Tool output and the environment never go in.
  */
-export function diagnostics(responses: ModelResponse[]) {
+export function diagnostics(responses: ModelResponse[], jevRetries: JevRetry[] = []) {
   const timing = (r: ModelResponse) => ({
     durationMs: r.durationMs ?? null,
     numTurns: r.numTurns ?? null,
@@ -80,13 +82,18 @@ export function diagnostics(responses: ModelResponse[]) {
       .filter((r) => r.role !== "voice")
       .map((r) => ({ card: r.role, raw: r.raw, ...timing(r) })),
     voice: voice ? { prose: voice.raw, ...timing(voice) } : null,
+    jevRetries,
   };
 }
 /** Writes diagnostics.json next to the output file, readable only by its owner. */
-export async function writeDiagnostics(outputFile: string, responses: ModelResponse[]) {
+export async function writeDiagnostics(
+  outputFile: string,
+  responses: ModelResponse[],
+  jevRetries: JevRetry[] = [],
+) {
   await writeFile(
     join(dirname(outputFile), "diagnostics.json"),
-    `${JSON.stringify(diagnostics(responses), null, 2)}\n`,
+    `${JSON.stringify(diagnostics(responses, jevRetries), null, 2)}\n`,
     { mode: 0o600 },
   );
 }
@@ -128,13 +135,19 @@ export async function runCli(
     );
     if (!environment.JEV_KEY) throw new InputError("missing environment variable JEV_KEY");
     const responses: ModelResponse[] = [];
-    const { run, actions } = cliServices(config, environment, (r) => responses.push(r));
+    const jevRetries: JevRetry[] = [];
+    const { run, actions } = cliServices(
+      config,
+      environment,
+      (r) => responses.push(r),
+      (retry) => jevRetries.push(retry),
+    );
     let result: Awaited<ReturnType<typeof run>>;
     try {
       result = await run(request);
     } catch (error) {
       // Written however the review ends, like the previous reviewer's always() upload.
-      await writeDiagnostics(outputFile, responses).catch(() => {});
+      await writeDiagnostics(outputFile, responses, jevRetries).catch(() => {});
       throw error;
     }
     try {
@@ -145,7 +158,7 @@ export async function runCli(
       throw new InputError(`cannot write output file ${outputFile} (${code(error)})`);
     }
     try {
-      await writeDiagnostics(outputFile, responses);
+      await writeDiagnostics(outputFile, responses, jevRetries);
     } catch (error) {
       throw new InputError(`cannot write diagnostics next to ${outputFile} (${code(error)})`);
     }

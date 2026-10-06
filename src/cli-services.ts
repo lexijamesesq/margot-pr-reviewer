@@ -16,6 +16,7 @@ export function cliServices(
   config: Parameters<typeof liveServices>[0],
   environment: NodeJS.ProcessEnv,
   onResponse?: Parameters<typeof liveServices>[2],
+  onJevRetry?: Parameters<typeof liveServices>[3],
 ) {
   const ticketingEnvironment = configuredTicketingEnvironment(config.claude.ticketing, environment);
   return liveServices(
@@ -28,5 +29,6 @@ export function cliServices(
       ...(Object.keys(ticketingEnvironment).length ? { ticketingEnvironment } : {}),
     },
     onResponse,
+    onJevRetry,
   );
 }

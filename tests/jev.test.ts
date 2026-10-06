@@ -35,25 +35,34 @@ function jev(
   options: {
     failures?: number;
     status?: number;
+    /** Jev's answers in turn, one per successful response; the last one repeats. */
+    sequence?: unknown[];
   } = {},
 ) {
   let attempts = 0;
+  let answered = 0;
   const calls: unknown[] = [];
+  const retries: unknown[] = [];
   const adapter = jevAdapter({
     key: "test-only",
     model: "test-model",
     fallbackClaude: pinnedClaude,
     retries: 1,
     minTimeout: 1,
+    onJevRetry: (retry) => retries.push(retry),
     fetch: async (_input, init) => {
       attempts++;
       calls.push(JSON.parse(String(init?.body)));
-      return new Response(JSON.stringify({ model: "test-model", answers: answer }), {
-        status: attempts <= (options.failures ?? 0) ? (options.status ?? 503) : 200,
+      const failing = attempts <= (options.failures ?? 0);
+      const answers = options.sequence
+        ? options.sequence[Math.min(failing ? answered : answered++, options.sequence.length - 1)]
+        : answer;
+      return new Response(JSON.stringify({ model: "test-model", answers }), {
+        status: failing ? (options.status ?? 503) : 200,
       });
     },
   });
-  return { adapter, calls, attempts: () => attempts };
+  return { adapter, calls, retries, attempts: () => attempts };
 }
 const classes = {
   functional: { type: "noul", noul: 0 },
@@ -622,6 +631,66 @@ describe("an irregular distribution, partial or not summing to one", () => {
       higherTail: "MEDIUM",
       noScore: "LOW",
       regular: "LOW",
+    });
+  });
+});
+describe("a malformed Jev answer", () => {
+  const regular = { type: "score", confidence: 0.9, probabilities: { 0: 0, 1: 0, 2: 1, 3: 0 } };
+  const wellFormed = Object.fromEntries(dimensions.map((d) => [d, regular]));
+  const malformed = {
+    ...wellFormed,
+    operations: { type: "score", confidence: 0.9, score: 3, probabilities: { 0: 1 } },
+  };
+  it("is asked again, and the next well-formed answer is used", async () => {
+    const j = jev(undefined, { sequence: [malformed, wellFormed] });
+    const r = riskSchema.parse(await j.adapter.risk(facts, [], riskQuestions, context()));
+    expect({
+      operations: r.dimensions.operations.probabilities,
+      calls: j.attempts(),
+      retries: j.retries,
+    }).toEqual({
+      operations: [0, 0, 1, 0],
+      calls: 2,
+      retries: [{ question: "risk", attempt: 2, reason: "operations: a partial distribution" }],
+    });
+  });
+  it("takes today's defaults only after three malformed answers", async () => {
+    const j = jev(malformed);
+    const r = riskSchema.parse(await j.adapter.risk(facts, [], riskQuestions, context()));
+    expect({ operations: r.dimensions.operations, calls: j.attempts() }).toEqual({
+      operations: { confidence: 0.9, score: 3, partial: true, probabilities: [1, 0, 0, 0] },
+      calls: 3,
+    });
+  });
+  it("is asked once when well-formed", async () => {
+    const j = jev(wellFormed);
+    await j.adapter.risk(facts, [], riskQuestions, context());
+    expect({ calls: j.attempts(), retries: j.retries }).toEqual({ calls: 1, retries: [] });
+  });
+  it("re-asks an unreadable classification and a missing routing exposure", async () => {
+    const classification = jev(undefined, {
+      sequence: [{ ...classes, mechanical: { type: "noul" } }, classes],
+    });
+    const classified = await classification.adapter.classify(
+      facts,
+      classificationQuestions,
+      context(),
+    );
+    const cardsOnly = Object.fromEntries(cardNames.map((k) => [k, { type: "noul", noul: 0 }]));
+    const routing = jev(undefined, {
+      sequence: [cardsOnly, { ...cardsOnly, exposure: regular }],
+    });
+    await routing.adapter.route(facts, "functional", routeQuestions, context());
+    expect({
+      mechanical: classificationSchema.parse(classified).mechanical,
+      classifyCalls: classification.attempts(),
+      routeCalls: routing.attempts(),
+      routeRetry: routing.retries,
+    }).toEqual({
+      mechanical: 1,
+      classifyCalls: 2,
+      routeCalls: 2,
+      routeRetry: [{ question: "route", attempt: 2, reason: "exposure: unreadable" }],
     });
   });
 });

@@ -14,6 +14,7 @@ Margot restores what a regression check of 0.9.0 against the previous reviewer f
 
 Deliberate differences from the previous reviewer:
 
+- A Jev answer that is malformed in any part is asked again, up to three answers in all, before the conservative defaults apply; the first well-formed answer is used. Malformed means a missing or unreadable card, exposure, meaning or classification answer, or a risk dimension that is missing, has no readable distribution, is partial, or sums off by 0.015 or more. Each re-ask is logged and listed in `diagnostics.json`. The previous reviewer re-asked only on a transport failure.
 - A malformed Jev distribution, one with levels missing or a sum off by 0.015 or more, is rated at the higher of its tail level and its rounded score when Jev gives a score, and by its tail without one. The previous reviewer rated it by its tail alone, so `{"0": 1}` with a score of 3 was level 0; the rule is never lower than the previous reviewer and never below Jev's own score. A well-formed distribution, all four levels present and summing to 1 within 0.015, keeps the previous reviewer's tail rule, since Jev's score is the expected value of that same distribution.
 - The voice's `band` and `rationale` are required, so a malformed verdict is held where the previous reviewer posted it: Margot fails closed.
 - The previous reviewer's Jev decision log was opt-in and never enabled, so it is not ported.

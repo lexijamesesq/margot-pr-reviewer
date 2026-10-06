@@ -91,6 +91,7 @@ it.each([
           },
         ],
         voice: null,
+        jevRetries: [],
       },
     });
   } finally {

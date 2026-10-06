@@ -46,6 +46,7 @@ it("keeps each card's raw block, duration, turns and model and the voice's prose
       models: ["claude-opus-5-5"],
       costUsd: 0.25,
     },
+    jevRetries: [],
   });
 });
 it("writes diagnostics.json privately next to the result, with no tool output or token", async () => {

@@ -13,9 +13,15 @@ vi.mock("../src/cli-services.js", async (importOriginal) => {
     cliServices: (...args: Parameters<typeof actual.cliServices>) => {
       if (!scripted.on) return actual.cliServices(...args);
       const onResponse = args[2];
+      const onJevRetry = args[3];
       return {
         actions: [],
         run: async () => {
+          onJevRetry?.({
+            question: "risk",
+            attempt: 2,
+            reason: "operations: a partial distribution",
+          });
           for (const role of ["safety", "voice"])
             onResponse?.({
               role,
@@ -190,6 +196,9 @@ it("writes diagnostics.json beside the output after a successful review", async 
           models: ["example-model"],
           costUsd: 0.1,
         },
+        jevRetries: [
+          { question: "risk", attempt: 2, reason: "operations: a partial distribution" },
+        ],
       },
     });
   } finally {

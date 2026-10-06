@@ -23,6 +23,7 @@ export function liveServices(
     ticketingEnvironment?: Record<string, string>;
   },
   onResponse?: ClaudeOptions["onResponse"],
+  onJevRetry?: Parameters<typeof jevAdapter>[0]["onJevRetry"],
 ) {
   const config = liveConfigSchema.parse(configInput);
   let costUsd = 0;
@@ -74,6 +75,7 @@ export function liveServices(
       model: config.jev.model,
       ...(config.jev.url ? { url: config.jev.url } : {}),
       fallbackClaude: config.claude,
+      ...(onJevRetry ? { onJevRetry } : {}),
     }),
     ...claudeAdapter({
       ...config.claude,
