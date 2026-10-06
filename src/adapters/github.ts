@@ -129,93 +129,11 @@ export function githubAdapter(
         after.title !== before.title
       )
         throw new Error("PR changed while reading facts");
-      const diffText: unknown = diff.data;
-      if (typeof diffText !== "string") throw new Error("Incomplete GitHub diff");
-      // The whole-PR diff is the source of truth: the compare endpoint caps its files array,
-      // but the diff has no such cap. The file list comes from it, and it is complete when
-      // every hunk is closed. GitHub's per-file listing is capped at 3,000,
-      // lags the PR's own `changed_files` on a fresh push, and omits `patch` with zero counts
-      // for large files; it is used only to enrich a file the diff already names, and its
-      // counts are cross-checked only where it supplied the content.
-      const parsed = parseDiff(diffText);
-      if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
-      // parse-diff names each section from its `---`/`+++`/`rename` lines, one path per line,
-      // never by splitting the `diff --git a/X b/Y` header (a path can contain " b/").
-      // Where GitHub's listing is as long as the diff it is complete, and every diff path
-      // must appear in it; a shorter
-      // listing is GitHub's cap, and the diff's names stand on their own.
-      const listed = new Map(files.map((f) => [f.filename, f]));
-      const listingComplete = files.length >= parsed.length;
-      const diffFiles = parsed.map((file) => {
-        const path = file.to && file.to !== "/dev/null" ? file.to : (file.from ?? "");
-        const from = file.from && file.from !== "/dev/null" ? file.from : undefined;
-        const entry = listed.get(path);
-        if (!entry && listingComplete) throw new Error("Diff and file listing disagree");
-        if (
-          entry &&
-          typeof entry.patch === "string" &&
-          (file.additions !== entry.additions || file.deletions !== entry.deletions)
-        )
-          throw new Error("Diff hunks are incomplete");
-        const previous = entry?.previous_filename ?? (from && from !== path ? from : undefined);
-        return { path, ...(previous ? { previousPath: previous } : {}) };
-      });
-      if (diffFiles.some((f) => !f.path)) throw new Error("Diff hunks are incomplete");
-      // Over-inclusion is the safe direction for the protected-path gate: a file GitHub lists
-      // that the diff did not name is still a changed file.
-      for (const f of files)
-        if (!diffFiles.some((d) => d.path === f.filename))
-          diffFiles.push({
-            path: f.filename,
-            ...(f.previous_filename ? { previousPath: f.previous_filename } : {}),
-          });
+      const { diffText, files: diffFiles } = changedFiles(diff.data, files);
       const historyReviews = options.shadowBeforeHead
         ? reviews.filter((v) => v.commit_id !== r.head)
         : reviews;
-      let triage = null;
-      const latest = checks
-        .filter(
-          (check) =>
-            options.triageAppId !== undefined &&
-            options.triageCheckName !== undefined &&
-            check.name === options.triageCheckName &&
-            check.status === "completed" &&
-            check.head_sha === r.head &&
-            check.app?.id === options.triageAppId,
-        )
-        .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id)[0];
-      if (latest?.started_at && Number.isInteger(latest.id)) {
-        try {
-          const machine = JSON.parse(latest.output?.text ?? "");
-          const classification =
-            "classification" in machine
-              ? machine.classification
-              : typeof machine.mechanical === "boolean"
-                ? machine.mechanical
-                  ? "mechanical"
-                  : "functional"
-                : null;
-          if (
-            machine.head_sha === r.head &&
-            machine.decision_source === "jev" &&
-            classNames.includes(classification)
-          )
-            triage = {
-              actor: latest.app?.slug ?? "unknown",
-              base: r.base,
-              head: r.head,
-              classification,
-              ...(probability.safeParse(machine.mechanical_probability).success
-                ? { mechanicalProbability: machine.mechanical_probability }
-                : {}),
-            };
-        } catch (error) {
-          // Unreadable triage conservatively requires functional review.
-          console.warn(
-            `Margot: triage check output unreadable (${errorMessage(error)}); requiring functional review`,
-          );
-        }
-      }
+      const triage = triageFromChecks(checks, r, options);
       return factsSchema.parse({
         repository: r.repository,
         pr: r.pr,
@@ -265,6 +183,127 @@ export function githubAdapter(
       });
     },
   };
+}
+/**
+ * The PR's changed files: every file the whole-PR diff names, with every hunk complete, plus
+ * every file GitHub's listing names. Throws when the diff is incomplete or disagrees with a
+ * complete listing. The review's facts and the self-instrument preflight both read it.
+ */
+export function changedFiles(
+  diffData: unknown,
+  files: {
+    filename: string;
+    previous_filename?: string;
+    patch?: string;
+    additions: number;
+    deletions: number;
+  }[],
+) {
+  const diffText: unknown = diffData;
+  if (typeof diffText !== "string") throw new Error("Incomplete GitHub diff");
+  // The whole-PR diff is the source of truth: the compare endpoint caps its files array,
+  // but the diff has no such cap. The file list comes from it, and it is complete when
+  // every hunk is closed. GitHub's per-file listing is capped at 3,000,
+  // lags the PR's own `changed_files` on a fresh push, and omits `patch` with zero counts
+  // for large files; it is used only to enrich a file the diff already names, and its
+  // counts are cross-checked only where it supplied the content.
+  const parsed = parseDiff(diffText);
+  if (!diffIsComplete(diffText, parsed)) throw new Error("Diff hunks are incomplete");
+  // parse-diff names each section from its `---`/`+++`/`rename` lines, one path per line,
+  // never by splitting the `diff --git a/X b/Y` header (a path can contain " b/").
+  // Where GitHub's listing is as long as the diff it is complete, and every diff path
+  // must appear in it; a shorter
+  // listing is GitHub's cap, and the diff's names stand on their own.
+  const listed = new Map(files.map((f) => [f.filename, f]));
+  const listingComplete = files.length >= parsed.length;
+  const diffFiles = parsed.map((file) => {
+    const path = file.to && file.to !== "/dev/null" ? file.to : (file.from ?? "");
+    const from = file.from && file.from !== "/dev/null" ? file.from : undefined;
+    const entry = listed.get(path);
+    if (!entry && listingComplete) throw new Error("Diff and file listing disagree");
+    if (
+      entry &&
+      typeof entry.patch === "string" &&
+      (file.additions !== entry.additions || file.deletions !== entry.deletions)
+    )
+      throw new Error("Diff hunks are incomplete");
+    const previous = entry?.previous_filename ?? (from && from !== path ? from : undefined);
+    return { path, ...(previous ? { previousPath: previous } : {}) };
+  });
+  if (diffFiles.some((f) => !f.path)) throw new Error("Diff hunks are incomplete");
+  // Over-inclusion is the safe direction for the protected-path gate: a file GitHub lists
+  // that the diff did not name is still a changed file.
+  for (const f of files)
+    if (!diffFiles.some((d) => d.path === f.filename))
+      diffFiles.push({
+        path: f.filename,
+        ...(f.previous_filename ? { previousPath: f.previous_filename } : {}),
+      });
+  return { diffText, files: diffFiles };
+}
+/**
+ * The verified triage for this head: the latest completed triage check the configured App
+ * posted on it, whose machine output is a Jev answer bound to the head. Anything else is null,
+ * which conservatively requires functional review.
+ */
+export function triageFromChecks(
+  checks: {
+    id: number;
+    name: string;
+    status: string;
+    head_sha: string;
+    started_at?: string | null;
+    app?: { id?: number; slug?: string } | null;
+    output?: { text?: string | null };
+  }[],
+  r: { base: string; head: string },
+  options: { triageAppId?: number; triageCheckName?: string },
+) {
+  let triage = null;
+  const latest = checks
+    .filter(
+      (check) =>
+        options.triageAppId !== undefined &&
+        options.triageCheckName !== undefined &&
+        check.name === options.triageCheckName &&
+        check.status === "completed" &&
+        check.head_sha === r.head &&
+        check.app?.id === options.triageAppId,
+    )
+    .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id)[0];
+  if (latest?.started_at && Number.isInteger(latest.id)) {
+    try {
+      const machine = JSON.parse(latest.output?.text ?? "");
+      const classification =
+        "classification" in machine
+          ? machine.classification
+          : typeof machine.mechanical === "boolean"
+            ? machine.mechanical
+              ? "mechanical"
+              : "functional"
+            : null;
+      if (
+        machine.head_sha === r.head &&
+        machine.decision_source === "jev" &&
+        classNames.includes(classification)
+      )
+        triage = {
+          actor: latest.app?.slug ?? "unknown",
+          base: r.base,
+          head: r.head,
+          classification,
+          ...(probability.safeParse(machine.mechanical_probability).success
+            ? { mechanicalProbability: machine.mechanical_probability }
+            : {}),
+        };
+    } catch (error) {
+      // Unreadable triage conservatively requires functional review.
+      console.warn(
+        `Margot: triage check output unreadable (${errorMessage(error)}); requiring functional review`,
+      );
+    }
+  }
+  return triage;
 }
 export function githubClient(options: { token?: string; gh?: string; retries?: number }) {
   return new Octokit({

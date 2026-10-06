@@ -67,11 +67,6 @@ const rejections: Rejection[] = [
     stage: "risk",
   },
   {
-    when: "a risk distribution does not sum to one",
-    change: withRiskDimension("operations", { probabilities: [1, 1, 1, 1], confidence: 1 }),
-    stage: "risk",
-  },
-  {
     when: "the bundle commit differs from the pin",
     change: withBundle({ commit: missingHead }),
     stage: "bundle",

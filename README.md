@@ -118,7 +118,10 @@ server (`mcp-linear`); `bind-request` refuses a placeholder or a path under the 
 margot-review REQUEST.json CONFIG.json OUTPUT.json
 ```
 
-It writes the result to `OUTPUT.json`. It exits 1 when the result is an error, printing the
+It writes the result to `OUTPUT.json`, and `diagnostics.json` beside it: each card's
+raw block, duration, turns and models, the voice's raw prose, and each re-ask of a
+malformed Jev answer (`jevRetries`), with no tool output,
+token or environment. It is written however the review ends, for the host to keep. It exits 1 when the result is an error, printing the
 failed stage and diagnostic to stderr, and 0 otherwise, including for held results.
 
 ## Running it in GitHub Actions
@@ -170,6 +173,10 @@ required checks, protected paths, allowed skipped checks, and authority applied.
 With `--authority true` the review publishes to GitHub, and `--run-url` must name
 this run; without authority it runs in shadow mode and publishes nothing.
 
+For a benchmark shadow run, `--reviewer-model <model>` overrides the card reviewers'
+model and `--fresh true` makes the review fresh, reading no earlier ledger; both are
+refused with `--authority true`, so a benchmark never publishes.
+
 Every classified stop exits **75** and prints `stop_reason=<reason>` (one of
 `superseded`, `merged`, `closed`, `draft`, `fork`, `conflict`, `empty`); a
 superseded stop also prints `live_sha=<current head>`. Both lines are appended
@@ -188,8 +195,10 @@ margot-instance bind-request \
 
 Closes a review check this run left open when routing failed, review failed, or
 publication did not happen. `--check-name` names the review check to close (your
-`publisher.checks.review`); it defaults to `review / margot`. Exits 0 after closing or
-finding nothing to close, and 2 on a GitHub read or write failure.
+`publisher.checks.review`); it defaults to `review / margot`. For a floor stop,
+`--blocking-checks` names what held the floor (such as `pending: ci / checks, lint`) and
+goes into the check's title; without it the title says "required checks not green".
+Exits 0 after closing or finding nothing to close, and 2 on a GitHub read or write failure.
 
 ```sh
 margot-instance close-stranded-check \
@@ -198,6 +207,26 @@ margot-instance close-stranded-check \
   --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
   --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
   --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"
+```
+
+### `self-instrument`
+
+Posts the self-instrument check for a pull request's live head, before the floor, as
+the previous reviewer's preflight did. A functional change to a protected path, or a
+rename or move of one in any class, is held (`neutral`, "held for the operator's
+approval", listing the matched paths); anything else is `success` ("clear", naming the
+class). The class is the verified triage's for the head (the triage check
+`--triage-check-name`, default `review / triage`, posted by `--app-id` and trusted
+through `--trusted-triage-actors`), or functional without one. `--check-name` defaults
+to `review / self-instrument`. It reads with `GH_TOKEN` and posts with
+`MARGOT_WRITE_TOKEN`, and refuses a head that is no longer the PR's. Publication posts
+the same check again.
+
+```sh
+margot-instance self-instrument \
+  --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
+  --protected-paths '["YOUR_AUTHORITY_PATH/**"]' --app-id "$MARGOT_APP_ID" \
+  --trusted-triage-actors '["triage-app"]'
 ```
 
 ## What Margot posts

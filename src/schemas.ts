@@ -15,6 +15,11 @@ export const cardNames = [
   "maintainable-no-slop",
   "house-style",
 ] as const;
+/** A risk distribution is well-formed when its levels sum to one within this tolerance. */
+export const distributionTolerance = 0.015;
+/** Whether a distribution's levels sum to one, within the tolerance. */
+export const sumsToOne = (levels: number[]) =>
+  Math.abs(levels.reduce((total, p) => total + p, 0) - 1) < distributionTolerance;
 export const dimensions = [
   "blast_radius",
   "reversibility",
@@ -146,16 +151,14 @@ export const riskSchema = z.strictObject({
   dimensions: z.record(
     z.enum(dimensions),
     z.strictObject({
-      probabilities: z
-        .tuple([probability, probability, probability, probability])
-        .refine(
-          (p) => Math.abs(p.reduce((a, b) => a + b, 0) - 1) < 0.015,
-          "Probabilities must sum to one",
-        ),
+      // Rated by its tail whatever it sums to, as the previous reviewer read it.
+      probabilities: z.tuple([probability, probability, probability, probability]),
       // Null when Jev gave no usable confidence: not "unsure", so the band is never lowered.
       confidence: probability.nullable(),
       // Jev's expected level, 0 to 3; it names the kind of exposure on a code verdict.
       score: z.number().min(0).max(3).optional(),
+      // Jev gave only some of the four levels; the missing ones read as 0.
+      partial: z.boolean().optional(),
     }),
   ),
 });

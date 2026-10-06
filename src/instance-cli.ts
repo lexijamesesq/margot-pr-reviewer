@@ -15,6 +15,7 @@ import {
   writeGitHubOutput,
 } from "./instance.js";
 import { shaSchema } from "./schemas.js";
+import { postSelfInstrument } from "./self-instrument.js";
 
 type Options = Record<string, string | undefined>;
 
@@ -94,12 +95,15 @@ function positiveInteger(input: Options, name: string) {
 }
 
 const usage =
-  "Usage: margot-instance <validate-deployment|bind-request|close-stranded-check> [named arguments]";
+  "Usage: margot-instance <validate-deployment|bind-request|close-stranded-check|self-instrument> [named arguments]";
 
 export async function runInstanceCommand(
   args: string[],
   environment: NodeJS.ProcessEnv,
   client?: Pick<Octokit, "rest">,
+  /** The GitHub client for a token; self-instrument reads with GH_TOKEN and posts with MARGOT_WRITE_TOKEN. */
+  githubFor: (token: string) => Pick<Octokit, "rest" | "paginate" | "request"> = (token) =>
+    githubClient({ token, retries: 0 }),
 ) {
   const [command, ...rest] = args;
   if (args.length === 1 && (command === "--help" || command === "-h")) return { help: usage };
@@ -135,6 +139,8 @@ export async function runInstanceCommand(
       "protected-paths",
       "allowed-skipped-checks",
       "run-url",
+      "reviewer-model",
+      "fresh",
     ]);
     const phase = required(input, "phase");
     if (phase !== "triage" && phase !== "review") throw new Error("--phase is invalid");
@@ -153,6 +159,8 @@ export async function runInstanceCommand(
           protectedPaths: list(input, "protected-paths"),
           allowedSkippedChecks: list(input, "allowed-skipped-checks"),
           ...(input["run-url"] ? { runUrl: input["run-url"] } : {}),
+          ...(input["reviewer-model"] ? { reviewerModel: input["reviewer-model"] } : {}),
+          ...(input.fresh !== undefined ? { fresh: bool(input, "fresh") } : {}),
         },
         environment.GH_TOKEN,
         client,
@@ -177,6 +185,7 @@ export async function runInstanceCommand(
       "published",
       "stop-reason",
       "live-sha",
+      "blocking-checks",
     ]);
     const head = shaSchema.parse(required(input, "head"));
     const ownRuns = required(input, "own-runs");
@@ -197,6 +206,7 @@ export async function runInstanceCommand(
       published,
       stopReason: required(input, "stop-reason"),
       ...(input["live-sha"] ? { liveSha: shaSchema.parse(input["live-sha"]) } : {}),
+      ...(input["blocking-checks"] ? { blockingChecks: input["blocking-checks"] } : {}),
     };
     if (!shouldCloseStrandedCheck(closeInput))
       return { action: "left" as const, message: "nothing to close" };
@@ -207,6 +217,35 @@ export async function runInstanceCommand(
     );
     if (decision.action === "error") throw new CommandError(decision.message, 2);
     return decision;
+  }
+  if (command === "self-instrument") {
+    const input = named(rest, [
+      "repository",
+      "pr",
+      "head",
+      "protected-paths",
+      "app-id",
+      "trusted-triage-actors",
+      "triage-check-name",
+      "check-name",
+    ]);
+    const selfInstrumentInput = {
+      repository: required(input, "repository"),
+      pr: positiveInteger(input, "pr"),
+      head: shaSchema.parse(required(input, "head")),
+      protectedPaths: list(input, "protected-paths"),
+      appId: positiveInteger(input, "app-id"),
+      trustedTriageActors: list(input, "trusted-triage-actors"),
+      triageCheckName: input["triage-check-name"] || "review / triage",
+      checkName: input["check-name"] || "review / self-instrument",
+    };
+    if (!environment.GH_TOKEN) throw new Error("GH_TOKEN is required");
+    if (!environment.MARGOT_WRITE_TOKEN) throw new Error("MARGOT_WRITE_TOKEN is required");
+    return postSelfInstrument(
+      selfInstrumentInput,
+      githubFor(environment.GH_TOKEN),
+      githubFor(environment.MARGOT_WRITE_TOKEN),
+    );
   }
   throw new Error(usage);
 }

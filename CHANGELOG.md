@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.1
+
+Margot restores what a regression check of 0.9.0 against the previous reviewer found changed without a record.
+
+- A risk dimension with a well-formed distribution from Jev, all four levels present and summing to 1 within 0.015, is rated by its tail, as the previous reviewer rated it. A malformed one, partial or off its sum, is no longer replaced by the score or refused by the risk schema: it is rated as the deliberate difference on a malformed Jev distribution below states, with a partial distribution's missing levels read as 0. A dimension with no distribution takes its score's level, and with no score level 2.
+- The verdict check's summary is `<outcome>, <band>: <first sentence of the risk label>`, capped at 900 characters, instead of the band rationale. The label is the voice's, or the one a code verdict carries.
+- `close-stranded-check --blocking-checks` names what held the floor in a floor stop's title, as the host words it (such as "pending: ci / checks, lint"): `Margot: preflight — <what held it> — waiting for the next push`. Without it the title still says "required checks not green".
+- `margot-instance self-instrument` posts the self-instrument check for a pull request's live head before the floor, with the previous reviewer's conclusion and wording: `neutral` and held for the operator's approval for a functional change to a protected path or a protected rename in any class, listing the matched paths, and otherwise `success`, naming the class. The class is the verified triage's for the head, or functional without one. It reads the changed files as the review does, from the whole-PR diff with every hunk complete plus GitHub's file listing, and holds rather than clears a change it cannot read completely. Publication posts the check with the same text: the previous reviewer's wording, with the matched paths sorted, in place of the port's own.
+- `margot-review` writes `diagnostics.json` beside its output however the review ends: each card's raw block, duration, turns, models and cost, and the voice's raw prose with the same. Tool output, tokens and the environment are not in it.
+- `bind-request --reviewer-model <model> --fresh true` binds a benchmark shadow run: the card reviewers' model overridden, no earlier ledger read, and nothing published. Either flag is refused with `--authority true`.
+- The card prompt carries the previous reviewer's authorship sentence verbatim ("You did NOT author this PR and you judge its author, never whoever invoked you.") and its confinement sentence verbatim: every local search stays in the read-only base-sha checkout at `/work` and in PR evidence fetched read-only through `gh` at the head sha, never a home path, a mounted volume or the PR head checked out.
+
+Deliberate differences from the previous reviewer:
+
+- A Jev answer that is malformed in any part is asked again, up to three answers in all, before the conservative defaults apply; the first well-formed answer is used. Malformed means a missing or unreadable card, exposure, meaning or classification answer, or a risk dimension that is missing, has no readable distribution, is partial, or sums off by 0.015 or more. Each re-ask is logged and listed in `diagnostics.json`. The previous reviewer re-asked only on a transport failure.
+- A malformed Jev distribution, one with levels missing or a sum off by 0.015 or more, is rated at the higher of its tail level and its rounded score when Jev gives a score, and by its tail without one. The previous reviewer rated it by its tail alone, so `{"0": 1}` with a score of 3 was level 0; the rule is never lower than the previous reviewer and never below Jev's own score. A well-formed distribution, all four levels present and summing to 1 within 0.015, keeps the previous reviewer's tail rule, since Jev's score is the expected value of that same distribution.
+- The voice's `band` and `rationale` are required, so a malformed verdict is held where the previous reviewer posted it: Margot fails closed.
+- The previous reviewer's Jev decision log was opt-in and never enabled, so it is not ported.
+- The previous reviewer's manual Colima containment script is not ported: the container's walls are the same, and its own workflow never ran the script.
+- The council roster hides dismissed findings, by the operator's contract for the roster.
+- An unreadable card block ends the review in an error.
+
 ## 0.9.0
 
 Reviewers run in the previous reviewer's container with its tools.

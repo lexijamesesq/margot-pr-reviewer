@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { z } from "zod";
 import { liveConfigSchema } from "./adapters/live.js";
 import { cliServices } from "./cli-services.js";
@@ -9,7 +10,8 @@ const usage = "Usage: margot-review REQUEST.json CONFIG.json OUTPUT.json";
 const help = `${usage}
 
 Reviews the pull request named by REQUEST.json under CONFIG.json and writes the
-result, the recorded actions and the model responses to OUTPUT.json.
+result, the recorded actions and the model responses to OUTPUT.json, and each card's
+and the voice's raw output, duration, turns and models to diagnostics.json beside it.
 
 Options:
   --help, -h     Print this help and exit.
@@ -53,6 +55,48 @@ async function packageVersion(): Promise<string> {
   return String(manifest.version);
 }
 
+type ModelResponse = {
+  role: string;
+  raw: string;
+  cost: number;
+  models: string[];
+  durationMs?: number;
+  numTurns?: number;
+};
+type JevRetry = { question: string; attempt: number; reason: string };
+/**
+ * The run's diagnostics, as the previous reviewer kept them: each card's raw block, duration,
+ * turns and models, and the voice's raw prose, with each re-ask of a malformed Jev answer.
+ * Tool output and the environment never go in.
+ */
+export function diagnostics(responses: ModelResponse[], jevRetries: JevRetry[] = []) {
+  const timing = (r: ModelResponse) => ({
+    durationMs: r.durationMs ?? null,
+    numTurns: r.numTurns ?? null,
+    models: r.models,
+    costUsd: r.cost,
+  });
+  const voice = responses.findLast((r) => r.role === "voice");
+  return {
+    cards: responses
+      .filter((r) => r.role !== "voice")
+      .map((r) => ({ card: r.role, raw: r.raw, ...timing(r) })),
+    voice: voice ? { prose: voice.raw, ...timing(voice) } : null,
+    jevRetries,
+  };
+}
+/** Writes diagnostics.json next to the output file, readable only by its owner. */
+export async function writeDiagnostics(
+  outputFile: string,
+  responses: ModelResponse[],
+  jevRetries: JevRetry[] = [],
+) {
+  await writeFile(
+    join(dirname(outputFile), "diagnostics.json"),
+    `${JSON.stringify(diagnostics(responses, jevRetries), null, 2)}\n`,
+    { mode: 0o600 },
+  );
+}
 /** Runs the review CLI and returns its exit code. Messages never include credentials. */
 export async function runCli(
   args: string[],
@@ -90,15 +134,33 @@ export async function runCli(
       configFile,
     );
     if (!environment.JEV_KEY) throw new InputError("missing environment variable JEV_KEY");
-    const responses: unknown[] = [];
-    const { run, actions } = cliServices(config, environment, (r) => responses.push(r));
-    const result = await run(request);
+    const responses: ModelResponse[] = [];
+    const jevRetries: JevRetry[] = [];
+    const { run, actions } = cliServices(
+      config,
+      environment,
+      (r) => responses.push(r),
+      (retry) => jevRetries.push(retry),
+    );
+    let result: Awaited<ReturnType<typeof run>>;
+    try {
+      result = await run(request);
+    } catch (error) {
+      // Written however the review ends, like the previous reviewer's always() upload.
+      await writeDiagnostics(outputFile, responses, jevRetries).catch(() => {});
+      throw error;
+    }
     try {
       await writeFile(outputFile, `${JSON.stringify({ result, actions, responses }, null, 2)}\n`, {
         mode: 0o600,
       });
     } catch (error) {
       throw new InputError(`cannot write output file ${outputFile} (${code(error)})`);
+    }
+    try {
+      await writeDiagnostics(outputFile, responses, jevRetries);
+    } catch (error) {
+      throw new InputError(`cannot write diagnostics next to ${outputFile} (${code(error)})`);
     }
     if (result.kind !== "error") return 0;
     // The output file is removed with the run's working files; the run log keeps the reason.

@@ -1,9 +1,45 @@
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { runCli } from "../src/cli-run.js";
+import { describe, expect, it, vi } from "vitest";
 import { readRecording } from "./helpers/recordings.js";
+
+// The real services unless a test asks for a scripted run that reports two responses.
+const scripted = vi.hoisted(() => ({ on: false }));
+vi.mock("../src/cli-services.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/cli-services.js")>();
+  return {
+    ...actual,
+    cliServices: (...args: Parameters<typeof actual.cliServices>) => {
+      if (!scripted.on) return actual.cliServices(...args);
+      const onResponse = args[2];
+      const onJevRetry = args[3];
+      return {
+        actions: [],
+        run: async () => {
+          onJevRetry?.({
+            question: "risk",
+            attempt: 2,
+            reason: "operations: a partial distribution",
+          });
+          for (const role of ["safety", "voice"])
+            onResponse?.({
+              role,
+              raw: `${role} raw`,
+              cost: 0.1,
+              models: ["example-model"],
+              tools: ["Bash"],
+              evidence: [],
+              durationMs: 10,
+              numTurns: 2,
+            });
+          return { kind: "reviewed" };
+        },
+      };
+    },
+  };
+});
+const { runCli } = await import("../src/cli-run.js");
 
 const recording = readRecording("mechanical-bump");
 const sampleConfig = JSON.parse(
@@ -132,4 +168,40 @@ describe("margot-review GitHub publication settings", () => {
     });
     expect(stderr).toContain("`publisher` configuration");
   });
+});
+it("writes diagnostics.json beside the output after a successful review", async () => {
+  scripted.on = true;
+  try {
+    const run = await invoke();
+    const written = JSON.parse(
+      await readFile(join(run.paths.output, "..", "diagnostics.json"), "utf8"),
+    );
+    expect({ code: run.code, written }).toEqual({
+      code: 0,
+      written: {
+        cards: [
+          {
+            card: "safety",
+            raw: "safety raw",
+            durationMs: 10,
+            numTurns: 2,
+            models: ["example-model"],
+            costUsd: 0.1,
+          },
+        ],
+        voice: {
+          prose: "voice raw",
+          durationMs: 10,
+          numTurns: 2,
+          models: ["example-model"],
+          costUsd: 0.1,
+        },
+        jevRetries: [
+          { question: "risk", attempt: 2, reason: "operations: a partial distribution" },
+        ],
+      },
+    });
+  } finally {
+    scripted.on = false;
+  }
 });

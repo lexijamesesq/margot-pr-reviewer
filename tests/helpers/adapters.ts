@@ -154,6 +154,7 @@ export async function fakeClaude(
     /** How the base checkout differs from the request: another commit, another remote, or dirty. */
     checkout?: { base?: string; remote?: string; dirty?: boolean };
     role?: "card" | "voice";
+    onResponse?: Parameters<typeof claudeAdapter>[0]["onResponse"];
   } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
@@ -289,6 +290,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, arg
             : {}),
           ...(options.githubToken ? { githubToken: options.githubToken } : {}),
           ...(options.ownChecks ? { ownChecks: options.ownChecks } : {}),
+          ...(options.onResponse ? { onResponse: options.onResponse } : {}),
         });
     const round = {
       round: options.delta === undefined ? 1 : 2,

@@ -6,6 +6,7 @@ import {
   classNames,
   dimensions,
   type routeSchema,
+  sumsToOne,
 } from "./schemas.js";
 import type {
   Card,
@@ -77,12 +78,15 @@ export function rate(
       voiceOverride: null,
     };
   const levels = dimensions.map((name) => {
-    const p = evidence.dimensions[name].probabilities;
-    return (
+    const { probabilities: p, score, partial } = evidence.dimensions[name];
+    const tail =
       [0, 1, 2, 3]
         .filter((level) => p.slice(level).reduce((a, b) => a + b, 0) >= config.riskTailThreshold)
-        .at(-1) ?? 0
-    );
+        .at(-1) ?? 0;
+    // An irregular distribution, partial or not summing to one, is never rated below Jev's
+    // own score: a deliberate upgrade on the previous reviewer, which used its tail alone.
+    const irregular = partial || !sumsToOne(p);
+    return irregular && score !== undefined ? Math.max(tail, Math.round(score)) : tail;
   });
   const confident = dimensions.filter(
     (name) => (evidence.dimensions[name].confidence ?? 0) >= config.noCouncilConfidenceFloor,
@@ -199,6 +203,44 @@ export function requireRiskLine(voice: Voice): void {
   if (voice.outcome !== "ERROR" && !voice.risk?.trim())
     throw new Error("held — comment not template-compliant: risk line has no classification");
 }
+/** A triage the review may take its class from: posted by a trusted actor, for this head. */
+export function verifiedTriage<T extends { actor: string; head: string }>(
+  triage: T | null | undefined,
+  trustedActors: string[],
+  head: string,
+): T | null {
+  return triage && trustedActors.includes(triage.actor) && triage.head === head ? triage : null;
+}
+/**
+ * The protected-path hold: a functional change to a protected path, or a rename or move whose
+ * old or new name is protected in any class. `paths` names every protected current or previous
+ * name. The preflight self-instrument check and publication share it.
+ */
+export function authorityHold(
+  files: { path: string; previousPath?: string | undefined }[],
+  classification: string,
+  protectedPaths: string[],
+): { hold: boolean; paths: string[] } {
+  const protectedPath = picomatch(protectedPaths, { dot: true });
+  const paths = [
+    ...new Set(
+      files.flatMap((file) =>
+        [file.path, ...(file.previousPath ? [file.previousPath] : [])].filter((path) =>
+          protectedPath(path),
+        ),
+      ),
+    ),
+  ];
+  const protectedRename = files.some(
+    (f) => f.previousPath && (protectedPath(f.path) || protectedPath(f.previousPath)),
+  );
+  return {
+    hold:
+      protectedRename ||
+      (classification === "functional" && files.some((f) => protectedPath(f.path))),
+    paths,
+  };
+}
 export function decide(
   classification: Classification,
   facts: Facts,
@@ -220,24 +262,12 @@ export function decide(
     !["none", "owned", "required_owned"].includes(facts.ownedPathTier)
   )
     holdReasons.push("ownership-uncomputed");
-  const protectedPath = picomatch(config.protectedPaths, { dot: true });
-  const authorityPaths = [
-    ...new Set(
-      facts.files.flatMap((file) =>
-        [file.path, ...(file.previousPath ? [file.previousPath] : [])].filter((path) =>
-          protectedPath(path),
-        ),
-      ),
-    ),
-  ];
-  const protectedRename = facts.files.some(
-    (f) => f.previousPath && (protectedPath(f.path) || protectedPath(f.previousPath)),
+  const { hold, paths: authorityPaths } = authorityHold(
+    facts.files,
+    classification,
+    config.protectedPaths,
   );
-  if (
-    protectedRename ||
-    (classification === "functional" && facts.files.some((f) => protectedPath(f.path)))
-  )
-    holdReasons.push("review-authority");
+  if (hold) holdReasons.push("review-authority");
   if (finalRating.band !== "LOW") holdReasons.push("risk");
   if (config.calibration) holdReasons.push("calibration");
   const outcome = voice?.outcome ?? "APPROVED";

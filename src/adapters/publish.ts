@@ -2,7 +2,7 @@ import type { Octokit } from "octokit";
 import type { z } from "zod";
 import { errorMessage } from "../errors.js";
 import { holdReason } from "../policy.js";
-import { checkText } from "../render.js";
+import { checkSummary, checkText, selfInstrumentCheck } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
 import { type Stage, stages } from "../stages.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
@@ -205,18 +205,17 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     // The review run never writes `review / triage`; that check is the triage run's alone.
     // Rewriting it here replaced Jev's answer with the review's merged class, which
     // readers of that check reject unless it came from Jev, so a mechanical PR read as functional.
-    const authorityHold = decision.holdReasons.includes("review-authority");
+    const authority = selfInstrumentCheck({
+      hold: decision.holdReasons.includes("review-authority"),
+      paths: decision.authorityPaths ?? [],
+      classification: review.classification,
+    });
     await check(
       r,
       config.checks.authority,
-      authorityHold ? "neutral" : "success",
-      authorityHold
-        ? "self-instrument: held for the operator's approval"
-        : "self-instrument: clear",
-      authorityHold
-        ? "This PR changes files Margot's own review depends on (the configured protected paths). Margot does not approve such a change by itself; it waits for a maintainer's approval.\n\nMatched:\n" +
-            (decision.authorityPaths ?? []).map((path) => `- \`${path}\``).join("\n")
-        : `No functional change to a protected path (class: ${review.classification}).`,
+      authority.conclusion,
+      authority.title,
+      authority.summary,
       undefined,
       c,
     );
@@ -261,7 +260,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           : decision.outcome === "ERROR"
             ? "not reviewed (error)"
             : `Margot: ${decision.outcome}`,
-      `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
+      checkSummary(review),
       checkText(review),
       c,
     );

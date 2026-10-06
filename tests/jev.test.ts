@@ -3,10 +3,12 @@ import { decisionFallback } from "../src/adapters/decision-fallback.js";
 import { councilText, jevAdapter, jevState } from "../src/adapters/jev.js";
 import * as processAdapter from "../src/adapters/process.js";
 import { recordedServices, review } from "../src/index.js";
+import { rate } from "../src/policy.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
 import {
   cardNames,
   classificationSchema,
+  configSchema,
   dimensions,
   factsSchema,
   requestSchema,
@@ -33,25 +35,34 @@ function jev(
   options: {
     failures?: number;
     status?: number;
+    /** Jev's answers in turn, one per successful response; the last one repeats. */
+    sequence?: unknown[];
   } = {},
 ) {
   let attempts = 0;
+  let answered = 0;
   const calls: unknown[] = [];
+  const retries: unknown[] = [];
   const adapter = jevAdapter({
     key: "test-only",
     model: "test-model",
     fallbackClaude: pinnedClaude,
     retries: 1,
     minTimeout: 1,
+    onJevRetry: (retry) => retries.push(retry),
     fetch: async (_input, init) => {
       attempts++;
       calls.push(JSON.parse(String(init?.body)));
-      return new Response(JSON.stringify({ model: "test-model", answers: answer }), {
-        status: attempts <= (options.failures ?? 0) ? (options.status ?? 503) : 200,
+      const failing = attempts <= (options.failures ?? 0);
+      const answers = options.sequence
+        ? options.sequence[Math.min(failing ? answered : answered++, options.sequence.length - 1)]
+        : answer;
+      return new Response(JSON.stringify({ model: "test-model", answers }), {
+        status: failing ? (options.status ?? 503) : 200,
       });
     },
   });
-  return { adapter, calls, attempts: () => attempts };
+  return { adapter, calls, retries, attempts: () => attempts };
 }
 const classes = {
   functional: { type: "noul", noul: 0 },
@@ -201,6 +212,30 @@ it("preserves risk levels in Jev score distributions", async () => {
   );
   const r = await jev(answers).adapter.risk(facts, [], riskQuestions, context());
   expect(riskSchema.parse(r).dimensions.operations.probabilities[2]).toBe(1);
+});
+it("rates any non-empty distribution by its tail, whatever it sums to, and only an absent one by its score", async () => {
+  const answers = {
+    ...Object.fromEntries(
+      dimensions.map((d) => [
+        d,
+        { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+      ]),
+    ),
+    // Sums to 0.98: the tail puts it at level 2 (P(>=2) = 0.38); its score would say 1.
+    operations: {
+      type: "score",
+      confidence: 0.9,
+      score: 1,
+      probabilities: { 0: 0.5, 1: 0.1, 2: 0.1, 3: 0.28 },
+    },
+    // A partial distribution counts its missing levels as 0.
+    data_security: { type: "score", confidence: 0.9, score: 0, probabilities: { 2: 1 } },
+  };
+  const r = riskSchema.parse(await jev(answers).adapter.risk(facts, [], riskQuestions, context()));
+  expect({
+    operations: r.dimensions.operations.probabilities,
+    dataSecurity: r.dimensions.data_security.probabilities,
+  }).toEqual({ operations: [0.5, 0.1, 0.1, 0.28], dataSecurity: [0, 0, 1, 0] });
 });
 it("keeps Jev's score for each risk dimension", async () => {
   const answers = Object.fromEntries(
@@ -565,5 +600,97 @@ describe("Jev failure diagnostics", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+describe("an irregular distribution, partial or not summing to one", () => {
+  const band = async (operations: Record<string, unknown>) => {
+    const answers = {
+      ...Object.fromEntries(
+        dimensions.map((d) => [
+          d,
+          { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+        ]),
+      ),
+      operations: { type: "score", confidence: 0.9, ...operations },
+    };
+    const evidence = riskSchema.parse(
+      await jev(answers).adapter.risk(facts, [], riskQuestions, context()),
+    );
+    return rate(evidence, false, configSchema.parse(recording.config)).band;
+  };
+  it("is rated no lower than Jev's own score, and a regular one by its tail alone", async () => {
+    expect({
+      partialAtZero: await band({ probabilities: { 0: 1 }, score: 3 }),
+      allZeros: await band({ probabilities: { 0: 0, 1: 0, 2: 0, 3: 0 }, score: 3 }),
+      higherTail: await band({ probabilities: { 0: 0.5, 1: 0.1, 2: 0.1, 3: 0.28 }, score: 0 }),
+      noScore: await band({ probabilities: { 0: 1 } }),
+      regular: await band({ probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 }, score: 3 }),
+    }).toEqual({
+      partialAtZero: "HIGH",
+      allZeros: "HIGH",
+      higherTail: "MEDIUM",
+      noScore: "LOW",
+      regular: "LOW",
+    });
+  });
+});
+describe("a malformed Jev answer", () => {
+  const regular = { type: "score", confidence: 0.9, probabilities: { 0: 0, 1: 0, 2: 1, 3: 0 } };
+  const wellFormed = Object.fromEntries(dimensions.map((d) => [d, regular]));
+  const malformed = {
+    ...wellFormed,
+    operations: { type: "score", confidence: 0.9, score: 3, probabilities: { 0: 1 } },
+  };
+  it("is asked again, and the next well-formed answer is used", async () => {
+    const j = jev(undefined, { sequence: [malformed, wellFormed] });
+    const r = riskSchema.parse(await j.adapter.risk(facts, [], riskQuestions, context()));
+    expect({
+      operations: r.dimensions.operations.probabilities,
+      calls: j.attempts(),
+      retries: j.retries,
+    }).toEqual({
+      operations: [0, 0, 1, 0],
+      calls: 2,
+      retries: [{ question: "risk", attempt: 2, reason: "operations: a partial distribution" }],
+    });
+  });
+  it("takes today's defaults only after three malformed answers", async () => {
+    const j = jev(malformed);
+    const r = riskSchema.parse(await j.adapter.risk(facts, [], riskQuestions, context()));
+    expect({ operations: r.dimensions.operations, calls: j.attempts() }).toEqual({
+      operations: { confidence: 0.9, score: 3, partial: true, probabilities: [1, 0, 0, 0] },
+      calls: 3,
+    });
+  });
+  it("is asked once when well-formed", async () => {
+    const j = jev(wellFormed);
+    await j.adapter.risk(facts, [], riskQuestions, context());
+    expect({ calls: j.attempts(), retries: j.retries }).toEqual({ calls: 1, retries: [] });
+  });
+  it("re-asks an unreadable classification and a missing routing exposure", async () => {
+    const classification = jev(undefined, {
+      sequence: [{ ...classes, mechanical: { type: "noul" } }, classes],
+    });
+    const classified = await classification.adapter.classify(
+      facts,
+      classificationQuestions,
+      context(),
+    );
+    const cardsOnly = Object.fromEntries(cardNames.map((k) => [k, { type: "noul", noul: 0 }]));
+    const routing = jev(undefined, {
+      sequence: [cardsOnly, { ...cardsOnly, exposure: regular }],
+    });
+    await routing.adapter.route(facts, "functional", routeQuestions, context());
+    expect({
+      mechanical: classificationSchema.parse(classified).mechanical,
+      classifyCalls: classification.attempts(),
+      routeCalls: routing.attempts(),
+      routeRetry: routing.retries,
+    }).toEqual({
+      mechanical: 1,
+      classifyCalls: 2,
+      routeCalls: 2,
+      routeRetry: [{ question: "route", attempt: 2, reason: "exposure: unreadable" }],
+    });
   });
 });

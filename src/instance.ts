@@ -102,6 +102,10 @@ export type BindRequestInput = {
   protectedPaths: string[];
   allowedSkippedChecks: string[];
   runUrl?: string;
+  /** A benchmark shadow run: the card reviewers' model for this run only. */
+  reviewerModel?: string;
+  /** A benchmark shadow run: a fresh review that reads no prior ledger. */
+  fresh?: boolean;
 };
 
 export type BindStopReason =
@@ -216,6 +220,14 @@ function bindPrepared(input: BindRequestInput, prepared: ReturnType<typeof prepa
   config.review.allowedSkippedChecks = input.allowedSkippedChecks;
   config.review.publication = input.authority ? "github" : "none";
   config.github.shadowBeforeHead = !input.authority;
+  // The previous reviewer's benchmark: a shadow review with the reviewer model overridden and
+  // no convergence ledger, which a real review never sets.
+  if (input.authority && (input.reviewerModel !== undefined || input.fresh))
+    throw new Error(
+      "--reviewer-model and --fresh are for a shadow benchmark run and cannot have --authority true",
+    );
+  if (input.reviewerModel !== undefined) config.claude.reviewerModel = input.reviewerModel;
+  if (input.fresh) config.github.freshShadow = true;
   config.claude.executable = resolveMargotRoot(
     config.claude.executable,
     input.margotRoot,

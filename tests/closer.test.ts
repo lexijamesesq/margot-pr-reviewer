@@ -45,7 +45,10 @@ async function wire(mode: string, checkName = "review / margot") {
     input.stopReason = mode;
   if (mode === "superseded") input.liveSha = "f".repeat(40);
   if (mode === "live-superseded") input.stopReason = "superseded";
-  if (mode === "floor") input.stopReason = "floor";
+  if (mode === "floor" || mode === "floor-named" || mode === "floor-blank")
+    input.stopReason = "floor";
+  if (mode === "floor-named") input.blockingChecks = "pending: ci / checks, lint";
+  if (mode === "floor-blank") input.blockingChecks = "  ";
   if (mode === "prototype-key") input.stopReason = "toString";
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     const target = new URL(String(url));
@@ -282,6 +285,22 @@ it("uses the preflight title for a floor stop", async () => {
           "The required checks were not green when the review's wait ended, so Margot did not review this head. She reviews it when she is dispatched again: on the next push, or when the host re-dispatches her once the checks finish.",
       },
     },
+  });
+});
+it("names the checks that held the floor in its title, as the previous reviewer did", async () => {
+  const named = (await wire("floor-named")).writes[0];
+  const blank = (await wire("floor-blank")).writes[0];
+  const floor = (await wire("floor")).writes[0];
+  expect({
+    named: ((named?.output ?? {}) as { title?: string }).title,
+    blank: ((blank?.output ?? {}) as { title?: string }).title,
+    sameSummary:
+      ((named?.output ?? {}) as { summary?: string }).summary ===
+      ((floor?.output ?? {}) as { summary?: string }).summary,
+  }).toEqual({
+    named: "Margot: preflight — pending: ci / checks, lint — waiting for the next push",
+    blank: "Margot: preflight — required checks not green — waiting for the next push",
+    sameSummary: true,
   });
 });
 it("says Margot stopped before a verdict for other failures", async () => {

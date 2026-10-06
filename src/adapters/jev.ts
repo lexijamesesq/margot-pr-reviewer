@@ -6,9 +6,11 @@ import {
   cardNames,
   classificationSchema,
   dimensions,
+  distributionTolerance,
   probability,
   riskSchema,
   routeSchema,
+  sumsToOne,
 } from "../schemas.js";
 import type { CallContext, Card, Facts, Services } from "../types.js";
 import { decisionFallback } from "./decision-fallback.js";
@@ -88,24 +90,56 @@ export function councilText(cards: Card[]): string {
     )
     .join("\n\n");
 }
+/** The first question whose noul answer is missing or unreadable, or null. */
+function unreadableNouls(answers: Record<string, unknown>, keys: string[]) {
+  const key = keys.find((k) => !noul.safeParse(answers[k]).success);
+  return key === undefined ? null : `${key}: unreadable`;
+}
+/** Why a risk dimension falls to a conservative default, or null when it is well-formed. */
+function malformedDimension(answer: unknown): string | null {
+  if (!answer || typeof answer !== "object") return "missing";
+  const distribution = partialDistribution.safeParse(
+    (answer as Record<string, unknown>).probabilities,
+  ).data;
+  if (!distribution) return "no readable distribution";
+  if (Object.keys(distribution).length < 4) return "a partial distribution";
+  return sumsToOne(Object.values(distribution).map((p) => p ?? 0))
+    ? null
+    : `a sum off by ${distributionTolerance} or more`;
+}
+/** A distribution as the previous reviewer read one: any non-empty set of levels, missing ones 0. */
+const partialDistribution = z
+  .strictObject({
+    "0": probability.optional(),
+    "1": probability.optional(),
+    "2": probability.optional(),
+    "3": probability.optional(),
+  })
+  .refine((levels) => Object.keys(levels).length > 0);
 /**
- * One risk dimension, read conservatively: an unreadable distribution falls back to the
- * level of Jev's score, and with no score to level 2; an unreadable confidence is null, which
- * keeps the cautious band: the no-council floor lowers nothing, so a band above LOW is held
- * or ruled by the voice as usual.
+ * One risk dimension, read conservatively: any non-empty distribution is kept, with missing
+ * levels read as 0 and the dimension marked `partial`; with none, the level of Jev's score,
+ * and with no score level 2. `rate()` rates a well-formed distribution by its tail and a
+ * malformed one, partial or off its sum, at no lower than Jev's rounded score. An unreadable
+ * confidence is null, which keeps the cautious band: the no-council floor lowers nothing, so
+ * a band above LOW is held or ruled by the voice as usual.
  */
 function riskDimension(answer: unknown) {
   const raw = (answer && typeof answer === "object" ? answer : {}) as Record<string, unknown>;
   const level = z.number().min(0).max(3).safeParse(raw.score).data;
-  const parsed = score.safeParse({ type: "score", confidence: 0, ...raw });
-  const distribution = parsed.data?.probabilities;
-  const probabilities: number[] =
-    distribution && Math.abs(Object.values(distribution).reduce((sum, p) => sum + p, 0) - 1) < 0.015
-      ? [distribution["0"], distribution["1"], distribution["2"], distribution["3"]]
-      : [0, 1, 2, 3].map((l) => Number(l === Math.round(level ?? 2)));
+  const distribution = partialDistribution.safeParse(raw.probabilities).data;
+  const probabilities: number[] = distribution
+    ? [
+        distribution["0"] ?? 0,
+        distribution["1"] ?? 0,
+        distribution["2"] ?? 0,
+        distribution["3"] ?? 0,
+      ]
+    : [0, 1, 2, 3].map((l) => Number(l === Math.round(level ?? 2)));
   return {
     confidence: probability.safeParse(raw.confidence).data ?? null,
     ...(level === undefined ? {} : { score: level }),
+    ...(distribution && Object.keys(distribution).length < 4 ? { partial: true } : {}),
     probabilities,
   };
 }
@@ -118,6 +152,8 @@ export function jevAdapter(options: {
   minTimeout?: number;
   fallbackClaude: { executable: string; version: string; reviewerModel: string };
   fallback?: typeof decisionFallback;
+  /** Told of each re-ask of a malformed answer, for the run's diagnostics. */
+  onJevRetry?: (retry: { question: string; attempt: number; reason: string }) => void;
 }) {
   const transport = options.fetch ?? fetch;
   async function ask(questions: object, state: unknown, c: CallContext) {
@@ -163,10 +199,32 @@ export function jevAdapter(options: {
       .parse(raw);
     return envelope.answers;
   }
-  /** One prose state, whole, as the previous reviewer sent it; never split into excerpts. */
-  async function decide(questions: object, state: string, c: CallContext, fallback = false) {
+  /**
+   * One prose state, whole, as the previous reviewer sent it; never split into excerpts. A Jev
+   * answer `malformed` faults is asked again, up to three answers in all; the first well-formed
+   * one is used, and only when every one is malformed do the conservative defaults apply.
+   */
+  async function decide(
+    question: string,
+    malformed: (answers: Record<string, unknown>) => string | null,
+    questions: object,
+    state: string,
+    c: CallContext,
+    fallback = false,
+  ) {
+    let answers: Record<string, unknown>;
     try {
-      return { answers: await ask(questions, state, c), source: "jev" as const };
+      answers = await ask(questions, state, c);
+      for (let attempt = 2; attempt <= 3; attempt++) {
+        const reason = malformed(answers);
+        if (reason === null) break;
+        console.warn(
+          `Margot: Jev's ${question} answer is malformed (${reason}); asking again (attempt ${attempt} of 3)`,
+        );
+        options.onJevRetry?.({ question, attempt, reason });
+        answers = await ask(questions, state, c);
+      }
+      return { answers, source: "jev" as const };
     } catch (error) {
       if (!fallback || c.signal.aborted) throw error;
       console.warn(`Margot: ${errorMessage(error)}; using the fallback decider`);
@@ -191,7 +249,15 @@ export function jevAdapter(options: {
   const classify: Services["classify"] = async (facts, questions, c) => {
     let a: Record<string, unknown>;
     try {
-      a = (await decide(nouls(questions), classificationState(facts), c)).answers;
+      a = (
+        await decide(
+          "classification",
+          (answers) => unreadableNouls(answers, Object.keys(questions)),
+          nouls(questions),
+          classificationState(facts),
+          c,
+        )
+      ).answers;
     } catch (error) {
       console.warn(
         `Margot: classification unavailable (${errorMessage(error)}); assuming functional`,
@@ -199,14 +265,13 @@ export function jevAdapter(options: {
       return { source: "jev_unreachable", functional: 1, documentation: 0, mechanical: 0 };
     }
     // An unreadable answer to any class question classifies the change as functional.
-    const answered = Object.keys(questions).map((k) => [k, noul.safeParse(a[k])] as const);
-    if (answered.some(([, parsed]) => !parsed.success)) {
+    if (unreadableNouls(a, Object.keys(questions))) {
       console.warn("Margot: Jev's classification answer is unreadable; classifying as functional");
       return { source: "jev", functional: 1, documentation: 0, mechanical: 0 };
     }
     return classificationSchema.parse({
       source: "jev",
-      ...Object.fromEntries(answered.map(([k, parsed]) => [k, parsed.data?.noul])),
+      ...Object.fromEntries(Object.keys(questions).map((k) => [k, noul.parse(a[k]).noul])),
     });
   };
   const route: Services["route"] = async (facts, classification, questions, c) => {
@@ -215,6 +280,13 @@ export function jevAdapter(options: {
     let response: Awaited<ReturnType<typeof decide>>;
     try {
       response = await decide(
+        "route",
+        (answers) =>
+          (score.safeParse(answers.exposure).success ? null : "exposure: unreadable") ??
+          unreadableNouls(answers, [
+            ...Object.keys(cardQuestions),
+            ...(documentation && substance ? ["documentation_substantive"] : []),
+          ]),
         {
           exposure: routingExposureQuestion,
           ...nouls(cardQuestions),
@@ -249,6 +321,14 @@ export function jevAdapter(options: {
   };
   const risk: Services["risk"] = async (facts, cards, questions, c) => {
     const { answers: a, source } = await decide(
+      "risk",
+      (answers) => {
+        for (const name of dimensions) {
+          const reason = malformedDimension(answers[name]);
+          if (reason) return `${name}: ${reason}`;
+        }
+        return null;
+      },
       Object.fromEntries(
         Object.entries(questions).map(([name, criteria]) => [
           name,
