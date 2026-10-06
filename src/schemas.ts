@@ -23,6 +23,18 @@ export const dimensions = [
   "verification_gap",
 ] as const;
 export const classNames = ["functional", "documentation", "mechanical"] as const;
+export const checkConclusions = [
+  "success",
+  "failure",
+  "neutral",
+  "cancelled",
+  "skipped",
+  "timed_out",
+  "action_required",
+  "stale",
+  "startup_failure",
+  "pending",
+] as const;
 export const classSchema = z.enum(classNames);
 export const cardNameSchema = z.enum(cardNames);
 export const bandSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
@@ -81,7 +93,8 @@ export const factsSchema = z.strictObject({
       name: text,
       actor: text,
       head: shaSchema,
-      conclusion: z.enum(["success", "failure", "pending", "skipped"]),
+      // GitHub's own conclusion, or `pending` while the run is not complete.
+      conclusion: z.enum(checkConclusions),
       // Recency, for a name that carries several runs on one head (a superseded run
       // stays in the list). Optional: older recordings lack them and fall back to order.
       startedAt: z.string().optional(),
