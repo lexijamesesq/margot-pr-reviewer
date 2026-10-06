@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.3
+
+- The check text carries the voice's `finding` as `setting finding: <finding>` right after `band_reason:`, as the previous reviewer's poster wrote it.
+- An error result's check summary is the error's reason, the diagnostic `margot-review` prints, capped at 900 characters, as the previous reviewer's error check set it. Its title, conclusion and the pull-request comment are unchanged.
+
 ## 0.9.2
 
 Margot restores the previous reviewer's advisory template-adherence check.
