@@ -62,7 +62,6 @@ export function classificationState(facts: Facts): string {
     `Diff:\n${facts.diff}`,
   ].join("\n");
 }
-/** The council's findings in the cards' own convention, one `===CARD: name===` block each. */
 /** The previous reviewer's adherence state: the posted risk line, summary and findings. */
 export function adherenceState(input: AdherenceInput): string {
   return [
@@ -75,6 +74,7 @@ export function adherenceState(input: AdherenceInput): string {
     ),
   ].join("\n");
 }
+/** The council's findings in the cards' own convention, one `===CARD: name===` block each. */
 export function councilText(cards: Card[]): string {
   return cards
     .map((card) =>
