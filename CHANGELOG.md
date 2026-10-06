@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.8.0
+
+Margot decides and presents reviews as the previous reviewer did wherever the port had diverged without a ruling.
+
+- Advisory ledger entries last one round. Only standing entries summon their card and reach reviewers, who see standing and dismissed entries. From round two a new MINOR or late finding is demoted with no ledger entry; only a re-raised standing entry turns advisory, for that round.
+- A dismissed finding a card raises again goes to the voice with its earlier reason, to keep dismissed unless the new changes altered it. The voice decides, not the card: `reopens=` is no longer asked for or parsed. Saved receipts still parse: `reopens` and the `carried-dismissal` advisory value stay in the schema, but nothing writes them.
+- From round two a finding without `late=` counts as new, and a `ledger=` key that names none of the card's earlier entries is ignored; neither fails the review. The card prompt no longer carries the package's own `late=new` and attribution sentences; the bundle's `pr-council` skill states `ledger=` and `late=`.
+- A mechanical or editorial documentation change whose ledger has a standing entry takes the full path: Jev routes it, the council is the routed cards plus the ledger's, and a mechanical change is scored for risk. Before, only the ledger's cards ran.
+- With no cards and confident routing, a band above LOW is held for the operator without the voice (`verdict_source: no_council`), instead of handing the voice an empty council.
+- A documentation review whose routing came from the fallback, or from the all-cards outage route, is reviewed and keeps `decision_source: jev`. The triage run is unchanged: its JSON says `decision_source: jev` only when Jev classified that head.
+- Every Jev question is one prose state, never split into excerpts and never combined by a maximum. Classification sends the PR, up to 60 changed files, the ownership tier and the whole diff, never the title, body or author. Routing and risk send the PR, its author, title, body to 1,500 characters, up to 60 files of the whole PR and the ownership tier; documentation routing adds the whole diff, and risk adds the council's findings. The questions use the previous reviewer's wording, including the risk anchors and the `documentation_substantive` key. Routing reads the whole PR; cards still read the round's delta.
+- The checks a card and the voice receive carry GitHub's own conclusion (`neutral`, `cancelled`, `timed_out` and the rest) and leave out the configured publisher's check names. The required-check gate is unchanged.
+- The evidence server serves `read_check_run`: a named check's current run on the head, with its conclusion, posting App, and output title, summary and text. Run logs are not served, because the read token has no `actions: read`. A card gets the tool once the bundle's `agents/pr-reviewer.md` lists `mcp__evidence__read_check_run`.
+- The voice prompt for a documentation change carries the previous reviewer's documentation ruling rule. The voice's definition already states the other ruling rules.
+- A verdict code reaches without the voice carries the previous reviewer's risk label and summary: "low exposure" with the dimension Jev scored highest (such as "low exposure — operations"; the risk answer now keeps Jev's `score`, and a dimension without one counts as 2) and "Reviewed against the summoned lenses; no blocking findings." (or "No review lens was required for this change."), the mechanical label and summary, and "editorial documentation change" with `verdict_source: documentation_editorial`.
+- A floor stop is titled "Margot: preflight — required checks not green — waiting for the next push" with the previous reviewer's summary, reversing the 0.6.12 wording.
+- A fresh verdict whose risk line has no classification is held instead of posted, as the previous reviewer's template gate held it. The voice's own ERROR is exempt, and a saved verdict replays as posted. The shipped recordings gain the `risk` line the voice always gives.
+- A fresh review whose shown card finding has no plain sentence (its text only punctuation) is held instead of posted, completing the previous reviewer's template gate.
+- A review the template gate holds ends at the `template-gate` stage as the previous reviewer's poster error: the check is `action_required`, titled "not reviewed: poster error", with the reason as its summary, and no comment is posted on the pull request.
+- A card's `Resolved:` section is kept and reaches the voice and Jev's risk text, as the council's prose did.
+- A missing or unreadable field in a Jev answer takes the previous reviewer's conservative default instead of failing the review: an unanswered card is summoned, routing without an exposure answer is unsure, documentation without a meaning answer is substantive, a risk dimension without a distribution takes its score's level (or level 2) and is unsure, and a classification with an unreadable answer is functional.
+- Correction: the 0.6.14 note that holding a documentation change on a fallback answer restores the previous reviewer's rule was wrong. The previous reviewer reviewed such a change and recorded it as Jev-sourced; 0.8.0 does the same.
+
+Deliberate differences from the previous reviewer:
+
+- The voice's band decides merge eligibility, one band for display and merge (the operator's ruling). The previous reviewer used Jev's conservative level.
+- Jev's routing and risk state names the ownership tier but not the owned files: the host passes only the tier (`MARGOT_OWNED_TIER`), and Margot adds no channel for the file list.
+- The ledger size budget drops the replay receipt first, then this round's fixed entries, then the oldest dismissals. The previous reviewer's order dropped dismissals first and lost them, which two independent reviews found and fixed as a bug.
+- The risk anchors keep the previous reviewer's wording, including "changes estate control", because the thresholds are calibrated on it.
+- Jev's advisory template-adherence check is not restored. Its two flags, a risk line that reads as a sentence and a card restating another card's finding, label text the comment already shows verbatim, and the risk line is now required; restoring it would add a Jev call to every review.
+- An empty ownership tier holds the review; the previous reviewer read it as no ownership and could clear it. Missing input never approves.
+- Triage during a Jev outage reports functional with source `jev_unreachable` and makes no fallback call; the previous reviewer spent a fallback call to reach the same functional class. The floor treats both as not Jev-sourced.
+
 ## 0.7.0
 
 - Cards and the voice now load natively from the card bundle. Claude Code runs the bundle's `pr-reviewer` and `margot` agents as a plugin (`--agent publish:pr-reviewer` or `publish:margot`, `--plugin-dir claude.pluginDirectory`), each with the tools its own frontmatter grants. A card invokes the `pr-council` skill and reads its card itself; the prompt names the card. Margot no longer rebuilds the agents from their prose, serves the card through the evidence server's `read_card` tool, or adds prompt text about the tools.
