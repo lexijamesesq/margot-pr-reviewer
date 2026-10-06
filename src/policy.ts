@@ -172,9 +172,6 @@ export function validateVoice(cards: Card[], voice: Voice): void {
   // An honest ERROR is Margot's own fail-closed ruling, never an incomplete verdict; a
   // finding she could not resolve legitimately lands in neither list.
   if (voice.outcome === "ERROR") return;
-  // The comment's risk line names the kind of risk; a verdict without one is not posted.
-  if (!voice.risk?.trim())
-    throw new Error("Comment not template-compliant: risk line has no classification");
   if (voice.outcome === "APPROVED" && voice.clarification?.trim())
     throw new Error("Approval contradicts an open clarification");
   const advisory = cards.flatMap((c) =>
@@ -191,6 +188,12 @@ export function validateVoice(cards: Card[], voice: Voice): void {
     throw new Error("Voice must account for every mandatory finding exactly once");
   if (voice.outcome === "APPROVED" && voice.dispositions.some((d) => d.status !== "dismissed"))
     throw new Error("Approval contradicts unresolved findings");
+}
+/** The comment's risk line names the kind of risk: a fresh verdict without one is not posted.
+ * The voice's own ERROR is exempt. A saved verdict is replayed as it was posted. */
+export function requireRiskLine(voice: Voice): void {
+  if (voice.outcome !== "ERROR" && !voice.risk?.trim())
+    throw new Error("Comment not template-compliant: risk line has no classification");
 }
 export function decide(
   classification: Classification,
