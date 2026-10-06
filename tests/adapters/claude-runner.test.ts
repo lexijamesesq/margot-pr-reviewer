@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, it } from "vitest";
 import { configuredTicketingEnvironment } from "../../src/cli-services.js";
 import { facts, fakeClaude, ticketing } from "../helpers/adapters.js";
+import { present } from "../helpers/present.js";
 
 const evidenceTools = (...names: string[]) => names.map((name) => `mcp__evidence__${name}`);
 const value = (args: string[], flag: string) =>
@@ -423,4 +424,18 @@ it("keeps Margot's own checks out of the evidence a card and the voice receive",
     voice: names(voice.stdin),
     configured: names(configured.stdin),
   }).toEqual({ card: ["ci"], voice: ["ci"], configured: ["ci"] });
+});
+it("grants the check-run tool to a card whose bundle lists it, and Margot's own checks reach the server", async () => {
+  const listed = [
+    "Skill",
+    "Read",
+    ...evidenceTools("read_diff", "read_file", "search_file", "list_files", "read_check_run"),
+  ];
+  const card = await fakeClaude({ reviewerTools: listed, ownChecks: ["review / margot"] });
+  expect({
+    allowed: value(card.args, "--allowedTools"),
+    ownChecks: JSON.parse(present(card.mcp.mcpServers.evidence?.env?.MARGOT_EVIDENCE)).ownChecks,
+  }).toEqual({ allowed: "mcp__evidence", ownChecks: ["review / margot"] });
+  await expect(fakeClaude({ tools: listed })).rejects.toThrow("exactly the requested tools");
+  await expect(fakeClaude({ reviewerTools: listed, tools: listed })).resolves.toBeDefined();
 });

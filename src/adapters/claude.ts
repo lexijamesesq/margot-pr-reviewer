@@ -127,6 +127,7 @@ export function claudeAdapter(options: ClaudeOptions) {
       diffPath: join(scratch, "review.diff"),
       ...(options.references ? { references: options.references } : {}),
       ...(options.gh ? { gh: options.gh } : {}),
+      ...(options.ownChecks ? { ownChecks: options.ownChecks } : {}),
     };
     // Claude Code passes the model credential through to MCP servers; neither needs it.
     const modelCredentialsBlanked = { ANTHROPIC_API_KEY: "", CLAUDE_CODE_OAUTH_TOKEN: "" };
@@ -159,6 +160,7 @@ export function claudeAdapter(options: ClaudeOptions) {
       ...(options.references ? ["mcp__evidence__read_reference"] : []),
       "mcp__evidence__list_files",
       "mcp__evidence__search_file",
+      "mcp__evidence__read_check_run",
     ];
     const tools = [
       ...access.builtIns,
