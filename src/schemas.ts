@@ -152,7 +152,8 @@ export const riskSchema = z.strictObject({
           (p) => Math.abs(p.reduce((a, b) => a + b, 0) - 1) < 0.015,
           "Probabilities must sum to one",
         ),
-      confidence: probability,
+      // Null when Jev gave no usable confidence: not "unsure", so the band is never lowered.
+      confidence: probability.nullable(),
       // Jev's expected level, 0 to 3; it names the kind of exposure on a code verdict.
       score: z.number().min(0).max(3).optional(),
     }),

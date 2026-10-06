@@ -421,9 +421,11 @@ export async function review(
           core.decision.holdReasons.push("fallback-risk");
       }
       // The comment's card rows each need a plain sentence; one without is not posted.
+      const before = stage;
       stage = stages.templateGate;
       const gap = shownFindingGap(core);
       if (gap) throw new Error(gap);
+      stage = before;
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
     const metadata = services.reviewMetadata?.() ?? {};

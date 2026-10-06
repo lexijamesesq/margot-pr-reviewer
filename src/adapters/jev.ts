@@ -27,14 +27,14 @@ const score = z.object({
   score: z.number().min(0).max(3).optional(),
   probabilities: distribution,
 });
-/**
- * The prose state Jev scores for routing and risk: the PR, its title and body, its files and
- * ownership tier. Routing and risk read no diff unless `extra` carries one.
- */
 const changedFiles = (facts: Facts) =>
   facts.files.flatMap((f) => [f.path, ...(f.previousPath ? [f.previousPath] : [])]);
 const ownershipTier = (facts: Facts) =>
   typeof facts.ownedPathTier === "string" ? facts.ownedPathTier || "none" : "unknown";
+/**
+ * The prose state Jev scores for routing and risk: the PR, its title and body, its files and
+ * ownership tier. Routing and risk read no diff unless `extra` carries one.
+ */
 export function jevState(facts: Facts, extra = ""): string {
   const files = changedFiles(facts);
   const body = Array.from(facts.body).slice(0, 1500).join("");
@@ -90,8 +90,8 @@ export function councilText(cards: Card[]): string {
 }
 /**
  * One risk dimension, read conservatively: an unreadable distribution falls back to the
- * level of Jev's score, and with no score to level 2; an unreadable confidence is 0, which
- * the voice treats as unsure.
+ * level of Jev's score, and with no score to level 2; an unreadable confidence is null, which
+ * keeps the cautious band and summons the voice.
  */
 function riskDimension(answer: unknown) {
   const raw = (answer && typeof answer === "object" ? answer : {}) as Record<string, unknown>;
@@ -103,7 +103,7 @@ function riskDimension(answer: unknown) {
       ? [distribution["0"], distribution["1"], distribution["2"], distribution["3"]]
       : [0, 1, 2, 3].map((l) => Number(l === Math.round(level ?? 2)));
   return {
-    confidence: probability.safeParse(raw.confidence).data ?? 0,
+    confidence: probability.safeParse(raw.confidence).data ?? null,
     ...(level === undefined ? {} : { score: level }),
     probabilities,
   };

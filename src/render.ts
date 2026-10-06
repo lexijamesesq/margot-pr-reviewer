@@ -72,11 +72,12 @@ function codeVerdict(review: Review): { risk: string; summary: string } {
     review.riskAnswer ? (review.riskAnswer.dimensions[name]?.score ?? 2) : 0,
   );
   const top = expected.indexOf(Math.max(...expected));
+  const exposure = `${review.decision.rating.band.toLowerCase()} exposure`;
   return {
     risk:
       (expected[top] ?? 0) > 0
-        ? `low exposure — ${dimensions[top]?.replaceAll("_", " ")}`
-        : "low exposure",
+        ? `${exposure} — ${dimensions[top]?.replaceAll("_", " ")}`
+        : exposure,
     summary:
       review.cards.length === 0
         ? "No review lens was required for this change."

@@ -26,6 +26,7 @@ fixture.voice = {
   outcome: "CHANGES_REQUESTED",
   band: "LOW",
   rationale: "Bounded author-resolvable defect",
+  risk: "functional change — a required check is removed",
   summary: "Restore the required check before merging.",
   dispositions: [
     {

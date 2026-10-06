@@ -85,10 +85,14 @@ export function rate(
     );
   });
   const confident = dimensions.filter(
-    (name) => evidence.dimensions[name].confidence >= config.noCouncilConfidenceFloor,
+    (name) => (evidence.dimensions[name].confidence ?? 0) >= config.noCouncilConfidenceFloor,
   );
+  // A dimension with no usable confidence is not "unsure": the floor lowers nothing.
+  const usable = dimensions.every((name) => evidence.dimensions[name].confidence !== null);
   const ignored =
-    noCouncil && confident.length > 0 ? dimensions.filter((name) => !confident.includes(name)) : [];
+    noCouncil && usable && confident.length > 0
+      ? dimensions.filter((name) => !confident.includes(name))
+      : [];
   const raw = Math.max(...levels);
   const adjusted = Math.max(
     ...levels.filter((_, i) => !ignored.includes(dimensions[i] as (typeof dimensions)[number])),

@@ -142,7 +142,7 @@ describe("a malformed Jev answer takes the conservative default", () => {
     );
     expect(r.documentationSubstantive).toBe(1);
   });
-  it("scores a missing risk dimension at level 2 and unsure, and an unreadable one by its score", async () => {
+  it("scores a missing risk dimension at level 2 with no confidence, and an unreadable one by its score", async () => {
     const answers = {
       ...Object.fromEntries(
         dimensions.map((d) => [
@@ -160,8 +160,8 @@ describe("a malformed Jev answer takes the conservative default", () => {
       operations: r.dimensions.operations,
       dataSecurity: r.dimensions.data_security,
     }).toEqual({
-      operations: { confidence: 0, probabilities: [0, 0, 1, 0] },
-      dataSecurity: { confidence: 0, score: 2.6, probabilities: [0, 0, 0, 1] },
+      operations: { confidence: null, probabilities: [0, 0, 1, 0] },
+      dataSecurity: { confidence: null, score: 2.6, probabilities: [0, 0, 0, 1] },
     });
   });
 });

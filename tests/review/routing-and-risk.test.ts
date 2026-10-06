@@ -131,6 +131,27 @@ describe("the risk band", () => {
     });
   });
 
+  it("keeps the cautious band when a dimension has no usable confidence", async () => {
+    const { result } = await reviewed(
+      noCouncilConfidentlyLow(
+        withRiskDimension("operations", { probabilities: [0, 0, 1, 0], confidence: null }),
+        withVoiceFields({ band: "LOW" }),
+      ),
+    );
+    expect({
+      band: result.decision.rating.band,
+      ignored: result.decision.rating.ignoredDimensions,
+      mergeEligible: result.decision.mergeEligible,
+    }).toEqual({ band: "MEDIUM", ignored: [], mergeEligible: false });
+  });
+
+  it("names the held band, not low exposure, on a no-council hold", async () => {
+    const { result } = await reviewed(
+      noCouncilConfidentlyLow(operationsAt([0, 0, 1, 0]), withVoiceFields({ band: "LOW" })),
+    );
+    expect(result.report.split("\n")[1]).toMatch(/^🟡 \*\*Risk: MEDIUM\*\* — medium exposure\b/u);
+  });
+
   it("keeps the band LOW when the risk tail is just below the boundary", async () => {
     const { result } = await reviewed(
       noCouncilConfidentlyLow(
