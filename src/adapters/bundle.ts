@@ -29,8 +29,5 @@ export async function resolveBundle(directory: string, commit: string, context: 
     commit,
     reviewerAgent: "publish:pr-reviewer",
     voiceAgent: "publish:margot",
-    cardPaths: Object.fromEntries(
-      cardNames.map((n) => [n, join(root, "skills/pr-council/playbooks", `${n}.md`)]),
-    ),
   });
 }

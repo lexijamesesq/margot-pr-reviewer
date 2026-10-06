@@ -33,11 +33,11 @@ describe("reviews replayed from recordings", () => {
     expect(publications).toHaveLength(1);
   });
 
-  it("runs the lenses the route selected, each from its explicit card path", async () => {
+  it("runs the lenses the route selected, each by name through the pinned reviewer", async () => {
     const { callInput } = await reviewed(recorded("council-clear"));
-    const cardPaths = councilClearCards.map((name) => callInput(`card:${name}`).cardPath);
-    expect(cardPaths).toEqual(
-      councilClearCards.map((name) => `/recorded-bundle/skills/pr-council/playbooks/${name}.md`),
+    const inputs = councilClearCards.map((name) => callInput(`card:${name}`));
+    expect(inputs.map(({ name, agent }) => ({ name, agent }))).toEqual(
+      councilClearCards.map((name) => ({ name, agent: "publish:pr-reviewer" })),
     );
   });
 

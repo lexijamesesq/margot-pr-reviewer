@@ -28,9 +28,9 @@ instead of clearing it for merge.
 - **The operator** — the person who owns the repositories and approves held pull
   requests.
 - **The card bundle** — the public repository
-  [publish-skills](https://github.com/lexijamesesq/publish-skills). Margot loads
-  the card and voice definitions from a checkout of it at `claude.pluginDirectory`,
-  pinned to the commit in `review.cardBundle.commit`.
+  [publish-skills](https://github.com/lexijamesesq/publish-skills). Claude Code
+  loads it as a plugin from a checkout at `claude.pluginDirectory`, pinned to the
+  commit in `review.cardBundle.commit`.
 
 ## Requirements and install
 
@@ -74,6 +74,9 @@ Without `--authority true` the review runs in shadow mode and publishes nothing.
 
 `claude.executable`, `claude.pluginDirectory` and `claude.ticketing.command` may use
 `${MARGOT_ROOT}`, which `margot-instance bind-request` resolves. A `claude.references` entry may name a `ref` (a branch or tag) in place of `head`; `bind-request` resolves it to its commit for each run.
+
+The ticketing server and tool names in `claude.ticketing` must match those the card
+bundle's `pr-reviewer` agent grants; a card run refuses tools the agent does not grant.
 
 ### Environment variables
 

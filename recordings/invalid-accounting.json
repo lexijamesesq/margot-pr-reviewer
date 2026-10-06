@@ -140,15 +140,7 @@
   "bundle": {
     "commit": "dddddddddddddddddddddddddddddddddddddddd",
     "reviewerAgent": "publish:pr-reviewer",
-    "voiceAgent": "publish:margot",
-    "cardPaths": {
-      "safety": "/recorded-bundle/skills/pr-council/playbooks/safety.md",
-      "works-and-proven": "/recorded-bundle/skills/pr-council/playbooks/works-and-proven.md",
-      "principal-engineer": "/recorded-bundle/skills/pr-council/playbooks/principal-engineer.md",
-      "achieves-the-objective": "/recorded-bundle/skills/pr-council/playbooks/achieves-the-objective.md",
-      "maintainable-no-slop": "/recorded-bundle/skills/pr-council/playbooks/maintainable-no-slop.md",
-      "house-style": "/recorded-bundle/skills/pr-council/playbooks/house-style.md"
-    }
+    "voiceAgent": "publish:margot"
   },
   "cards": {
     "works-and-proven": {

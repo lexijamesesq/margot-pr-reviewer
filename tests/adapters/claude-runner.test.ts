@@ -1,16 +1,139 @@
-import { access } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, it } from "vitest";
 import { configuredTicketingEnvironment } from "../../src/cli-services.js";
 import { facts, fakeClaude, ticketing } from "../helpers/adapters.js";
 
-it("denies Claude built-in tools and pull request settings", async () => {
-  const { args } = await fakeClaude();
-  expect(
-    args[args.indexOf("--tools") + 1] === "" &&
+const evidenceTools = (...names: string[]) => names.map((name) => `mcp__evidence__${name}`);
+const value = (args: string[], flag: string) =>
+  args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined;
+it("loads the card reviewer natively from the pinned plugin", async () => {
+  const { args, root } = await fakeClaude();
+  expect({
+    agent: value(args, "--agent"),
+    model: value(args, "--model"),
+    pluginDir: value(args, "--plugin-dir"),
+    settings: JSON.parse(value(args, "--settings") ?? "{}"),
+    tools: value(args, "--tools"),
+    addDir: value(args, "--add-dir"),
+    allowed: value(args, "--allowedTools"),
+    agentFlags: args.filter((arg) => arg.startsWith("--agent")),
+    slashCommands: args.includes("--disable-slash-commands"),
+    restricted:
       args.includes("--strict-mcp-config") &&
       args.includes("--restricted") &&
-      args[args.indexOf("--setting-sources") + 1] === "",
-  ).toBe(true);
+      value(args, "--setting-sources") === "" &&
+      value(args, "--permission-mode") === "dontAsk",
+  }).toEqual({
+    agent: "publish:pr-reviewer",
+    model: "example-model",
+    pluginDir: root,
+    settings: {
+      enabledPlugins: { "publish@inline": true },
+      disableAllHooks: true,
+      autoMemoryEnabled: false,
+      claudeMdExcludes: ["**"],
+    },
+    tools: "Skill,Read",
+    addDir: `${root}/skills/pr-council`,
+    allowed: "mcp__evidence",
+    agentFlags: ["--agent"],
+    slashCommands: false,
+    restricted: true,
+  });
+});
+it("loads the voice natively with no built-in tools or card directory", async () => {
+  const { args, root } = await fakeClaude({ role: "voice" });
+  expect({
+    agent: value(args, "--agent"),
+    model: value(args, "--model") ?? null,
+    pluginDir: value(args, "--plugin-dir"),
+    enabled: JSON.parse(value(args, "--settings") ?? "{}").enabledPlugins,
+    tools: value(args, "--tools"),
+    addDir: args.includes("--add-dir"),
+    allowed: value(args, "--allowedTools"),
+    agentFlags: args.filter((arg) => arg.startsWith("--agent")),
+    slashCommands: args.includes("--disable-slash-commands"),
+  }).toEqual({
+    agent: "publish:margot",
+    model: null,
+    pluginDir: root,
+    enabled: { "publish@inline": true },
+    tools: "",
+    addDir: false,
+    allowed: "mcp__evidence",
+    agentFlags: ["--agent"],
+    slashCommands: false,
+  });
+});
+it("denies the card every sibling skill in the plugin but pr-council", async () => {
+  const card = await fakeClaude();
+  const voice = await fakeClaude({ role: "voice" });
+  const denied = card.args.slice(
+    card.args.indexOf("--disallowedTools") + 1,
+    card.args.indexOf("--allowedTools"),
+  );
+  expect({
+    denied: denied.sort(),
+    allowed: card.args
+      .slice(card.args.indexOf("--allowedTools") + 1)
+      .filter((arg) => arg.startsWith("Skill")),
+    voiceDenies: voice.args.includes("--disallowedTools"),
+  }).toEqual({
+    denied: ["Skill(publish:github-readme)", "Skill(publish:smoke)"],
+    allowed: [],
+    voiceDenies: false,
+  });
+});
+it("runs Claude in an empty working directory away from the diff and MCP configuration", async () => {
+  const { cwd, cwdEntries, mcpPath, diffPath } = await fakeClaude();
+  expect({
+    cwdEntries,
+    mcpInCwd: mcpPath.startsWith(cwd),
+    diffInCwd: diffPath.startsWith(cwd),
+  }).toEqual({ cwdEntries: [], mcpInCwd: false, diffInCwd: false });
+});
+it("names the card and the ledger conventions in the prompt, and leaves tools to the agent", async () => {
+  const { stdin } = await fakeClaude();
+  expect({
+    card: stdin.includes("Your card is safety."),
+    conventions: ["late=new", "reopens=", "must not establish an advisory finding"].every((rule) =>
+      stdin.includes(rule),
+    ),
+    path: stdin.includes("playbooks"),
+    toolProse: /\bread_|\btools?\b|\bruntime\b/i.test(stdin.split("\n").slice(0, -1).join("\n")),
+  }).toEqual({ card: true, conventions: true, path: false, toolProse: false });
+});
+it("accepts exactly Skill, Read and the served evidence tools for a card", async () => {
+  const card = [
+    "Skill",
+    "Read",
+    ...evidenceTools("read_diff", "read_file", "search_file", "list_files"),
+  ];
+  await expect(fakeClaude({ tools: card })).resolves.toBeDefined();
+  await expect(
+    fakeClaude({
+      tools: [...card, "mcp__evidence__read_reference"],
+      references: { pinned: { repository: "example/reference", head: "c".repeat(40) } },
+    }),
+  ).resolves.toBeDefined();
+  await expect(fakeClaude({ tools: card.filter((tool) => tool !== "Skill") })).rejects.toThrow(
+    "exactly the requested tools",
+  );
+  await expect(fakeClaude({ tools: [...card, "mcp__evidence__read_reference"] })).rejects.toThrow(
+    "exactly the requested tools",
+  );
+});
+it("accepts exactly the voice's listed evidence tools", async () => {
+  const voice = evidenceTools("read_file", "read_diff");
+  await expect(fakeClaude({ role: "voice", tools: voice })).resolves.toBeDefined();
+  await expect(fakeClaude({ role: "voice", tools: [...voice, "Read"] })).rejects.toThrow(
+    "exactly the requested tools",
+  );
+  await expect(
+    fakeClaude({ role: "voice", tools: [...voice, "mcp__evidence__list_files"] }),
+  ).rejects.toThrow("exactly the requested tools");
 });
 it("grants configured ticket evidence only to card runs", async () => {
   const configured = {
@@ -22,26 +145,19 @@ it("grants configured ticket evidence only to card runs", async () => {
   };
   const card = await fakeClaude(configured);
   const voice = await fakeClaude({ ...configured, role: "voice" });
-  const cardAgent = JSON.parse(card.args[card.args.indexOf("--agents") + 1] ?? "{}")[
-    "margot-bound"
-  ];
-  const voiceAgent = JSON.parse(voice.args[voice.args.indexOf("--agents") + 1] ?? "{}")[
-    "margot-bound"
-  ];
+  const allowed = (args: string[]) => args.slice(args.indexOf("--allowedTools") + 1, -2);
   const cardServer = card.mcp.mcpServers.tickets;
   expect({
     cardTicketingServers: Object.keys(card.mcp.mcpServers)
       .filter((server) => server !== "evidence")
       .sort(),
     cardServer,
-    cardTicketingTools: cardAgent.tools.filter((tool: string) => tool.startsWith("mcp__tickets__")),
+    cardTicketingTools: allowed(card.args).filter((tool) => tool.startsWith("mcp__tickets__")),
     voiceTicketingServers: Object.keys(voice.mcp.mcpServers)
       .filter((server) => server !== "evidence")
       .sort(),
     voiceServer: voice.mcp.mcpServers.tickets ?? null,
-    voiceTicketingTools: voiceAgent.tools.filter((tool: string) =>
-      tool.startsWith("mcp__tickets__"),
-    ),
+    voiceTicketingTools: allowed(voice.args).filter((tool) => tool.startsWith("mcp__tickets__")),
   }).toMatchObject({
     cardTicketingServers: ["tickets"],
     cardServer: {
@@ -57,6 +173,30 @@ it("grants configured ticket evidence only to card runs", async () => {
     voiceServer: null,
     voiceTicketingTools: [],
   });
+});
+it("refuses ticketing tools the pinned reviewer does not grant, before spawning Claude", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "margot-spawn-log-"));
+  const spawnLog = join(dir, "spawns");
+  try {
+    const configured = {
+      ticketing,
+      ticketingEnvironment: { TICKETING_TOKEN: "t", TICKETING_TENANT: "x" },
+      spawnLog,
+    };
+    await expect(
+      fakeClaude({
+        ...configured,
+        reviewerTools: ["Skill", "Read", "mcp__evidence__read_diff", "mcp__tickets__get_issue"],
+      }),
+    ).rejects.toThrow(
+      "The card bundle's agents/pr-reviewer.md does not grant the configured ticketing tools: mcp__tickets__get_comments",
+    );
+    await expect(access(spawnLog)).rejects.toThrow();
+    await expect(fakeClaude(configured)).resolves.toBeDefined();
+    await expect(access(spawnLog)).resolves.toBeUndefined();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 it("keeps every credential off the Claude command line and in a private file", async () => {
   const secrets = {
@@ -125,12 +265,9 @@ it("keeps ticket evidence detached without configuration", async () => {
       TICKETING_TENANT: "test-only-tenant",
     },
   });
-  const agent = JSON.parse(invocation.args[invocation.args.indexOf("--agents") + 1] ?? "{}")[
-    "margot-bound"
-  ];
   expect({
     server: invocation.mcp.mcpServers.tickets ?? null,
-    tools: agent.tools.filter((tool: string) => tool.startsWith("mcp__tickets__")),
+    tools: invocation.args.filter((arg) => arg.startsWith("mcp__tickets__")),
   }).toMatchObject({ server: null, tools: [] });
 });
 it("keeps ticket evidence detached when a named environment variable is unset", async () => {
@@ -140,12 +277,9 @@ it("keeps ticket evidence detached when a named environment variable is unset", 
       TICKETING_TOKEN: "test-only-ticket-token",
     },
   });
-  const agent = JSON.parse(invocation.args[invocation.args.indexOf("--agents") + 1] ?? "{}")[
-    "margot-bound"
-  ];
   expect({
     server: invocation.mcp.mcpServers.tickets ?? null,
-    tools: agent.tools.filter((tool: string) => tool.startsWith("mcp__tickets__")),
+    tools: invocation.args.filter((arg) => arg.startsWith("mcp__tickets__")),
   }).toMatchObject({ server: null, tools: [] });
 });
 it("keeps ticket credentials out of the model prompt and parsed result", async () => {

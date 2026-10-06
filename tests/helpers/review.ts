@@ -21,7 +21,7 @@ export interface Draft extends Recording {
   classification: Obj;
   route: Obj & { cards: Obj };
   risk: Obj & { dimensions: Record<string, Obj> };
-  bundle: Obj & { cardPaths: Obj };
+  bundle: Obj;
   cards: Record<string, Obj>;
   voice: Obj;
 }
@@ -256,11 +256,6 @@ export const withBundle =
   (fields: Obj): Change =>
   (draft) => {
     Object.assign(draft.bundle, fields);
-  };
-export const withCardPath =
-  (name: CardName, path: string): Change =>
-  (draft) => {
-    draft.bundle.cardPaths[name] = path;
   };
 export const withHead =
   (head: unknown): Change =>

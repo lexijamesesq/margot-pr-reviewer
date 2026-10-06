@@ -191,7 +191,6 @@ export const bundleSchema = z.strictObject({
   commit: shaSchema,
   reviewerAgent: z.literal("publish:pr-reviewer"),
   voiceAgent: z.literal("publish:margot"),
-  cardPaths: z.record(cardNameSchema, z.string().regex(/^\//)),
 });
 export const publicationSchema = z.strictObject({
   head: shaSchema,
