@@ -285,6 +285,30 @@ export function githubAdapter(
         throw new Error("File exceeds evidence limit");
       return Buffer.from(blob.content, "base64").toString("utf8");
     },
+    /** The current run of one named check on the bound head, with its output. */
+    async checkRun(r: ReviewRequest, name: string, c: CallContext) {
+      const runs = await client.paginate(client.rest.checks.listForRef, {
+        ...params(r, c),
+        ref: r.head,
+        per_page: 100,
+        filter: "latest",
+      });
+      const run = runs
+        .filter((check) => check.name === name && check.head_sha === r.head)
+        .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id)[0];
+      if (!run) throw new Error("No check run of that name on the head");
+      return {
+        name: run.name,
+        app: run.app?.slug ?? "unknown",
+        conclusion:
+          run.status === "completed"
+            ? (checkConclusions.find((v) => v === run.conclusion) ?? "pending")
+            : "pending",
+        title: run.output.title ?? "",
+        summary: run.output.summary ?? "",
+        text: run.output.text ?? "",
+      };
+    },
     async tree(r: ReviewRequest, c: CallContext) {
       const tree = (
         await client.rest.git.getTree({ ...params(r, c), tree_sha: r.head, recursive: "1" })

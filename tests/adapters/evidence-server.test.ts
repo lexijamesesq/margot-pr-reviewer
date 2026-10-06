@@ -45,6 +45,7 @@ describe("the evidence server's repository tools", () => {
     try {
       expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual([
         "list_files",
+        "read_check_run",
         "read_file",
         "search_file",
       ]);
@@ -195,6 +196,77 @@ describe("bound evidence", () => {
         arguments: { reference: "unconfigured", path: "hook.ts" },
       });
       expect({ error: result.isError === true, calls }).toEqual({ error: true, calls: 0 });
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe("the evidence server's check-run tool", () => {
+  const run = (name: string, id: number, startedAt: string, text: string, head = request.head) => ({
+    id,
+    name,
+    status: "completed",
+    conclusion: "failure",
+    head_sha: head,
+    started_at: startedAt,
+    app: { id: 1, slug: "github-actions" },
+    output: { title: `${name} ${id}`, summary: "2 failed", text },
+  });
+  const serve = (runs: unknown[], ownChecks?: string[]) =>
+    connectEvidence(
+      createEvidenceServer(
+        { request, ...(ownChecks ? { ownChecks } : {}) },
+        github({ checkRuns: runs }).adapter,
+      ),
+    );
+  const call = async (
+    client: Awaited<ReturnType<typeof serve>>["client"],
+    args: Record<string, unknown>,
+  ) => {
+    const result = await client.callTool({ name: "read_check_run", arguments: args });
+    const content = result.content as { text: string }[];
+    return result.isError
+      ? { error: present(content[0]).text }
+      : JSON.parse(present(content[0]).text);
+  };
+
+  it("serves the current run's output on the bound head, in pages", async () => {
+    const { client, close } = await serve([
+      run("tests", 1, "2026-10-01T00:00:00Z", "old run"),
+      run("tests", 2, "2026-10-01T00:05:00Z", "FAIL a.test.ts\nexpected 2, got 3"),
+      run("tests", 3, "2026-10-01T00:09:00Z", "another head", "f".repeat(40)),
+    ]);
+    try {
+      expect(await call(client, { name: "tests", offset: 5, limit: 9 })).toEqual({
+        name: "tests",
+        app: "github-actions",
+        conclusion: "failure",
+        title: "tests 2",
+        summary: "2 failed",
+        text: "a.test.ts",
+        offset: 5,
+        end: 14,
+        total: 32,
+      });
+    } finally {
+      await close();
+    }
+  });
+
+  it("refuses Margot's own checks and a name with no run on the head", async () => {
+    const { client, close } = await serve(
+      [run("review / margot", 1, "2026-10-01T00:00:00Z", "verdict")],
+      ["review / margot"],
+    );
+    try {
+      expect({
+        own: await call(client, { name: "review / margot" }),
+        missing: await call(client, { name: "absent" }),
+      }).toEqual({
+        own: { error: expect.stringContaining("Margot's own checks are not evidence") },
+        missing: { error: expect.stringContaining("No check run of that name on the head") },
+      });
     } finally {
       await close();
     }
