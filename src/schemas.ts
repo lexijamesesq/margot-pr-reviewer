@@ -152,6 +152,8 @@ export const riskSchema = z.strictObject({
       confidence: probability.nullable(),
       // Jev's expected level, 0 to 3; it names the kind of exposure on a code verdict.
       score: z.number().min(0).max(3).optional(),
+      // Jev gave only some of the four levels; the missing ones read as 0.
+      partial: z.boolean().optional(),
     }),
   ),
 });

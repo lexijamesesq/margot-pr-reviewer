@@ -4,7 +4,7 @@
 
 Margot restores what a regression check of 0.9.0 against the previous reviewer found changed without a record.
 
-- A risk dimension with any non-empty distribution from Jev is rated by its tail, whatever the distribution sums to; a partial distribution counts its missing levels as 0. Only a dimension with no distribution takes its score's level, and with no score level 2. Before, a sum off by 0.015 or more fell back to the score, and the risk schema failed the review on such a sum.
+- A risk dimension with any non-empty distribution from Jev is rated by its tail, whatever the distribution sums to; a partial distribution counts its missing levels as 0. A dimension with no distribution takes its score's level, and with no score level 2. Before, a sum off by 0.015 or more fell back to the score, and the risk schema failed the review on such a sum.
 - The verdict check's summary is `<outcome>, <band>: <first sentence of the risk label>`, capped at 900 characters, instead of the band rationale. The label is the voice's, or the one a code verdict carries.
 - `close-stranded-check --blocking-checks` names what held the floor in a floor stop's title, as the host words it (such as "pending: ci / checks, lint"): `Margot: preflight — <what held it> — waiting for the next push`. Without it the title still says "required checks not green".
 - `margot-instance self-instrument` posts the self-instrument check for a pull request's live head before the floor, with the previous reviewer's conclusion and wording: `neutral` and held for the operator's approval for a functional change to a protected path or a protected rename in any class, listing the matched paths, and otherwise `success`, naming the class. The class is the verified triage's for the head, or functional without one. It reads the changed files as the review does, from the whole-PR diff with every hunk complete plus GitHub's file listing, and holds rather than clears a change it cannot read completely. Publication posts the check with the same text: the previous reviewer's wording, with the matched paths sorted, in place of the port's own.
@@ -14,6 +14,7 @@ Margot restores what a regression check of 0.9.0 against the previous reviewer f
 
 Deliberate differences from the previous reviewer:
 
+- A distribution that is partial or does not sum to one (off by 0.015 or more) is rated at the higher of its tail level and its rounded score when Jev gives a score; without a score, by its tail. The previous reviewer rated it by its tail alone, so `{"0": 1}` with a score of 3 was level 0. The rule is never lower than the previous reviewer and never below Jev's own score. A complete distribution that sums to one keeps the tail rule alone.
 - The voice's `band` and `rationale` are required, so a malformed verdict is held where the previous reviewer posted it: Margot fails closed.
 - The previous reviewer's Jev decision log was opt-in and never enabled, so it is not ported.
 - The previous reviewer's manual Colima containment script is not ported: the container's walls are the same, and its own workflow never ran the script.

@@ -3,10 +3,12 @@ import { decisionFallback } from "../src/adapters/decision-fallback.js";
 import { councilText, jevAdapter, jevState } from "../src/adapters/jev.js";
 import * as processAdapter from "../src/adapters/process.js";
 import { recordedServices, review } from "../src/index.js";
+import { rate } from "../src/policy.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
 import {
   cardNames,
   classificationSchema,
+  configSchema,
   dimensions,
   factsSchema,
   requestSchema,
@@ -589,5 +591,37 @@ describe("Jev failure diagnostics", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+describe("an irregular distribution, partial or not summing to one", () => {
+  const band = async (operations: Record<string, unknown>) => {
+    const answers = {
+      ...Object.fromEntries(
+        dimensions.map((d) => [
+          d,
+          { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+        ]),
+      ),
+      operations: { type: "score", confidence: 0.9, ...operations },
+    };
+    const evidence = riskSchema.parse(
+      await jev(answers).adapter.risk(facts, [], riskQuestions, context()),
+    );
+    return rate(evidence, false, configSchema.parse(recording.config)).band;
+  };
+  it("is rated no lower than Jev's own score, and a regular one by its tail alone", async () => {
+    expect({
+      partialAtZero: await band({ probabilities: { 0: 1 }, score: 3 }),
+      allZeros: await band({ probabilities: { 0: 0, 1: 0, 2: 0, 3: 0 }, score: 3 }),
+      higherTail: await band({ probabilities: { 0: 0.5, 1: 0.1, 2: 0.1, 3: 0.28 }, score: 0 }),
+      noScore: await band({ probabilities: { 0: 1 } }),
+      regular: await band({ probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 }, score: 3 }),
+    }).toEqual({
+      partialAtZero: "HIGH",
+      allZeros: "HIGH",
+      higherTail: "MEDIUM",
+      noScore: "LOW",
+      regular: "LOW",
+    });
   });
 });

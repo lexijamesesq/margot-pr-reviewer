@@ -77,12 +77,15 @@ export function rate(
       voiceOverride: null,
     };
   const levels = dimensions.map((name) => {
-    const p = evidence.dimensions[name].probabilities;
-    return (
+    const { probabilities: p, score, partial } = evidence.dimensions[name];
+    const tail =
       [0, 1, 2, 3]
         .filter((level) => p.slice(level).reduce((a, b) => a + b, 0) >= config.riskTailThreshold)
-        .at(-1) ?? 0
-    );
+        .at(-1) ?? 0;
+    // An irregular distribution, partial or not summing to one, is never rated below Jev's
+    // own score: a deliberate upgrade on the previous reviewer, which used its tail alone.
+    const irregular = partial || Math.abs(p.reduce((a, b) => a + b, 0) - 1) >= 0.015;
+    return irregular && score !== undefined ? Math.max(tail, Math.round(score)) : tail;
   });
   const confident = dimensions.filter(
     (name) => (evidence.dimensions[name].confidence ?? 0) >= config.noCouncilConfidenceFloor,

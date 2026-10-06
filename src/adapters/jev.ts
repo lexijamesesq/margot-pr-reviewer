@@ -118,6 +118,7 @@ function riskDimension(answer: unknown) {
   return {
     confidence: probability.safeParse(raw.confidence).data ?? null,
     ...(level === undefined ? {} : { score: level }),
+    ...(distribution && Object.keys(distribution).length < 4 ? { partial: true } : {}),
     probabilities,
   };
 }
