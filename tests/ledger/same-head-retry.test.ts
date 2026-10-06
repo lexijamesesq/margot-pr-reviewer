@@ -4,7 +4,7 @@ import { recordedServices } from "../../src/adapters/recorded.js";
 import { review } from "../../src/review.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
 import type { RoundScope } from "../../src/types.js";
-import { entry, facts, history, margot, posted, prior } from "../helpers/ledger.js";
+import { card, entry, facts, history, margot, posted, prior } from "../helpers/ledger.js";
 import { present } from "../helpers/present.js";
 
 it("reviews a mechanical change fully when a card is standing", async () => {
@@ -25,6 +25,29 @@ it("reviews an editorial change fully when a card is standing", async () => {
     cards: [{ name: "safety" }],
   });
 });
+for (const [classification, editorial, risk] of [
+  ["mechanical", false, true],
+  ["documentation", true, false],
+] as const)
+  it(`takes the full path for ${editorial ? "an editorial" : "a mechanical"} change when a card is standing`, async () => {
+    const { r } = await margot(classification, editorial);
+    (r.route as { cards: Record<string, number> }).cards["house-style"] = 1;
+    r.cards = { ...(r.cards as object), "house-style": card([], "house-style") };
+    const s = recordedServices(r);
+    const result = await review(r.request, r.config, s);
+    const names = s.calls.map((c) => c.name);
+    expect({
+      cards: names.filter((name) => name.startsWith("card:")).sort(),
+      risk: names.includes("risk"),
+      summonedByLedger: result.kind === "reviewed" && result.provenance.summonedByLedger,
+      roster: result.kind === "reviewed" && result.report.includes("Council reviewed"),
+    }).toEqual({
+      cards: ["card:house-style", "card:safety"],
+      risk,
+      summonedByLedger: ["safety"],
+      roster: true,
+    });
+  });
 it("gives each card only its own standing and dismissed history", async () => {
   const { r } = await margot();
   const f = history(

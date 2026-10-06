@@ -161,7 +161,7 @@ export function render(review: Review): string {
     : "none";
   const risk = normalized(review.voice?.risk ?? "");
   const clarification = review.voice?.clarification?.trim();
-  const mechanical = review.classification === "mechanical" && review.cards.length === 0;
+  const mechanical = review.classification === "mechanical" && review.routeAnswer === null;
   const confidence =
     typeof review.provenance.mechanicalProbability === "number"
       ? ` (confidence ${Math.round(review.provenance.mechanicalProbability * 100)}%)`
@@ -216,7 +216,7 @@ export function render(review: Review): string {
 export function checkText(review: Review): string {
   const summoned = review.cards.map((card) => card.name);
   const verdictSource =
-    review.classification === "mechanical"
+    review.classification === "mechanical" && review.routeAnswer === null
       ? "mechanical"
       : review.voice
         ? "verdict_voice"
