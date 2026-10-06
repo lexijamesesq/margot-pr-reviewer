@@ -631,3 +631,13 @@ it("sends a delta round's card to the compare between the reviewed heads, limite
     inlineDiff: false,
   });
 });
+it("reports each response's duration, turns and models from the result envelope", async () => {
+  const responses: unknown[] = [];
+  await fakeClaude({
+    envelope: { duration_ms: 1234, num_turns: 7, modelUsage: { "claude-haiku-4-5": {} } },
+    onResponse: (response) => responses.push(response),
+  });
+  expect(responses).toMatchObject([
+    { role: "safety", durationMs: 1234, numTurns: 7, models: ["claude-haiku-4-5"] },
+  ]);
+});

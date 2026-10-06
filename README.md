@@ -118,7 +118,9 @@ server (`mcp-linear`); `bind-request` refuses a placeholder or a path under the 
 margot-review REQUEST.json CONFIG.json OUTPUT.json
 ```
 
-It writes the result to `OUTPUT.json`. It exits 1 when the result is an error, printing the
+It writes the result to `OUTPUT.json`, and `diagnostics.json` beside it: each card's
+raw block, duration, turns and models, and the voice's raw prose, with no tool output,
+token or environment. It is written however the review ends, for the host to keep. It exits 1 when the result is an error, printing the
 failed stage and diagnostic to stderr, and 0 otherwise, including for held results.
 
 ## Running it in GitHub Actions

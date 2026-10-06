@@ -22,6 +22,8 @@ export type ClaudeOptions = z.infer<typeof liveConfigSchema>["claude"] & {
     models: string[];
     tools: string[];
     evidence: unknown[];
+    durationMs?: number;
+    numTurns?: number;
   }) => void;
 };
 /** Explicit allowlist: Jev keys and unrelated process credentials cannot reach Claude. */
@@ -302,6 +304,8 @@ export function claudeAdapter(options: ClaudeOptions) {
         result: z.string().min(1),
         total_cost_usd: z.number(),
         modelUsage: z.record(z.string(), z.unknown()).optional(),
+        duration_ms: z.number().optional(),
+        num_turns: z.number().optional(),
       })
       .parse(events.findLast((e) => e.type === "result"));
     options.onResponse?.({
@@ -311,6 +315,8 @@ export function claudeAdapter(options: ClaudeOptions) {
       models: Object.keys(envelope.modelUsage ?? {}),
       tools: granted,
       evidence: evidenceEvents,
+      ...(envelope.duration_ms === undefined ? {} : { durationMs: envelope.duration_ms }),
+      ...(envelope.num_turns === undefined ? {} : { numTurns: envelope.num_turns }),
     });
     return envelope.result;
   }
