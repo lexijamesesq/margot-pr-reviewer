@@ -54,6 +54,24 @@ against `claude.version`), a Claude credential in the process environment
 a clean git checkout of the review skills at `claude.pluginDirectory`, pinned
 to the exact commit named in `review.cardBundle.commit`.
 
+Every card and voice runs in its own `docker run` of the runtime image built from
+`runtime/` (Claude Code, gh, git, jq, ripgrep and the Linear MCP server, each
+pinned by build argument). The configuration's `claude.container.image` names that
+image by digest; build it with `CLAUDE_CODE_VERSION` equal to `claude.version`
+(`docker build -f runtime/Dockerfile .` from the installed release package, which
+ships `runtime/`, or from a checkout after `npm run build`). The build asserts the
+version and that every flag the package passes exists in `claude --help`.
+The container has a read-only root and no capabilities, and mounts two read-only
+directories: the base-sha checkout at `claude.container.work`, which the reviewers
+see at `/work`, and the card bundle. Reviewers read the pull request head with `gh`
+at the head sha; `margot-review` refuses a base checkout that is not the request's
+base commit of its repository, clean. A card may use Skill (only `pr-council`), the
+`gh` read commands its skill names, and Read, Grep and Glob within `/work` and the
+skill; the voice may use only `gh api` and `gh pr diff`. The Claude credential,
+`GH_TOKEN` and the ticketing configuration reach the container by environment,
+never on its command line. `claude.container.docker` names the docker executable
+(default `docker`).
+
 ## Configuration
 
 A review run takes two JSON files: a request and a configuration.
@@ -72,11 +90,13 @@ its comment and check runs to the pull request. That needs the `publisher` block
 names, the review app's actor and id, and the run URL); `bind-request` fails without it.
 Without `--authority true` the review runs in shadow mode and publishes nothing.
 
-`claude.executable`, `claude.pluginDirectory` and `claude.ticketing.command` may use
+`claude.executable`, `claude.pluginDirectory` and `claude.container.work` may use
 `${MARGOT_ROOT}`, which `margot-instance bind-request` resolves. A `claude.references` entry may name a `ref` (a branch or tag) in place of `head`; `bind-request` resolves it to its commit for each run.
 
 The ticketing server and tool names in `claude.ticketing` must match those the card
 bundle's `pr-reviewer` agent grants; a card run refuses tools the agent does not grant.
+`claude.ticketing.command` runs inside the container, so it names the image's own
+server (`mcp-linear`); `bind-request` refuses a placeholder or a path under the Margot root.
 
 ### Environment variables
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0
+
+Reviewers run in the previous reviewer's container with its tools.
+
+- Every card and voice `claude` invocation runs in its own `docker run --rm --read-only` of the runtime image, as user 1000 with every capability dropped, `no-new-privileges`, 3 GiB memory and 512 processes. Only the base-sha checkout (at `/work`) and the card bundle are mounted, both read-only; the config and `/tmp` are tmpfs. The image is `claude.container.image`, pinned by digest; the base checkout is `claude.container.work`. Before each invocation Margot checks that the base checkout is at the request's base commit, clean, with an `origin` remote naming the request's repository, and otherwise fails with "Base checkout mismatch".
+- The containerized calls no longer check `claude.version` at run time, as the previous reviewer did not. The image build installs the exact `CLAUDE_CODE_VERSION`, asserts `claude --version`, and fails if any long flag the package passes to `claude` is absent from `claude --help`; the digest pin then fixes the version. The decision fallback, which still runs `claude.executable` on the host, keeps its check.
+- A card's tools are the previous reviewer's: Skill (only `pr-council`, every sibling skill denied), the `gh` read commands its `pr-council` skill names (`gh pr view`, `gh pr diff`, `gh pr checks`, `gh api`, `gh run view`), Read, Grep and Glob over `/work` and the `pr-council` skill, and the configured ticketing read tools. Grep and Glob have no allow rule, so they reach only the working directory and the added skill directory. Agent, Write and Edit are denied, as are reading the MCP config and `/proc`. The voice has Bash, limited to `gh api` and `gh pr diff`. Both roles are denied `gh alias`, `gh extension`, `gh auth` and `gh config`. The tool check expects exactly these tools.
+- The evidence MCP server and its tools (`read_diff`, `read_file`, `search_file`, `list_files`, `read_reference`, `read_check_run`) are removed, with the `@modelcontextprotocol/sdk` dependency. The card prompt says the base checkout is at `/work` and to read the pull request head with `gh` at the head sha. In a delta round it names the previously reviewed head and sends the card to `gh api repos/{repo}/compare/{priorHead}...{head}`, limited to the round's files, as its skill states, not to the pull request's diff. The diff is no longer inlined or served. The GitHub adapter's evidence reads (`readFile`, `checkRun`, `tree`) are removed.
+- The credentials (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`, `GH_TOKEN`) and the ticketing MCP config reach the container by environment, never on the command line. The entrypoint writes the MCP config to tmpfs.
+- `runtime/` holds the image's Dockerfile, its dockerignore and the entrypoint, ported from the previous reviewer's, and ships in the release package so the image builds from the verified release asset. The flag check reads the compiled `dist/adapters/claude.js`. The card bundle is mounted, not baked.
+- Each container is named `margot-<card or voice>-<random>`. When a call times out or is aborted, Margot runs `docker kill` on that name, bounded to 10 seconds, so the container does not outlive the stage; `--rm` removes it.
+- `claude.ticketing.command` runs inside the container, so `bind-request` no longer resolves `${MARGOT_ROOT}` in it and refuses a placeholder or a path under the Margot root; it names the image's server, such as `mcp-linear`.
+- The card bundle's `agents/pr-reviewer.md` must grant Skill, Read, Grep, Glob and Bash, and `agents/margot.md` must grant Bash.
+
 ## 0.8.0
 
 Margot decides and presents reviews as the previous reviewer did wherever the port had diverged without a ruling.

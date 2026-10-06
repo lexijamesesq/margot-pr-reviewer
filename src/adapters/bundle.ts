@@ -1,5 +1,6 @@
 import { lstat, realpath } from "node:fs/promises";
 import { join } from "node:path";
+import { errorMessage } from "../errors.js";
 import { bundleSchema, cardNames, shaSchema } from "../schemas.js";
 import type { CallContext } from "../types.js";
 import { execute } from "./process.js";
@@ -30,4 +31,28 @@ export async function resolveBundle(directory: string, commit: string, context: 
     reviewerAgent: "publish:pr-reviewer",
     voiceAgent: "publish:margot",
   });
+}
+/**
+ * The base checkout the reviewers read at /work must be the request's base commit of the
+ * request's repository, clean, as the card bundle is checked against its pin.
+ */
+export async function verifyBaseCheckout(
+  directory: string,
+  repository: string,
+  base: string,
+  context: CallContext,
+) {
+  const mismatch = (reason: string) => new Error(`Base checkout mismatch: ${reason}`);
+  const git = (args: string[]) =>
+    execute("git", ["-C", directory, ...args], context).catch((error: unknown) => {
+      throw mismatch(`git ${args[0]} failed: ${errorMessage(error)}`);
+    });
+  const head = (await git(["rev-parse", "HEAD"])).trim();
+  if (head !== base) throw mismatch(`HEAD ${head} is not ${base}`);
+  if ((await git(["status", "--porcelain", "--untracked-files=all"])).trim())
+    throw mismatch("uncommitted changes");
+  const url = (await git(["remote", "get-url", "origin"])).trim();
+  const remote = url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?\/?$/i)?.[1];
+  if (remote?.toLowerCase() !== repository.toLowerCase())
+    throw mismatch(`origin ${url} is not ${repository}`);
 }

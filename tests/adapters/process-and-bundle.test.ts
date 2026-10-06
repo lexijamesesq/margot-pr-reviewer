@@ -81,7 +81,7 @@ it("redacts MCP credentials from failed subprocess diagnostics", async () => {
       "process.stderr.write(process.argv[2]);process.exit(1)",
       "--",
       "--mcp-config",
-      JSON.stringify({ mcpServers: { evidence: { env: { GH_TOKEN: canary } } } }),
+      JSON.stringify({ mcpServers: { tickets: { env: { GH_TOKEN: canary } } } }),
     ]);
     return expect(false).toBe(true);
   } catch (error) {

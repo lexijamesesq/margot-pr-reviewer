@@ -1,6 +1,5 @@
 import { Octokit } from "octokit";
 import parseDiff from "parse-diff";
-import { z } from "zod";
 import { diffIsComplete } from "../diff.js";
 import { errorMessage } from "../errors.js";
 import {
@@ -264,57 +263,6 @@ export function githubAdapter(
         ownedPathTier: options.ownedPathTier,
         autoMergeArmed: before.auto_merge !== null,
       });
-    },
-    async readFile(r: ReviewRequest, path: string, revision: "head" | "base", c: CallContext) {
-      if (!path || path.startsWith("/") || path.split("/").some((p) => p === "." || p === ".."))
-        throw new Error("Invalid repository path");
-      const response = await client.rest.repos.getContent({
-        ...params(r, c),
-        path,
-        ref: r[revision],
-      });
-      const blob = z
-        .object({
-          type: z.literal("file"),
-          encoding: z.literal("base64"),
-          content: z.string(),
-          size: z.number(),
-        })
-        .parse(response.data);
-      if (blob.size > 1024 * 1024 || (!blob.content && blob.size > 0))
-        throw new Error("File exceeds evidence limit");
-      return Buffer.from(blob.content, "base64").toString("utf8");
-    },
-    /** The current run of one named check on the bound head, with its output. */
-    async checkRun(r: ReviewRequest, name: string, c: CallContext) {
-      const runs = await client.paginate(client.rest.checks.listForRef, {
-        ...params(r, c),
-        ref: r.head,
-        per_page: 100,
-        filter: "latest",
-      });
-      const run = runs
-        .filter((check) => check.name === name && check.head_sha === r.head)
-        .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id)[0];
-      if (!run) throw new Error("No check run of that name on the head");
-      return {
-        name: run.name,
-        app: run.app?.slug ?? "unknown",
-        conclusion:
-          run.status === "completed"
-            ? (checkConclusions.find((v) => v === run.conclusion) ?? "pending")
-            : "pending",
-        title: run.output.title ?? "",
-        summary: run.output.summary ?? "",
-        text: run.output.text ?? "",
-      };
-    },
-    async tree(r: ReviewRequest, c: CallContext) {
-      const tree = (
-        await client.rest.git.getTree({ ...params(r, c), tree_sha: r.head, recursive: "1" })
-      ).data;
-      if (tree.truncated) throw new Error("Repository tree truncated");
-      return tree.tree.map((item) => item.path).join("\n");
     },
   };
 }

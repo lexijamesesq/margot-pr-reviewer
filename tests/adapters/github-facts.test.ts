@@ -347,3 +347,7 @@ it("keeps the conclusion GitHub recorded for every check run", async () => {
     "unit=pending",
   ]);
 });
+it("serves no evidence reads: the reviewers read with gh in their container", () => {
+  const { adapter } = github();
+  expect(["readFile", "checkRun", "tree"].filter((method) => method in adapter)).toEqual([]);
+});

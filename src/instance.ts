@@ -226,11 +226,21 @@ function bindPrepared(input: BindRequestInput, prepared: ReturnType<typeof prepa
     input.margotRoot,
     "claude.pluginDirectory",
   );
-  if (config.claude.ticketing)
-    config.claude.ticketing.command = resolveMargotRoot(
-      config.claude.ticketing.command,
-      input.margotRoot,
-      "claude.ticketing.command",
+  config.claude.container.work = resolveMargotRoot(
+    config.claude.container.work,
+    input.margotRoot,
+    "claude.container.work",
+  );
+  // The ticketing server runs inside the runtime container, where the Margot root does not exist.
+  const ticketingCommand = config.claude.ticketing?.command;
+  if (
+    ticketingCommand !== undefined &&
+    (ticketingCommand.includes("${") ||
+      ticketingCommand === input.margotRoot ||
+      ticketingCommand.startsWith(`${input.margotRoot.replace(/\/+$/, "")}/`))
+  )
+    throw new Error(
+      "claude.ticketing.command runs inside the runtime container: name the image's command (such as mcp-linear), not a path under the Margot root or a placeholder",
     );
   const boundConfig = liveConfigSchema.parse(config);
   const request = requestSchema.parse({
