@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkText, render } from "../../src/render.js";
+import { checkSummary, checkText, render } from "../../src/render.js";
 import { present } from "../helpers/present.js";
 import { authorChangesReview, mechanicalReview } from "../helpers/publication.js";
 import {
@@ -253,4 +253,12 @@ describe("a verdict code reaches without the voice", () => {
       "> No review lens was required for this change.",
     ]);
   });
+});
+it("takes the first sentence of the voice's risk label for the check summary", () => {
+  const value = structuredClone(authorChangesReview);
+  if (!value.voice) throw new Error("voice fixture required");
+  value.voice.risk = "unproven  behavior. Tests are missing!";
+  expect(checkSummary(value)).toBe("CHANGES_REQUESTED, MEDIUM: unproven behavior.");
+  value.voice.risk = "widened access;";
+  expect(checkSummary(value)).toBe("CHANGES_REQUESTED, MEDIUM: widened access.");
 });
