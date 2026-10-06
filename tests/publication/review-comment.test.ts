@@ -79,25 +79,19 @@ it("warns that confidence is reduced and nothing was auto-merged on a fallback-s
     "> ⚠️ _The risk model was unavailable — this risk was scored by a fallback at reduced confidence, so nothing was auto-merged._",
   );
 });
-it("says only routing fell back when the risk was not scored by a fallback", () => {
-  const value = structuredClone(authorChangesReview);
-  value.provenance.decision_source = "fallback";
-  value.decision.holdReasons = ["fallback-routing"];
-  const text = render(value);
-  expect({
-    routing: text.includes("routing fell back to a simpler model at reduced confidence"),
-    risk: text.includes("scored by a fallback"),
-  }).toEqual({ routing: true, risk: false });
-});
-it("says both steps fell back when routing and risk both did", () => {
-  const value = structuredClone(authorChangesReview);
-  value.decision.holdReasons = ["fallback-routing", "fallback-risk"];
-  expect(render(value)).toContain("routing and risk were both decided by a fallback");
-});
-it("shows the generic fallback notice for a receipt saved with the legacy reason", () => {
-  const value = structuredClone(authorChangesReview);
-  value.decision.holdReasons = ["fallback"];
-  expect(render(value)).toContain("A model step was unavailable");
+it("gives one fallback notice whichever step fell back", () => {
+  const notice =
+    "> ⚠️ _The risk model was unavailable — this risk was scored by a fallback at reduced confidence, so nothing was auto-merged._";
+  const shown = [["fallback-routing"], ["fallback-routing", "fallback-risk"], ["fallback"]];
+  expect(
+    shown.map((reasons) => {
+      const value = structuredClone(authorChangesReview);
+      value.decision.holdReasons = reasons;
+      return render(value)
+        .split("\n")
+        .filter((line) => line.startsWith("> ⚠️"));
+    }),
+  ).toEqual([[notice], [notice], [notice]]);
 });
 it("renders the first two sentences of a long rationale", () => {
   const value = structuredClone(authorChangesReview);
@@ -178,13 +172,13 @@ describe("merge actor in the authority hold", () => {
   }
   it("names the configured merge actor", () => {
     expect(authorityHold("merge-bot")).toContain(
-      "Above my authority: it touches a protected path. Approve it and merge-bot merges it.",
+      "Above my authority: it changes Margot's own machinery; approve it and merge-bot merges it. Yours to merge.",
     );
   });
   it("names no merger when none is configured", () => {
     const report = authorityHold();
     expect(report).toContain(
-      "Above my authority: it touches a protected path. Approve it to merge it.",
+      "Above my authority: it changes Margot's own machinery; approve it to merge it. Yours to merge.",
     );
     expect(report).not.toContain("merges it");
   });

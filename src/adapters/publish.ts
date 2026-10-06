@@ -254,13 +254,15 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       reviewConclusion,
       // A held title is what merge automation surfaces to the operator, so it names the
       // reason the PR is actually held.
-      decision.mergeEligible
-        ? "Margot: approved"
-        : decision.outcome === "APPROVED"
-          ? `held for the operator: ${holdReason(decision).sentence}`
-          : decision.outcome === "ERROR"
-            ? "not reviewed (error)"
-            : `Margot: ${decision.outcome}`,
+      decision.holdReasons.includes("calibration")
+        ? "calibrating"
+        : decision.mergeEligible
+          ? "Margot: approved"
+          : decision.outcome === "APPROVED"
+            ? `held for the operator: ${holdReason(decision, review.presentation?.mergeActor) ?? "above my authority"}`
+            : decision.outcome === "ERROR"
+              ? "not reviewed (error)"
+              : `Margot: ${decision.outcome}`,
       checkSummary(review),
       checkText(review),
       c,

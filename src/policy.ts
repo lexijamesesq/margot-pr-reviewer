@@ -251,50 +251,31 @@ export function decide(
   };
 }
 
-/** Every reason an approved review is held, most telling first; a missing "risk" sentence is filled with the band. */
-const holdSentences: [string, string][] = [
-  ["review-authority", "it touches a protected path"],
-  ["fallback-risk", "the risk was scored by a fallback (reduced confidence)"],
-  ["fallback-routing", "routing fell back to a simpler model (reduced confidence)"],
-  // Saved by 0.6.12, before the step was recorded; a replayed receipt still carries it.
-  ["fallback", "a model step fell back (reduced confidence)"],
-  ["ownership-uncomputed", "ownership could not be established"],
-  ["calibration", "calibration mode is on"],
-  ["risk", ""],
-];
+const fallbackReasons = ["fallback-risk", "fallback-routing", "fallback"];
 
-/** The one reason a held review is held, for the comment and the check title alike. */
-export function holdReason(decision: { holdReasons: string[]; rating: { band: string } }): {
-  reason: string;
-  sentence: string;
-} {
-  if (
-    decision.holdReasons.includes("fallback-routing") &&
-    decision.holdReasons.includes("fallback-risk") &&
-    !decision.holdReasons.includes("review-authority")
-  )
-    return {
-      reason: "fallback-risk",
-      sentence: "routing and risk both fell back (reduced confidence)",
-    };
-  const [reason, sentence] = holdSentences.find(([r]) => decision.holdReasons.includes(r)) ?? [
-    "risk",
-    "",
-  ];
-  return { reason, sentence: sentence || `risk is ${decision.rating.band}` };
+/**
+ * The one reason an approved review is held, in the previous reviewer's words and order, for
+ * the comment and the check title alike. Null when only calibration holds it: calibration
+ * is not a reason the change is above Margot's authority.
+ */
+export function holdReason(
+  decision: { holdReasons: string[]; rating: { band: string } },
+  mergeActor?: string,
+): string | null {
+  const reasons = decision.holdReasons;
+  if (reasons.some((r) => fallbackReasons.includes(r)))
+    return "the risk was scored by the fallback (reduced confidence)";
+  if (decision.rating.band !== "LOW") return `risk is ${decision.rating.band}`;
+  if (reasons.includes("review-authority"))
+    return `it changes Margot's own machinery; ${mergeActor ? `approve it and ${mergeActor} merges it` : "approve it to merge it"}`;
+  if (reasons.includes("ownership-uncomputed")) return "ownership could not be established";
+  if (reasons.every((r) => r === "calibration")) return null;
+  return "above my authority";
 }
 
-/** Which model step fell back, for the review comment; null when none did. */
+/** The comment's notice that a model step fell back; null when none did. */
 export function fallbackNotice(holdReasons: string[]): string | null {
-  const routing = holdReasons.includes("fallback-routing");
-  const risk = holdReasons.includes("fallback-risk");
-  if (routing && risk)
-    return "The risk model was unavailable — routing and risk were both decided by a fallback at reduced confidence";
-  if (risk)
-    return "The risk model was unavailable — this risk was scored by a fallback at reduced confidence";
-  if (routing)
-    return "The routing model was unavailable — routing fell back to a simpler model at reduced confidence";
-  if (holdReasons.includes("fallback"))
-    return "A model step was unavailable — a fallback decided it at reduced confidence";
-  return null;
+  return holdReasons.some((r) => fallbackReasons.includes(r))
+    ? "The risk model was unavailable — this risk was scored by a fallback at reduced confidence"
+    : null;
 }

@@ -381,7 +381,7 @@ export async function runPublication(
             ? "calibration"
             : "risk",
       ];
-      value.decision.rating.band = "HIGH";
+      value.decision.rating.band = value.decision.holdReasons.includes("risk") ? "HIGH" : "LOW";
       if (mode === "authority-summary")
         value.decision.authorityPaths = [".github/workflows/review.yml", "config/review.json"];
     }

@@ -54,7 +54,9 @@ it("titles a hold with the reason the PR is held, not the band", async () => {
         title?: string;
       }
     ).title,
-  }).toMatchObject({ title: "held for the operator: it touches a protected path" });
+  }).toMatchObject({
+    title: "held for the operator: it changes Margot's own machinery; approve it to merge it",
+  });
 });
 it("overwrites the verdict check text after a later failure so merge automation never reads a stale approval", async () => {
   const run = await runPublication("review-fail");

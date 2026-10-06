@@ -86,15 +86,8 @@ function codeVerdict(review: Review): { risk: string; summary: string } {
 
 function authorityLine(review: Review): string | null {
   if (review.decision.outcome !== "APPROVED" || review.decision.mergeEligible) return null;
-  const { reason, sentence } = holdReason(review.decision);
-  const { mergeActor } = review.presentation ?? {};
-  const next =
-    reason !== "review-authority"
-      ? "Yours to merge."
-      : mergeActor
-        ? `Approve it and ${mergeActor} merges it.`
-        : "Approve it to merge it.";
-  return `Above my authority: ${sentence}. ${next}`;
+  const reason = holdReason(review.decision, review.presentation?.mergeActor);
+  return reason ? `Above my authority: ${reason}. Yours to merge.` : null;
 }
 
 function duration(value: number): string {
