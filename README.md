@@ -202,6 +202,26 @@ margot-instance close-stranded-check \
   --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"
 ```
 
+### `self-instrument`
+
+Posts the self-instrument check for a pull request's live head, before the floor, as
+the previous reviewer's preflight did. A functional change to a protected path, or a
+rename or move of one in any class, is held (`neutral`, "held for the operator's
+approval", listing the matched paths); anything else is `success` ("clear", naming the
+class). The class is the verified triage's for the head (the triage check
+`--triage-check-name`, default `review / triage`, posted by `--app-id` and trusted
+through `--trusted-triage-actors`), or functional without one. `--check-name` defaults
+to `review / self-instrument`. It reads with `GH_TOKEN` and posts with
+`MARGOT_WRITE_TOKEN`, and refuses a head that is no longer the PR's. Publication posts
+the same check again.
+
+```sh
+margot-instance self-instrument \
+  --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
+  --protected-paths '["YOUR_AUTHORITY_PATH/**"]' --app-id "$MARGOT_APP_ID" \
+  --trusted-triage-actors '["triage-app"]'
+```
+
 ## What Margot posts
 
 The review comment opens with the outcome and risk band, a short rationale, and
