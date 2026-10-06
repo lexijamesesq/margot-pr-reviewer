@@ -515,3 +515,43 @@ it("requires the container image pinned by digest", () => {
     taggedOnly: container("registry.example/margot-runtime"),
   }).toEqual({ digest: true, id: true, tag: false, taggedOnly: false });
 });
+it("kills its named container when the call times out", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "margot-docker-log-"));
+  const dockerLog = join(dir, "docker");
+  try {
+    await expect(
+      fakeClaude({ dockerLog, hang: true, signal: AbortSignal.timeout(500) }),
+    ).rejects.toThrow();
+    const calls = (await readFile(dockerLog, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as string[]);
+    const run = calls.find((call) => call[0] === "run") ?? [];
+    const name = value(run, "--name");
+    expect({
+      name: /^margot-safety-[a-z0-9]+$/.test(name ?? ""),
+      kill: calls.filter((call) => call[0] === "kill"),
+    }).toEqual({ name: true, kill: [["kill", name]] });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+it("names every container uniquely", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "margot-docker-log-"));
+  const dockerLog = join(dir, "docker");
+  try {
+    await fakeClaude({ dockerLog });
+    await fakeClaude({ dockerLog });
+    await fakeClaude({ dockerLog, role: "voice" });
+    const names = (await readFile(dockerLog, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => value(JSON.parse(line) as string[], "--name") ?? "");
+    expect({
+      prefixes: names.map((name) => name.replace(/-[a-z0-9]+$/, "")),
+      unique: new Set(names).size,
+    }).toEqual({ prefixes: ["margot-safety", "margot-safety", "margot-voice"], unique: 3 });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

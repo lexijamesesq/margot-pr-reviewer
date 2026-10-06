@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -121,7 +122,8 @@ export function claudeAdapter(options: ClaudeOptions) {
         ),
       ).name;
     const access = card ? await cardAccess(options.pluginDirectory, plugin) : voiceAccess;
-    const docker = containerArgv(options.container, options.pluginDirectory);
+    const name = `margot-${role}-${randomBytes(6).toString("hex")}`;
+    const docker = containerArgv(options.container, options.pluginDirectory, name);
     // Claude Code passes the model credential through to MCP servers; neither needs it.
     const modelCredentialsBlanked = { ANTHROPIC_API_KEY: "", CLAUDE_CODE_OAUTH_TOKEN: "" };
     const mcp = {
@@ -230,7 +232,16 @@ export function claudeAdapter(options: ClaudeOptions) {
         }),
         input: prompt,
       },
-    );
+    ).catch(async (error: unknown) => {
+      // The abort stops only the docker client; the container runs on until it is killed,
+      // and --rm then removes it. The kill is bounded so a stuck daemon cannot hold the stage.
+      if (c.signal.aborted)
+        await execute(options.container.docker, ["kill", name], {
+          signal: AbortSignal.timeout(10_000),
+          env: dockerEnvironment(process.env, {}),
+        }).catch(() => {});
+      throw error;
+    });
     const events = stdout
       .trim()
       .split("\n")

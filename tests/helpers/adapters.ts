@@ -144,6 +144,11 @@ export async function fakeClaude(
     reviewerTools?: string[];
     /** A file the fake docker appends each Claude invocation's arguments to. */
     spawnLog?: string;
+    /** A file the fake docker appends every invocation's full docker argv to, one JSON line each. */
+    dockerLog?: string;
+    /** The container never finishes, so only the call's signal ends it. */
+    hang?: boolean;
+    signal?: AbortSignal;
     role?: "card" | "voice";
   } = {},
 ) {
@@ -189,10 +194,11 @@ export async function fakeClaude(
       `#!/usr/bin/env node
 const fs = require("node:fs");
 const argv = process.argv.slice(2);
+${options.dockerLog ? `fs.appendFileSync(${JSON.stringify(options.dockerLog)}, JSON.stringify(argv) + "\\n");\n` : ""}if (argv[0] === "kill") process.exit(0);
 const at = argv.indexOf(${JSON.stringify(image)});
 const docker = argv.slice(0, at + 1);
 const args = argv.slice(at + 2);
-${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, args.join(" ") + "\\n");\n` : ""}{
+${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, args.join(" ") + "\\n");\n` : ""}${options.hang ? "setInterval(() => {}, 1000);\n" : ""}if (!${JSON.stringify(!!options.hang)}) {
   const mcp = process.env.MARGOT_MCP_CONFIG ? JSON.parse(process.env.MARGOT_MCP_CONFIG) : { mcpServers: {} };
   // Like docker: the bundle is the host directory mounted at the container's plugin directory.
   const mounts = docker.flatMap((arg, i) => (docker[i - 1] === "--mount" ? [Object.fromEntries(arg.split(",").map((kv) => kv.split("=")))] : []));
@@ -275,7 +281,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, arg
               agent: "publish:margot",
               round,
             },
-            context(),
+            options.signal ? { signal: options.signal } : context(),
           )
         : await adapter.card(
             {
@@ -285,7 +291,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, arg
               agent: "publish:pr-reviewer",
               round,
             },
-            context(),
+            options.signal ? { signal: options.signal } : context(),
           );
     return {
       ...(JSON.parse(await readFile(capture, "utf8")) as {

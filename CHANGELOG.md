@@ -10,6 +10,7 @@ Reviewers run in the previous reviewer's container with its tools.
 - The evidence MCP server and its tools (`read_diff`, `read_file`, `search_file`, `list_files`, `read_reference`, `read_check_run`) are removed, with the `@modelcontextprotocol/sdk` dependency. The card prompt says the base checkout is at `/work` and to read the pull request head with `gh` at the head sha; the diff is no longer inlined or served.
 - The credentials (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`, `GH_TOKEN`) and the ticketing MCP config reach the container by environment, never on the command line. The entrypoint writes the MCP config to tmpfs.
 - `runtime/` holds the image's Dockerfile and entrypoint, ported from the previous reviewer's. The card bundle is mounted, not baked.
+- Each container is named `margot-<card or voice>-<random>`. When a call times out or is aborted, Margot runs `docker kill` on that name, bounded to 10 seconds, so the container does not outlive the stage; `--rm` removes it.
 - The card bundle's `agents/pr-reviewer.md` must grant Skill, Read, Grep, Glob and Bash, and `agents/margot.md` must grant Bash.
 
 ## 0.8.0

@@ -33,10 +33,13 @@ export function dockerEnvironment(source: NodeJS.ProcessEnv, handed: Record<stri
 export function containerArgv(
   container: z.infer<typeof liveConfigSchema>["claude"]["container"],
   pluginDirectory: string,
+  name: string,
 ) {
   return [
     "run",
     "--rm",
+    "--name",
+    name,
     "-i",
     "--read-only",
     "--user",
