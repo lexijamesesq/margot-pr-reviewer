@@ -181,6 +181,12 @@ export function claudeAdapter(options: ClaudeOptions) {
         card
           ? `Your card is ${card.name}.`
           : "Rule on the supplied findings; use their exact IDs in established/dismissed.",
+        // The voice's definition states the other ruling rules; documentation's is Margot's.
+        ...(!card && input.classification === "documentation"
+          ? [
+              "Documentation accuracy findings go back to the author as CHANGES_REQUESTED, including any finding only the operator could otherwise act on. The route's band is LOW; preserve dismissals and ask a clarification question when needed.",
+            ]
+          : []),
       ].join(" "),
       [
         ...(options.references
