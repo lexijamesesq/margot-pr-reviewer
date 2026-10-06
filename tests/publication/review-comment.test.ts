@@ -33,11 +33,14 @@ it("displays the voice's short risk statement on the risk line instead of the ba
   value.decision.rating.rationale = "The band comes from a separate risk assessment.";
   expect(render(value).split("\n")[1]).toBe("🟡 **Risk: MEDIUM** — operator workflow disruption");
 });
-it("omits the explanatory suffix when the voice gives no risk statement", () => {
+it("omits the explanatory suffix on the voice's own ERROR without a risk statement", () => {
+  // Only an ERROR may omit the risk line; any other verdict without one is held, not posted.
   const value = structuredClone(authorChangesReview);
   if (!value.voice) throw new Error("voice fixture required");
+  value.voice.outcome = "ERROR";
+  value.decision.outcome = "ERROR";
   delete value.voice.risk;
-  expect(render(value).split("\n")[1]).toBe("🟡 **Risk: MEDIUM**");
+  expect(render(value).split("\n").slice(0, 2)).toEqual(["### 🚫 ERROR", "🟡 **Risk: MEDIUM**"]);
 });
 it("posts confidence, files, cost and runtime without a council roster on a mechanical review", () => {
   const value = structuredClone(mechanicalReview);
