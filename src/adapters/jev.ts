@@ -91,7 +91,8 @@ export function councilText(cards: Card[]): string {
 /**
  * One risk dimension, read conservatively: an unreadable distribution falls back to the
  * level of Jev's score, and with no score to level 2; an unreadable confidence is null, which
- * keeps the cautious band and summons the voice.
+ * keeps the cautious band: the no-council floor lowers nothing, so a band above LOW is held
+ * or ruled by the voice as usual.
  */
 function riskDimension(answer: unknown) {
   const raw = (answer && typeof answer === "object" ? answer : {}) as Record<string, unknown>;
