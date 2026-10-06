@@ -191,6 +191,14 @@ function defaultPresentation(review: Review): ReviewPresentation {
   };
 }
 
+/** The first sentence of a text, whole, ending in one period; empty stays empty. */
+function labelSentence(value: string): string {
+  const text = normalized(value);
+  const end = text.search(/[.!?](?: |$)/u);
+  const cut = (end < 0 ? text : text.slice(0, end)).replace(/[.!?;,: ]+$/u, "");
+  return cut ? `${cut}.` : "";
+}
+
 export function render(review: Review): string {
   const { decision, request } = review;
   const verdict = codeVerdict(review);
