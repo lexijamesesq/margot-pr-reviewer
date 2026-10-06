@@ -21,7 +21,7 @@ import {
   validateVoice,
 } from "./policy.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "./questions.js";
-import { render } from "./render.js";
+import { render, shownFindingGap } from "./render.js";
 import {
   bundleSchema,
   cardSchema,
@@ -419,6 +419,10 @@ export async function review(
         if (riskAnswer && riskAnswer.source !== "jev")
           core.decision.holdReasons.push("fallback-risk");
       }
+      // The comment's card rows each need a plain sentence; one without is not posted.
+      stage = stages.render;
+      const gap = shownFindingGap(core);
+      if (gap) throw new Error(gap);
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
     const metadata = services.reviewMetadata?.() ?? {};

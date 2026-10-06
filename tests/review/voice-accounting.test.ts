@@ -12,6 +12,7 @@ import {
   reviewRecording,
   voiceRuling,
   withCard,
+  withCardFields,
   withRoute,
   withRoutedCards,
   withVoice,
@@ -282,4 +283,31 @@ describe("voice publication safeguards", () => {
       expect(publications).toEqual([]);
     },
   );
+});
+
+describe("the comment's card rows", () => {
+  const withShownFinding = (what: string) =>
+    withCardFields("safety", {
+      findings: [{ tag: "info", severity: "MINOR", confidence: "HIGH", location: "a.ts:1", what }],
+    });
+  it("holds a review whose shown finding has no plain sentence instead of posting it", async () => {
+    const { result, publications } = await reviewRecording(
+      recorded("council-clear", withShownFinding(" . ")),
+    );
+    expect({ result, publications }).toMatchObject({
+      result: {
+        kind: "error",
+        stage: "render",
+        diagnostic:
+          "Comment not template-compliant: safety: its shown finding has no plain-language comment",
+      },
+      publications: [],
+    });
+  });
+  it("posts a review whose shown finding has a sentence", async () => {
+    const { result } = await reviewRecording(
+      recorded("council-clear", withShownFinding("The note is minor.")),
+    );
+    expect(result.kind).toBe("reviewed");
+  });
 });
