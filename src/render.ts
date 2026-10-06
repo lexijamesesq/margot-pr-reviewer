@@ -220,7 +220,9 @@ export function checkText(review: Review): string {
       ? "mechanical"
       : review.voice
         ? "verdict_voice"
-        : "fast_path";
+        : review.cards.length === 0 && review.decision.rating.band !== "LOW"
+          ? "no_council"
+          : "fast_path";
   const lines = [
     `outcome: ${review.decision.outcome} | band: ${review.decision.rating.band}`,
     `decision_source: ${review.provenance.decision_source ?? "jev"}`,

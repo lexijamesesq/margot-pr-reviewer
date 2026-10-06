@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { checkText as renderCheckText } from "../../src/render.js";
 import {
   asDocumentation,
   type Change,
@@ -108,7 +109,26 @@ describe("the risk band", () => {
       noCouncilConfidentlyLow(operationsAt([0, 0.7, 0.3, 0]), withVoiceFields({ band: "MEDIUM" })),
     );
     expect(result.decision.rating.band).toBe("MEDIUM");
-    expect(result.voice).not.toBeNull();
+    expect(result.voice).toBeNull();
+  });
+
+  it("holds a band above LOW without the voice when routing confidently selects no lens", async () => {
+    const { result, calls } = await reviewed(
+      noCouncilConfidentlyLow(operationsAt([0, 0, 1, 0]), withVoiceFields({ band: "LOW" })),
+    );
+    expect({
+      voiceCalled: calls.includes("voice"),
+      outcome: result.decision.outcome,
+      band: result.decision.rating.band,
+      holdReasons: result.decision.holdReasons,
+      verdictSource: renderCheckText(result).match(/^verdict_source: (.*)$/m)?.[1],
+    }).toEqual({
+      voiceCalled: false,
+      outcome: "APPROVED",
+      band: "MEDIUM",
+      holdReasons: ["risk"],
+      verdictSource: "no_council",
+    });
   });
 
   it("keeps the band LOW when the risk tail is just below the boundary", async () => {
