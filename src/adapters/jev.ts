@@ -88,21 +88,33 @@ export function councilText(cards: Card[]): string {
     )
     .join("\n\n");
 }
+/** A distribution as the previous reviewer read one: any non-empty set of levels, missing ones 0. */
+const partialDistribution = z
+  .strictObject({
+    "0": probability.optional(),
+    "1": probability.optional(),
+    "2": probability.optional(),
+    "3": probability.optional(),
+  })
+  .refine((levels) => Object.keys(levels).length > 0);
 /**
- * One risk dimension, read conservatively: an unreadable distribution falls back to the
- * level of Jev's score, and with no score to level 2; an unreadable confidence is null, which
- * keeps the cautious band: the no-council floor lowers nothing, so a band above LOW is held
- * or ruled by the voice as usual.
+ * One risk dimension, read conservatively: any non-empty distribution is rated by its tail,
+ * whatever it sums to; with none, the level of Jev's score, and with no score level 2. An
+ * unreadable confidence is null, which keeps the cautious band: the no-council floor lowers
+ * nothing, so a band above LOW is held or ruled by the voice as usual.
  */
 function riskDimension(answer: unknown) {
   const raw = (answer && typeof answer === "object" ? answer : {}) as Record<string, unknown>;
   const level = z.number().min(0).max(3).safeParse(raw.score).data;
-  const parsed = score.safeParse({ type: "score", confidence: 0, ...raw });
-  const distribution = parsed.data?.probabilities;
-  const probabilities: number[] =
-    distribution && Math.abs(Object.values(distribution).reduce((sum, p) => sum + p, 0) - 1) < 0.015
-      ? [distribution["0"], distribution["1"], distribution["2"], distribution["3"]]
-      : [0, 1, 2, 3].map((l) => Number(l === Math.round(level ?? 2)));
+  const distribution = partialDistribution.safeParse(raw.probabilities).data;
+  const probabilities: number[] = distribution
+    ? [
+        distribution["0"] ?? 0,
+        distribution["1"] ?? 0,
+        distribution["2"] ?? 0,
+        distribution["3"] ?? 0,
+      ]
+    : [0, 1, 2, 3].map((l) => Number(l === Math.round(level ?? 2)));
   return {
     confidence: probability.safeParse(raw.confidence).data ?? null,
     ...(level === undefined ? {} : { score: level }),

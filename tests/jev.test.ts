@@ -202,6 +202,30 @@ it("preserves risk levels in Jev score distributions", async () => {
   const r = await jev(answers).adapter.risk(facts, [], riskQuestions, context());
   expect(riskSchema.parse(r).dimensions.operations.probabilities[2]).toBe(1);
 });
+it("rates any non-empty distribution by its tail, whatever it sums to, and only an absent one by its score", async () => {
+  const answers = {
+    ...Object.fromEntries(
+      dimensions.map((d) => [
+        d,
+        { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+      ]),
+    ),
+    // Sums to 0.98: the tail puts it at level 2 (P(>=2) = 0.38); its score would say 1.
+    operations: {
+      type: "score",
+      confidence: 0.9,
+      score: 1,
+      probabilities: { 0: 0.5, 1: 0.1, 2: 0.1, 3: 0.28 },
+    },
+    // A partial distribution counts its missing levels as 0.
+    data_security: { type: "score", confidence: 0.9, score: 0, probabilities: { 2: 1 } },
+  };
+  const r = riskSchema.parse(await jev(answers).adapter.risk(facts, [], riskQuestions, context()));
+  expect({
+    operations: r.dimensions.operations.probabilities,
+    dataSecurity: r.dimensions.data_security.probabilities,
+  }).toEqual({ operations: [0.5, 0.1, 0.1, 0.28], dataSecurity: [0, 0, 1, 0] });
+});
 it("keeps Jev's score for each risk dimension", async () => {
   const answers = Object.fromEntries(
     dimensions.map((d, i) => [
