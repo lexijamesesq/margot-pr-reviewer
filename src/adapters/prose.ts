@@ -121,12 +121,14 @@ export function parseCard(prose: string, name: Card["name"]): Card {
       },
     ];
   });
+  const resolved = section(raw, "Resolved");
   return cardSchema.parse({
     name,
     completion,
     ...(completionReason ? { completionReason } : {}),
     checked: section(raw, "Checked"),
     notCovered: section(raw, "Not covered"),
+    ...(resolved.length ? { resolved } : {}),
     findings,
   });
 }

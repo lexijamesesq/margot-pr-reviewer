@@ -188,6 +188,8 @@ export const cardSchema = z.strictObject({
   completionReason: text.optional(),
   checked: z.array(text),
   notCovered: z.array(text),
+  // From round two: the card's standing entries it closed, each with the lines that fix it.
+  resolved: z.array(text).optional(),
   findings: z.array(findingSchema),
 });
 export const voiceSchema = z.strictObject({

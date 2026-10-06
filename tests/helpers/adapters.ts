@@ -6,6 +6,7 @@ import { claudeAdapter } from "../../src/adapters/claude.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { cliServices } from "../../src/cli-services.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
+import type { Card } from "../../src/types.js";
 import { readRecording } from "./recordings.js";
 
 export const recording = readRecording("mechanical-bump");
@@ -137,6 +138,8 @@ export async function fakeClaude(
     references?: Record<string, { repository: string; head: string }>;
     ownChecks?: string[];
     classification?: "functional" | "documentation" | "mechanical";
+    /** The council the voice rules on. */
+    cards?: Card[];
     /** Replaces the tools the fixture reviewer's frontmatter grants. */
     reviewerTools?: string[];
     /** A file the fake CLI appends each invocation's arguments to. */
@@ -269,7 +272,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
             {
               facts: options.facts ?? facts,
               classification: options.classification ?? "functional",
-              cards: [],
+              cards: options.cards ?? [],
               rating: {} as never,
               agent: "publish:margot",
               round,

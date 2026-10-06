@@ -273,3 +273,24 @@ describe("captured reviewer output", () => {
     });
   });
 });
+it("keeps a card's Resolved section for the voice and Jev's risk text", async () => {
+  const { councilText } = await import("../src/adapters/jev.js");
+  const { fakeClaude } = await import("./helpers/adapters.js");
+  const card = parseCard(
+    "card: safety\ncompletion: completed\nChecked:\n- Read the workflow.\nNot covered:\nResolved:\n- R1-F1 · a.ts:4 — the token is now masked\nFindings:\n",
+    "safety",
+  );
+  const voice = await fakeClaude({ role: "voice", cards: [card] });
+  const input = JSON.parse(voice.stdin.split("\n").at(-1) ?? "{}") as {
+    cards: { resolved?: string[] }[];
+  };
+  expect({
+    parsed: card.resolved,
+    voice: input.cards[0]?.resolved,
+    risk: councilText([card]).includes("Resolved:\n- R1-F1 · a.ts:4 — the token is now masked"),
+  }).toEqual({
+    parsed: ["R1-F1 · a.ts:4 — the token is now masked"],
+    voice: ["R1-F1 · a.ts:4 — the token is now masked"],
+    risk: true,
+  });
+});

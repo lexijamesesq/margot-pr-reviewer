@@ -71,6 +71,9 @@ export function councilText(cards: Card[]): string {
         ...card.checked.map((line) => `- ${line}`),
         "Not covered:",
         ...card.notCovered.map((line) => `- ${line}`),
+        ...(card.resolved?.length
+          ? ["Resolved:", ...card.resolved.map((line) => `- ${line}`)]
+          : []),
         "Findings:",
         // Findings the ledger synthesized are Margot's, not the card's.
         ...card.findings
