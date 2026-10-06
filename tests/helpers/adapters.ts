@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { Octokit } from "octokit";
 import { claudeAdapter } from "../../src/adapters/claude.js";
 import { githubAdapter } from "../../src/adapters/github.js";
+import { execute } from "../../src/adapters/process.js";
 import { cliServices } from "../../src/cli-services.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
 import type { Card } from "../../src/types.js";
@@ -148,7 +149,10 @@ export async function fakeClaude(
     dockerLog?: string;
     /** The container never finishes, so only the call's signal ends it. */
     hang?: boolean;
-    signal?: AbortSignal;
+    /** The call's timeout, started when the adapter is called. */
+    timeoutMs?: number;
+    /** How the base checkout differs from the request: another commit, another remote, or dirty. */
+    checkout?: { base?: string; remote?: string; dirty?: boolean };
     role?: "card" | "voice";
   } = {},
 ) {
@@ -157,6 +161,30 @@ export async function fakeClaude(
     const bundle = join(root, "bundle"),
       work = join(root, "base");
     await mkdir(work);
+    // The base checkout is a real clean git checkout of the request's repository; the request's
+    // base is its commit unless the test says otherwise.
+    const git = (...args: string[]) => execute("git", ["-C", work, ...args]);
+    await git("init", "-q");
+    await writeFile(join(work, "README.md"), "base\n");
+    await git("add", "README.md");
+    await git(
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.invalid",
+      "commit",
+      "-qm",
+      "base",
+    );
+    await git(
+      "remote",
+      "add",
+      "origin",
+      options.checkout?.remote ?? `https://github.com/${(options.facts ?? facts).repository}`,
+    );
+    if (options.checkout?.dirty) await writeFile(join(work, "untracked.txt"), "dirty\n");
+    const base = options.checkout?.base ?? (await git("rev-parse", "HEAD")).trim();
+    const inputFacts = { ...(options.facts ?? facts), base };
     await mkdir(join(bundle, "agents"), { recursive: true });
     await mkdir(join(bundle, ".claude-plugin"));
     for (const skill of ["pr-council", "github-readme", "smoke"])
@@ -266,32 +294,32 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, arg
       round: options.delta === undefined ? 1 : 2,
       priorHead: options.delta === undefined ? null : "b".repeat(40),
       full: options.delta === undefined,
-      diff: options.delta ?? (options.facts ?? facts).diff,
-      files: (options.facts ?? facts).files,
+      diff: options.delta ?? inputFacts.diff,
+      files: inputFacts.files,
       entries: [],
     };
     const result =
       options.role === "voice"
         ? await adapter.voice(
             {
-              facts: options.facts ?? facts,
+              facts: inputFacts,
               classification: options.classification ?? "functional",
               cards: options.cards ?? [],
               rating: {} as never,
               agent: "publish:margot",
               round,
             },
-            options.signal ? { signal: options.signal } : context(),
+            options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : context(),
           )
         : await adapter.card(
             {
-              facts: options.facts ?? facts,
+              facts: inputFacts,
               name: "safety",
               classification: options.classification ?? "functional",
               agent: "publish:pr-reviewer",
               round,
             },
-            options.signal ? { signal: options.signal } : context(),
+            options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : context(),
           );
     return {
       ...(JSON.parse(await readFile(capture, "utf8")) as {
@@ -314,6 +342,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, arg
       result,
       bundle,
       work,
+      base,
     };
   } finally {
     await rm(root, { recursive: true, force: true });

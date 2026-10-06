@@ -53,7 +53,7 @@
     "executable": "${MARGOT_ROOT}/node_modules/.bin/claude",
     "ticketing": {
       "server": "YOUR_TICKETING_MCP_SERVER_NAME",
-      "command": "${MARGOT_ROOT}/node_modules/.bin/your-ticketing-mcp-server",
+      "command": "mcp-linear",
       "args": ["YOUR_SERVER_ARGUMENT"],
       "env": ["YOUR_TICKETING_CREDENTIAL_ENV_VAR"],
       "tools": ["mcp__YOUR_TICKETING_MCP_SERVER_NAME__YOUR_READ_TOOL"]

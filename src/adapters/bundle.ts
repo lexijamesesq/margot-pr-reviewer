@@ -31,3 +31,24 @@ export async function resolveBundle(directory: string, commit: string, context: 
     voiceAgent: "publish:margot",
   });
 }
+/**
+ * The base checkout the reviewers read at /work must be the request's base commit of the
+ * request's repository, clean, as the card bundle is checked against its pin.
+ */
+export async function verifyBaseCheckout(
+  directory: string,
+  repository: string,
+  base: string,
+  context: CallContext,
+) {
+  const git = (args: string[]) => execute("git", ["-C", directory, ...args], context);
+  const remote = (await git(["remote", "get-url", "origin"]).catch(() => ""))
+    .trim()
+    .match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?\/?$/i)?.[1];
+  if (
+    (await git(["rev-parse", "HEAD"]).catch(() => "")).trim() !== base ||
+    (await git(["status", "--porcelain", "--untracked-files=all"]).catch(() => "x")).trim() ||
+    remote?.toLowerCase() !== repository.toLowerCase()
+  )
+    throw new Error("Base checkout mismatch");
+}

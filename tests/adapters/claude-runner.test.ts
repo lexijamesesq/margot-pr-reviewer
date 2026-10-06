@@ -82,16 +82,25 @@ it("loads the card reviewer natively from the mounted bundle with the previous r
     addDir: "/opt/margot/bundle/skills/pr-council",
     mcpConfig: "/run/margot/mcp.json",
     // `//` makes a permission path absolute; a single slash would anchor it at /work.
+    // Grep and Glob have no allow entry: dontAsk permits them only in the working directory
+    // (/work) and the added pr-council directory, and Read denies apply to them.
     allowed: [
-      "Bash(gh:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh api:*)",
+      "Bash(gh run view:*)",
       "Read(//work/**)",
       "Read(//opt/margot/bundle/skills/pr-council/**)",
-      "Grep",
-      "Glob",
     ],
     disallowed: [
       "Agent",
+      "Bash(gh alias:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh config:*)",
+      "Bash(gh extension:*)",
       "Edit",
+      "Read(//proc/**)",
       "Read(//run/margot/mcp.json)",
       "Skill(publish:github-readme)",
       "Skill(publish:smoke)",
@@ -113,7 +122,7 @@ it("loads the voice natively with only read-only gh", async () => {
     mcpConfig: args.includes("--mcp-config"),
     strictMcp: args.includes("--strict-mcp-config"),
     allowed: values(args, "--allowedTools"),
-    disallowed: args.includes("--disallowedTools"),
+    disallowed: values(args, "--disallowedTools"),
     agentFlags: args.filter((arg) => arg.startsWith("--agent")),
   }).toEqual({
     agent: "publish:margot",
@@ -125,7 +134,12 @@ it("loads the voice natively with only read-only gh", async () => {
     mcpConfig: false,
     strictMcp: true,
     allowed: ["Bash(gh api:*)", "Bash(gh pr diff:*)"],
-    disallowed: false,
+    disallowed: [
+      "Bash(gh alias:*)",
+      "Bash(gh extension:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh config:*)",
+    ],
     agentFlags: ["--agent"],
   });
 });
@@ -147,7 +161,7 @@ it("serves no evidence server and grants no evidence tool", async () => {
   await expect(source("evidence-server.ts")).rejects.toThrow();
 });
 it("tells the card where the base checkout is and to read the head with gh", async () => {
-  const { stdin } = await fakeClaude({ delta: "diff --git a/a.ts b/a.ts\n+round delta\n" });
+  const { stdin } = await fakeClaude();
   const instructions = stdin.split("\n").slice(0, -1).join("\n");
   const supplied = JSON.parse(stdin.split("\n").at(-1) ?? "");
   expect({
@@ -157,7 +171,7 @@ it("tells the card where the base checkout is and to read the head with gh", asy
     readDiff: stdin.includes("read_diff"),
     factsDiff: supplied.facts.diff,
     roundDiff: supplied.round.diff,
-    inlineDiff: stdin.includes("round delta"),
+    inlineDiff: stdin.includes("+new"),
   }).toEqual({
     work: true,
     readDiff: false,
@@ -174,11 +188,11 @@ it("denies the card every sibling skill in the plugin but pr-council", async () 
       .filter((arg) => arg.startsWith("Skill"))
       .sort(),
     allowed: values(card.args, "--allowedTools").filter((arg) => arg.startsWith("Skill")),
-    voiceDenies: voice.args.includes("--disallowedTools"),
+    voiceDenies: values(voice.args, "--disallowedTools").filter((arg) => arg.startsWith("Skill")),
   }).toEqual({
     denied: ["Skill(publish:github-readme)", "Skill(publish:smoke)"],
     allowed: [],
-    voiceDenies: false,
+    voiceDenies: [],
   });
 });
 it("names the card in the prompt and leaves the finding conventions to the bundle", async () => {
@@ -385,7 +399,7 @@ it("keeps ticket credentials out of the model prompt and parsed result", async (
 });
 it("sends Claude its complete prompt on stdin", async () => {
   const inputFacts = { ...facts, body: "Review context. ".repeat(2000) };
-  const { args, docker, stdin } = await fakeClaude({ facts: inputFacts, delta: "+delta\n" });
+  const { args, docker, stdin, base } = await fakeClaude({ facts: inputFacts, delta: "+delta\n" });
   const supplied = JSON.parse(stdin.split("\n").at(-1) ?? "");
   expect({
     stdinPrompt:
@@ -399,6 +413,7 @@ it("sends Claude its complete prompt on stdin", async () => {
     argvPrompt: false,
     facts: {
       ...facts,
+      base,
       body: "Review context. ".repeat(2000),
       diff: "Not inlined: read it with gh at the head sha",
     },
@@ -519,9 +534,7 @@ it("kills its named container when the call times out", async () => {
   const dir = await mkdtemp(join(tmpdir(), "margot-docker-log-"));
   const dockerLog = join(dir, "docker");
   try {
-    await expect(
-      fakeClaude({ dockerLog, hang: true, signal: AbortSignal.timeout(500) }),
-    ).rejects.toThrow();
+    await expect(fakeClaude({ dockerLog, hang: true, timeoutMs: 500 })).rejects.toThrow();
     const calls = (await readFile(dockerLog, "utf8"))
       .trim()
       .split("\n")
@@ -554,4 +567,65 @@ it("names every container uniquely", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+it("limits the card's gh to the read commands its skill names, for card and voice alike", async () => {
+  const card = await fakeClaude();
+  const voice = await fakeClaude({ role: "voice" });
+  const gh = ["Bash(gh alias:*)", "Bash(gh extension:*)", "Bash(gh auth:*)", "Bash(gh config:*)"];
+  expect({
+    bareGh: [
+      ...values(card.args, "--allowedTools"),
+      ...values(voice.args, "--allowedTools"),
+    ].filter((rule) => rule === "Bash(gh:*)" || rule === "Bash"),
+    cardDenies: gh.filter((rule) => values(card.args, "--disallowedTools").includes(rule)),
+    voiceDenies: gh.filter((rule) => values(voice.args, "--disallowedTools").includes(rule)),
+  }).toEqual({ bareGh: [], cardDenies: gh, voiceDenies: gh });
+});
+it("allows no unscoped search and denies /proc", async () => {
+  const { args } = await fakeClaude();
+  const allowed = values(args, "--allowedTools");
+  expect({
+    unscoped: allowed.filter((rule) => !rule.includes("(")),
+    reads: allowed.filter((rule) => /^(Read|Grep|Glob)\(/.test(rule)),
+    proc: values(args, "--disallowedTools").includes("Read(//proc/**)"),
+    addDir: values(args, "--add-dir"),
+  }).toEqual({
+    unscoped: [],
+    reads: ["Read(//work/**)", "Read(//opt/margot/bundle/skills/pr-council/**)"],
+    proc: true,
+    addDir: ["/opt/margot/bundle/skills/pr-council"],
+  });
+});
+it("refuses a base checkout at another commit, of another repository, or dirty", async () => {
+  await expect(fakeClaude({ checkout: { base: "c".repeat(40) } })).rejects.toThrow(
+    "Base checkout mismatch",
+  );
+  await expect(
+    fakeClaude({ checkout: { remote: "https://github.com/someone/else.git" } }),
+  ).rejects.toThrow("Base checkout mismatch");
+  await expect(fakeClaude({ checkout: { dirty: true } })).rejects.toThrow("Base checkout mismatch");
+  await expect(
+    fakeClaude({ checkout: { remote: `git@github.com:${facts.repository}.git` } }),
+  ).resolves.toBeDefined();
+});
+it("sends a delta round's card to the compare between the reviewed heads, limited to its files", async () => {
+  const { stdin } = await fakeClaude({ delta: "+round delta\n" });
+  const instructions = stdin.split("\n").slice(0, -1).join("\n");
+  const supplied = JSON.parse(stdin.split("\n").at(-1) ?? "");
+  const compare = `gh api repos/${facts.repository}/compare/${"b".repeat(40)}...${facts.head}`;
+  expect({
+    priorHead: instructions.includes(`The previously reviewed head is ${"b".repeat(40)}.`),
+    compare: instructions.includes(
+      `Read your delta with ${compare}, limited to the files in round.files; the head sha's pull request diff is not your delta.`,
+    ),
+    headDiff: instructions.includes("Read the pull request head with gh at the head sha"),
+    roundDiff: supplied.round.diff,
+    inlineDiff: stdin.includes("round delta"),
+  }).toEqual({
+    priorHead: true,
+    compare: true,
+    headDiff: true,
+    roundDiff: `Not inlined: read it with ${compare}, limited to round.files`,
+    inlineDiff: false,
+  });
 });

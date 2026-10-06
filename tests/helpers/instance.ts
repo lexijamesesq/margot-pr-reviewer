@@ -46,7 +46,7 @@ export const config = {
     executable: `${margotRootPlaceholder}/node_modules/.bin/claude`,
     ticketing: {
       server: "tickets",
-      command: `${margotRootPlaceholder}/node_modules/.bin/tickets`,
+      command: "tickets",
       args: [],
       env: ["TICKET_TOKEN"],
       tools: ["mcp__tickets__read"],

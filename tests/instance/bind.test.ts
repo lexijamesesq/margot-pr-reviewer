@@ -56,13 +56,13 @@ it("requires a unique run URL for authority", async () => {
   expect(error).toBeInstanceOf(Error);
   expect((error as Error).message).toMatch(/run URL/);
 });
-it("resolves runtime placeholders in Claude and ticketing paths", async () => {
+it("resolves runtime placeholders in Claude paths and leaves the in-container ticketing command alone", async () => {
   const root = "/runtime/margot";
   const result = await bindRequest(bindInput(), readPull());
   expect(result.config.claude).toMatchObject({
     executable: `${root}/node_modules/.bin/claude`,
     pluginDirectory: `${root}/publish-skills`,
-    ticketing: { command: `${root}/node_modules/.bin/tickets` },
+    ticketing: { command: "tickets" },
     container: { work: `${root}/base` },
   });
 });
@@ -85,20 +85,6 @@ it("rejects unresolved placeholders in executable paths at bind time", async () 
       config: {
         ...config,
         claude: { ...config.claude, pluginDirectory: `${stalePlaceholder}/publish-skills` },
-      },
-    },
-    {
-      field: "claude.ticketing.command",
-      placeholder: stalePlaceholder,
-      config: {
-        ...config,
-        claude: {
-          ...config.claude,
-          ticketing: {
-            ...config.claude.ticketing,
-            command: `${stalePlaceholder}/node_modules/.bin/tickets`,
-          },
-        },
       },
     },
     {
@@ -133,6 +119,29 @@ it("rejects unresolved placeholders in executable paths at bind time", async () 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe(
       `Unresolved placeholder ${candidate.placeholder} in ${candidate.field}; the install root is \${MARGOT_ROOT}`,
+    );
+  }
+});
+it("refuses a ticketing command that names the Margot root, since it runs in the container", async () => {
+  const commands = [
+    `\${MARGOT_ROOT}/node_modules/.bin/tickets`,
+    `${stalePlaceholder}/node_modules/.bin/tickets`,
+    "/runtime/margot/node_modules/.bin/tickets",
+  ];
+  for (const command of commands) {
+    const error = await captureError(() =>
+      bindRequest(
+        bindInput({
+          config: {
+            ...config,
+            claude: { ...config.claude, ticketing: { ...config.claude.ticketing, command } },
+          },
+        }),
+        readPull(),
+      ),
+    );
+    expect((error as Error).message).toBe(
+      "claude.ticketing.command runs inside the runtime container: name the image's command (such as mcp-linear), not a path under the Margot root or a placeholder",
     );
   }
 });
