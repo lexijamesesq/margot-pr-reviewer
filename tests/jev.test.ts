@@ -4,7 +4,14 @@ import { councilText, jevAdapter, jevState } from "../src/adapters/jev.js";
 import * as processAdapter from "../src/adapters/process.js";
 import { recordedServices, review } from "../src/index.js";
 import { rate } from "../src/policy.js";
-import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
+import {
+  adherenceDistinctQuestion,
+  adherenceQuestions,
+  adherenceRiskQuestion,
+  classificationQuestions,
+  riskQuestions,
+  routeQuestions,
+} from "../src/questions.js";
 import {
   cardNames,
   classificationSchema,
@@ -704,9 +711,17 @@ describe("the advisory template-adherence check", () => {
       { name: "works-and-proven", findings: [{ what: "no test" }, { what: "no receipt" }] },
     ],
   };
+  const questions = adherenceQuestions(["safety", "works-and-proven"]);
   const distinct = (card: string) => ({
     type: "noul",
-    instructions: `Does the '${card}' card's finding state ITS OWN review lens's distinct contribution, rather than merely RESTATE in similar words the same root-cause chain another card's finding already states? Several cards independently corroborating one real defect from their own distinct angles is legitimate and is True; only a phrasing-level restatement adding no lens-specific point is False.`,
+    instructions: adherenceDistinctQuestion(card),
+  });
+  it("keeps the previous reviewer's wording, verbatim", () => {
+    expect({ risk: adherenceRiskQuestion, distinct: adherenceDistinctQuestion("safety") }).toEqual({
+      risk: "Is the risk line a SHORT CLASSIFICATION — a few-word noun phrase naming the KIND of exposure (e.g. 'workflow-injection risk' or 'dependency bump, non-behavioral') — rather than a full explanatory sentence? True = a classification; False = a sentence.",
+      distinct:
+        "Does the 'safety' card's finding state ITS OWN review lens's distinct contribution, rather than merely RESTATE in similar words the same root-cause chain another card's finding already states? Several cards independently corroborating one real defect from their own distinct angles is legitimate and is True; only a phrasing-level restatement adding no lens-specific point is False.",
+    });
   });
   it("asks the previous reviewer's questions over its prose state", async () => {
     const j = jev({
@@ -714,17 +729,13 @@ describe("the advisory template-adherence check", () => {
       distinct__safety: { type: "noul", noul: 0.2 },
       "distinct__works-and-proven": { type: "noul", noul: 0.8 },
     });
-    const result = await j.adapter.adherence(input, context());
+    const result = await j.adapter.adherence(input, questions, context());
     expect({ sent: j.calls, result }).toEqual({
       sent: [
         {
           model: "test-model",
           questions: {
-            risk_is_classification: {
-              type: "noul",
-              instructions:
-                "Is the risk line a SHORT CLASSIFICATION — a few-word noun phrase naming the KIND of exposure (e.g. 'workflow-injection risk' or 'dependency bump, non-behavioral') — rather than a full explanatory sentence? True = a classification; False = a sentence.",
-            },
+            risk_is_classification: { type: "noul", instructions: adherenceRiskQuestion },
             distinct__safety: distinct("safety"),
             "distinct__works-and-proven": distinct("works-and-proven"),
           },
@@ -757,13 +768,13 @@ describe("the advisory template-adherence check", () => {
       fetch: async () => new Response("{}", { status: 503 }),
     });
     expect({
-      result: await adapter.adherence(input, context()),
+      result: await adapter.adherence(input, questions, context()),
       fallback: fallback.mock.calls.length,
     }).toEqual({ result: { status: "unchecked" }, fallback: 0 });
   });
   it("re-asks an unreadable answer, then reads a still-missing one as a pass", async () => {
     const j = jev({ risk_is_classification: { type: "noul" } });
-    const result = await j.adapter.adherence(input, context());
+    const result = await j.adapter.adherence(input, questions, context());
     expect({ calls: j.attempts(), result }).toEqual({
       calls: 3,
       result: {

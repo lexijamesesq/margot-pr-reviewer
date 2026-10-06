@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { adherenceQuestions } from "../../src/questions.js";
 import { checkText } from "../../src/render.js";
 import { recorded, reviewed, reviewRecording } from "../helpers/review.js";
 
@@ -24,6 +25,9 @@ describe("the advisory template-adherence check", () => {
     expect({ adherence: result.adherence, input: callInput("adherence") }).toEqual({
       adherence: flagged,
       input: {
+        questions: adherenceQuestions(
+          result.cards.filter((card) => card.findings.length > 0).map((card) => card.name),
+        ),
         risk: result.voice?.risk,
         summary: result.voice?.summary,
         cards: result.cards.map((card) => ({

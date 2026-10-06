@@ -86,3 +86,15 @@ export const routingExposureQuestion = {
   instructions: "Score this change's overall security/operational exposure.",
   criteria: riskQuestions.data_security,
 } as const;
+// The previous reviewer's advisory template-adherence questions, verbatim.
+export const adherenceRiskQuestion =
+  "Is the risk line a SHORT CLASSIFICATION — a few-word noun phrase naming the KIND of exposure (e.g. 'workflow-injection risk' or 'dependency bump, non-behavioral') — rather than a full explanatory sentence? True = a classification; False = a sentence.";
+export const adherenceDistinctQuestion = (card: string) =>
+  `Does the '${card}' card's finding state ITS OWN review lens's distinct contribution, rather than merely RESTATE in similar words the same root-cause chain another card's finding already states? Several cards independently corroborating one real defect from their own distinct angles is legitimate and is True; only a phrasing-level restatement adding no lens-specific point is False.`;
+/** The risk-line question, and one distinct-contribution question per card with findings. */
+export const adherenceQuestions = (cardsWithFindings: readonly string[]) => ({
+  risk_is_classification: adherenceRiskQuestion,
+  ...Object.fromEntries(
+    cardsWithFindings.map((card) => [`distinct__${card}`, adherenceDistinctQuestion(card)]),
+  ),
+});

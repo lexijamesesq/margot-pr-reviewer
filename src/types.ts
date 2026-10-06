@@ -97,7 +97,11 @@ export interface Services {
   progress?(title: ReviewPhaseTitle, context: CallContext): Promise<unknown>;
   facts(request: ReviewRequest, context: CallContext): Promise<unknown>;
   /** The advisory template-adherence check over what Margot will post; it never gates. */
-  adherence?(input: AdherenceInput, context: CallContext): Promise<unknown>;
+  adherence?(
+    input: AdherenceInput,
+    questions: Readonly<Record<string, string>>,
+    context: CallContext,
+  ): Promise<unknown>;
   compare?(request: ReviewRequest, priorHead: string, context: CallContext): Promise<unknown>;
   classify(
     facts: Facts,

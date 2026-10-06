@@ -22,7 +22,12 @@ import {
   validateVoice,
   verifiedTriage,
 } from "./policy.js";
-import { classificationQuestions, riskQuestions, routeQuestions } from "./questions.js";
+import {
+  adherenceQuestions,
+  classificationQuestions,
+  riskQuestions,
+  routeQuestions,
+} from "./questions.js";
 import { mechanicalVerdict, postedSummary, render, riskLabel, shownFindingGap } from "./render.js";
 import {
   adherenceSchema,
@@ -99,6 +104,9 @@ async function adherence(
             findings: card.findings.map((finding) => ({ what: finding.what })),
           })),
         },
+        adherenceQuestions(
+          review.cards.filter((card) => card.findings.length > 0).map((card) => card.name),
+        ),
         { signal: AbortSignal.timeout(timeoutMs) },
       ),
     );
