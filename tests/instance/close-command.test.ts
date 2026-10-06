@@ -43,3 +43,14 @@ it("rejects a malformed closer repository before GitHub", async () => {
   expect(instanceExitCode(error)).toBe(1);
   expect(calls).toHaveLength(0);
 });
+it("maps --blocking-checks into the floor stop's title", async () => {
+  const { client, writes } = closeCommandClient();
+  await runInstanceCommand(
+    closeCommandArgs({ published: "false", "blocking-checks": "failing: ci / checks" }),
+    { GH_TOKEN: "write-token" },
+    client,
+  );
+  expect(writes[0]).toMatchObject({
+    output: { title: "Margot: preflight — failing: ci / checks — waiting for the next push" },
+  });
+});

@@ -17,6 +17,8 @@ export type CloseStrandedCheckInput = {
   published: string;
   stopReason: string;
   liveSha?: string;
+  /** What held the floor, as the host words it (such as "pending: ci / checks, lint"). */
+  blockingChecks?: string;
 };
 
 export type CloseStrandedCheckDecision = {
@@ -34,7 +36,7 @@ type Checks = Awaited<
 
 type CheckConclusion = "skipped" | "cancelled" | "failure" | "action_required";
 type CheckOutput = { conclusion: CheckConclusion; title: string; summary: string };
-type StopContext = { liveSha: string; stopped: [string, string] };
+type StopContext = { liveSha: string; stopped: [string, string]; blockingChecks: string };
 
 const stopChecks = {
   superseded: ({ liveSha }: StopContext): CheckOutput => ({
@@ -73,9 +75,9 @@ const stopChecks = {
     title: "Margot: not reviewed: empty (no changed files)",
     summary: "This PR changes no files, so Margot has nothing to review.",
   }),
-  floor: (): CheckOutput => ({
+  floor: ({ blockingChecks }: StopContext): CheckOutput => ({
     conclusion: "action_required",
-    title: "Margot: preflight — required checks not green — waiting for the next push",
+    title: `Margot: preflight — ${blockingChecks || "required checks not green"} — waiting for the next push`,
     summary:
       "The required checks were not green when the review's wait ended, so Margot did not review this head. She reviews it when she is dispatched again: on the next push, or when the host re-dispatches her once the checks finish.",
   }),
@@ -184,7 +186,11 @@ export async function closeStrandedCheck(
         : ["package", "did not publish"];
   const cancelled =
     stopped[1] === "cancelled" || (stopped[0] === "package" && input.stopReason === "cancelled");
-  const context = { liveSha: input.liveSha ?? ownPull.head.sha, stopped };
+  const context = {
+    liveSha: input.liveSha ?? ownPull.head.sha,
+    stopped,
+    blockingChecks: input.blockingChecks?.trim() ?? "",
+  };
   const mapped = Object.hasOwn(stopChecks, input.stopReason)
     ? stopChecks[input.stopReason as keyof typeof stopChecks]
     : undefined;

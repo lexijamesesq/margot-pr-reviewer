@@ -177,6 +177,7 @@ export async function runInstanceCommand(
       "published",
       "stop-reason",
       "live-sha",
+      "blocking-checks",
     ]);
     const head = shaSchema.parse(required(input, "head"));
     const ownRuns = required(input, "own-runs");
@@ -197,6 +198,7 @@ export async function runInstanceCommand(
       published,
       stopReason: required(input, "stop-reason"),
       ...(input["live-sha"] ? { liveSha: shaSchema.parse(input["live-sha"]) } : {}),
+      ...(input["blocking-checks"] ? { blockingChecks: input["blocking-checks"] } : {}),
     };
     if (!shouldCloseStrandedCheck(closeInput))
       return { action: "left" as const, message: "nothing to close" };

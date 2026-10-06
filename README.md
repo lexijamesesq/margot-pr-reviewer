@@ -188,8 +188,10 @@ margot-instance bind-request \
 
 Closes a review check this run left open when routing failed, review failed, or
 publication did not happen. `--check-name` names the review check to close (your
-`publisher.checks.review`); it defaults to `review / margot`. Exits 0 after closing or
-finding nothing to close, and 2 on a GitHub read or write failure.
+`publisher.checks.review`); it defaults to `review / margot`. For a floor stop,
+`--blocking-checks` names what held the floor (such as `pending: ci / checks, lint`) and
+goes into the check's title; without it the title says "required checks not green".
+Exits 0 after closing or finding nothing to close, and 2 on a GitHub read or write failure.
 
 ```sh
 margot-instance close-stranded-check \
