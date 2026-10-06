@@ -17,6 +17,8 @@ export interface Recording {
   disableAutoMerge: unknown;
   publication: unknown;
   failures?: Record<string, string>;
+  /** The advisory template-adherence answer; a recording without one reads as unchecked. */
+  adherence?: unknown;
 }
 export function recordedServices(
   recording: Recording,
@@ -37,6 +39,7 @@ export function recordedServices(
     calls,
     publications,
     facts: (request) => read("facts", request, data.facts),
+    adherence: (input) => read("adherence", input, data.adherence),
     compare: (request, priorHead) => read("compare", { request, priorHead }, data.comparison),
     classify: (facts, questions) =>
       read("classification", { facts, questions }, data.classification),

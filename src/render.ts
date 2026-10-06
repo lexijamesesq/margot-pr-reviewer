@@ -48,13 +48,13 @@ function firstClause(value: string): string {
 }
 
 /** Whether a documentation change was editorial: it is the one class reviewed by no card. */
-const editorial = (review: Review) =>
+const editorial = (review: ReviewCore) =>
   review.classification === "documentation" &&
   review.routeAnswer !== null &&
   review.cards.length === 0;
 
 /** The risk label and summary of a review the voice did not rule. */
-function codeVerdict(review: Review): { risk: string; summary: string } {
+function codeVerdict(review: ReviewCore): { risk: string; summary: string } {
   if (review.classification === "mechanical" && review.routeAnswer === null)
     return {
       risk: "mechanical change — no functional change",
@@ -240,8 +240,33 @@ export function selfInstrumentCheck(input: {
 }
 
 /** The comment's risk label: the voice's, or the one code gives a verdict it reached alone. */
-function riskLabel(review: Review): string {
+export function riskLabel(review: ReviewCore): string {
   return normalized(review.voice ? (review.voice.risk ?? "") : codeVerdict(review).risk);
+}
+
+/** The comment's summary: the voice's, or the one code gives a verdict it reached alone. */
+export function postedSummary(review: ReviewCore): string {
+  return review.voice ? review.voice.summary.trim() : codeVerdict(review).summary;
+}
+
+/** A mechanical change cleared without routing: the verdict code reaches for a version bump. */
+export function mechanicalVerdict(review: ReviewCore): boolean {
+  return review.classification === "mechanical" && review.routeAnswer === null;
+}
+
+/** The advisory adherence lines, as the previous reviewer's poster wrote them. */
+function adherenceLines(review: Review): string[] {
+  const adherence = review.adherence;
+  if (!adherence) return [];
+  if (adherence.status !== "checked") return [`adherence: ${adherence.status}`];
+  const restating = adherence.cardsRestating.filter(Boolean);
+  return [
+    `adherence: ${adherence.ok ? "clean" : "flags"}`,
+    ...(adherence.riskClassificationOk
+      ? []
+      : ["  risk line reads as a sentence, not a classification"]),
+    ...(restating.length ? [`  cards restating a shared finding: ${restating.join(", ")}`] : []),
+  ];
 }
 
 /** The verdict check's summary: outcome, band and the risk label's first sentence. */
@@ -254,8 +279,7 @@ export function checkSummary(review: Review): string {
 
 export function render(review: Review): string {
   const { decision, request } = review;
-  const verdict = codeVerdict(review);
-  const rationale = review.voice ? review.voice.summary.trim() : verdict.summary;
+  const rationale = postedSummary(review);
   const tally = findingTally(review);
   const presentation = defaultPresentation(review);
   const cards = cardRows(review);
@@ -323,16 +347,15 @@ export function render(review: Review): string {
  */
 export function checkText(review: Review): string {
   const summoned = review.cards.map((card) => card.name);
-  const verdictSource =
-    review.classification === "mechanical" && review.routeAnswer === null
-      ? "mechanical"
-      : review.voice
-        ? "verdict_voice"
-        : editorial(review)
-          ? "documentation_editorial"
-          : review.cards.length === 0 && review.decision.rating.band !== "LOW"
-            ? "no_council"
-            : "fast_path";
+  const verdictSource = mechanicalVerdict(review)
+    ? "mechanical"
+    : review.voice
+      ? "verdict_voice"
+      : editorial(review)
+        ? "documentation_editorial"
+        : review.cards.length === 0 && review.decision.rating.band !== "LOW"
+          ? "no_council"
+          : "fast_path";
   const lines = [
     `outcome: ${review.decision.outcome} | band: ${review.decision.rating.band}`,
     `decision_source: ${review.provenance.decision_source ?? "jev"}`,
@@ -341,6 +364,7 @@ export function checkText(review: Review): string {
     `summoned: ${summoned.join(", ") || "none"}`,
     `convergence: ${JSON.stringify(review.convergence)}`,
     `can auto-merge: ${review.decision.mergeEligible ? "True" : "False"}`,
+    ...adherenceLines(review),
     `band_reason: ${review.decision.rating.rationale}`,
     "pipeline_ok: true",
     `vector: ${JSON.stringify(review.riskAnswer?.dimensions ?? {})}`,

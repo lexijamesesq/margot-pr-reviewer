@@ -22,8 +22,9 @@ import {
   verifiedTriage,
 } from "./policy.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "./questions.js";
-import { render, shownFindingGap } from "./render.js";
+import { mechanicalVerdict, postedSummary, render, riskLabel, shownFindingGap } from "./render.js";
 import {
+  adherenceSchema,
   bundleSchema,
   cardSchema,
   classificationSchema,
@@ -40,6 +41,7 @@ import {
 } from "./schemas.js";
 import { type CardStage, cardStage, type Stage, stages } from "./stages.js";
 import type {
+  Adherence,
   Bundle,
   Card,
   Facts,
@@ -69,6 +71,38 @@ function currentCheck(runs: CheckFact[]): CheckFact | undefined {
       current = run;
   }
   return current;
+}
+/**
+ * The previous reviewer's advisory template-adherence check, on the verdict Margot will post.
+ * Skipped for a mechanical verdict or with no risk line; a Jev outage, a service that is not
+ * there, or any failure is `unchecked`. It never touches the decision and never throws.
+ */
+async function adherence(
+  review: ReviewCore,
+  services: Services,
+  timeoutMs: number,
+): Promise<Adherence> {
+  const risk = riskLabel(review);
+  if (mechanicalVerdict(review) || !risk) return { status: "skipped" };
+  if (!services.adherence) return { status: "unchecked" };
+  try {
+    return adherenceSchema.parse(
+      await services.adherence(
+        {
+          risk,
+          summary: postedSummary(review),
+          cards: review.cards.map((card) => ({
+            name: card.name,
+            findings: card.findings.map((finding) => ({ what: finding.what })),
+          })),
+        },
+        { signal: AbortSignal.timeout(timeoutMs) },
+      ),
+    );
+  } catch (error) {
+    console.warn(`Margot: adherence check unchecked (${errorMessage(error)})`);
+    return { status: "unchecked" };
+  }
 }
 export async function review(
   requestInput: unknown,
@@ -422,6 +456,8 @@ export async function review(
       const gap = shownFindingGap(core);
       if (gap) throw new Error(gap);
       stage = before;
+      // Advisory, on the final verdict; saved in the receipt so a same-head replay repeats it.
+      core.adherence = await adherence(core, services, config.timeoutMs);
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
     const metadata = services.reviewMetadata?.() ?? {};

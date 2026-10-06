@@ -66,10 +66,14 @@ type ModelResponse = {
 type JevRetry = { question: string; attempt: number; reason: string };
 /**
  * The run's diagnostics, as the previous reviewer kept them: each card's raw block, duration,
- * turns and models, and the voice's raw prose, with each re-ask of a malformed Jev answer.
- * Tool output and the environment never go in.
+ * turns and models, and the voice's raw prose, with each re-ask of a malformed Jev answer and,
+ * for a completed review, its advisory adherence check. Tool output and the environment never go in.
  */
-export function diagnostics(responses: ModelResponse[], jevRetries: JevRetry[] = []) {
+export function diagnostics(
+  responses: ModelResponse[],
+  jevRetries: JevRetry[] = [],
+  adherence?: unknown,
+) {
   const timing = (r: ModelResponse) => ({
     durationMs: r.durationMs ?? null,
     numTurns: r.numTurns ?? null,
@@ -83,6 +87,7 @@ export function diagnostics(responses: ModelResponse[], jevRetries: JevRetry[] =
       .map((r) => ({ card: r.role, raw: r.raw, ...timing(r) })),
     voice: voice ? { prose: voice.raw, ...timing(voice) } : null,
     jevRetries,
+    ...(adherence === undefined ? {} : { adherence }),
   };
 }
 /** Writes diagnostics.json next to the output file, readable only by its owner. */
@@ -90,10 +95,11 @@ export async function writeDiagnostics(
   outputFile: string,
   responses: ModelResponse[],
   jevRetries: JevRetry[] = [],
+  adherence?: unknown,
 ) {
   await writeFile(
     join(dirname(outputFile), "diagnostics.json"),
-    `${JSON.stringify(diagnostics(responses, jevRetries), null, 2)}\n`,
+    `${JSON.stringify(diagnostics(responses, jevRetries, adherence), null, 2)}\n`,
     { mode: 0o600 },
   );
 }
@@ -158,7 +164,12 @@ export async function runCli(
       throw new InputError(`cannot write output file ${outputFile} (${code(error)})`);
     }
     try {
-      await writeDiagnostics(outputFile, responses, jevRetries);
+      await writeDiagnostics(
+        outputFile,
+        responses,
+        jevRetries,
+        result.kind === "reviewed" ? result.adherence : undefined,
+      );
     } catch (error) {
       throw new InputError(`cannot write diagnostics next to ${outputFile} (${code(error)})`);
     }

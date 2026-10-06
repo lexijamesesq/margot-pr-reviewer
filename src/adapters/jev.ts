@@ -348,5 +348,62 @@ export function jevAdapter(options: {
       dimensions: Object.fromEntries(dimensions.map((k) => [k, riskDimension(a[k])])),
     });
   };
-  return { classify, route, risk };
+  /**
+   * The previous reviewer's advisory template-adherence check: is the risk line a short
+   * classification, and does each card with findings state its own lens's contribution. It
+   * never falls back and never throws: a Jev outage is `unchecked`, and an answer still
+   * missing after the re-asks reads as a pass, so it never spuriously flags.
+   */
+  const adherence: NonNullable<Services["adherence"]> = async (input, c) => {
+    const withFindings = input.cards.filter((card) => card.findings.length > 0);
+    const questions: Record<string, { type: "noul"; instructions: string }> = {
+      risk_is_classification: {
+        type: "noul",
+        instructions:
+          "Is the risk line a SHORT CLASSIFICATION — a few-word noun phrase naming the KIND of exposure (e.g. 'workflow-injection risk' or 'dependency bump, non-behavioral') — rather than a full explanatory sentence? True = a classification; False = a sentence.",
+      },
+    };
+    for (const card of withFindings)
+      questions[`distinct__${card.name}`] = {
+        type: "noul",
+        instructions: `Does the '${card.name}' card's finding state ITS OWN review lens's distinct contribution, rather than merely RESTATE in similar words the same root-cause chain another card's finding already states? Several cards independently corroborating one real defect from their own distinct angles is legitimate and is True; only a phrasing-level restatement adding no lens-specific point is False.`,
+      };
+    const state = [
+      `Risk line: ${input.risk}`,
+      `Summary: ${input.summary}`,
+      "",
+      "Council findings (card: finding):",
+      ...input.cards.flatMap((card) =>
+        card.findings.map((finding) => `- [${card.name}] ${finding.what}`),
+      ),
+    ].join("\n");
+    let answers: Record<string, unknown>;
+    try {
+      answers = (
+        await decide(
+          "adherence",
+          (a) => unreadableNouls(a, Object.keys(questions)),
+          questions,
+          state,
+          c,
+        )
+      ).answers;
+    } catch (error) {
+      console.warn(`Margot: adherence check unchecked (${errorMessage(error)})`);
+      return { status: "unchecked" };
+    }
+    const value = (key: string) => noul.safeParse(answers[key]).data?.noul ?? 1;
+    const riskClassificationOk = value("risk_is_classification") >= 0.5;
+    const cardsRestating = withFindings
+      .filter((card) => value(`distinct__${card.name}`) < 0.5)
+      .map((card) => card.name);
+    return {
+      status: "checked",
+      riskClassificationOk,
+      cardsRestating,
+      ok: riskClassificationOk && cardsRestating.length === 0,
+      nouls: Object.fromEntries(Object.keys(questions).map((key) => [key, value(key)])),
+    };
+  };
+  return { classify, route, risk, adherence };
 }
