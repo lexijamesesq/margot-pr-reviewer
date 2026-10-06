@@ -226,6 +226,11 @@ function bindPrepared(input: BindRequestInput, prepared: ReturnType<typeof prepa
     input.margotRoot,
     "claude.pluginDirectory",
   );
+  config.claude.container.work = resolveMargotRoot(
+    config.claude.container.work,
+    input.margotRoot,
+    "claude.container.work",
+  );
   if (config.claude.ticketing)
     config.claude.ticketing.command = resolveMargotRoot(
       config.claude.ticketing.command,

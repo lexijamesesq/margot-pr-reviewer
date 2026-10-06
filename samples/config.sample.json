@@ -61,6 +61,11 @@
     "version": "0.0.0",
     "pluginDirectory": "${MARGOT_ROOT}/publish-skills",
     "reviewerModel": "YOUR_REVIEWER_MODEL",
+    "container": {
+      "docker": "docker",
+      "image": "YOUR_REGISTRY/margot-runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "work": "${MARGOT_ROOT}/base"
+    },
     "references": {
       "YOUR_REFERENCE_NAME": {
         "repository": "YOUR_ORG/YOUR_REFERENCE_REPOSITORY",

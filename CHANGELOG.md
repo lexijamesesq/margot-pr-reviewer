@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+
+Reviewers run in the previous reviewer's container with its tools.
+
+- Every card and voice `claude` invocation runs in its own `docker run --rm --read-only` of the runtime image, as user 1000 with every capability dropped, `no-new-privileges`, 3 GiB memory and 512 processes. Only the base-sha checkout (at `/work`) and the card bundle are mounted, both read-only; the config and `/tmp` are tmpfs. The image is `claude.container.image`, pinned by digest; the base checkout is `claude.container.work`. The pinned Claude version is checked inside the container.
+- A card's tools are the previous reviewer's: Skill (only `pr-council`, every sibling skill denied), `Bash(gh:*)`, Read over `/work` and the `pr-council` skill, Grep, Glob, and the configured ticketing read tools. Agent, Write and Edit are denied, as is reading the MCP config. The voice has Bash, limited to `gh api` and `gh pr diff`. The tool check expects exactly these.
+- The evidence MCP server and its tools (`read_diff`, `read_file`, `search_file`, `list_files`, `read_reference`, `read_check_run`) are removed, with the `@modelcontextprotocol/sdk` dependency. The card prompt says the base checkout is at `/work` and to read the pull request head with `gh` at the head sha; the diff is no longer inlined or served.
+- The credentials (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`, `GH_TOKEN`) and the ticketing MCP config reach the container by environment, never on the command line. The entrypoint writes the MCP config to tmpfs.
+- `runtime/` holds the image's Dockerfile and entrypoint, ported from the previous reviewer's. The card bundle is mounted, not baked.
+- The card bundle's `agents/pr-reviewer.md` must grant Skill, Read, Grep, Glob and Bash, and `agents/margot.md` must grant Bash.
+
 ## 0.8.0
 
 Margot decides and presents reviews as the previous reviewer did wherever the port had diverged without a ruling.

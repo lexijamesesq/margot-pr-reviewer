@@ -114,7 +114,8 @@ export function github(
     calls,
   };
 }
-/** Runs the Claude adapter against a scripted CLI and returns what the CLI captured plus the parsed result. */
+export const image = `example.invalid/margot-runtime@sha256:${"a".repeat(64)}`;
+/** Runs the Claude adapter against a scripted docker and returns what it captured plus the parsed result. */
 export async function fakeClaude(
   options: {
     version?: string;
@@ -142,36 +143,39 @@ export async function fakeClaude(
     cards?: Card[];
     /** Replaces the tools the fixture reviewer's frontmatter grants. */
     reviewerTools?: string[];
-    /** A file the fake CLI appends each invocation's arguments to. */
+    /** A file the fake docker appends each Claude invocation's arguments to. */
     spawnLog?: string;
     role?: "card" | "voice";
   } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
   try {
-    await mkdir(join(root, "agents"));
-    await mkdir(join(root, ".claude-plugin"));
+    const bundle = join(root, "bundle"),
+      work = join(root, "base");
+    await mkdir(work);
+    await mkdir(join(bundle, "agents"), { recursive: true });
+    await mkdir(join(bundle, ".claude-plugin"));
     for (const skill of ["pr-council", "github-readme", "smoke"])
-      await mkdir(join(root, "skills", skill), { recursive: true });
-    await writeFile(join(root, "skills/README.md"), "Not a skill.");
-    await writeFile(join(root, ".claude-plugin/plugin.json"), '{"name":"publish"}');
+      await mkdir(join(bundle, "skills", skill), { recursive: true });
+    await writeFile(join(bundle, "skills/README.md"), "Not a skill.");
+    await writeFile(join(bundle, ".claude-plugin/plugin.json"), '{"name":"publish"}');
     const reviewerTools = options.reviewerTools ?? [
       "Skill",
       "Read",
-      ...["read_diff", "read_file", "search_file", "list_files", "read_reference"].map(
-        (name) => `mcp__evidence__${name}`,
-      ),
+      "Grep",
+      "Glob",
+      "Bash",
       ...ticketing.tools,
     ];
     await writeFile(
-      join(root, "agents/pr-reviewer.md"),
+      join(bundle, "agents/pr-reviewer.md"),
       `---\ndescription: Test reviewer\nmodel: inherit\ntools:\n${reviewerTools.map((t) => `  - ${t}\n`).join("")}---\nPinned test law.\n`,
     );
     await writeFile(
-      join(root, "agents/margot.md"),
-      "---\ndescription: Test voice\nmodel: inherit\ntools:\n  - mcp__evidence__read_file\n  - mcp__evidence__read_diff\n---\nPinned test voice.\n",
+      join(bundle, "agents/margot.md"),
+      "---\ndescription: Test voice\nmodel: inherit\ntools:\n  - Bash\n---\nPinned test voice.\n",
     );
-    const executable = join(root, "claude.cjs"),
+    const executable = join(root, "docker.cjs"),
       capture = join(root, "capture.json");
     const envelope = {
       type: "result",
@@ -185,29 +189,28 @@ export async function fakeClaude(
       executable,
       `#!/usr/bin/env node
 const fs = require("node:fs");
-${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, process.argv.slice(2).join(" ") + "\\n");\n` : ""}if (process.argv.includes("--version")) {
+const argv = process.argv.slice(2);
+const at = argv.indexOf(${JSON.stringify(image)});
+const docker = argv.slice(0, at + 1);
+const args = argv.slice(at + 2);
+${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, args.join(" ") + "\\n");\n` : ""}if (args.includes("--version")) {
   if (process.env.MARGOT_WRITE_TOKEN) process.exit(19);
   console.log(${JSON.stringify(options.version ?? "0.0.1 test")});
 } else {
-  const args = process.argv.slice(2);
-  const mcpPath = args[args.indexOf("--mcp-config") + 1];
-  const mcpText = fs.readFileSync(mcpPath, "utf8");
-  const mcp = JSON.parse(mcpText);
-  const evidence = JSON.parse(mcp.mcpServers.evidence.env.MARGOT_EVIDENCE);
-  // Like Claude Code: the agent's frontmatter grants, --tools narrows the built-ins, and an
-  // MCP tool survives only when its server is configured and serves it.
+  const mcp = process.env.MARGOT_MCP_CONFIG ? JSON.parse(process.env.MARGOT_MCP_CONFIG) : { mcpServers: {} };
+  // Like docker: the bundle is the host directory mounted at the container's plugin directory.
+  const mounts = docker.flatMap((arg, i) => (docker[i - 1] === "--mount" ? [Object.fromEntries(arg.split(",").map((kv) => kv.split("=")))] : []));
   const value = (flag) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
-  const agentPath = value("--plugin-dir") + "/agents/" + String(value("--agent")).split(":")[1] + ".md";
+  const bundle = mounts.find((mount) => mount.target === value("--plugin-dir"))?.source;
+  // Like Claude Code: the agent's frontmatter grants, --tools narrows the built-ins, and an
+  // MCP tool survives only when its server is configured.
+  const agentPath = bundle + "/agents/" + String(value("--agent")).split(":")[1] + ".md";
   const listed = fs.existsSync(agentPath)
     ? [...fs.readFileSync(agentPath, "utf8").matchAll(/^  - (.+)$/gm)].map((m) => m[1])
     : [];
   const builtIns = (value("--tools") ?? "").split(",");
   const granted = listed.filter((tool) =>
-    !tool.startsWith("mcp__")
-      ? builtIns.includes(tool)
-      : tool === "mcp__evidence__read_reference"
-        ? !!evidence.references
-        : !!mcp.mcpServers[tool.split("__")[1]],
+    !tool.startsWith("mcp__") ? builtIns.includes(tool) : !!mcp.mcpServers[tool.split("__")[1]],
   );
   console.log(JSON.stringify({
     type: "system",
@@ -218,26 +221,25 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
       Object.keys(mcp.mcpServers).map((name) => ({ name, status: "connected" })),
   }));
   fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({
+    docker,
+    program: argv[at + 1],
     args,
+    mounts,
+    env: process.env,
     mcp,
-    mcpMode: fs.statSync(mcpPath).mode & 0o777,
-    mcpPath,
-    cwd: process.cwd(),
-    cwdEntries: fs.readdirSync(process.cwd()),
-    diffPath: evidence.diffPath,
     stdin: fs.readFileSync(0, "utf8"),
-    diff: fs.readFileSync(evidence.diffPath, "utf8"),
   }));
   console.log(JSON.stringify(${JSON.stringify(envelope)}));
 }`,
       { mode: 0o700 },
     );
     const claude = {
-      executable,
+      executable: "claude",
       ...(options.ticketing ? { ticketing: options.ticketing } : {}),
       version: "0.0.1",
-      pluginDirectory: root,
+      pluginDirectory: bundle,
       reviewerModel: "example-model",
+      container: { docker: executable, image, work },
       ...(options.references ? { references: options.references } : {}),
     };
     const adapter = options.cliEnvironment
@@ -291,12 +293,11 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
           );
     return {
       ...(JSON.parse(await readFile(capture, "utf8")) as {
+        docker: string[];
+        program: string;
         args: string[];
-        mcpMode: number;
-        mcpPath: string;
-        cwd: string;
-        cwdEntries: string[];
-        diffPath: string;
+        mounts: Record<string, string>[];
+        env: Record<string, string>;
         mcp: {
           mcpServers: Record<
             string,
@@ -307,10 +308,10 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
           >;
         };
         stdin: string;
-        diff: string;
       }),
       result,
-      root,
+      bundle,
+      work,
     };
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -323,21 +324,3 @@ export const ticketing = {
   env: ["TICKETING_TOKEN", "TICKETING_TENANT"],
   tools: ["mcp__tickets__get_issue", "mcp__tickets__get_comments"],
 };
-
-/** Connects an evidence server to an in-memory client; `close` shuts both down. */
-export async function connectEvidence(
-  server: ReturnType<typeof import("../../src/adapters/evidence-server.js").createEvidenceServer>,
-) {
-  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
-  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
-  const [a, b] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "test", version: "1" });
-  await Promise.all([server.connect(a), client.connect(b)]);
-  return {
-    client,
-    async close() {
-      await client.close();
-      await server.close();
-    },
-  };
-}

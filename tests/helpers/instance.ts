@@ -54,6 +54,10 @@ export const config = {
     version: "1.2.3",
     pluginDirectory: `${margotRootPlaceholder}/publish-skills`,
     reviewerModel: "reviewer",
+    container: {
+      image: `registry.example/margot-runtime@sha256:${"0".repeat(64)}`,
+      work: `${margotRootPlaceholder}/base`,
+    },
   },
   publisher: {
     checks: {

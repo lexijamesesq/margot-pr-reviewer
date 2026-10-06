@@ -249,10 +249,7 @@ export const publisherSchema = z.strictObject({
 const environmentVariableNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
 const ticketingSchema = z
   .strictObject({
-    server: z
-      .string()
-      .regex(/^[A-Za-z0-9_-]+$/)
-      .refine((server) => server !== "evidence", "The evidence server name is reserved"),
+    server: z.string().regex(/^[A-Za-z0-9_-]+$/),
     command: text,
     args: z.array(z.string()),
     env: z
@@ -287,6 +284,17 @@ export const liveConfigSchema = z.strictObject({
     pluginDirectory: z.string().min(1),
     reviewerModel: z.string().min(1),
     references: referencesSchema.optional(),
+    /** The runtime image every card and voice invocation runs in, and the base checkout it reads. */
+    container: z.strictObject({
+      docker: z.string().min(1).default("docker"),
+      image: z
+        .string()
+        .regex(
+          /^(?:[^\s@]+@)?sha256:[a-f0-9]{64}$/,
+          "The container image must be pinned by digest (name@sha256:… or sha256:…)",
+        ),
+      work: z.string().min(1),
+    }),
   }),
 });
 

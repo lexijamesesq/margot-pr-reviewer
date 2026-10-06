@@ -63,6 +63,7 @@ it("resolves runtime placeholders in Claude and ticketing paths", async () => {
     executable: `${root}/node_modules/.bin/claude`,
     pluginDirectory: `${root}/publish-skills`,
     ticketing: { command: `${root}/node_modules/.bin/tickets` },
+    container: { work: `${root}/base` },
   });
 });
 it("rejects unresolved placeholders in executable paths at bind time", async () => {
@@ -97,6 +98,17 @@ it("rejects unresolved placeholders in executable paths at bind time", async () 
             ...config.claude.ticketing,
             command: `${stalePlaceholder}/node_modules/.bin/tickets`,
           },
+        },
+      },
+    },
+    {
+      field: "claude.container.work",
+      placeholder: stalePlaceholder,
+      config: {
+        ...config,
+        claude: {
+          ...config.claude,
+          container: { ...config.claude.container, work: `${stalePlaceholder}/base` },
         },
       },
     },
