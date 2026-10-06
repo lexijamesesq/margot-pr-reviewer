@@ -299,11 +299,13 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       if (result.kind === "error") {
         if (refused && result.stage === stages.publication) throw refused;
         notReviewed = notReviewedReason(result.stage);
-        if (result.stage === stages.templateGate)
-          errorOutput = {
-            title: "not reviewed: poster error",
-            summary: result.diagnostic.slice(0, 900),
-          };
+        // The summary is the failure's reason, capped at 900, as the previous reviewer's
+        // error_check wrote it; the title stays the stage's.
+        errorOutput = {
+          title:
+            result.stage === stages.templateGate ? "not reviewed: poster error" : errorOutput.title,
+          summary: Array.from(result.diagnostic).slice(0, 900).join(""),
+        };
         throw new Error(`${result.stage}: ${result.diagnostic}`);
       }
       if (result.kind === "held") {
