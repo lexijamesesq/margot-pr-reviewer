@@ -271,3 +271,12 @@ it("takes the first sentence of the voice's risk label for the check summary", (
   value.voice.risk = "x".repeat(2000);
   expect(Array.from(checkSummary(value))).toHaveLength(900);
 });
+it("decides a mechanical verdict by one rule, mechanicalVerdict", async () => {
+  const { readdir, readFile } = await import("node:fs/promises");
+  const root = new URL("../../src/", import.meta.url);
+  const files = (await readdir(root, { recursive: true })).filter((f) => f.endsWith(".ts"));
+  const text = (await Promise.all(files.map((f) => readFile(new URL(f, root), "utf8")))).join("\n");
+  expect(text.match(/classification === "mechanical" && \w+\.routeAnswer === null/g)).toHaveLength(
+    1,
+  );
+});

@@ -55,7 +55,7 @@ const editorial = (review: ReviewCore) =>
 
 /** The risk label and summary of a review the voice did not rule. */
 function codeVerdict(review: ReviewCore): { risk: string; summary: string } {
-  if (review.classification === "mechanical" && review.routeAnswer === null)
+  if (mechanicalVerdict(review))
     return {
       risk: "mechanical change — no functional change",
       summary:
@@ -293,7 +293,7 @@ export function render(review: Review): string {
     : "none";
   const risk = riskLabel(review);
   const clarification = review.voice?.clarification?.trim();
-  const mechanical = review.classification === "mechanical" && review.routeAnswer === null;
+  const mechanical = mechanicalVerdict(review);
   const confidence =
     typeof review.provenance.mechanicalProbability === "number"
       ? ` (confidence ${Math.round(review.provenance.mechanicalProbability * 100)}%)`
