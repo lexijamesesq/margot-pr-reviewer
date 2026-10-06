@@ -49,6 +49,18 @@ export async function assertClaudeVersion(
   });
   if (!reported.startsWith(`${version} `)) throw new Error("Claude CLI pin mismatch");
 }
+/**
+ * A card's built-in access, kept in one place: the built-ins Claude reports at init, the flags
+ * that grant and confine them (Read reaches only the pr-council skill), and any permission
+ * rules for them, which join the --allowedTools list. The voice has no built-ins.
+ */
+function cardAccess(pluginDirectory: string) {
+  return {
+    builtIns: ["Skill", "Read"],
+    argv: ["--tools", "Skill,Read", "--add-dir", join(pluginDirectory, "skills", "pr-council")],
+    allowed: [] as string[],
+  };
+}
 export function claudeAdapter(options: ClaudeOptions) {
   async function run(
     role: string,
@@ -133,8 +145,11 @@ export function claudeAdapter(options: ClaudeOptions) {
       "mcp__evidence__list_files",
       "mcp__evidence__search_file",
     ];
+    const access = card
+      ? cardAccess(options.pluginDirectory)
+      : { builtIns: [], argv: ["--tools", ""], allowed: [] };
     const tools = [
-      ...(card ? ["Skill", "Read"] : []),
+      ...access.builtIns,
       ...listed.filter((name) => served.includes(name)),
       ...ticketingTools,
     ];
@@ -194,16 +209,10 @@ export function claudeAdapter(options: ClaudeOptions) {
           "--mcp-config",
           mcpPath,
           // Frontmatter grants the tools; --tools only narrows the built-ins it may keep.
-          ...(card
-            ? [
-                "--tools",
-                "Skill,Read",
-                "--add-dir",
-                join(options.pluginDirectory, "skills", "pr-council"),
-              ]
-            : ["--tools", ""]),
+          ...access.argv,
           // dontAsk denies MCP calls that are not pre-approved.
           "--allowedTools",
+          ...access.allowed,
           "mcp__evidence",
           ...ticketingTools,
           "--permission-mode",
