@@ -78,6 +78,21 @@ it("reuses the council result on the same head without classifying again", async
     calls: s.calls.map((c) => c.name),
   }).toMatchObject({ equal: true, calls: ["facts", "head"] });
 });
+it("replays a saved verdict that carried no risk line, as it was posted", async () => {
+  const { result, r } = await margot();
+  if (result.kind !== "reviewed" || !result.ledger.receipt?.review.voice)
+    throw new Error("baseline");
+  delete result.ledger.receipt.review.voice.risk;
+  const f = factsSchema.parse(r.facts);
+  f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
+  r.facts = f;
+  const s = recordedServices(r);
+  const retry = await review(r.request, r.config, s);
+  expect({ kind: retry.kind, calls: s.calls.map((c) => c.name) }).toEqual({
+    kind: "reviewed",
+    calls: ["facts", "head"],
+  });
+});
 it("replays the saved result under the current request when dispatch fields differ", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");

@@ -15,6 +15,7 @@ import {
   decide,
   needsVoice,
   rate,
+  requireRiskLine,
   reviewPath,
   selectCards,
   validateVoice,
@@ -381,6 +382,7 @@ export async function review(
               ),
             );
             validateVoice(cards, voice);
+            requireRiskLine(voice);
           }
         }
       }
