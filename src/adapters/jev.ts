@@ -14,17 +14,18 @@ import type { CallContext, Card, Facts, Services } from "../types.js";
 import { decisionFallback } from "./decision-fallback.js";
 
 const noul = z.object({ type: z.literal("noul"), noul: probability });
+const distribution = z.object({
+  "0": probability,
+  "1": probability,
+  "2": probability,
+  "3": probability,
+});
 const score = z.object({
   type: z.literal("score"),
   confidence: probability,
   // Jev's expected level, 0 to 3.
   score: z.number().min(0).max(3).optional(),
-  probabilities: z.object({
-    "0": probability,
-    "1": probability,
-    "2": probability,
-    "3": probability,
-  }),
+  probabilities: distribution,
 });
 /**
  * The prose state Jev scores for routing and risk: the PR, its title and body, its files and
@@ -86,6 +87,26 @@ export function councilText(cards: Card[]): string {
       ].join("\n"),
     )
     .join("\n\n");
+}
+/**
+ * One risk dimension, read conservatively: an unreadable distribution falls back to the
+ * level of Jev's score, and with no score to level 2; an unreadable confidence is 0, which
+ * the voice treats as unsure.
+ */
+function riskDimension(answer: unknown) {
+  const raw = (answer && typeof answer === "object" ? answer : {}) as Record<string, unknown>;
+  const level = z.number().min(0).max(3).safeParse(raw.score).data;
+  const parsed = score.safeParse({ type: "score", confidence: 0, ...raw });
+  const distribution = parsed.data?.probabilities;
+  const probabilities: number[] =
+    distribution && Math.abs(Object.values(distribution).reduce((sum, p) => sum + p, 0) - 1) < 0.015
+      ? [distribution["0"], distribution["1"], distribution["2"], distribution["3"]]
+      : [0, 1, 2, 3].map((l) => Number(l === Math.round(level ?? 2)));
+  return {
+    confidence: probability.safeParse(raw.confidence).data ?? 0,
+    ...(level === undefined ? {} : { score: level }),
+    probabilities,
+  };
 }
 export function jevAdapter(options: {
   key: string;
@@ -176,9 +197,15 @@ export function jevAdapter(options: {
       );
       return { source: "jev_unreachable", functional: 1, documentation: 0, mechanical: 0 };
     }
+    // An unreadable answer to any class question classifies the change as functional.
+    const answered = Object.keys(questions).map((k) => [k, noul.safeParse(a[k])] as const);
+    if (answered.some(([, parsed]) => !parsed.success)) {
+      console.warn("Margot: Jev's classification answer is unreadable; classifying as functional");
+      return { source: "jev", functional: 1, documentation: 0, mechanical: 0 };
+    }
     return classificationSchema.parse({
       source: "jev",
-      ...Object.fromEntries(Object.keys(questions).map((k) => [k, noul.parse(a[k]).noul])),
+      ...Object.fromEntries(answered.map(([k, parsed]) => [k, parsed.data?.noul])),
     });
   };
   const route: Services["route"] = async (facts, classification, questions, c) => {
@@ -208,13 +235,15 @@ export function jevAdapter(options: {
       };
     }
     const { answers: a, source } = response;
-    const cards = Object.fromEntries(cardNames.map((k) => [k, noul.parse(a[k]).noul]));
+    // A missing or unreadable answer summons the card, leaves routing unsure, and treats
+    // documentation as substantive.
+    const answer = (key: string) => noul.safeParse(a[key]).data?.noul ?? 1;
     return routeSchema.parse({
       source,
-      cards,
-      confidence: score.parse(a.exposure).confidence,
+      cards: Object.fromEntries(cardNames.map((k) => [k, answer(k)])),
+      confidence: score.safeParse(a.exposure).data?.confidence ?? 0,
       documentationSubstantive:
-        documentation && substance ? noul.parse(a.documentation_substantive).noul : null,
+        documentation && substance ? answer("documentation_substantive") : null,
     });
   };
   const risk: Services["risk"] = async (facts, cards, questions, c) => {
@@ -235,24 +264,7 @@ export function jevAdapter(options: {
     );
     return riskSchema.parse({
       source,
-      dimensions: Object.fromEntries(
-        dimensions.map((k) => {
-          const s = score.parse(a[k]);
-          return [
-            k,
-            {
-              confidence: s.confidence,
-              ...(s.score === undefined ? {} : { score: s.score }),
-              probabilities: [
-                s.probabilities["0"],
-                s.probabilities["1"],
-                s.probabilities["2"],
-                s.probabilities["3"],
-              ],
-            },
-          ];
-        }),
-      ),
+      dimensions: Object.fromEntries(dimensions.map((k) => [k, riskDimension(a[k])])),
     });
   };
   return { classify, route, risk };

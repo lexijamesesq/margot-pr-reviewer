@@ -96,14 +96,74 @@ it("classifies the code change alone: files, tier and the whole diff, in one req
     ].join("\n"),
   });
 });
-it("fails validation for a malformed Jev classification", async () => {
-  await expect(
-    jev({ ...classes, mechanical: { type: "noul", noul: "yes" } }).adapter.classify(
-      facts,
-      classificationQuestions,
-      context(),
-    ),
-  ).rejects.toThrow();
+describe("a malformed Jev answer takes the conservative default", () => {
+  it("classifies as functional when any class answer is unreadable", async () => {
+    expect(
+      await jev({ ...classes, mechanical: { type: "noul", noul: "yes" } }).adapter.classify(
+        facts,
+        classificationQuestions,
+        context(),
+      ),
+    ).toEqual({ source: "jev", functional: 1, documentation: 0, mechanical: 0 });
+  });
+  it("summons a card whose routing answer is missing or unreadable", async () => {
+    const { documentation_substantive: _substance, ...functional } = routeQuestions;
+    const answers = {
+      ...Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0 }])),
+      safety: { type: "noul", noul: "high" },
+      "house-style": undefined,
+      exposure: { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+    };
+    const r = routeSchema.parse(
+      await jev(answers).adapter.route(facts, "functional", functional, context()),
+    );
+    expect(
+      Object.entries(r.cards)
+        .filter(([, p]) => p === 1)
+        .map(([n]) => n),
+    ).toEqual(["safety", "house-style"]);
+  });
+  it("treats routing as unsure when the exposure answer is missing", async () => {
+    const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0 }]));
+    const { documentation_substantive: _substance, ...functional } = routeQuestions;
+    const r = routeSchema.parse(
+      await jev(answers).adapter.route(facts, "functional", functional, context()),
+    );
+    expect(r.confidence).toBe(0);
+  });
+  it("treats documentation as substantive when its meaning answer is unreadable", async () => {
+    const answers = {
+      ...Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0 }])),
+      documentation_substantive: { type: "noul" },
+      exposure: { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+    };
+    const r = routeSchema.parse(
+      await jev(answers).adapter.route(facts, "documentation", routeQuestions, context()),
+    );
+    expect(r.documentationSubstantive).toBe(1);
+  });
+  it("scores a missing risk dimension at level 2 and unsure, and an unreadable one by its score", async () => {
+    const answers = {
+      ...Object.fromEntries(
+        dimensions.map((d) => [
+          d,
+          { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+        ]),
+      ),
+      operations: undefined,
+      data_security: { type: "score", confidence: "high", score: 2.6, probabilities: null },
+    };
+    const r = riskSchema.parse(
+      await jev(answers).adapter.risk(facts, [], riskQuestions, context()),
+    );
+    expect({
+      operations: r.dimensions.operations,
+      dataSecurity: r.dimensions.data_security,
+    }).toEqual({
+      operations: { confidence: 0, probabilities: [0, 0, 1, 0] },
+      dataSecurity: { confidence: 0, score: 2.6, probabilities: [0, 0, 0, 1] },
+    });
+  });
 });
 it("retries a transient Jev response and recovers", async () => {
   const j = jev(classes, { failures: 1 });
