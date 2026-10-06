@@ -280,3 +280,22 @@ it("decides a mechanical verdict by one rule, mechanicalVerdict", async () => {
     1,
   );
 });
+it("carries the voice's finding after band_reason, as the previous reviewer's poster did", () => {
+  const value = structuredClone(authorChangesReview);
+  if (!value.voice) throw new Error("voice fixture required");
+  value.voice.outcome = "ERROR";
+  value.voice.finding = "the look at a.ts:4 failed: the file was unreadable at the head sha";
+  const lines = checkText(value).split("\n");
+  const without = structuredClone(authorChangesReview);
+  if (without.voice) delete without.voice.finding;
+  const at = lines.findIndex((line) => line.startsWith("band_reason: "));
+  expect({
+    next: lines[at + 1],
+    without: checkText(without)
+      .split("\n")
+      .filter((line) => line.startsWith("setting finding:")),
+  }).toEqual({
+    next: "setting finding: the look at a.ts:4 failed: the file was unreadable at the head sha",
+    without: [],
+  });
+});
