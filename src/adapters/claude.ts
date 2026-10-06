@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,13 +51,24 @@ export async function assertClaudeVersion(
 }
 /**
  * A card's built-in access, kept in one place: the built-ins Claude reports at init, the flags
- * that grant and confine them (Read reaches only the pr-council skill), and any permission
- * rules for them, which join the --allowedTools list. The voice has no built-ins.
+ * that grant and confine them, and any permission rules for them, which join the --allowedTools
+ * list. Read reaches only the pr-council skill. Skill may launch only pr-council: every sibling
+ * skill in the plugin is denied, and a bare Skill allow rule would undo that. The voice has no
+ * built-ins.
  */
-function cardAccess(pluginDirectory: string) {
+async function cardAccess(pluginDirectory: string, plugin: string) {
+  const siblings = (await readdir(join(pluginDirectory, "skills"), { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory() && entry.name !== "pr-council")
+    .map((entry) => `Skill(${plugin}:${entry.name})`);
   return {
     builtIns: ["Skill", "Read"],
-    argv: ["--tools", "Skill,Read", "--add-dir", join(pluginDirectory, "skills", "pr-council")],
+    argv: [
+      "--tools",
+      "Skill,Read",
+      "--add-dir",
+      join(pluginDirectory, "skills", "pr-council"),
+      ...(siblings.length ? ["--disallowedTools", ...siblings] : []),
+    ],
     allowed: [] as string[],
   };
 }
@@ -102,6 +113,9 @@ export function claudeAdapter(options: ClaudeOptions) {
           await readFile(join(options.pluginDirectory, ".claude-plugin", "plugin.json"), "utf8"),
         ),
       ).name;
+    const access = card
+      ? await cardAccess(options.pluginDirectory, plugin)
+      : { builtIns: [], argv: ["--tools", ""], allowed: [] };
     // Claude can always read its working directory, so it runs in an empty one; the diff and
     // the MCP configuration live in a separate private directory.
     const cwd = await mkdtemp(join(tmpdir(), "margot-claude-"));
@@ -145,9 +159,6 @@ export function claudeAdapter(options: ClaudeOptions) {
       "mcp__evidence__list_files",
       "mcp__evidence__search_file",
     ];
-    const access = card
-      ? cardAccess(options.pluginDirectory)
-      : { builtIns: [], argv: ["--tools", ""], allowed: [] };
     const tools = [
       ...access.builtIns,
       ...listed.filter((name) => served.includes(name)),

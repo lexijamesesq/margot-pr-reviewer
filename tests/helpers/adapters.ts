@@ -139,6 +139,9 @@ export async function fakeClaude(
   try {
     await mkdir(join(root, "agents"));
     await mkdir(join(root, ".claude-plugin"));
+    for (const skill of ["pr-council", "github-readme", "smoke"])
+      await mkdir(join(root, "skills", skill), { recursive: true });
+    await writeFile(join(root, "skills/README.md"), "Not a skill.");
     await writeFile(join(root, ".claude-plugin/plugin.json"), '{"name":"publish"}');
     const reviewerTools = [
       "Skill",

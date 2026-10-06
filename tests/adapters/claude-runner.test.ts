@@ -65,6 +65,25 @@ it("loads the voice natively with no built-in tools or card directory", async ()
     slashCommands: false,
   });
 });
+it("denies the card every sibling skill in the plugin but pr-council", async () => {
+  const card = await fakeClaude();
+  const voice = await fakeClaude({ role: "voice" });
+  const denied = card.args.slice(
+    card.args.indexOf("--disallowedTools") + 1,
+    card.args.indexOf("--allowedTools"),
+  );
+  expect({
+    denied: denied.sort(),
+    allowed: card.args
+      .slice(card.args.indexOf("--allowedTools") + 1)
+      .filter((arg) => arg.startsWith("Skill")),
+    voiceDenies: voice.args.includes("--disallowedTools"),
+  }).toEqual({
+    denied: ["Skill(publish:github-readme)", "Skill(publish:smoke)"],
+    allowed: [],
+    voiceDenies: false,
+  });
+});
 it("runs Claude in an empty working directory away from the diff and MCP configuration", async () => {
   const { cwd, cwdEntries, mcpPath, diffPath } = await fakeClaude();
   expect({

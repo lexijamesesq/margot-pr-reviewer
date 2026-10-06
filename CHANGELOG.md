@@ -4,7 +4,7 @@
 
 - Cards and the voice now load natively from the card bundle. Claude Code runs the bundle's `pr-reviewer` and `margot` agents as a plugin (`--agent publish:pr-reviewer` or `publish:margot`, `--plugin-dir claude.pluginDirectory`), each with the tools its own frontmatter grants. A card invokes the `pr-council` skill and reads its card itself; the prompt names the card. Margot no longer rebuilds the agents from their prose, serves the card through the evidence server's `read_card` tool, or adds prompt text about the tools.
 - The bundle commit in `review.cardBundle.commit` must have agents whose frontmatter lists the evidence tools (publish-skills `native-confined` or later). With an older bundle the tool check rejects the run.
-- The tool check expects `Skill`, `Read`, the served evidence tools the reviewer's frontmatter lists and any configured ticketing tools for a card, and the evidence tools Margot's frontmatter lists for the voice. A card's `Read` is confined to the bundle's `pr-council` skill directory and an empty working directory.
+- The tool check expects `Skill`, `Read`, the served evidence tools the reviewer's frontmatter lists and any configured ticketing tools for a card, and the evidence tools Margot's frontmatter lists for the voice. A card's `Read` is confined to the bundle's `pr-council` skill directory and an empty working directory. A card's `Skill` is denied every skill in the plugin except `pr-council`.
 - Claude runs in an empty working directory; the diff and the MCP configuration are kept in a separate private directory.
 - The bundle no longer reports card paths; recordings drop `bundle.cardPaths`.
 
