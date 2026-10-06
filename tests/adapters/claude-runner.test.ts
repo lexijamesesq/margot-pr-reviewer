@@ -1,4 +1,6 @@
-import { access } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, it } from "vitest";
 import { configuredTicketingEnvironment } from "../../src/cli-services.js";
 import { facts, fakeClaude, ticketing } from "../helpers/adapters.js";
@@ -171,6 +173,30 @@ it("grants configured ticket evidence only to card runs", async () => {
     voiceServer: null,
     voiceTicketingTools: [],
   });
+});
+it("refuses ticketing tools the pinned reviewer does not grant, before spawning Claude", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "margot-spawn-log-"));
+  const spawnLog = join(dir, "spawns");
+  try {
+    const configured = {
+      ticketing,
+      ticketingEnvironment: { TICKETING_TOKEN: "t", TICKETING_TENANT: "x" },
+      spawnLog,
+    };
+    await expect(
+      fakeClaude({
+        ...configured,
+        reviewerTools: ["Skill", "Read", "mcp__evidence__read_diff", "mcp__tickets__get_issue"],
+      }),
+    ).rejects.toThrow(
+      "The card bundle's agents/pr-reviewer.md does not grant the configured ticketing tools: mcp__tickets__get_comments",
+    );
+    await expect(access(spawnLog)).rejects.toThrow();
+    await expect(fakeClaude(configured)).resolves.toBeDefined();
+    await expect(access(spawnLog)).resolves.toBeUndefined();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 it("keeps every credential off the Claude command line and in a private file", async () => {
   const secrets = {

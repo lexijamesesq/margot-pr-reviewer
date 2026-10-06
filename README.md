@@ -75,6 +75,9 @@ Without `--authority true` the review runs in shadow mode and publishes nothing.
 `claude.executable`, `claude.pluginDirectory` and `claude.ticketing.command` may use
 `${MARGOT_ROOT}`, which `margot-instance bind-request` resolves. A `claude.references` entry may name a `ref` (a branch or tag) in place of `head`; `bind-request` resolves it to its commit for each run.
 
+The ticketing server and tool names in `claude.ticketing` must match those the card
+bundle's `pr-reviewer` agent grants; a card run refuses tools the agent does not grant.
+
 ### Environment variables
 
 `margot-review` and `margot-instance` read these from the process environment:

@@ -132,6 +132,10 @@ export async function fakeClaude(
     githubToken?: string;
     cliEnvironment?: NodeJS.ProcessEnv;
     references?: Record<string, { repository: string; head: string }>;
+    /** Replaces the tools the fixture reviewer's frontmatter grants. */
+    reviewerTools?: string[];
+    /** A file the fake CLI appends each invocation's arguments to. */
+    spawnLog?: string;
     role?: "card" | "voice";
   } = {},
 ) {
@@ -143,7 +147,7 @@ export async function fakeClaude(
       await mkdir(join(root, "skills", skill), { recursive: true });
     await writeFile(join(root, "skills/README.md"), "Not a skill.");
     await writeFile(join(root, ".claude-plugin/plugin.json"), '{"name":"publish"}');
-    const reviewerTools = [
+    const reviewerTools = options.reviewerTools ?? [
       "Skill",
       "Read",
       ...["read_diff", "read_file", "search_file", "list_files", "read_reference"].map(
@@ -173,7 +177,7 @@ export async function fakeClaude(
       executable,
       `#!/usr/bin/env node
 const fs = require("node:fs");
-if (process.argv.includes("--version")) {
+${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, process.argv.slice(2).join(" ") + "\\n");\n` : ""}if (process.argv.includes("--version")) {
   if (process.env.MARGOT_WRITE_TOKEN) process.exit(19);
   console.log(${JSON.stringify(options.version ?? "0.0.1 test")});
 } else {

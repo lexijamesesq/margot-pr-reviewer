@@ -50,11 +50,8 @@ export async function assertClaudeVersion(
   if (!reported.startsWith(`${version} `)) throw new Error("Claude CLI pin mismatch");
 }
 /**
- * A card's built-in access, kept in one place: the built-ins Claude reports at init, the flags
- * that grant and confine them, and any permission rules for them, which join the --allowedTools
- * list. Read reaches only the pr-council skill. Skill may launch only pr-council: every sibling
- * skill in the plugin is denied, and a bare Skill allow rule would undo that. The voice has no
- * built-ins.
+ * A card's built-ins and the flags that confine them: Read reaches only the pr-council skill,
+ * and Skill may launch only pr-council because every sibling skill in the plugin is denied.
  */
 async function cardAccess(pluginDirectory: string, plugin: string) {
   const siblings = (await readdir(join(pluginDirectory, "skills"), { withFileTypes: true }))
@@ -63,13 +60,10 @@ async function cardAccess(pluginDirectory: string, plugin: string) {
   return {
     builtIns: ["Skill", "Read"],
     argv: [
-      "--tools",
-      "Skill,Read",
       "--add-dir",
       join(pluginDirectory, "skills", "pr-council"),
       ...(siblings.length ? ["--disallowedTools", ...siblings] : []),
     ],
-    allowed: [] as string[],
   };
 }
 export function claudeAdapter(options: ClaudeOptions) {
@@ -78,7 +72,6 @@ export function claudeAdapter(options: ClaudeOptions) {
     input: Parameters<Services["card"]>[0] | Parameters<Services["voice"]>[0],
     c: CallContext,
   ) {
-    await assertClaudeVersion(options.executable, options.version, c);
     const request = {
       repository: input.facts.repository,
       pr: input.facts.pr,
@@ -106,6 +99,11 @@ export function claudeAdapter(options: ClaudeOptions) {
     const frontmatter = agentText.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/)?.[1];
     if (frontmatter === undefined) throw new Error("Invalid pinned agent frontmatter");
     const listed = z.object({ tools: z.array(z.string()) }).parse(parseYaml(frontmatter)).tools;
+    const ungranted = card && ticketing ? ticketing.tools.filter((t) => !listed.includes(t)) : [];
+    if (ungranted.length)
+      throw new Error(
+        `The card bundle's agents/pr-reviewer.md does not grant the configured ticketing tools: ${ungranted.join(", ")}`,
+      );
     const plugin = z
       .object({ name: z.string().min(1) })
       .parse(
@@ -115,7 +113,8 @@ export function claudeAdapter(options: ClaudeOptions) {
       ).name;
     const access = card
       ? await cardAccess(options.pluginDirectory, plugin)
-      : { builtIns: [], argv: ["--tools", ""], allowed: [] };
+      : { builtIns: [], argv: [] };
+    await assertClaudeVersion(options.executable, options.version, c);
     // Claude can always read its working directory, so it runs in an empty one; the diff and
     // the MCP configuration live in a separate private directory.
     const cwd = await mkdtemp(join(tmpdir(), "margot-claude-"));
@@ -228,10 +227,11 @@ export function claudeAdapter(options: ClaudeOptions) {
           "--mcp-config",
           mcpPath,
           // Frontmatter grants the tools; --tools only narrows the built-ins it may keep.
+          "--tools",
+          access.builtIns.join(","),
           ...access.argv,
           // dontAsk denies MCP calls that are not pre-approved.
           "--allowedTools",
-          ...access.allowed,
           "mcp__evidence",
           ...ticketingTools,
           "--permission-mode",
