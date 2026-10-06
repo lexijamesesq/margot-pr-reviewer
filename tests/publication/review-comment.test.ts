@@ -211,25 +211,41 @@ describe("a verdict code reaches without the voice", () => {
       source: "documentation_editorial",
     });
   });
-  it("names the highest-scored dimension on a cleared council review", async () => {
+  it("names the dimension Jev scored highest on a cleared council review", async () => {
     const { result } = await reviewed(
       recorded(
         "council-clear",
-        withRisk(uniformRisk(confidentLow)),
-        withRiskDimension("operations", { probabilities: [0, 0.8, 0.2, 0], confidence: 1 }),
+        withRisk(uniformRisk({ ...confidentLow, score: 0.2 })),
+        // The distribution's expected level is higher here, but Jev's score decides.
+        withRiskDimension("operations", {
+          probabilities: [0, 0.8, 0.2, 0],
+          confidence: 1,
+          score: 0.3,
+        }),
+        withRiskDimension("data_security", {
+          probabilities: [1, 0, 0, 0],
+          confidence: 1,
+          score: 0.6,
+        }),
       ),
     );
     expect(head(result.report)).toEqual([
-      "🟢 **Risk: LOW** — low exposure — operations",
+      "🟢 **Risk: LOW** — low exposure — data security",
       "> Reviewed against the summoned lenses; no blocking findings.",
     ]);
+  });
+  it("counts a dimension Jev gave no score as 2", async () => {
+    const { result } = await reviewed(
+      recorded("council-clear", withRisk(uniformRisk(confidentLow))),
+    );
+    expect(head(result.report)[0]).toBe("🟢 **Risk: LOW** — low exposure — blast radius");
   });
   it("says no lens was required when routing selected none", async () => {
     const { result } = await reviewed(
       recorded(
         "council-clear",
         withNoCouncil(),
-        withRisk(uniformRisk({ probabilities: [1, 0, 0, 0], confidence: 1 })),
+        withRisk(uniformRisk({ probabilities: [1, 0, 0, 0], confidence: 1, score: 0 })),
       ),
     );
     expect(head(result.report)).toEqual([

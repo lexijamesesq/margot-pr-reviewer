@@ -66,11 +66,11 @@ function codeVerdict(review: Review): { risk: string; summary: string } {
       risk: "editorial documentation change",
       summary: "An editorial documentation change with unchanged meaning — no review was required.",
     };
-  // The highest-scored dimension names the kind of exposure; an all-zero score names none.
-  const expected = dimensions.map((name) => {
-    const p = review.riskAnswer?.dimensions[name]?.probabilities ?? [1, 0, 0, 0];
-    return p.reduce((sum, value, level) => sum + value * level, 0);
-  });
+  // The dimension Jev scored highest names the kind of exposure; an all-zero score names
+  // none. A dimension without a score counts as 2, and an unscored review as all zero.
+  const expected = dimensions.map((name) =>
+    review.riskAnswer ? (review.riskAnswer.dimensions[name]?.score ?? 2) : 0,
+  );
   const top = expected.indexOf(Math.max(...expected));
   return {
     risk:

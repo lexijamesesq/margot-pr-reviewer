@@ -17,6 +17,8 @@ const noul = z.object({ type: z.literal("noul"), noul: probability });
 const score = z.object({
   type: z.literal("score"),
   confidence: probability,
+  // Jev's expected level, 0 to 3.
+  score: z.number().min(0).max(3).optional(),
   probabilities: z.object({
     "0": probability,
     "1": probability,
@@ -237,6 +239,7 @@ export function jevAdapter(options: {
             k,
             {
               confidence: s.confidence,
+              ...(s.score === undefined ? {} : { score: s.score }),
               probabilities: [
                 s.probabilities["0"],
                 s.probabilities["1"],

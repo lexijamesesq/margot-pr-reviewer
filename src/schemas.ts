@@ -153,6 +153,8 @@ export const riskSchema = z.strictObject({
           "Probabilities must sum to one",
         ),
       confidence: probability,
+      // Jev's expected level, 0 to 3; it names the kind of exposure on a code verdict.
+      score: z.number().min(0).max(3).optional(),
     }),
   ),
 });
