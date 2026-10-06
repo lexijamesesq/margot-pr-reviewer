@@ -4,7 +4,8 @@
  * redact: callers must not put a credential in an error message.
  */
 export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message.trim();
+  return String(error);
 }
 
 /** A failure the operator can fix by changing configuration; the message names the setting and holds no secret. */
