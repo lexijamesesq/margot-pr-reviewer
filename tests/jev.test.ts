@@ -142,6 +142,16 @@ it("preserves risk levels in Jev score distributions", async () => {
   const r = await jev(answers).adapter.risk(facts, [], riskQuestions, context());
   expect(riskSchema.parse(r).dimensions.operations.probabilities[2]).toBe(1);
 });
+it("keeps Jev's score for each risk dimension", async () => {
+  const answers = Object.fromEntries(
+    dimensions.map((d, i) => [
+      d,
+      { type: "score", confidence: 0.8, score: i / 4, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+    ]),
+  );
+  const r = riskSchema.parse(await jev(answers).adapter.risk(facts, [], riskQuestions, context()));
+  expect(dimensions.map((d) => r.dimensions[d].score)).toEqual([0, 0.25, 0.5, 0.75, 1]);
+});
 it("preserves routing uncertainty in Jev exposure confidence", async () => {
   const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0.5 }]));
   const r = await jev({
@@ -387,7 +397,10 @@ describe("fallback decisions", () => {
         state: present(flags[1]).includes(JSON.stringify({ diff: facts.diff })),
         required: schema.required,
       }).toMatchObject({
-        answers: { lens: { noul: 0.9 }, exposure: { confidence: 0, probabilities: { "2": 1 } } },
+        answers: {
+          lens: { noul: 0.9 },
+          exposure: { confidence: 0, score: 2, probabilities: { "2": 1 } },
+        },
         model: "configured-reviewer-model",
         tools: "",
         strict: true,

@@ -76,6 +76,7 @@ export async function decisionFallback(
         {
           type: "score",
           confidence: 0,
+          score,
           probabilities: Object.fromEntries(
             [0, 1, 2, 3].map((level) => [String(level), Number(level === score)]),
           ),

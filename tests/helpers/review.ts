@@ -160,7 +160,7 @@ export const withRoutedCards =
 export const withNoCouncil = (): Change => withRoutedCards({});
 export const withRouteConfidence = (confidence: number): Change => withRoute({ confidence });
 
-export type Dimension = { probabilities: number[]; confidence: number };
+export type Dimension = { probabilities: number[]; confidence: number; score?: number };
 export const riskDimensions = dimensions;
 /** A risk answer that gives every dimension the same distribution. */
 export const uniformRisk = (dimension: Dimension): Obj => ({
