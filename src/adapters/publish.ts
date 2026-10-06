@@ -2,7 +2,7 @@ import type { Octokit } from "octokit";
 import type { z } from "zod";
 import { errorMessage } from "../errors.js";
 import { holdReason } from "../policy.js";
-import { checkText } from "../render.js";
+import { checkSummary, checkText } from "../render.js";
 import { publisherSchema, requestSchema } from "../schemas.js";
 import { type Stage, stages } from "../stages.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
@@ -261,7 +261,7 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           : decision.outcome === "ERROR"
             ? "not reviewed (error)"
             : `Margot: ${decision.outcome}`,
-      `${decision.outcome}, ${decision.rating.band}: ${decision.rating.rationale}`,
+      checkSummary(review),
       checkText(review),
       c,
     );

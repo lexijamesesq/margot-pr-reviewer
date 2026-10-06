@@ -200,6 +200,19 @@ function labelSentence(value: string): string {
   return cut ? `${cut}.` : "";
 }
 
+/** The comment's risk label: the voice's, or the one code gives a verdict it reached alone. */
+function riskLabel(review: Review): string {
+  return normalized(review.voice ? (review.voice.risk ?? "") : codeVerdict(review).risk);
+}
+
+/** The verdict check's summary: outcome, band and the risk label's first sentence. */
+export function checkSummary(review: Review): string {
+  const { outcome, rating } = review.decision;
+  return Array.from(`${outcome}, ${rating.band}: ${labelSentence(riskLabel(review))}`)
+    .slice(0, 900)
+    .join("");
+}
+
 export function render(review: Review): string {
   const { decision, request } = review;
   const verdict = codeVerdict(review);
@@ -215,7 +228,7 @@ export function render(review: Review): string {
   const ticket = presentation.ticket
     ? `[${presentation.ticket.label}](${presentation.ticket.url})`
     : "none";
-  const risk = normalized(review.voice ? (review.voice.risk ?? "") : verdict.risk);
+  const risk = riskLabel(review);
   const clarification = review.voice?.clarification?.trim();
   const mechanical = review.classification === "mechanical" && review.routeAnswer === null;
   const confidence =

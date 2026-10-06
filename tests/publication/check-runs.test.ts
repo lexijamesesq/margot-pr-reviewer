@@ -195,3 +195,9 @@ it("never writes the triage check from a review run", async () => {
   );
   expect(triageWrites).toEqual([]);
 });
+it("summarizes the verdict check with the risk label's first sentence", async () => {
+  const run = await runPublication("hold");
+  expect(((run.final?.output ?? {}) as { summary?: string }).summary).toBe(
+    "APPROVED, HIGH: mechanical change — no functional change.",
+  );
+});
