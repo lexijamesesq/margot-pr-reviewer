@@ -193,6 +193,7 @@
     "band": "LOW",
     "rationale": "Recorded risk judgment",
     "summary": "Reviewed against the summoned lenses; no blocking findings.",
+    "risk": "low exposure",
     "dispositions": []
   },
   "head": "0000000000000000000000000000000000000002",
