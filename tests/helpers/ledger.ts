@@ -79,6 +79,7 @@ export const voice = (
   band: "LOW",
   rationale: "Bounded change",
   summary: "Checked",
+  risk: "access control",
   dispositions: [{ id, status, reason: "a.ts:1 now validates access" }],
 });
 export const core = (cards: Card[], v: Voice | null): ReviewCore => ({

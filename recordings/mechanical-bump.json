@@ -148,6 +148,7 @@
     "band": "LOW",
     "rationale": "Recorded risk judgment",
     "summary": "A mechanical change (dependency bump, or linter/formatter output) with no functional change — no review was required.",
+    "risk": "low exposure",
     "dispositions": []
   },
   "head": "0000000000000000000000000000000000000001",

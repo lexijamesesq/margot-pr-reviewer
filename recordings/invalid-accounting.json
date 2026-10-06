@@ -211,6 +211,7 @@
     "band": "HIGH",
     "rationale": "organization-wide untested config",
     "summary": "The exclusions fix unwanted checks but have no regression test. Add coverage before merging.",
+    "risk": "organization-wide untested config",
     "dispositions": []
   },
   "head": "0000000000000000000000000000000000000004",

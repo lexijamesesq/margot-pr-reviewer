@@ -236,6 +236,7 @@ export const voiceRuling = (
   band,
   rationale: "The bounded behavior is proven.",
   summary: "The selected checks establish the change.",
+  risk: "bounded behavior change",
   dispositions,
   ...fields,
 });
