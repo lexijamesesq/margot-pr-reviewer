@@ -206,13 +206,20 @@ describe("a risk answer from the fallback", () => {
     const { result } = await reviewed(draft);
     expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
   });
-  it("holds an editorial documentation change whose routing answer came from the fallback", async () => {
+  it("does not hold a documentation change whose routing answer came from the fallback", async () => {
     const draft = recorded("council-clear", asDocumentation(0));
     draft.route.source = "fallback";
     const { result } = await reviewed(draft);
-    expect(result.classification).toBe("documentation");
-    expect(result.provenance.decision_source).toBe("fallback");
-    expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
+    expect({
+      classification: result.classification,
+      decisionSource: result.provenance.decision_source,
+      mergeEligible: result.decision.mergeEligible,
+      holdReasons: result.decision.holdReasons,
+    }).toEqual({
+      classification: "documentation",
+      decisionSource: "jev",
+      mergeEligible: true,
+      holdReasons: [],
+    });
   });
 });

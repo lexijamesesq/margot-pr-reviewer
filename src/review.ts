@@ -400,9 +400,12 @@ export async function review(
           summonedByLedger: recalled.filter(
             (name) => !routeAnswer || (routeAnswer.cards[name] ?? 0) < config.routeThreshold,
           ),
+          // Documentation's LOW band comes from the verified class, not from routing: a
+          // routing outage summons review, and does not make accuracy the operator's risk.
           decision_source:
-            (routeAnswer && routeAnswer.source !== "jev") ||
-            (riskAnswer && riskAnswer.source !== "jev")
+            classification !== "documentation" &&
+            ((routeAnswer && routeAnswer.source !== "jev") ||
+              (riskAnswer && riskAnswer.source !== "jev"))
               ? "fallback"
               : "jev",
           services: services.provenance,

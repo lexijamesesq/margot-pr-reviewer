@@ -88,6 +88,18 @@ describe("the triage phase's class", () => {
       classification: "functional",
     });
   });
+
+  it("names Jev as the triage's source only when Jev classified the head", async () => {
+    expect(
+      await triaged(
+        withClassification({ source: "jev_unreachable", functional: 1, documentation: 0 }),
+      ),
+    ).toMatchObject({
+      kind: "classified",
+      classification: "functional",
+      decision_source: "jev_unreachable",
+    });
+  });
 });
 
 describe("trusted triage", () => {
@@ -292,7 +304,7 @@ describe("classification provenance and availability", () => {
     expect(result.classification).toBe("functional");
   });
 
-  it("holds a clear documentation review after conservative outage routing", async () => {
+  it("reviews a documentation change on outage routing and keeps its decision source", async () => {
     const outageRoute = {
       source: "jev_unreachable",
       documentationSubstantive: 1,
@@ -312,11 +324,23 @@ describe("classification provenance and availability", () => {
       }),
     );
     expect(calls).toContain("route");
-    expect(result.routeAnswer?.source).toBe("jev_unreachable");
-    expect(result.classification).toBe("documentation");
-    expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
-    expect(result.provenance.decision_source).toBe("fallback");
+    expect({
+      routeSource: result.routeAnswer?.source,
+      classification: result.classification,
+      cards: result.cards.length,
+      mergeEligible: result.decision.mergeEligible,
+      holdReasons: result.decision.holdReasons,
+      decisionSource: result.provenance.decision_source,
+      check: checkText(result).match(/^decision_source: (.*)$/m)?.[1],
+    }).toEqual({
+      routeSource: "jev_unreachable",
+      classification: "documentation",
+      cards: 6,
+      mergeEligible: true,
+      holdReasons: [],
+      decisionSource: "jev",
+      check: "jev",
+    });
   });
 
   it("holds approval and records fallback provenance when risk uses the fallback", async () => {
