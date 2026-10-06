@@ -6,7 +6,8 @@ import {
   nextLedger,
   prepareFindings,
   roundScope,
-  selectLedger,
+  savedAdherence,
+  selectLedgerReview,
   standingCards,
 } from "./ledger.js";
 import {
@@ -72,6 +73,8 @@ function currentCheck(runs: CheckFact[]): CheckFact | undefined {
   }
   return current;
 }
+const optionalAdherence = (value: Adherence | undefined) =>
+  value === undefined ? {} : { adherence: value };
 /**
  * The previous reviewer's advisory template-adherence check, on the verdict Margot will post.
  * Skipped for a mechanical verdict or with no risk line; a Jev outage, a service that is not
@@ -170,7 +173,10 @@ export async function review(
     const historyUnavailable =
       !facts.history.complete || (facts.history.priorLedger && !facts.history.reviews);
     const ledgerWarnings: string[] = [];
-    const prior = selectLedger(facts, config, (warning) => ledgerWarnings.push(warning));
+    const priorReview = selectLedgerReview(facts, config, (warning) =>
+      ledgerWarnings.push(warning),
+    );
+    const prior = priorReview?.ledger ?? null;
     // Unreadable history holds rather than approves: without the earlier ledger Margot cannot
     // know whether findings from earlier rounds were resolved, so an approval would be a guess.
     // The reason names the way out, because the hold recurs on every run until the history is
@@ -305,6 +311,7 @@ export async function review(
         provenance: { ...cached.review.provenance, classification: classSource },
         ledger: prior,
         convergence: cached.counts,
+        ...(priorReview ? optionalAdherence(savedAdherence(priorReview.body)) : {}),
       };
     } else {
       const cards: Card[] = [];
@@ -456,9 +463,13 @@ export async function review(
       const gap = shownFindingGap(core);
       if (gap) throw new Error(gap);
       stage = before;
-      // Advisory, on the final verdict; saved in the receipt so a same-head replay repeats it.
-      core.adherence = await adherence(core, services, config.timeoutMs);
-      result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
+      // Advisory, on the final verdict; posted beside the ledger, never in its receipt.
+      const advisory = await adherence(core, services, config.timeoutMs);
+      result = {
+        ...core,
+        ...nextLedger(scope, cards, voice, core, config, facts),
+        adherence: advisory,
+      };
     }
     const metadata = services.reviewMetadata?.() ?? {};
     result = {

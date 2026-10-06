@@ -3,9 +3,8 @@ import { deflateSync, inflateSync } from "node:zlib";
 import parseDiff from "parse-diff";
 import { diffIsComplete } from "./diff.js";
 import { errorMessage } from "./errors.js";
-import { adherenceSchema, comparisonSchema, ledgerSchema } from "./schemas.js";
+import { comparisonSchema, ledgerSchema } from "./schemas.js";
 import type {
-  Adherence,
   Card,
   Convergence,
   Facts,
@@ -15,29 +14,6 @@ import type {
   RoundScope,
   Voice,
 } from "./types.js";
-
-/**
- * The advisory adherence result, posted in its own marker before the ledger block. It stays
- * out of the ledger encoding, which earlier releases parse strictly, so a rollback still reads
- * the ledger; a same-head replay reads it back from the review that carried the ledger.
- */
-export function adherenceBlock(adherence: Adherence): string {
-  return `<!-- margot-adherence:v1 ${Buffer.from(JSON.stringify(adherence)).toString("base64")} -->`;
-}
-/** The adherence result a posted review carried, or undefined when it has none or it is unreadable. */
-export function savedAdherence(body: string): Adherence | undefined {
-  const match = [...body.matchAll(/(?:^|\n)<!-- margot-adherence:v1 ([A-Za-z0-9+/=]+) -->/g)].at(
-    -1,
-  );
-  if (!match) return undefined;
-  try {
-    return adherenceSchema.parse(
-      JSON.parse(Buffer.from(match[1] ?? "", "base64").toString("utf8")),
-    );
-  } catch {
-    return undefined;
-  }
-}
 
 export const configHash = (config: ReviewConfig): string =>
   createHash("sha256")
@@ -72,14 +48,6 @@ export function selectLedger(
   config: ReviewConfig,
   onWarning?: (warning: string) => void,
 ): Ledger | null {
-  return selectLedgerReview(facts, config, onWarning)?.ledger ?? null;
-}
-/** The selected ledger with the body of the posted review that carried it. */
-export function selectLedgerReview(
-  facts: Facts,
-  config: ReviewConfig,
-  onWarning?: (warning: string) => void,
-): { ledger: Ledger; body: string } | null {
   if (!facts.history.complete) return null;
   if (facts.history.priorLedger && !facts.history.reviews) return null;
   const reviews = [...(facts.history.reviews ?? [])].sort(
@@ -118,7 +86,7 @@ export function selectLedgerReview(
           ledger.receipt.review.request.pr !== facts.pr)
       )
         throw new Error("Ledger belongs to another PR");
-      return { ledger, body: review.body };
+      return ledger;
     } catch (error) {
       const reason = errorMessage(error);
       const warning = `Skipped ledger from review ${review.id}: ${reason.replace(/\s+/g, " ").trim()}`;

@@ -1,4 +1,4 @@
-import { ledgerBlock } from "./ledger.js";
+import { adherenceBlock, ledgerBlock } from "./ledger.js";
 import { fallbackNotice, holdReason } from "./policy.js";
 import { cardNames, dimensions } from "./schemas.js";
 import type { Card, Review, ReviewCore, ReviewPresentation } from "./types.js";
@@ -336,7 +336,8 @@ export function render(review: Review): string {
     "<!-- margot:v1 -->",
   ];
   const body = lines.join("\n").replaceAll("margot-ledger", "margot‑ledger");
-  return `${body}\n${ledgerBlock(review.ledger)}`;
+  // The ledger block stays last: every release reads it only as the body's final line.
+  return `${body}\n${review.adherence ? `${adherenceBlock(review.adherence)}\n` : ""}${ledgerBlock(review.ledger)}`;
 }
 
 /**

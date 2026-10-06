@@ -31,13 +31,17 @@ export const prior = (entries = [entry()], round = 1): Ledger => ({
   round,
   entries,
 });
-export const posted = (ledger: Ledger, actor = "reviewer[bot]") => ({
+export const posted = (
+  ledger: Ledger,
+  actor = "reviewer[bot]",
+  body = `review\n${ledgerBlock(ledger)}`,
+) => ({
   id: 1,
   actor,
   actorType: "Bot",
   head: ledger.head,
   submittedAt: "2026-09-01T00:00:00Z",
-  body: `review\n${ledgerBlock(ledger)}`,
+  body,
 });
 export const history = (ledger = prior()) => ({
   ...facts,

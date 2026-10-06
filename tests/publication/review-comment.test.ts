@@ -146,7 +146,11 @@ it("renders the verdict, risk, council roster and finding tally in the review co
     footer: ["**Author:**", "**Ticket:**", "**Commit:**", "**Run:**"].every(
       (field) => lines.filter((line) => line.startsWith(field)).length === 1,
     ),
-    markers: report.includes("<!-- margot:v1 -->\n<!-- margot-ledger:v1 "),
+    // The adherence marker sits between the comment marker and the ledger, which stays last.
+    markers:
+      /<!-- margot:v1 -->\n(?:<!-- margot-adherence:v1 [A-Za-z0-9+/=]+ -->\n)?<!-- margot-ledger:v1 [A-Za-z0-9+/=]+ -->$/.test(
+        report,
+      ),
   }).toMatchObject({
     outcome: true,
     risk: true,
