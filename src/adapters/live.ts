@@ -77,6 +77,7 @@ export function liveServices(
     }),
     ...claudeAdapter({
       ...config.claude,
+      ...(config.publisher ? { ownChecks: Object.values(config.publisher.checks) } : {}),
       ...(config.github.gh ? { gh: config.github.gh } : {}),
       ...(credentials.githubToken ? { githubToken: credentials.githubToken } : {}),
       ...(credentials.ticketingEnvironment

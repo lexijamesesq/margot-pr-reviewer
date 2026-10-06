@@ -6,6 +6,7 @@ import { claudeAdapter } from "../../src/adapters/claude.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { cliServices } from "../../src/cli-services.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
+import type { Card } from "../../src/types.js";
 import { readRecording } from "./recordings.js";
 
 export const recording = readRecording("mechanical-bump");
@@ -36,6 +37,7 @@ export function github(
     historyFailure?: boolean;
     diff?: string;
     ledger?: boolean;
+    checkRuns?: unknown[];
   } = {},
 ) {
   let pulls = 0;
@@ -73,8 +75,10 @@ export function github(
       ];
       if (overrides.pageTwo && url.searchParams.get("page") !== "2")
         headers.link = `<${url.origin}${url.pathname}?page=2>; rel="next"`;
-    } else if (url.pathname.endsWith("/check-runs")) data = { total_count: 0, check_runs: [] };
-    else if (url.pathname.endsWith("/reviews")) {
+    } else if (url.pathname.endsWith("/check-runs")) {
+      const runs = overrides.checkRuns ?? [];
+      data = { total_count: runs.length, check_runs: runs };
+    } else if (url.pathname.endsWith("/reviews")) {
       if (overrides.historyFailure) throw new Error("History unavailable");
       data = overrides.ledger
         ? [{ body: "<!-- margot-ledger:v1 unknown -->", commit_id: request.head }]
@@ -132,6 +136,10 @@ export async function fakeClaude(
     githubToken?: string;
     cliEnvironment?: NodeJS.ProcessEnv;
     references?: Record<string, { repository: string; head: string }>;
+    ownChecks?: string[];
+    classification?: "functional" | "documentation" | "mechanical";
+    /** The council the voice rules on. */
+    cards?: Card[];
     /** Replaces the tools the fixture reviewer's frontmatter grants. */
     reviewerTools?: string[];
     /** A file the fake CLI appends each invocation's arguments to. */
@@ -248,6 +256,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
             ? { ticketingEnvironment: options.ticketingEnvironment }
             : {}),
           ...(options.githubToken ? { githubToken: options.githubToken } : {}),
+          ...(options.ownChecks ? { ownChecks: options.ownChecks } : {}),
         });
     const round = {
       round: options.delta === undefined ? 1 : 2,
@@ -262,8 +271,8 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
         ? await adapter.voice(
             {
               facts: options.facts ?? facts,
-              classification: "functional",
-              cards: [],
+              classification: options.classification ?? "functional",
+              cards: options.cards ?? [],
               rating: {} as never,
               agent: "publish:margot",
               round,
@@ -274,7 +283,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
             {
               facts: options.facts ?? facts,
               name: "safety",
-              classification: "functional",
+              classification: options.classification ?? "functional",
               agent: "publish:pr-reviewer",
               round,
             },

@@ -193,6 +193,7 @@
     "band": "MEDIUM",
     "rationale": "merge-gate change",
     "summary": "The removed summary step no longer gates merges, and all required checks remain. The operator should merge this gate-wiring change.",
+    "risk": "merge-gate change",
     "dispositions": []
   },
   "head": "0000000000000000000000000000000000000003",

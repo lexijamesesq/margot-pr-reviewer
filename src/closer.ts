@@ -75,7 +75,7 @@ const stopChecks = {
   }),
   floor: (): CheckOutput => ({
     conclusion: "action_required",
-    title: "Margot: not reviewed yet: required checks not green",
+    title: "Margot: preflight — required checks not green — waiting for the next push",
     summary:
       "The required checks were not green when the review's wait ended, so Margot did not review this head. She reviews it when she is dispatched again: on the next push, or when the host re-dispatches her once the checks finish.",
   }),

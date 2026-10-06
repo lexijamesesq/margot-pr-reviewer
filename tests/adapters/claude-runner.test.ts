@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, it } from "vitest";
 import { configuredTicketingEnvironment } from "../../src/cli-services.js";
 import { facts, fakeClaude, ticketing } from "../helpers/adapters.js";
+import { present } from "../helpers/present.js";
 
 const evidenceTools = (...names: string[]) => names.map((name) => `mcp__evidence__${name}`);
 const value = (args: string[], flag: string) =>
@@ -94,16 +95,29 @@ it("runs Claude in an empty working directory away from the diff and MCP configu
     diffInCwd: diffPath.startsWith(cwd),
   }).toEqual({ cwdEntries: [], mcpInCwd: false, diffInCwd: false });
 });
-it("names the card and the ledger conventions in the prompt, and leaves tools to the agent", async () => {
+it("names the card in the prompt, leaves the finding conventions to the bundle and tools to the agent", async () => {
   const { stdin } = await fakeClaude();
+  const instructions = stdin.split("\n").slice(0, -1).join("\n");
   expect({
     card: stdin.includes("Your card is safety."),
-    conventions: ["late=new", "reopens=", "must not establish an advisory finding"].every((rule) =>
-      stdin.includes(rule),
+    // The bundle's pr-council skill states `ledger=` and `late=`; a new finding needs no mark.
+    conventions: ["late=", "reopens=", "attribution", "ledger="].filter((rule) =>
+      instructions.includes(rule),
     ),
+    previouslyDismissed: instructions.includes(
+      "keep it dismissed unless the new changes altered it",
+    ),
+    advisory: instructions.includes("must not establish an advisory finding"),
     path: stdin.includes("playbooks"),
-    toolProse: /\bread_|\btools?\b|\bruntime\b/i.test(stdin.split("\n").slice(0, -1).join("\n")),
-  }).toEqual({ card: true, conventions: true, path: false, toolProse: false });
+    toolProse: /\bread_|\btools?\b|\bruntime\b/i.test(instructions),
+  }).toEqual({
+    card: true,
+    conventions: [],
+    previouslyDismissed: true,
+    advisory: true,
+    path: false,
+    toolProse: false,
+  });
 });
 it("accepts exactly Skill, Read and the served evidence tools for a card", async () => {
   const card = [
@@ -384,4 +398,55 @@ it("keeps the publication credential out of the Claude version probe", async () 
     if (previous === undefined) delete process.env.MARGOT_WRITE_TOKEN;
     else process.env.MARGOT_WRITE_TOKEN = previous;
   }
+});
+it("keeps Margot's own checks out of the evidence a card and the voice receive", async () => {
+  const withChecks = {
+    ...facts,
+    checks: ["ci", "review / margot", "review / triage"].map((name, id) => ({
+      name,
+      actor: "example-app",
+      head: facts.head,
+      conclusion: "neutral" as const,
+      id,
+    })),
+  };
+  const names = (stdin: string) =>
+    (
+      JSON.parse(stdin.split("\n").at(-1) ?? "{}") as { facts: { checks: { name: string }[] } }
+    ).facts.checks.map((check) => `${check.name}`);
+  const ownChecks = ["review / margot", "review / triage", "review / self-instrument"];
+  const card = await fakeClaude({ facts: withChecks, ownChecks });
+  const voice = await fakeClaude({ facts: withChecks, ownChecks, role: "voice" });
+  // The configured publisher's check names are Margot's own.
+  const configured = await fakeClaude({ facts: withChecks, cliEnvironment: { JEV_KEY: "unused" } });
+  expect({
+    card: names(card.stdin),
+    voice: names(voice.stdin),
+    configured: names(configured.stdin),
+  }).toEqual({ card: ["ci"], voice: ["ci"], configured: ["ci"] });
+});
+it("grants the check-run tool to a card whose bundle lists it, and Margot's own checks reach the server", async () => {
+  const listed = [
+    "Skill",
+    "Read",
+    ...evidenceTools("read_diff", "read_file", "search_file", "list_files", "read_check_run"),
+  ];
+  const card = await fakeClaude({ reviewerTools: listed, ownChecks: ["review / margot"] });
+  expect({
+    allowed: value(card.args, "--allowedTools"),
+    ownChecks: JSON.parse(present(card.mcp.mcpServers.evidence?.env?.MARGOT_EVIDENCE)).ownChecks,
+  }).toEqual({ allowed: "mcp__evidence", ownChecks: ["review / margot"] });
+  await expect(fakeClaude({ tools: listed })).rejects.toThrow("exactly the requested tools");
+  await expect(fakeClaude({ reviewerTools: listed, tools: listed })).resolves.toBeDefined();
+});
+it("tells the voice how documentation findings are ruled, and only for documentation", async () => {
+  const rule = "Documentation accuracy findings go back to the author as CHANGES_REQUESTED";
+  const documentation = await fakeClaude({ role: "voice", classification: "documentation" });
+  const functional = await fakeClaude({ role: "voice" });
+  const card = await fakeClaude({ classification: "documentation" });
+  expect({
+    documentation: documentation.stdin.includes(rule),
+    functional: functional.stdin.includes(rule),
+    card: card.stdin.includes(rule),
+  }).toEqual({ documentation: true, functional: false, card: false });
 });

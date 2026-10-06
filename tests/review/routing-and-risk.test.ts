@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { checkText as renderCheckText } from "../../src/render.js";
 import {
   asDocumentation,
   type Change,
@@ -108,7 +109,47 @@ describe("the risk band", () => {
       noCouncilConfidentlyLow(operationsAt([0, 0.7, 0.3, 0]), withVoiceFields({ band: "MEDIUM" })),
     );
     expect(result.decision.rating.band).toBe("MEDIUM");
-    expect(result.voice).not.toBeNull();
+    expect(result.voice).toBeNull();
+  });
+
+  it("holds a band above LOW without the voice when routing confidently selects no lens", async () => {
+    const { result, calls } = await reviewed(
+      noCouncilConfidentlyLow(operationsAt([0, 0, 1, 0]), withVoiceFields({ band: "LOW" })),
+    );
+    expect({
+      voiceCalled: calls.includes("voice"),
+      outcome: result.decision.outcome,
+      band: result.decision.rating.band,
+      holdReasons: result.decision.holdReasons,
+      verdictSource: renderCheckText(result).match(/^verdict_source: (.*)$/m)?.[1],
+    }).toEqual({
+      voiceCalled: false,
+      outcome: "APPROVED",
+      band: "MEDIUM",
+      holdReasons: ["risk"],
+      verdictSource: "no_council",
+    });
+  });
+
+  it("keeps the cautious band when a dimension has no usable confidence", async () => {
+    const { result } = await reviewed(
+      noCouncilConfidentlyLow(
+        withRiskDimension("operations", { probabilities: [0, 0, 1, 0], confidence: null }),
+        withVoiceFields({ band: "LOW" }),
+      ),
+    );
+    expect({
+      band: result.decision.rating.band,
+      ignored: result.decision.rating.ignoredDimensions,
+      mergeEligible: result.decision.mergeEligible,
+    }).toEqual({ band: "MEDIUM", ignored: [], mergeEligible: false });
+  });
+
+  it("names the held band, not low exposure, on a no-council hold", async () => {
+    const { result } = await reviewed(
+      noCouncilConfidentlyLow(operationsAt([0, 0, 1, 0]), withVoiceFields({ band: "LOW" })),
+    );
+    expect(result.report.split("\n")[1]).toMatch(/^🟡 \*\*Risk: MEDIUM\*\* — medium exposure\b/u);
   });
 
   it("keeps the band LOW when the risk tail is just below the boundary", async () => {
@@ -186,13 +227,20 @@ describe("a risk answer from the fallback", () => {
     const { result } = await reviewed(draft);
     expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
   });
-  it("holds an editorial documentation change whose routing answer came from the fallback", async () => {
+  it("does not hold a documentation change whose routing answer came from the fallback", async () => {
     const draft = recorded("council-clear", asDocumentation(0));
     draft.route.source = "fallback";
     const { result } = await reviewed(draft);
-    expect(result.classification).toBe("documentation");
-    expect(result.provenance.decision_source).toBe("fallback");
-    expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["fallback-routing"]);
+    expect({
+      classification: result.classification,
+      decisionSource: result.provenance.decision_source,
+      mergeEligible: result.decision.mergeEligible,
+      holdReasons: result.decision.holdReasons,
+    }).toEqual({
+      classification: "documentation",
+      decisionSource: "jev",
+      mergeEligible: true,
+      holdReasons: [],
+    });
   });
 });

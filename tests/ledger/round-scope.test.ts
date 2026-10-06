@@ -1,6 +1,18 @@
 import { expect, it } from "vitest";
+import { recordedServices } from "../../src/adapters/recorded.js";
 import { roundScope } from "../../src/ledger.js";
-import { comparison, diff, entry, facts, prior } from "../helpers/ledger.js";
+import { review } from "../../src/review.js";
+import type { Ledger } from "../../src/types.js";
+import {
+  comparison,
+  config,
+  diff,
+  entry,
+  facts,
+  history,
+  prior,
+  source,
+} from "../helpers/ledger.js";
 
 it("excludes unrelated main changes from the delta", () => {
   expect({
@@ -51,5 +63,48 @@ it("preserves the ledger with an empty delta when the trees are identical", () =
     full: false,
     files: [],
     entries: [entry()],
+  });
+});
+it("summons cards for standing entries only and shows cards standing and dismissed entries", async () => {
+  const advisory: Ledger["entries"][number] = {
+    ...entry("MINOR"),
+    key: "R1-F2",
+    card: "house-style",
+    status: "advisory",
+    advisory_round: 1,
+  };
+  const dismissed = { ...entry("MAJOR", "dismissed"), key: "R1-F3" };
+  const services = recordedServices({
+    ...source,
+    config: { ...config, publication: "none" },
+    facts: history(prior([entry(), advisory, dismissed])),
+  });
+  await review(source.request, { ...config, publication: "none" }, services);
+  const safety = services.calls.find((call) => call.name === "card:safety")?.input as {
+    round: { entries: { key: string }[] };
+  };
+  expect({
+    houseStyle: services.calls.some((call) => call.name === "card:house-style"),
+    safetyEntries: safety.round.entries.map((e) => e.key),
+  }).toEqual({ houseStyle: false, safetyEntries: ["R1-F1", "R1-F3"] });
+});
+it("routes on the whole PR while the cards read the round's delta", async () => {
+  const services = recordedServices({
+    ...source,
+    config: { ...config, publication: "none" },
+    facts: history(prior([])),
+    comparison: { ...comparison(""), status: "identical" },
+  });
+  await review(source.request, { ...config, publication: "none" }, services);
+  const input = (name: string) =>
+    services.calls.find((call) => call.name === name)?.input as {
+      facts: { diff: string; files: unknown[] };
+    };
+  expect({
+    route: [input("route").facts.diff, input("route").facts.files],
+    card: [input("card:safety").facts.diff, input("card:safety").facts.files],
+  }).toEqual({
+    route: [facts.diff, facts.files],
+    card: ["No delta on this PR", []],
   });
 });

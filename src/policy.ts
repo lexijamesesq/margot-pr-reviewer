@@ -25,28 +25,40 @@ export function classify(
   if (answer.source !== "jev") return "functional";
   return classNames.find((name) => answer[name] >= config.classificationThreshold) ?? "functional";
 }
+/** A standing ledger entry puts a mechanical or editorial change on the full path: routing,
+ * the routed and ledger cards, and risk for anything but documentation. */
 export function reviewPath(
   classification: Classification,
   route: z.infer<typeof routeSchema> | null,
   config: ReviewConfig,
+  ledgerOpen = false,
 ): { routing: boolean; council: boolean; risk: boolean } {
   const editorial =
+    !ledgerOpen &&
     classification === "documentation" &&
     route !== null &&
     route.documentationSubstantive !== null &&
     route.documentationSubstantive < config.routeThreshold;
+  const routing = classification !== "mechanical" || ledgerOpen;
   return {
-    routing: classification !== "mechanical",
-    council: classification !== "mechanical" && !editorial,
-    risk: classification === "functional",
+    routing,
+    council: routing && !editorial,
+    risk: classification === "functional" || (classification === "mechanical" && ledgerOpen),
   };
 }
+/** The routed cards plus the ledger's; a documentation change with none gets the proof card. */
 export function selectCards(
   route: z.infer<typeof routeSchema>,
   classification: Classification,
   config: ReviewConfig,
+  recalled: Card["name"][] = [],
 ): Card["name"][] {
-  const selected = cardNames.filter((name) => route.cards[name] >= config.routeThreshold);
+  const selected = [
+    ...new Set([
+      ...cardNames.filter((name) => route.cards[name] >= config.routeThreshold),
+      ...recalled,
+    ]),
+  ];
   if (classification === "documentation" && selected.length === 0)
     selected.push("works-and-proven");
   return selected;
@@ -73,10 +85,14 @@ export function rate(
     );
   });
   const confident = dimensions.filter(
-    (name) => evidence.dimensions[name].confidence >= config.noCouncilConfidenceFloor,
+    (name) => (evidence.dimensions[name].confidence ?? 0) >= config.noCouncilConfidenceFloor,
   );
+  // A dimension with no usable confidence is not "unsure": the floor lowers nothing.
+  const usable = dimensions.every((name) => evidence.dimensions[name].confidence !== null);
   const ignored =
-    noCouncil && confident.length > 0 ? dimensions.filter((name) => !confident.includes(name)) : [];
+    noCouncil && usable && confident.length > 0
+      ? dimensions.filter((name) => !confident.includes(name))
+      : [];
   const raw = Math.max(...levels);
   const adjusted = Math.max(
     ...levels.filter((_, i) => !ignored.includes(dimensions[i] as (typeof dimensions)[number])),
@@ -127,7 +143,11 @@ export function needsVoice(
   routeConfidence: number,
   config: ReviewConfig,
 ): boolean {
-  if (summonsVoice(cards) || rating.band !== "LOW") return true;
+  if (summonsVoice(cards)) return true;
+  // No cards with confident routing is a clean council: the band alone decides, and a band
+  // above LOW is held for the operator without handing the voice an empty council.
+  if (rating.band !== "LOW")
+    return !(cards.length === 0 && routeConfidence >= config.confidenceThreshold);
   if (cards.length === 0 && routeConfidence < config.confidenceThreshold) return true;
   return (
     rating.evidence !== null &&
@@ -172,6 +192,12 @@ export function validateVoice(cards: Card[], voice: Voice): void {
     throw new Error("Voice must account for every mandatory finding exactly once");
   if (voice.outcome === "APPROVED" && voice.dispositions.some((d) => d.status !== "dismissed"))
     throw new Error("Approval contradicts unresolved findings");
+}
+/** The comment's risk line names the kind of risk: a fresh verdict without one is not posted.
+ * The voice's own ERROR is exempt. A saved verdict is replayed as it was posted. */
+export function requireRiskLine(voice: Voice): void {
+  if (voice.outcome !== "ERROR" && !voice.risk?.trim())
+    throw new Error("held — comment not template-compliant: risk line has no classification");
 }
 export function decide(
   classification: Classification,

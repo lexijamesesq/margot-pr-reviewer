@@ -276,6 +276,13 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     if (active) throw new Error("Publisher is single-use");
     active = requestSchema.parse(r);
     let notReviewed: string | undefined;
+    // A comment that fails the template gate is held as the poster's own error: the check
+    // says so and nothing is posted on the pull request.
+    let errorOutput = {
+      title: "Margot: not reviewed (error)",
+      summary:
+        "Publication or evaluation failed; no clearance. The review run's log has the diagnostic.",
+    };
     const context = () => ({ signal: AbortSignal.timeout(60000) });
     try {
       await check(
@@ -293,6 +300,11 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
       if (result.kind === "error") {
         if (refused && result.stage === stages.publication) throw refused;
         notReviewed = notReviewedReason(result.stage);
+        if (result.stage === stages.templateGate)
+          errorOutput = {
+            title: "not reviewed: poster error",
+            summary: result.diagnostic.slice(0, 900),
+          };
         throw new Error(`${result.stage}: ${result.diagnostic}`);
       }
       if (result.kind === "held") {
@@ -369,8 +381,8 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
               r,
               checkName(r),
               "action_required",
-              "Margot: not reviewed (error)",
-              "Publication or evaluation failed; no clearance. The review run's log has the diagnostic.",
+              errorOutput.title,
+              errorOutput.summary,
               // Overwrite any verdict text already written for this head: with no
               // `outcome:` line a reader sees "held without a verdict", never "approved".
               "no verdict: publication or evaluation failed after the check was opened",

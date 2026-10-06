@@ -15,12 +15,13 @@ import {
   decide,
   needsVoice,
   rate,
+  requireRiskLine,
   reviewPath,
   selectCards,
   validateVoice,
 } from "./policy.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "./questions.js";
-import { render } from "./render.js";
+import { render, shownFindingGap } from "./render.js";
 import {
   bundleSchema,
   cardSchema,
@@ -294,8 +295,9 @@ export async function review(
         return bundle;
       };
       const recalled = standingCards(scope);
-      if (reviewPath(classification, null, config).routing || recalled.length > 0) {
-        const { documentationSubstantive: _documentationSubstantive, ...functionalRouteQuestions } =
+      const ledgerOpen = recalled.length > 0;
+      if (reviewPath(classification, null, config, ledgerOpen).routing) {
+        const { documentation_substantive: _substance, ...functionalRouteQuestions } =
           routeQuestions;
         const questions =
           classification === "documentation" ? routeQuestions : functionalRouteQuestions;
@@ -305,20 +307,14 @@ export async function review(
           files: scope.files,
           fileCount: scope.files.length,
         };
+        // Routing reads the whole PR, as risk does; the cards read this round's scope.
         routeAnswer = routeSchema.parse(
-          await call(stages.route, (c) =>
-            services.route(scopedFacts, classification, questions, c),
-          ),
+          await call(stages.route, (c) => services.route(facts, classification, questions, c)),
         );
-        const path = reviewPath(classification, routeAnswer, config);
-        if (path.council || recalled.length > 0) {
+        const path = reviewPath(classification, routeAnswer, config, ledgerOpen);
+        if (path.council) {
           await progress("Margot: council is reviewing the changes");
-          const selected = [
-            ...new Set([
-              ...(path.council ? selectCards(routeAnswer, classification, config) : []),
-              ...recalled,
-            ]),
-          ];
+          const selected = selectCards(routeAnswer, classification, config, recalled);
           if (selected.length > 0) {
             const resolved = await loadBundle();
             const completed = await Promise.allSettled(
@@ -337,9 +333,7 @@ export async function review(
                         round: {
                           ...scope,
                           entries: scope.entries.filter(
-                            (e) =>
-                              e.card === name &&
-                              ["standing", "dismissed", "advisory"].includes(e.status),
+                            (e) => e.card === name && ["standing", "dismissed"].includes(e.status),
                           ),
                         },
                       },
@@ -388,6 +382,8 @@ export async function review(
               ),
             );
             validateVoice(cards, voice);
+            stage = stages.templateGate;
+            requireRiskLine(voice);
           }
         }
       }
@@ -404,14 +400,14 @@ export async function review(
           classification: classSource,
           mechanicalProbability,
           summonedByLedger: recalled.filter(
-            (name) =>
-              !routeAnswer ||
-              !reviewPath(classification, routeAnswer, config).council ||
-              !selectCards(routeAnswer, classification, config).includes(name),
+            (name) => !routeAnswer || (routeAnswer.cards[name] ?? 0) < config.routeThreshold,
           ),
+          // Documentation's LOW band comes from the verified class, not from routing: a
+          // routing outage summons review, and does not make accuracy the operator's risk.
           decision_source:
-            (routeAnswer && routeAnswer.source !== "jev") ||
-            (riskAnswer && riskAnswer.source !== "jev")
+            classification !== "documentation" &&
+            ((routeAnswer && routeAnswer.source !== "jev") ||
+              (riskAnswer && riskAnswer.source !== "jev"))
               ? "fallback"
               : "jev",
           services: services.provenance,
@@ -424,6 +420,12 @@ export async function review(
         if (riskAnswer && riskAnswer.source !== "jev")
           core.decision.holdReasons.push("fallback-risk");
       }
+      // The comment's card rows each need a plain sentence; one without is not posted.
+      const before = stage;
+      stage = stages.templateGate;
+      const gap = shownFindingGap(core);
+      if (gap) throw new Error(gap);
+      stage = before;
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };
     }
     const metadata = services.reviewMetadata?.() ?? {};

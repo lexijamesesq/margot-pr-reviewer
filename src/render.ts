@@ -1,7 +1,7 @@
 import { ledgerBlock } from "./ledger.js";
 import { fallbackNotice, holdReason } from "./policy.js";
-import { cardNames } from "./schemas.js";
-import type { Card, Review, ReviewPresentation } from "./types.js";
+import { cardNames, dimensions } from "./schemas.js";
+import type { Card, Review, ReviewCore, ReviewPresentation } from "./types.js";
 
 const outcomeIcons = {
   APPROVED: "✅",
@@ -47,10 +47,42 @@ function firstClause(value: string): string {
   return boundary < 0 ? text : text.slice(0, boundary);
 }
 
-function fallbackRationale(review: Review): string {
-  if (review.classification === "mechanical")
-    return "A mechanical change has no functional effect, so no council review was required.";
-  return "The selected review path completed without unresolved findings.";
+/** Whether a documentation change was editorial: it is the one class reviewed by no card. */
+const editorial = (review: Review) =>
+  review.classification === "documentation" &&
+  review.routeAnswer !== null &&
+  review.cards.length === 0;
+
+/** The risk label and summary of a review the voice did not rule. */
+function codeVerdict(review: Review): { risk: string; summary: string } {
+  if (review.classification === "mechanical" && review.routeAnswer === null)
+    return {
+      risk: "mechanical change — no functional change",
+      summary:
+        "A mechanical change (dependency bump, or linter/formatter output) with no functional change — no review was required.",
+    };
+  if (editorial(review))
+    return {
+      risk: "editorial documentation change",
+      summary: "An editorial documentation change with unchanged meaning — no review was required.",
+    };
+  // The dimension Jev scored highest names the kind of exposure; an all-zero score names
+  // none. A dimension without a score counts as 2, and an unscored review as all zero.
+  const expected = dimensions.map((name) =>
+    review.riskAnswer ? (review.riskAnswer.dimensions[name]?.score ?? 2) : 0,
+  );
+  const top = expected.indexOf(Math.max(...expected));
+  const exposure = `${review.decision.rating.band.toLowerCase()} exposure`;
+  return {
+    risk:
+      (expected[top] ?? 0) > 0
+        ? `${exposure} — ${dimensions[top]?.replaceAll("_", " ")}`
+        : exposure,
+    summary:
+      review.cards.length === 0
+        ? "No review lens was required for this change."
+        : "Reviewed against the summoned lenses; no blocking findings.",
+  };
 }
 
 function authorityLine(review: Review): string | null {
@@ -86,17 +118,32 @@ function findingKey(finding: Card["findings"][number]): string {
   return `${finding.location}\u0000${finding.what}`;
 }
 
-function cardRows(review: Review): { rows: string[]; findings: number } {
-  const cards = new Map(review.cards.map((card) => [card.name, card]));
+/** Each card's findings the comment shows: every finding the voice did not dismiss. */
+function visibleFindings(review: ReviewCore): Map<Card["name"], Card["findings"]> {
   const dismissed = new Set(
     review.voice?.dispositions.filter((d) => d.status === "dismissed").map((d) => d.id) ?? [],
   );
-  const visible = new Map(
+  return new Map(
     review.cards.map((card) => [
       card.name,
       card.findings.filter((finding) => !finding.id || !dismissed.has(finding.id)),
     ]),
   );
+}
+
+/** A card row whose shown finding has no plain sentence is not posted; null when none. */
+export function shownFindingGap(review: ReviewCore): string | null {
+  for (const [name, findings] of visibleFindings(review)) {
+    const first = findings[0];
+    if (first && !labelSentence(first.what))
+      return `held — comment not template-compliant: ${name}: its shown finding has no plain-language comment`;
+  }
+  return null;
+}
+
+function cardRows(review: Review): { rows: string[]; findings: number } {
+  const cards = new Map(review.cards.map((card) => [card.name, card]));
+  const visible = visibleFindings(review);
   const owners = new Map<string, Card["name"][]>();
   for (const [name, findings] of visible)
     for (const finding of findings) {
@@ -145,9 +192,18 @@ function defaultPresentation(review: Review): ReviewPresentation {
   };
 }
 
+/** The first sentence of a text, whole, ending in one period; empty stays empty. */
+function labelSentence(value: string): string {
+  const text = normalized(value);
+  const end = text.search(/[.!?](?: |$)/u);
+  const cut = (end < 0 ? text : text.slice(0, end)).replace(/[.!?;,: ]+$/u, "");
+  return cut ? `${cut}.` : "";
+}
+
 export function render(review: Review): string {
   const { decision, request } = review;
-  const rationale = review.voice?.summary.trim() || fallbackRationale(review);
+  const verdict = codeVerdict(review);
+  const rationale = review.voice ? review.voice.summary.trim() : verdict.summary;
   const tally = findingTally(review);
   const presentation = defaultPresentation(review);
   const cards = cardRows(review);
@@ -159,9 +215,9 @@ export function render(review: Review): string {
   const ticket = presentation.ticket
     ? `[${presentation.ticket.label}](${presentation.ticket.url})`
     : "none";
-  const risk = normalized(review.voice?.risk ?? "");
+  const risk = normalized(review.voice ? (review.voice.risk ?? "") : verdict.risk);
   const clarification = review.voice?.clarification?.trim();
-  const mechanical = review.classification === "mechanical" && review.cards.length === 0;
+  const mechanical = review.classification === "mechanical" && review.routeAnswer === null;
   const confidence =
     typeof review.provenance.mechanicalProbability === "number"
       ? ` (confidence ${Math.round(review.provenance.mechanicalProbability * 100)}%)`
@@ -216,11 +272,15 @@ export function render(review: Review): string {
 export function checkText(review: Review): string {
   const summoned = review.cards.map((card) => card.name);
   const verdictSource =
-    review.classification === "mechanical"
+    review.classification === "mechanical" && review.routeAnswer === null
       ? "mechanical"
       : review.voice
         ? "verdict_voice"
-        : "fast_path";
+        : editorial(review)
+          ? "documentation_editorial"
+          : review.cards.length === 0 && review.decision.rating.band !== "LOW"
+            ? "no_council"
+            : "fast_path";
   const lines = [
     `outcome: ${review.decision.outcome} | band: ${review.decision.rating.band}`,
     `decision_source: ${review.provenance.decision_source ?? "jev"}`,

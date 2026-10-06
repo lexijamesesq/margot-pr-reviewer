@@ -83,6 +83,8 @@ describe("required checks", () => {
     ["comes from an actor that is not trusted", withCheck({ actor: "forger" })],
     ["ran against a stale head", withCheck({ head: "b".repeat(40) })],
     ["did not succeed", withCheck({ conclusion: "failure" })],
+    ["concluded neutral", withCheck({ conclusion: "neutral" })],
+    ["was cancelled", withCheck({ conclusion: "cancelled" })],
   ])("errors at the checks stage when the required check %s", async (_cause, change) => {
     const { result } = await reviewRecording(recorded("council-clear", change));
     expect(result).toMatchObject({ kind: "error", stage: "checks", mergeEligible: false });

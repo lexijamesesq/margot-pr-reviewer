@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { decisionFallback } from "../src/adapters/decision-fallback.js";
-import { jevAdapter } from "../src/adapters/jev.js";
+import { councilText, jevAdapter, jevState } from "../src/adapters/jev.js";
 import * as processAdapter from "../src/adapters/process.js";
 import { recordedServices, review } from "../src/index.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
@@ -70,39 +70,100 @@ it("sends the golden classification questions, in order", async () => {
     JSON.stringify(goldenClassificationQuestions),
   );
 });
-it("keeps full code evidence and excludes author prose in classification", async () => {
+it("classifies the code change alone: files, tier and the whole diff, in one request", async () => {
   const j = jev(classes);
+  const diff = "a.ts evidence 🐱 ".repeat(8000);
   await j.adapter.classify(
     {
       ...facts,
       title: "External release changes",
       body: "New external behavior",
       author: "release-bot",
+      files: [{ path: "b.ts", previousPath: "a.ts" }],
+      ownedPathTier: "required_owned",
+      diff,
     },
     classificationQuestions,
     context(),
   );
-  const sent = (
-    j.calls[0] as {
-      state: Record<string, unknown>;
-    }
-  ).state;
-  expect(
-    j.calls.length === 1 &&
-      sent.diff === facts.diff &&
-      sent.head === facts.head &&
-      sent.base === facts.base &&
-      ["title", "body", "author", "history"].every((name) => !(name in sent)),
-  ).toBe(true);
+  expect({ requests: j.calls.length, state: (j.calls[0] as { state: unknown }).state }).toEqual({
+    requests: 1,
+    state: [
+      `Pull request #${facts.pr} in ${facts.repository}.`,
+      "Changed files (2): b.ts, a.ts",
+      "CODEOWNERS ownership tier: required_owned",
+      `Diff:\n${diff}`,
+    ].join("\n"),
+  });
 });
-it("fails validation for a malformed Jev classification", async () => {
-  await expect(
-    jev({ ...classes, mechanical: { type: "noul", noul: "yes" } }).adapter.classify(
-      facts,
-      classificationQuestions,
-      context(),
-    ),
-  ).rejects.toThrow();
+describe("a malformed Jev answer takes the conservative default", () => {
+  it("classifies as functional when any class answer is unreadable", async () => {
+    expect(
+      await jev({ ...classes, mechanical: { type: "noul", noul: "yes" } }).adapter.classify(
+        facts,
+        classificationQuestions,
+        context(),
+      ),
+    ).toEqual({ source: "jev", functional: 1, documentation: 0, mechanical: 0 });
+  });
+  it("summons a card whose routing answer is missing or unreadable", async () => {
+    const { documentation_substantive: _substance, ...functional } = routeQuestions;
+    const answers = {
+      ...Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0 }])),
+      safety: { type: "noul", noul: "high" },
+      "house-style": undefined,
+      exposure: { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+    };
+    const r = routeSchema.parse(
+      await jev(answers).adapter.route(facts, "functional", functional, context()),
+    );
+    expect(
+      Object.entries(r.cards)
+        .filter(([, p]) => p === 1)
+        .map(([n]) => n),
+    ).toEqual(["safety", "house-style"]);
+  });
+  it("treats routing as unsure when the exposure answer is missing", async () => {
+    const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0 }]));
+    const { documentation_substantive: _substance, ...functional } = routeQuestions;
+    const r = routeSchema.parse(
+      await jev(answers).adapter.route(facts, "functional", functional, context()),
+    );
+    expect(r.confidence).toBe(0);
+  });
+  it("treats documentation as substantive when its meaning answer is unreadable", async () => {
+    const answers = {
+      ...Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0 }])),
+      documentation_substantive: { type: "noul" },
+      exposure: { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+    };
+    const r = routeSchema.parse(
+      await jev(answers).adapter.route(facts, "documentation", routeQuestions, context()),
+    );
+    expect(r.documentationSubstantive).toBe(1);
+  });
+  it("scores a missing risk dimension at level 2 with no confidence, and an unreadable one by its score", async () => {
+    const answers = {
+      ...Object.fromEntries(
+        dimensions.map((d) => [
+          d,
+          { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+        ]),
+      ),
+      operations: undefined,
+      data_security: { type: "score", confidence: "high", score: 2.6, probabilities: null },
+    };
+    const r = riskSchema.parse(
+      await jev(answers).adapter.risk(facts, [], riskQuestions, context()),
+    );
+    expect({
+      operations: r.dimensions.operations,
+      dataSecurity: r.dimensions.data_security,
+    }).toEqual({
+      operations: { confidence: null, probabilities: [0, 0, 1, 0] },
+      dataSecurity: { confidence: null, score: 2.6, probabilities: [0, 0, 0, 1] },
+    });
+  });
 });
 it("retries a transient Jev response and recovers", async () => {
   const j = jev(classes, { failures: 1 });
@@ -141,11 +202,21 @@ it("preserves risk levels in Jev score distributions", async () => {
   const r = await jev(answers).adapter.risk(facts, [], riskQuestions, context());
   expect(riskSchema.parse(r).dimensions.operations.probabilities[2]).toBe(1);
 });
+it("keeps Jev's score for each risk dimension", async () => {
+  const answers = Object.fromEntries(
+    dimensions.map((d, i) => [
+      d,
+      { type: "score", confidence: 0.8, score: i / 4, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
+    ]),
+  );
+  const r = riskSchema.parse(await jev(answers).adapter.risk(facts, [], riskQuestions, context()));
+  expect(dimensions.map((d) => r.dimensions[d].score)).toEqual([0, 0.25, 0.5, 0.75, 1]);
+});
 it("preserves routing uncertainty in Jev exposure confidence", async () => {
   const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0.5 }]));
   const r = await jev({
     ...answers,
-    documentationSubstantive: { type: "noul", noul: 1 },
+    documentation_substantive: { type: "noul", noul: 1 },
     exposure: {
       type: "score",
       confidence: 0,
@@ -154,93 +225,130 @@ it("preserves routing uncertainty in Jev exposure confidence", async () => {
   }).adapter.route(facts, "documentation", routeQuestions, context());
   expect(routeSchema.parse(r).confidence).toBe(0);
 });
-describe("bound evidence batching", () => {
+describe("routing and risk state", () => {
   const source = readRecording("council-clear");
   const facts = factsSchema.parse(source.facts);
-  for (const [name, check] of [
-    ["retains every evidence byte when batching", "evidence"],
-    ["takes conservative maximum tails across batched risk", "severity"],
-    ["preserves the lowest confidence across batches", "confidence"],
-  ] as const)
-    it(name, async () => {
-      const { jevAdapter } = await import("../src/adapters/jev.js");
-      const requests: Record<string, unknown>[] = [];
-      const { riskQuestions } = await import("../src/questions.js");
-      const data = { ...facts, diff: "a.ts evidence 🐱 ".repeat(8000) };
-      const client = jevAdapter({
-        key: "test",
-        model: "test",
-        fallbackClaude: pinnedClaude,
-        fetch: (async (_url, init) => {
-          const request = JSON.parse(String(init?.body));
-          requests.push(request.state);
-          const last = request.state.evidencePart === request.state.totalParts;
-          const high = last;
-          return new Response(
-            JSON.stringify({
-              model: "test",
-              answers: Object.fromEntries(
-                Object.keys(riskQuestions).map((k) => [
-                  k,
-                  {
-                    type: "score",
-                    confidence: last ? 0.1 : 0.9,
-                    probabilities: high
-                      ? { "0": 0, "1": 0, "2": 0, "3": 1 }
-                      : { "0": 1, "1": 0, "2": 0, "3": 0 },
-                  },
-                ]),
-              ),
-            }),
-          );
-        }) as typeof fetch,
-      });
-      const output = (await client.risk(data, [], riskQuestions, {
-        signal: AbortSignal.timeout(3000),
-      })) as {
-        dimensions: {
-          operations: {
-            probabilities: number[];
-            confidence: number;
-          };
-        };
-      };
-      const expected = { facts: { ...data } as Partial<typeof facts>, cards: [] };
-      delete expected.facts.history;
-      const reconstructed = requests.map((r) => r.evidence).join("");
-      if (check === "evidence") expect(reconstructed).toBe(JSON.stringify(expected));
-      else if (check === "severity") expect(output.dimensions.operations.probabilities[3]).toBe(1);
-      else expect(output.dimensions.operations.confidence).toBe(0.1);
-    });
-  it("keeps functional evidence from the final batch through aggregation", async () => {
-    const { jevAdapter } = await import("../src/adapters/jev.js");
-    const { classificationQuestions } = await import("../src/questions.js");
+  const scoreAll = (questions: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.keys(questions).map((k) => [
+        k,
+        k in riskQuestions || k === "exposure"
+          ? { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } }
+          : { type: "noul", noul: 0.5 },
+      ]),
+    );
+  const capture = () => {
+    const requests: { state: unknown; questions: Record<string, { instructions: string }> }[] = [];
     const client = jevAdapter({
       key: "test",
       model: "test",
       fallbackClaude: pinnedClaude,
       fetch: (async (_url, init) => {
-        const r = JSON.parse(String(init?.body));
-        const last = r.state.evidencePart === r.state.totalParts;
+        const request = JSON.parse(String(init?.body));
+        requests.push(request);
         return new Response(
-          JSON.stringify({
-            model: "test",
-            answers: {
-              functional: { type: "noul", noul: last ? 0.9 : 0.1 },
-              documentation: { type: "noul", noul: 0.1 },
-              mechanical: { type: "noul", noul: 0.9 },
-            },
-          }),
+          JSON.stringify({ model: "test", answers: scoreAll(request.questions) }),
         );
       }) as typeof fetch,
     });
+    return { client, requests };
+  };
+  const large = {
+    ...facts,
+    title: "Pin the shell checker",
+    body: `Why: ${"x".repeat(2000)}`,
+    author: "octocat",
+    files: Array.from({ length: 70 }, (_, i) => ({ path: `f${i}.ts` })),
+    ownedPathTier: "owned",
+    diff: "a.ts evidence 🐱 ".repeat(8000),
+  };
+  it("routes a functional change on the PR summary, without the diff, in one request", async () => {
+    const { client, requests } = capture();
+    const { documentation_substantive: _substance, ...functional } = routeQuestions;
+    await client.route(large, "functional", functional, context());
+    const state = String(requests[0]?.state);
+    expect({
+      requests: requests.length,
+      lines: state.split("\n").map((line) => line.slice(0, 40)),
+      body: state.split("\n")[2]?.length,
+      files: state.split("\n")[3]?.split(", ").length,
+      questions: Object.keys(requests[0]?.questions ?? {}),
+      exposure: requests[0]?.questions.exposure?.instructions,
+      safety: requests[0]?.questions.safety?.instructions,
+    }).toEqual({
+      requests: 1,
+      lines: [
+        "Pull request #2 in example/project by oc",
+        "Title: Pin the shell checker",
+        `Body: Why: ${"x".repeat(29)}`,
+        "Changed files (70): f0.ts, f1.ts, f2.ts,",
+        "CODEOWNERS ownership tier: owned",
+      ],
+      body: "Body: ".length + 1500,
+      files: 60,
+      questions: ["exposure", ...cardNames],
+      exposure: "Score this change's overall security/operational exposure.",
+      safety:
+        "Does this change need the 'safety' review lens? It does when: a changed file can run, be sourced, grant access, or carry a credential shape.",
+    });
+  });
+  it("routes a documentation change with the whole diff and asks whether its meaning changed", async () => {
+    const { client, requests } = capture();
+    await client.route(large, "documentation", routeQuestions, context());
+    expect({
+      requests: requests.length,
+      diff: String(requests[0]?.state).endsWith(`\nDiff:\n${large.diff}`),
+      last: Object.keys(requests[0]?.questions ?? {}).at(-1),
+    }).toEqual({ requests: 1, diff: true, last: "documentation_substantive" });
+  });
+  it("scores risk on the PR summary and the council's findings, in one request", async () => {
+    const { client, requests } = capture();
+    const card = {
+      name: "safety" as const,
+      completion: "completed" as const,
+      checked: ["Read the workflow"],
+      notCovered: [],
+      findings: [
+        {
+          id: "F1",
+          tag: "issue" as const,
+          severity: "MAJOR" as const,
+          confidence: "HIGH" as const,
+          location: "a.ts:1",
+          what: "The token reaches the log.",
+        },
+      ],
+    };
+    await client.risk(large, [card], riskQuestions, context());
+    expect({
+      requests: requests.length,
+      state: requests[0]?.state,
+      instructions: requests[0]?.questions.blast_radius?.instructions,
+    }).toEqual({
+      requests: 1,
+      state: jevState(large, `Council findings:\n${councilText([card])}`),
+      instructions: "Score the change's blast radius against the anchors.",
+    });
+    expect(councilText([card])).toBe(
+      [
+        "===CARD: safety===",
+        "card: safety",
+        "completion: completed",
+        "Checked:",
+        "- Read the workflow",
+        "Not covered:",
+        "Findings:",
+        "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH",
+        "    what: The token reaches the log.",
+      ].join("\n"),
+    );
+  });
+  it("tells risk when no council ran", async () => {
+    const { client, requests } = capture();
+    await client.risk(facts, [], riskQuestions, context());
     expect(
-      await client.classify(
-        { ...facts, diff: "a.ts evidence ".repeat(4000) },
-        classificationQuestions,
-        { signal: AbortSignal.timeout(3000) },
-      ),
-    ).toMatchObject({ functional: 0.9 });
+      String(requests[0]?.state).endsWith("\nCouncil findings:\n(no council: no_council)"),
+    ).toBe(true);
   });
 });
 describe("fallback decisions", () => {
@@ -273,7 +381,7 @@ describe("fallback decisions", () => {
     let calls = 0;
     const adapter = outage(async (questions, state) => {
       calls++;
-      expect(state).toHaveProperty("diff", facts.diff);
+      expect(state).toBe(jevState(facts));
       return Object.fromEntries(
         Object.keys(questions).map((key) => [
           key,
@@ -349,7 +457,10 @@ describe("fallback decisions", () => {
         state: present(flags[1]).includes(JSON.stringify({ diff: facts.diff })),
         required: schema.required,
       }).toMatchObject({
-        answers: { lens: { noul: 0.9 }, exposure: { confidence: 0, probabilities: { "2": 1 } } },
+        answers: {
+          lens: { noul: 0.9 },
+          exposure: { confidence: 0, score: 2, probabilities: { "2": 1 } },
+        },
         model: "configured-reviewer-model",
         tools: "",
         strict: true,

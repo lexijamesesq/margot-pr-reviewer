@@ -2,6 +2,16 @@ import { describe, expect, it } from "vitest";
 import { checkText, render } from "../../src/render.js";
 import { present } from "../helpers/present.js";
 import { authorChangesReview, mechanicalReview } from "../helpers/publication.js";
+import {
+  asDocumentation,
+  confidentLow,
+  recorded,
+  reviewed,
+  uniformRisk,
+  withNoCouncil,
+  withRisk,
+  withRiskDimension,
+} from "../helpers/review.js";
 
 it("shows an incomplete card's completion and reason instead of clear", () => {
   const value = structuredClone(authorChangesReview);
@@ -23,11 +33,14 @@ it("displays the voice's short risk statement on the risk line instead of the ba
   value.decision.rating.rationale = "The band comes from a separate risk assessment.";
   expect(render(value).split("\n")[1]).toBe("🟡 **Risk: MEDIUM** — operator workflow disruption");
 });
-it("omits the explanatory suffix when the voice gives no risk statement", () => {
+it("omits the explanatory suffix on the voice's own ERROR without a risk statement", () => {
+  // Only an ERROR may omit the risk line; any other verdict without one is held, not posted.
   const value = structuredClone(authorChangesReview);
   if (!value.voice) throw new Error("voice fixture required");
+  value.voice.outcome = "ERROR";
+  value.decision.outcome = "ERROR";
   delete value.voice.risk;
-  expect(render(value).split("\n")[1]).toBe("🟡 **Risk: MEDIUM**");
+  expect(render(value).split("\n").slice(0, 2)).toEqual(["### 🚫 ERROR", "🟡 **Risk: MEDIUM**"]);
 });
 it("posts confidence, files, cost and runtime without a council roster on a mechanical review", () => {
   const value = structuredClone(mechanicalReview);
@@ -177,5 +190,70 @@ describe("merge actor in the authority hold", () => {
       "Above my authority: it touches a protected path. Approve it to merge it.",
     );
     expect(report).not.toContain("merges it");
+  });
+});
+describe("a verdict code reaches without the voice", () => {
+  const head = (report: string) => report.split("\n").slice(1, 3);
+  it("labels a mechanical change and says no review was required", async () => {
+    const { result } = await reviewed(recorded("mechanical-bump"));
+    expect(head(result.report)).toEqual([
+      "🟢 **Risk: LOW** — mechanical change — no functional change",
+      "> A mechanical change (dependency bump, or linter/formatter output) with no functional change — no review was required.",
+    ]);
+  });
+  it("labels an editorial documentation change and records it as editorial", async () => {
+    const { result } = await reviewed(recorded("council-clear", asDocumentation(0)));
+    expect({
+      head: head(result.report),
+      source: checkText(result).match(/^verdict_source: (.*)$/m)?.[1],
+    }).toEqual({
+      head: [
+        "🟢 **Risk: LOW** — editorial documentation change",
+        "> An editorial documentation change with unchanged meaning — no review was required.",
+      ],
+      source: "documentation_editorial",
+    });
+  });
+  it("names the dimension Jev scored highest on a cleared council review", async () => {
+    const { result } = await reviewed(
+      recorded(
+        "council-clear",
+        withRisk(uniformRisk({ ...confidentLow, score: 0.2 })),
+        // The distribution's expected level is higher here, but Jev's score decides.
+        withRiskDimension("operations", {
+          probabilities: [0, 0.8, 0.2, 0],
+          confidence: 1,
+          score: 0.3,
+        }),
+        withRiskDimension("data_security", {
+          probabilities: [1, 0, 0, 0],
+          confidence: 1,
+          score: 0.6,
+        }),
+      ),
+    );
+    expect(head(result.report)).toEqual([
+      "🟢 **Risk: LOW** — low exposure — data security",
+      "> Reviewed against the summoned lenses; no blocking findings.",
+    ]);
+  });
+  it("counts a dimension Jev gave no score as 2", async () => {
+    const { result } = await reviewed(
+      recorded("council-clear", withRisk(uniformRisk(confidentLow))),
+    );
+    expect(head(result.report)[0]).toBe("🟢 **Risk: LOW** — low exposure — blast radius");
+  });
+  it("says no lens was required when routing selected none", async () => {
+    const { result } = await reviewed(
+      recorded(
+        "council-clear",
+        withNoCouncil(),
+        withRisk(uniformRisk({ probabilities: [1, 0, 0, 0], confidence: 1, score: 0 })),
+      ),
+    );
+    expect(head(result.report)).toEqual([
+      "🟢 **Risk: LOW** — low exposure",
+      "> No review lens was required for this change.",
+    ]);
   });
 });

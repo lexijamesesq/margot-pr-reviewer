@@ -148,6 +148,7 @@
     "band": "LOW",
     "rationale": "Synthetic unused voice",
     "summary": "No voice expected.",
+    "risk": "low exposure",
     "dispositions": []
   },
   "head": "0000000000000000000000000000000000000007",

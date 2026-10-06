@@ -23,6 +23,18 @@ export const dimensions = [
   "verification_gap",
 ] as const;
 export const classNames = ["functional", "documentation", "mechanical"] as const;
+export const checkConclusions = [
+  "success",
+  "failure",
+  "neutral",
+  "cancelled",
+  "skipped",
+  "timed_out",
+  "action_required",
+  "stale",
+  "startup_failure",
+  "pending",
+] as const;
 export const classSchema = z.enum(classNames);
 export const cardNameSchema = z.enum(cardNames);
 export const bandSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
@@ -81,7 +93,8 @@ export const factsSchema = z.strictObject({
       name: text,
       actor: text,
       head: shaSchema,
-      conclusion: z.enum(["success", "failure", "pending", "skipped"]),
+      // GitHub's own conclusion, or `pending` while the run is not complete.
+      conclusion: z.enum(checkConclusions),
       // Recency, for a name that carries several runs on one head (a superseded run
       // stays in the list). Optional: older recordings lack them and fall back to order.
       startedAt: z.string().optional(),
@@ -139,7 +152,10 @@ export const riskSchema = z.strictObject({
           (p) => Math.abs(p.reduce((a, b) => a + b, 0) - 1) < 0.015,
           "Probabilities must sum to one",
         ),
-      confidence: probability,
+      // Null when Jev gave no usable confidence: not "unsure", so the band is never lowered.
+      confidence: probability.nullable(),
+      // Jev's expected level, 0 to 3; it names the kind of exposure on a code verdict.
+      score: z.number().min(0).max(3).optional(),
     }),
   ),
 });
@@ -158,8 +174,12 @@ export const findingSchema = z.strictObject({
     .optional(),
   // Any `late=` value is kept; only a `missed` prefix changes what the ledger does.
   late: text.optional(),
+  // No longer read or written; receipts saved by 0.7.0 and earlier still carry it.
   reopens: text.optional(),
   unconfirmed: z.boolean().optional(),
+  // The earlier dismissal's reason, on a dismissed finding a card raised again.
+  previouslyDismissed: text.optional(),
+  // `carried-dismissal` is no longer assigned; receipts saved by 0.7.0 and earlier carry it.
   advisory: z.enum(["minor-after-round-1", "late-non-blocking", "carried-dismissal"]).optional(),
 });
 export const cardSchema = z.strictObject({
@@ -169,6 +189,8 @@ export const cardSchema = z.strictObject({
   completionReason: text.optional(),
   checked: z.array(text),
   notCovered: z.array(text),
+  // From round two: the card's standing entries it closed, each with the lines that fix it.
+  resolved: z.array(text).optional(),
   findings: z.array(findingSchema),
 });
 export const voiceSchema = z.strictObject({

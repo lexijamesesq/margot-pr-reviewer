@@ -211,6 +211,7 @@
     "band": "MEDIUM",
     "rationale": "outdated guidance",
     "summary": "The removed summary check no longer gates merges. The guide still names it and must be corrected.",
+    "risk": "outdated guidance",
     "dispositions": [
       {
         "id": "F1",

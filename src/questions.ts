@@ -26,52 +26,63 @@ export const classificationQuestions = {
   documentation: `${definition}Is this documentation? Return the probability that the change includes human-facing documentation or explanatory comments needing accuracy review, with no functional effect.`,
   mechanical: `${definition}Is this mechanical? Return the probability that the change is wholly mechanical under these definitions.`,
 };
-export const routeQuestions = {
-  safety: "Can a changed file run, grant access or carry credentials?",
-  "works-and-proven": "Does the change claim behavior, a fix or a result evidence could establish?",
-  "principal-engineer": "Is there blast radius, reversibility or operational risk?",
-  "achieves-the-objective": "Is intent or scope alignment unresolved?",
+// Each card's summon trigger; routing asks whether the change needs that card's lens.
+const cardTriggers = {
+  safety: "a changed file can run, be sourced, grant access, or carry a credential shape",
+  "works-and-proven":
+    "the change claims a behavior, a fix, or a result that evidence could establish",
+  "principal-engineer": "blast radius, reversibility, or operations is 1 or more",
+  "achieves-the-objective":
+    "intent or scope alignment is unresolved after reading the body and diff",
   "maintainable-no-slop":
-    "Does a material maintainability question remain after mechanical checks?",
-  "house-style": "Does a material convention question remain after mechanical checks?",
-  documentationSubstantive:
-    "Does this documentation change meaning, claims, instructions, examples or explanations? Pure editorial changes with unchanged meaning answer no.",
+    "a material maintainability/slop question remains after the mechanical checks",
+  "house-style": "a material convention question remains after the mechanical checks",
+} as const;
+export const routeQuestions = {
+  ...(Object.fromEntries(
+    Object.entries(cardTriggers).map(([card, trigger]) => [
+      card,
+      `Does this change need the '${card}' review lens? It does when: ${trigger}.`,
+    ]),
+  ) as Record<keyof typeof cardTriggers, string>),
+  documentation_substantive:
+    "Probability that this change alters what the documentation says, not only how it says it. Altering what it says means a reader would know or do something different, such as a changed fact, instruction or command. Spelling, formatting and rewording that keeps the meaning do not.",
 };
 export const riskQuestions = {
   blast_radius: [
     "non-behavioral",
     "one bounded behavior",
-    "shared contract or several consumers",
-    "changes organization control",
+    "a shared contract or several consumers",
+    "changes estate control",
   ],
   reversibility: [
     "no state effect",
     "a revert restores it",
-    "recovery needs demonstrated extra procedure",
-    "irreversible or no recovery",
+    "recovery needs a demonstrated extra procedure",
+    "irreversible, or no effective recovery",
   ],
   data_security: [
     "none",
-    "existing boundary preserved",
-    "consequential data or privilege change",
-    "credential exposure or trust-boundary failure",
+    "an existing boundary preserved",
+    "a consequential data or privilege change",
+    "credential exposure, trust-boundary failure, or an authorization-control change",
   ],
   operations: [
     "none",
-    "local observable failure",
-    "shared automation or service disruption",
-    "loss of recovery or critical control",
+    "a local, observable failure",
+    "a shared automation or service disruption",
+    "loss of recovery or control, or critical machine or house behavior",
   ],
   verification_gap: [
     "proportionate evidence complete",
-    "minor uncertainty cannot change clearance",
-    "author-resolvable proof missing",
-    "cannot be established with execution or static proof",
+    "minor uncertainty that cannot change clearance",
+    "material, author-resolvable proof missing",
+    "cannot be established by any test, static proof, or execution evidence",
   ],
 } as const;
 /** Route confidence comes from this Score, not an invented Noul confidence. */
 export const routingExposureQuestion = {
   type: "score",
-  instructions: "Score this change's overall security and operational exposure.",
+  instructions: "Score this change's overall security/operational exposure.",
   criteria: riskQuestions.data_security,
 } as const;

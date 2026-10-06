@@ -3,7 +3,13 @@ import parseDiff from "parse-diff";
 import { z } from "zod";
 import { diffIsComplete } from "../diff.js";
 import { errorMessage } from "../errors.js";
-import { classNames, factsSchema, probability, requestSchema } from "../schemas.js";
+import {
+  checkConclusions,
+  classNames,
+  factsSchema,
+  probability,
+  requestSchema,
+} from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
 
@@ -229,14 +235,11 @@ export function githubAdapter(
           head: check.head_sha,
           ...(check.started_at ? { startedAt: check.started_at } : {}),
           id: check.id,
+          // The conclusion GitHub recorded, never one claimed on the check's behalf.
           conclusion:
-            check.status !== "completed"
-              ? "pending"
-              : check.conclusion === "success"
-                ? "success"
-                : check.conclusion === "skipped"
-                  ? "skipped"
-                  : "failure",
+            check.status === "completed"
+              ? (checkConclusions.find((c) => c === check.conclusion) ?? "pending")
+              : "pending",
         })),
         history: {
           complete: historyComplete,
@@ -281,6 +284,30 @@ export function githubAdapter(
       if (blob.size > 1024 * 1024 || (!blob.content && blob.size > 0))
         throw new Error("File exceeds evidence limit");
       return Buffer.from(blob.content, "base64").toString("utf8");
+    },
+    /** The current run of one named check on the bound head, with its output. */
+    async checkRun(r: ReviewRequest, name: string, c: CallContext) {
+      const runs = await client.paginate(client.rest.checks.listForRef, {
+        ...params(r, c),
+        ref: r.head,
+        per_page: 100,
+        filter: "latest",
+      });
+      const run = runs
+        .filter((check) => check.name === name && check.head_sha === r.head)
+        .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id)[0];
+      if (!run) throw new Error("No check run of that name on the head");
+      return {
+        name: run.name,
+        app: run.app?.slug ?? "unknown",
+        conclusion:
+          run.status === "completed"
+            ? (checkConclusions.find((v) => v === run.conclusion) ?? "pending")
+            : "pending",
+        title: run.output.title ?? "",
+        summary: run.output.summary ?? "",
+        text: run.output.text ?? "",
+      };
     },
     async tree(r: ReviewRequest, c: CallContext) {
       const tree = (

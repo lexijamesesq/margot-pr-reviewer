@@ -11,6 +11,8 @@ import { parseCard, parseVoice } from "./prose.js";
 
 export type ClaudeOptions = z.infer<typeof liveConfigSchema>["claude"] & {
   gh?: string;
+  /** Margot's own check names, kept out of the evidence cards and the voice receive. */
+  ownChecks?: string[];
   githubToken?: string;
   ticketingEnvironment?: Record<string, string>;
   onResponse?: (response: {
@@ -125,6 +127,7 @@ export function claudeAdapter(options: ClaudeOptions) {
       diffPath: join(scratch, "review.diff"),
       ...(options.references ? { references: options.references } : {}),
       ...(options.gh ? { gh: options.gh } : {}),
+      ...(options.ownChecks ? { ownChecks: options.ownChecks } : {}),
     };
     // Claude Code passes the model credential through to MCP servers; neither needs it.
     const modelCredentialsBlanked = { ANTHROPIC_API_KEY: "", CLAUDE_CODE_OAUTH_TOKEN: "" };
@@ -157,6 +160,7 @@ export function claudeAdapter(options: ClaudeOptions) {
       ...(options.references ? ["mcp__evidence__read_reference"] : []),
       "mcp__evidence__list_files",
       "mcp__evidence__search_file",
+      "mcp__evidence__read_check_run",
     ];
     const tools = [
       ...access.builtIns,
@@ -170,17 +174,19 @@ export function claudeAdapter(options: ClaudeOptions) {
         input.round.full
           ? "Review the full PR; nothing is late this round."
           : "Review only the supplied delta plus standing entries. Do not re-review unchanged code.",
-        // The ledger and parser depend on these conventions; the bundle does not state them all.
-        "Card findings may add ledger=R1-F1 and late=missed: reason or late=delta-reach: reason.",
-        "For a new finding in the delta use late=new.",
-        "Every new issue on a delta round must name one of these three attributions.",
-        "For a previously dismissed finding, keep the dismissal unless the delta changes the cited code; only then add reopens=<delta citation and reason>.",
+        "A finding with previouslyDismissed was dismissed before for that reason: keep it dismissed unless the new changes altered it.",
         "The voice must verify synthesized unconfirmed findings against the cited fix before dismissing, and must not establish an advisory finding.",
         "Scope and prior entries are supplied in round.",
         "Margot bounds prose when it renders the comment; the review check retains the complete finding text.",
         card
           ? `Your card is ${card.name}.`
           : "Rule on the supplied findings; use their exact IDs in established/dismissed.",
+        // The voice's definition states the other ruling rules; documentation's is Margot's.
+        ...(!card && input.classification === "documentation"
+          ? [
+              "Documentation accuracy findings go back to the author as CHANGES_REQUESTED, including any finding only the operator could otherwise act on. The route's band is LOW; preserve dismissals and ask a clarification question when needed.",
+            ]
+          : []),
       ].join(" "),
       [
         ...(options.references
@@ -191,7 +197,11 @@ export function claudeAdapter(options: ClaudeOptions) {
       ].join(" "),
       JSON.stringify({
         ...input,
-        facts: { ...input.facts, diff: "Available through read_diff" },
+        facts: {
+          ...input.facts,
+          diff: "Available through read_diff",
+          checks: input.facts.checks.filter((check) => !options.ownChecks?.includes(check.name)),
+        },
         round: { ...input.round, diff: "Available through read_diff" },
       }),
     ].join("\n");

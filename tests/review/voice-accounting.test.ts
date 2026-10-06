@@ -12,6 +12,7 @@ import {
   reviewRecording,
   voiceRuling,
   withCard,
+  withCardFields,
   withRoute,
   withRoutedCards,
   withVoice,
@@ -214,7 +215,7 @@ describe("voice publication safeguards", () => {
   it("refuses an approval with an established finding outside the mandatory set", async () => {
     const { result, publications } = await reviewRecording(
       recordedWithVoiceProse(
-        "outcome: APPROVED\nband: LOW\nband_reason: Bounded change\nsummary: Reviewed\nestablished:\n- F999 · The guard is missing\ndismissed:\n",
+        "outcome: APPROVED\nband: LOW\nband_reason: Bounded change\nrisk: configuration change\nsummary: Reviewed\nestablished:\n- F999 · The guard is missing\ndismissed:\n",
       ),
     );
     expect(result).toMatchObject({
@@ -223,6 +224,35 @@ describe("voice publication safeguards", () => {
       diagnostic: "Approval contradicts unresolved findings",
     });
     expect(publications).toEqual([]);
+  });
+
+  it.each(["", "risk: \n"])(
+    "holds a verdict whose risk line has no classification (%j) instead of posting it",
+    async (risk) => {
+      const { result, publications } = await reviewRecording(
+        recordedWithVoiceProse(
+          `outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change\n${risk}summary: Reviewed\nestablished:\ndismissed:\n`,
+        ),
+      );
+      expect({ result, publications }).toMatchObject({
+        result: {
+          kind: "error",
+          stage: "template-gate",
+          mergeEligible: false,
+          diagnostic: "held — comment not template-compliant: risk line has no classification",
+        },
+        publications: [],
+      });
+    },
+  );
+
+  it("posts the voice's own ERROR without a risk classification", async () => {
+    const { result } = await reviewRecording(
+      recordedWithVoiceProse(
+        "outcome: ERROR\nband: LOW\nband_reason: Could not read a.ts\nsummary: The review could not be completed.\nfinding: F1 unreadable\nestablished:\ndismissed:\n",
+      ),
+    );
+    expect(result).toMatchObject({ kind: "reviewed", decision: { outcome: "ERROR" } });
   });
 
   it.each(["summary", "risk", "band_reason", "finding", "clarification"])(
@@ -253,4 +283,31 @@ describe("voice publication safeguards", () => {
       expect(publications).toEqual([]);
     },
   );
+});
+
+describe("the comment's card rows", () => {
+  const withShownFinding = (what: string) =>
+    withCardFields("safety", {
+      findings: [{ tag: "info", severity: "MINOR", confidence: "HIGH", location: "a.ts:1", what }],
+    });
+  it("holds a review whose shown finding has no plain sentence instead of posting it", async () => {
+    const { result, publications } = await reviewRecording(
+      recorded("council-clear", withShownFinding(" . ")),
+    );
+    expect({ result, publications }).toMatchObject({
+      result: {
+        kind: "error",
+        stage: "template-gate",
+        diagnostic:
+          "held — comment not template-compliant: safety: its shown finding has no plain-language comment",
+      },
+      publications: [],
+    });
+  });
+  it("posts a review whose shown finding has a sentence", async () => {
+    const { result } = await reviewRecording(
+      recorded("council-clear", withShownFinding("The note is minor.")),
+    );
+    expect(result.kind).toBe("reviewed");
+  });
 });
