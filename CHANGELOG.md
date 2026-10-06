@@ -31,6 +31,7 @@ Deliberate differences from the previous reviewer:
 - An editorial documentation change still renders the council roster, every card skipped, as the previous reviewer rendered it.
 - Jev's advisory template-adherence check is not restored. Its two flags, a risk line that reads as a sentence and a card restating another card's finding, label text the comment already shows verbatim, and the risk line is now required; restoring it would add a Jev call to every review.
 - An empty ownership tier holds the review; the previous reviewer read it as no ownership and could clear it. Missing input never approves.
+- Cards and the voice run as `claude` processes on the runner host, not inside a read-only container with a read-only checkout. The previous reviewer's container confined a shell and a checkout of the pull request; Margot's reviewers have neither. They read evidence only through the read-only evidence tools, with `Read` confined to the card bundle's skill directory and an empty working directory.
 - Triage during a Jev outage reports functional with source `jev_unreachable` and makes no fallback call; the previous reviewer spent a fallback call to reach the same functional class. The floor treats both as not Jev-sourced.
 
 ## 0.7.0
