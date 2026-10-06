@@ -294,7 +294,8 @@ export async function review(
         return bundle;
       };
       const recalled = standingCards(scope);
-      if (reviewPath(classification, null, config).routing || recalled.length > 0) {
+      const ledgerOpen = recalled.length > 0;
+      if (reviewPath(classification, null, config, ledgerOpen).routing) {
         const { documentationSubstantive: _documentationSubstantive, ...functionalRouteQuestions } =
           routeQuestions;
         const questions =
@@ -310,15 +311,10 @@ export async function review(
             services.route(scopedFacts, classification, questions, c),
           ),
         );
-        const path = reviewPath(classification, routeAnswer, config);
-        if (path.council || recalled.length > 0) {
+        const path = reviewPath(classification, routeAnswer, config, ledgerOpen);
+        if (path.council) {
           await progress("Margot: council is reviewing the changes");
-          const selected = [
-            ...new Set([
-              ...(path.council ? selectCards(routeAnswer, classification, config) : []),
-              ...recalled,
-            ]),
-          ];
+          const selected = selectCards(routeAnswer, classification, config, recalled);
           if (selected.length > 0) {
             const resolved = await loadBundle();
             const completed = await Promise.allSettled(
@@ -402,10 +398,7 @@ export async function review(
           classification: classSource,
           mechanicalProbability,
           summonedByLedger: recalled.filter(
-            (name) =>
-              !routeAnswer ||
-              !reviewPath(classification, routeAnswer, config).council ||
-              !selectCards(routeAnswer, classification, config).includes(name),
+            (name) => !routeAnswer || (routeAnswer.cards[name] ?? 0) < config.routeThreshold,
           ),
           decision_source:
             (routeAnswer && routeAnswer.source !== "jev") ||
