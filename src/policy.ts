@@ -139,7 +139,11 @@ export function needsVoice(
   routeConfidence: number,
   config: ReviewConfig,
 ): boolean {
-  if (summonsVoice(cards) || rating.band !== "LOW") return true;
+  if (summonsVoice(cards)) return true;
+  // No cards with confident routing is a clean council: the band alone decides, and a band
+  // above LOW is held for the operator without handing the voice an empty council.
+  if (rating.band !== "LOW")
+    return !(cards.length === 0 && routeConfidence >= config.confidenceThreshold);
   if (cards.length === 0 && routeConfidence < config.confidenceThreshold) return true;
   return (
     rating.evidence !== null &&
