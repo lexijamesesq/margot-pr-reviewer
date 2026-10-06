@@ -30,6 +30,8 @@ Deliberate differences from the previous reviewer:
 - The risk anchors keep the previous reviewer's wording, including "changes estate control", because the thresholds are calibrated on it.
 - An editorial documentation change still renders the council roster, every card skipped, as the previous reviewer rendered it.
 - Jev's advisory template-adherence check is not restored. Its two flags, a risk line that reads as a sentence and a card restating another card's finding, label text the comment already shows verbatim, and the risk line is now required; restoring it would add a Jev call to every review.
+- An empty ownership tier holds the review; the previous reviewer read it as no ownership and could clear it. Missing input never approves.
+- Triage during a Jev outage reports functional with source `jev_unreachable` and makes no fallback call; the previous reviewer spent a fallback call to reach the same functional class. The floor treats both as not Jev-sourced.
 
 ## 0.7.0
 
