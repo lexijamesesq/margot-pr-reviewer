@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { decisionFallback } from "../src/adapters/decision-fallback.js";
-import { jevAdapter } from "../src/adapters/jev.js";
+import { councilText, jevAdapter, jevState } from "../src/adapters/jev.js";
 import * as processAdapter from "../src/adapters/process.js";
 import { recordedServices, review } from "../src/index.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "../src/questions.js";
@@ -145,7 +145,7 @@ it("preserves routing uncertainty in Jev exposure confidence", async () => {
   const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0.5 }]));
   const r = await jev({
     ...answers,
-    documentationSubstantive: { type: "noul", noul: 1 },
+    documentation_substantive: { type: "noul", noul: 1 },
     exposure: {
       type: "score",
       confidence: 0,
@@ -154,64 +154,133 @@ it("preserves routing uncertainty in Jev exposure confidence", async () => {
   }).adapter.route(facts, "documentation", routeQuestions, context());
   expect(routeSchema.parse(r).confidence).toBe(0);
 });
-describe("bound evidence batching", () => {
+describe("routing and risk state", () => {
   const source = readRecording("council-clear");
   const facts = factsSchema.parse(source.facts);
-  for (const [name, check] of [
-    ["retains every evidence byte when batching", "evidence"],
-    ["takes conservative maximum tails across batched risk", "severity"],
-    ["preserves the lowest confidence across batches", "confidence"],
-  ] as const)
-    it(name, async () => {
-      const { jevAdapter } = await import("../src/adapters/jev.js");
-      const requests: Record<string, unknown>[] = [];
-      const { riskQuestions } = await import("../src/questions.js");
-      const data = { ...facts, diff: "a.ts evidence 🐱 ".repeat(8000) };
-      const client = jevAdapter({
-        key: "test",
-        model: "test",
-        fallbackClaude: pinnedClaude,
-        fetch: (async (_url, init) => {
-          const request = JSON.parse(String(init?.body));
-          requests.push(request.state);
-          const last = request.state.evidencePart === request.state.totalParts;
-          const high = last;
-          return new Response(
-            JSON.stringify({
-              model: "test",
-              answers: Object.fromEntries(
-                Object.keys(riskQuestions).map((k) => [
-                  k,
-                  {
-                    type: "score",
-                    confidence: last ? 0.1 : 0.9,
-                    probabilities: high
-                      ? { "0": 0, "1": 0, "2": 0, "3": 1 }
-                      : { "0": 1, "1": 0, "2": 0, "3": 0 },
-                  },
-                ]),
-              ),
-            }),
-          );
-        }) as typeof fetch,
-      });
-      const output = (await client.risk(data, [], riskQuestions, {
-        signal: AbortSignal.timeout(3000),
-      })) as {
-        dimensions: {
-          operations: {
-            probabilities: number[];
-            confidence: number;
-          };
-        };
-      };
-      const expected = { facts: { ...data } as Partial<typeof facts>, cards: [] };
-      delete expected.facts.history;
-      const reconstructed = requests.map((r) => r.evidence).join("");
-      if (check === "evidence") expect(reconstructed).toBe(JSON.stringify(expected));
-      else if (check === "severity") expect(output.dimensions.operations.probabilities[3]).toBe(1);
-      else expect(output.dimensions.operations.confidence).toBe(0.1);
+  const scoreAll = (questions: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.keys(questions).map((k) => [
+        k,
+        k in riskQuestions || k === "exposure"
+          ? { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } }
+          : { type: "noul", noul: 0.5 },
+      ]),
+    );
+  const capture = () => {
+    const requests: { state: unknown; questions: Record<string, { instructions: string }> }[] = [];
+    const client = jevAdapter({
+      key: "test",
+      model: "test",
+      fallbackClaude: pinnedClaude,
+      fetch: (async (_url, init) => {
+        const request = JSON.parse(String(init?.body));
+        requests.push(request);
+        return new Response(
+          JSON.stringify({ model: "test", answers: scoreAll(request.questions) }),
+        );
+      }) as typeof fetch,
     });
+    return { client, requests };
+  };
+  const large = {
+    ...facts,
+    title: "Pin the shell checker",
+    body: `Why: ${"x".repeat(2000)}`,
+    author: "octocat",
+    files: Array.from({ length: 70 }, (_, i) => ({ path: `f${i}.ts` })),
+    ownedPathTier: "owned",
+    diff: "a.ts evidence 🐱 ".repeat(8000),
+  };
+  it("routes a functional change on the PR summary, without the diff, in one request", async () => {
+    const { client, requests } = capture();
+    const { documentation_substantive: _substance, ...functional } = routeQuestions;
+    await client.route(large, "functional", functional, context());
+    const state = String(requests[0]?.state);
+    expect({
+      requests: requests.length,
+      lines: state.split("\n").map((line) => line.slice(0, 40)),
+      body: state.split("\n")[2]?.length,
+      files: state.split("\n")[3]?.split(", ").length,
+      questions: Object.keys(requests[0]?.questions ?? {}),
+      exposure: requests[0]?.questions.exposure?.instructions,
+      safety: requests[0]?.questions.safety?.instructions,
+    }).toEqual({
+      requests: 1,
+      lines: [
+        "Pull request #2 in example/project by oc",
+        "Title: Pin the shell checker",
+        `Body: Why: ${"x".repeat(29)}`,
+        "Changed files (70): f0.ts, f1.ts, f2.ts,",
+        "CODEOWNERS ownership tier: owned",
+      ],
+      body: "Body: ".length + 1500,
+      files: 60,
+      questions: ["exposure", ...cardNames],
+      exposure: "Score this change's overall security/operational exposure.",
+      safety:
+        "Does this change need the 'safety' review lens? It does when: a changed file can run, be sourced, grant access, or carry a credential shape.",
+    });
+  });
+  it("routes a documentation change with the whole diff and asks whether its meaning changed", async () => {
+    const { client, requests } = capture();
+    await client.route(large, "documentation", routeQuestions, context());
+    expect({
+      requests: requests.length,
+      diff: String(requests[0]?.state).endsWith(`\nDiff:\n${large.diff}`),
+      last: Object.keys(requests[0]?.questions ?? {}).at(-1),
+    }).toEqual({ requests: 1, diff: true, last: "documentation_substantive" });
+  });
+  it("scores risk on the PR summary and the council's findings, in one request", async () => {
+    const { client, requests } = capture();
+    const card = {
+      name: "safety" as const,
+      completion: "completed" as const,
+      checked: ["Read the workflow"],
+      notCovered: [],
+      findings: [
+        {
+          id: "F1",
+          tag: "issue" as const,
+          severity: "MAJOR" as const,
+          confidence: "HIGH" as const,
+          location: "a.ts:1",
+          what: "The token reaches the log.",
+        },
+      ],
+    };
+    await client.risk(large, [card], riskQuestions, context());
+    expect({
+      requests: requests.length,
+      state: requests[0]?.state,
+      instructions: requests[0]?.questions.blast_radius?.instructions,
+    }).toEqual({
+      requests: 1,
+      state: jevState(large, `Council findings:\n${councilText([card])}`),
+      instructions: "Score the change's blast radius against the anchors.",
+    });
+    expect(councilText([card])).toBe(
+      [
+        "===CARD: safety===",
+        "card: safety",
+        "completion: completed",
+        "Checked:",
+        "- Read the workflow",
+        "Not covered:",
+        "Findings:",
+        "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH",
+        "    what: The token reaches the log.",
+      ].join("\n"),
+    );
+  });
+  it("tells risk when no council ran", async () => {
+    const { client, requests } = capture();
+    await client.risk(facts, [], riskQuestions, context());
+    expect(
+      String(requests[0]?.state).endsWith("\nCouncil findings:\n(no council: no_council)"),
+    ).toBe(true);
+  });
+});
+describe("classification evidence batching", () => {
   it("keeps functional evidence from the final batch through aggregation", async () => {
     const { jevAdapter } = await import("../src/adapters/jev.js");
     const { classificationQuestions } = await import("../src/questions.js");
@@ -273,7 +342,7 @@ describe("fallback decisions", () => {
     let calls = 0;
     const adapter = outage(async (questions, state) => {
       calls++;
-      expect(state).toHaveProperty("diff", facts.diff);
+      expect(state).toBe(jevState(facts));
       return Object.fromEntries(
         Object.keys(questions).map((key) => [
           key,

@@ -88,3 +88,23 @@ it("summons cards for standing entries only and shows cards standing and dismiss
     safetyEntries: safety.round.entries.map((e) => e.key),
   }).toEqual({ houseStyle: false, safetyEntries: ["R1-F1", "R1-F3"] });
 });
+it("routes on the whole PR while the cards read the round's delta", async () => {
+  const services = recordedServices({
+    ...source,
+    config: { ...config, publication: "none" },
+    facts: history(prior([])),
+    comparison: { ...comparison(""), status: "identical" },
+  });
+  await review(source.request, { ...config, publication: "none" }, services);
+  const input = (name: string) =>
+    services.calls.find((call) => call.name === name)?.input as {
+      facts: { diff: string; files: unknown[] };
+    };
+  expect({
+    route: [input("route").facts.diff, input("route").facts.files],
+    card: [input("card:safety").facts.diff, input("card:safety").facts.files],
+  }).toEqual({
+    route: [facts.diff, facts.files],
+    card: ["No delta on this PR", []],
+  });
+});

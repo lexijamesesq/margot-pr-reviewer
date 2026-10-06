@@ -237,13 +237,13 @@ describe("the classification question", () => {
   it("asks Jev whether documentation changes meaning", async () => {
     const { callInput } = await reviewRecording(recorded("council-clear", asDocumentation(1)));
     const questions = callInput("route").questions as Record<string, unknown>;
-    expect(typeof questions.documentationSubstantive).toBe("string");
+    expect(typeof questions.documentation_substantive).toBe("string");
   });
 
   it("omits the documentation meaning question when routing a functional change", async () => {
     const { callInput } = await reviewRecording(recorded("council-clear"));
     const questions = callInput("route").questions as Record<string, unknown>;
-    expect(questions.documentationSubstantive).toBeUndefined();
+    expect(questions.documentation_substantive).toBeUndefined();
   });
 });
 
