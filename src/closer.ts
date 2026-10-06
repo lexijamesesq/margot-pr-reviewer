@@ -1,5 +1,5 @@
 import type { Octokit } from "octokit";
-import { errorMessage } from "./errors.js";
+import { describeFailure } from "./describe-failure.js";
 import { repositorySchema, shaSchema } from "./schemas.js";
 
 const openStates = new Set(["queued", "in_progress"]);
@@ -124,7 +124,7 @@ export async function closeStrandedCheck(
   } catch (error) {
     return {
       action: "error",
-      message: `could not read the pull requests of ${short} — left untouched (${errorMessage(error)})`,
+      message: `could not read the pull requests of ${short} — left untouched (${describeFailure(error)})`,
     };
   }
   const ownPull = pulls.find((pull) => pull.number === input.pr);
@@ -160,7 +160,7 @@ export async function closeStrandedCheck(
   } catch (error) {
     return {
       action: "error",
-      message: `could not read check-runs on ${short} — left untouched (${errorMessage(error)})`,
+      message: `could not read check-runs on ${short} — left untouched (${describeFailure(error)})`,
     };
   }
   const check = checks.find((candidate) => openStates.has(candidate.status));
@@ -211,7 +211,7 @@ export async function closeStrandedCheck(
   } catch (error) {
     return {
       action: "error",
-      message: `could not close check ${checkId} (${errorMessage(error)})`,
+      message: `could not close check ${checkId} (${describeFailure(error)})`,
     };
   }
   return {
