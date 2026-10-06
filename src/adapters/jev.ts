@@ -28,16 +28,33 @@ const score = z.object({
  * The prose state Jev scores for routing and risk: the PR, its title and body, its files and
  * ownership tier. Routing and risk read no diff unless `extra` carries one.
  */
+const changedFiles = (facts: Facts) =>
+  facts.files.flatMap((f) => [f.path, ...(f.previousPath ? [f.previousPath] : [])]);
+const ownershipTier = (facts: Facts) =>
+  typeof facts.ownedPathTier === "string" ? facts.ownedPathTier || "none" : "unknown";
 export function jevState(facts: Facts, extra = ""): string {
-  const files = facts.files.flatMap((f) => [f.path, ...(f.previousPath ? [f.previousPath] : [])]);
+  const files = changedFiles(facts);
   const body = Array.from(facts.body).slice(0, 1500).join("");
   return [
     `Pull request #${facts.pr} in ${facts.repository} by ${facts.author || "unknown"}.`,
     `Title: ${facts.title}`,
     facts.body ? `Body: ${body}` : "Body: (none)",
     `Changed files (${files.length}): ${files.slice(0, 60).join(", ")}`,
-    `CODEOWNERS ownership tier: ${typeof facts.ownedPathTier === "string" ? facts.ownedPathTier || "none" : "unknown"}`,
+    `CODEOWNERS ownership tier: ${ownershipTier(facts)}`,
     ...(extra ? [extra] : []),
+  ].join("\n");
+}
+/**
+ * The state Jev classifies: the code change alone, its files, ownership tier and whole diff.
+ * Never the title, body or author: an author's prose must not sway the light path.
+ */
+export function classificationState(facts: Facts): string {
+  const files = changedFiles(facts);
+  return [
+    `Pull request #${facts.pr} in ${facts.repository}.`,
+    `Changed files (${files.length}): ${files.slice(0, 60).join(", ")}`,
+    `CODEOWNERS ownership tier: ${ownershipTier(facts)}`,
+    `Diff:\n${facts.diff}`,
   ].join("\n");
 }
 /** The council's findings in the cards' own convention, one `===CARD: name===` block each. */
@@ -119,94 +136,23 @@ export function jevAdapter(options: {
       .parse(raw);
     return envelope.answers;
   }
-  async function decide(questions: object, input: unknown, c: CallContext, fallback = false) {
-    // Routing and risk send one prose state, whole.
-    if (typeof input === "string") {
-      try {
-        return { answers: await ask(questions, input, c), source: "jev" as const };
-      } catch (error) {
-        if (!fallback || c.signal.aborted) throw error;
-        console.warn(`Margot: ${errorMessage(error)}; using the fallback decider`);
-        return {
-          answers: await (options.fallback ?? decisionFallback)(
-            questions,
-            input,
-            c,
-            options.fallbackClaude,
-          ),
-          source: "fallback" as const,
-        };
-      }
+  /** One prose state, whole, as the previous reviewer sent it; never split into excerpts. */
+  async function decide(questions: object, state: string, c: CallContext, fallback = false) {
+    try {
+      return { answers: await ask(questions, state, c), source: "jev" as const };
+    } catch (error) {
+      if (!fallback || c.signal.aborted) throw error;
+      console.warn(`Margot: ${errorMessage(error)}; using the fallback decider`);
+      return {
+        answers: await (options.fallback ?? decisionFallback)(
+          questions,
+          state,
+          c,
+          options.fallbackClaude,
+        ),
+        source: "fallback" as const,
+      };
     }
-    // History belongs to the convergence reducer, not Jev. Keep every byte of the diff.
-    const state = structuredClone(input) as Record<string, unknown>;
-    const facts = (state.facts ?? state) as Record<string, unknown>;
-    delete facts.history;
-    const evidence = JSON.stringify(state);
-    const chunks = evidence.match(/[\s\S]{1,16000}/gu) ?? [evidence];
-    const answers: Record<string, unknown>[] = [];
-    let source: "jev" | "fallback" = "jev";
-    for (const [index, chunk] of chunks.entries()) {
-      const batch =
-        chunks.length === 1
-          ? state
-          : {
-              repository: facts.repository,
-              pr: facts.pr,
-              head: facts.head,
-              base: facts.base,
-              evidencePart: index + 1,
-              totalParts: chunks.length,
-              evidence: chunk,
-              scope:
-                "Contiguous excerpt of complete JSON evidence, possibly continuing across boundaries. Assess the evidence visible in this excerpt; Margot combines every excerpt conservatively.",
-            };
-      try {
-        answers.push(await ask(questions, batch, c));
-      } catch (error) {
-        if (!fallback || c.signal.aborted) throw error;
-        console.warn(`Margot: ${errorMessage(error)}; using the fallback decider`);
-        answers.push(
-          await (options.fallback ?? decisionFallback)(questions, batch, c, options.fallbackClaude),
-        );
-        source = "fallback";
-      }
-    }
-    if (answers.length === 1 && answers[0]) return { answers: answers[0], source };
-    return {
-      source,
-      answers: Object.fromEntries(
-        Object.keys(questions).map((name) => {
-          const values = answers.map((a) => a[name]);
-          if (noul.safeParse(values[0]).success)
-            return [
-              name,
-              { type: "noul", noul: Math.max(...values.map((v) => noul.parse(v).noul)) },
-            ];
-          const scores = values.map((v) => score.parse(v));
-          // Maximum tail at each level is a valid conservative distribution.
-          const tails = [0, 1, 2, 3].map((level) =>
-            Math.max(
-              ...scores.map((s) =>
-                Object.values(s.probabilities)
-                  .slice(level)
-                  .reduce((a, b) => a + b, 0),
-              ),
-            ),
-          );
-          return [
-            name,
-            {
-              type: "score",
-              confidence: Math.min(...scores.map((s) => s.confidence)),
-              probabilities: Object.fromEntries(
-                tails.map((tail, i) => [String(i), Math.max(0, tail - (tails[i + 1] ?? 0))]),
-              ),
-            },
-          ];
-        }),
-      ),
-    };
   }
   const nouls = (questions: Readonly<Record<string, string>>) =>
     Object.fromEntries(
@@ -216,12 +162,9 @@ export function jevAdapter(options: {
       ]),
     );
   const classify: Services["classify"] = async (facts, questions, c) => {
-    // Match the measured classifier's code-only evidence. Release notes and author
-    // claims describe external behavior and must not change the light-path decision.
-    const { title: _title, body: _body, author: _author, ...evidence } = facts;
     let a: Record<string, unknown>;
     try {
-      a = (await decide(nouls(questions), evidence, c)).answers;
+      a = (await decide(nouls(questions), classificationState(facts), c)).answers;
     } catch (error) {
       console.warn(
         `Margot: classification unavailable (${errorMessage(error)}); assuming functional`,
