@@ -57,7 +57,9 @@ to the exact commit named in `review.cardBundle.commit`.
 Every card and voice runs in its own `docker run` of the runtime image built from
 `runtime/` (Claude Code, gh, git, jq, ripgrep and the Linear MCP server, each
 pinned by build argument). The configuration's `claude.container.image` names that
-image by digest, and the runtime image's Claude Code must match `claude.version`.
+image by digest; build it with `CLAUDE_CODE_VERSION` equal to `claude.version`
+(`docker build -f runtime/Dockerfile .` from the package root). The build asserts the
+version and that every flag the package passes exists in `claude --help`.
 The container has a read-only root and no capabilities, and mounts two read-only
 directories: the base-sha checkout at `claude.container.work`, which the reviewers
 see at `/work`, and the card bundle. Reviewers read the pull request head with `gh`

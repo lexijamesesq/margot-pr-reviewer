@@ -4,6 +4,7 @@ import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import type { liveConfigSchema } from "../schemas.js";
 import type { CallContext, Services } from "../types.js";
+import { containerArgv, dockerEnvironment, inContainer } from "./container.js";
 import { execute } from "./process.js";
 import { parseCard, parseVoice } from "./prose.js";
 
@@ -48,64 +49,6 @@ export async function assertClaudeVersion(
   });
   if (!reported.startsWith(`${version} `)) throw new Error("Claude CLI pin mismatch");
 }
-/** Where the container sees the read-only base checkout, the bundle, and its private MCP config. */
-const inContainer = {
-  work: "/work",
-  bundle: "/opt/margot/bundle",
-  mcp: "/run/margot/mcp.json",
-};
-/** The docker client's environment: how to reach the daemon, and the values `-e NAME` hands in. */
-function dockerEnvironment(source: NodeJS.ProcessEnv, handed: Record<string, string>) {
-  return {
-    ...Object.fromEntries(
-      [
-        "PATH",
-        "HOME",
-        "DOCKER_HOST",
-        "DOCKER_CONTEXT",
-        "DOCKER_CONFIG",
-        "DOCKER_TLS_VERIFY",
-        "DOCKER_CERT_PATH",
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "ANTHROPIC_API_KEY",
-      ].flatMap((key) => (source[key] ? [[key, source[key]]] : [])),
-    ),
-    ...handed,
-  };
-}
-/**
- * The previous reviewer's container: read-only root, no capabilities, bounded, with only the
- * base checkout and the card bundle mounted, both read-only. Credentials go in by name only.
- */
-function containerArgv(container: ClaudeOptions["container"], pluginDirectory: string) {
-  return [
-    "run",
-    "--rm",
-    "-i",
-    "--read-only",
-    "--user",
-    "1000:1000",
-    "--cap-drop",
-    "ALL",
-    "--memory=3g",
-    "--memory-swap=3g",
-    "--pids-limit=512",
-    "--security-opt",
-    "no-new-privileges",
-    "--mount",
-    `type=bind,source=${container.work},target=${inContainer.work},readonly`,
-    "--mount",
-    `type=bind,source=${pluginDirectory},target=${inContainer.bundle},readonly`,
-    "--tmpfs",
-    "/run/margot:rw,mode=1777,size=1g",
-    "--tmpfs",
-    "/tmp:rw,mode=1777,size=256m",
-    ...["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "GH_TOKEN", "MARGOT_MCP_CONFIG"].flatMap(
-      (name) => ["-e", name],
-    ),
-    container.image,
-  ];
-}
 /**
  * A card's tools are the previous reviewer's: Skill, read-only gh, and Read, Grep and Glob over
  * the base checkout and the pr-council skill. Skill may launch only pr-council because every
@@ -139,18 +82,6 @@ const voiceAccess = {
   allowed: ["Bash(gh api:*)", "Bash(gh pr diff:*)"],
   argv: [],
 };
-/** The same check, of the claude the container runs. */
-async function assertContainerClaudeVersion(
-  options: ClaudeOptions,
-  docker: string[],
-  c: CallContext,
-): Promise<void> {
-  const reported = await execute(options.container.docker, [...docker, "claude", "--version"], {
-    ...c,
-    env: dockerEnvironment(process.env, {}),
-  });
-  if (!reported.startsWith(`${options.version} `)) throw new Error("Claude CLI pin mismatch");
-}
 export function claudeAdapter(options: ClaudeOptions) {
   async function run(
     role: string,
@@ -191,7 +122,6 @@ export function claudeAdapter(options: ClaudeOptions) {
       ).name;
     const access = card ? await cardAccess(options.pluginDirectory, plugin) : voiceAccess;
     const docker = containerArgv(options.container, options.pluginDirectory);
-    await assertContainerClaudeVersion(options, docker, c);
     // Claude Code passes the model credential through to MCP servers; neither needs it.
     const modelCredentialsBlanked = { ANTHROPIC_API_KEY: "", CLAUDE_CODE_OAUTH_TOKEN: "" };
     const mcp = {

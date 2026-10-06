@@ -118,7 +118,6 @@ export const image = `example.invalid/margot-runtime@sha256:${"a".repeat(64)}`;
 /** Runs the Claude adapter against a scripted docker and returns what it captured plus the parsed result. */
 export async function fakeClaude(
   options: {
-    version?: string;
     tools?: string[];
     /** Report the requested tools with the first one replaced by this name. */
     replaceFirstTool?: string;
@@ -193,10 +192,7 @@ const argv = process.argv.slice(2);
 const at = argv.indexOf(${JSON.stringify(image)});
 const docker = argv.slice(0, at + 1);
 const args = argv.slice(at + 2);
-${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, args.join(" ") + "\\n");\n` : ""}if (args.includes("--version")) {
-  if (process.env.MARGOT_WRITE_TOKEN) process.exit(19);
-  console.log(${JSON.stringify(options.version ?? "0.0.1 test")});
-} else {
+${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, args.join(" ") + "\\n");\n` : ""}{
   const mcp = process.env.MARGOT_MCP_CONFIG ? JSON.parse(process.env.MARGOT_MCP_CONFIG) : { mcpServers: {} };
   // Like docker: the bundle is the host directory mounted at the container's plugin directory.
   const mounts = docker.flatMap((arg, i) => (docker[i - 1] === "--mount" ? [Object.fromEntries(arg.split(",").map((kv) => kv.split("=")))] : []));

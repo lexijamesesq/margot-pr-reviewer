@@ -9,7 +9,11 @@
 # (a read-scoped token) and MARGOT_MCP_CONFIG (the ticketing MCP config, which holds
 # its token) are passed by name at `docker run` time.
 #
+# Build from the package root: docker build -f runtime/Dockerfile .
+# runtime/Dockerfile.dockerignore keeps the context to the two files the build reads.
 # Pin the base by digest at build time (--build-arg BASE_IMAGE=node:22-bookworm@sha256:...).
+# CLAUDE_CODE_VERSION must equal the configuration's claude.version: the package does
+# not check the version at run time, so this build and the image digest pin it.
 ARG BASE_IMAGE=node:22-bookworm
 FROM ${BASE_IMAGE}
 
@@ -42,10 +46,22 @@ RUN npm install -g \
         @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
         @tacticlaunch/mcp-linear@${MCP_LINEAR_VERSION} \
     && npm cache clean --force \
-    && claude --version \
+    && claude --version | grep -q "^${CLAUDE_CODE_VERSION} " \
     && command -v mcp-linear
 
-COPY --chown=root:root entrypoint.sh /usr/local/bin/margot-entrypoint
+# Flag-drift guard: every long flag the package passes to `claude` must exist in this
+# Claude Code's --help, so a removed flag fails the build rather than a live review.
+RUN --mount=type=bind,source=src/adapters/claude.ts,target=/tmp/claude.ts \
+    set -eux; \
+    help="$(claude --help 2>&1)"; \
+    flags="$(grep -oE '"--[a-zA-Z-]+"' /tmp/claude.ts | tr -d '"' | sort -u)"; \
+    test -n "$flags" || { echo "flag guard found no claude flags" >&2; exit 1; }; \
+    for f in $flags; do \
+      printf '%s\n' "$help" | grep -qF -- "$f" || { echo "claude flag '$f' is absent from 'claude --help' ($(claude --version))" >&2; exit 1; }; \
+    done; \
+    echo "all claude flags present in claude --help"
+
+COPY --chown=root:root runtime/entrypoint.sh /usr/local/bin/margot-entrypoint
 RUN chmod 755 /usr/local/bin/margot-entrypoint
 
 # node:22 ships the non-root `node` user (uid 1000).

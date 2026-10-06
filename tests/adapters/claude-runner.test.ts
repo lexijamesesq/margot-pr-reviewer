@@ -441,13 +441,18 @@ it("blanks the model credentials in every MCP server's environment", async () =>
     ),
   ).toEqual({ tickets: ["", ""] });
 });
-it("checks the pinned Claude version inside the container", async () => {
+it("runs one container per invocation and leaves the version pin to the image build", async () => {
   const dir = await mkdtemp(join(tmpdir(), "margot-spawn-log-"));
   const spawnLog = join(dir, "spawns");
   try {
     await fakeClaude({ spawnLog });
-    expect((await readFile(spawnLog, "utf8")).split("\n")[0]).toBe("--version");
-    await expect(fakeClaude({ version: "0.0.2 test" })).rejects.toThrow("pin mismatch");
+    await fakeClaude({ spawnLog, role: "voice" });
+    expect(
+      (await readFile(spawnLog, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => line.split(" ").slice(0, 3).join(" ")),
+    ).toEqual(["-p --agent publish:pr-reviewer", "-p --agent publish:margot"]);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -462,16 +467,6 @@ it("rejects an error-marked result", async () => {
 });
 it("rejects an empty result body", async () => {
   await expect(fakeClaude({ envelope: { result: "" } })).rejects.toThrow("result");
-});
-it("keeps the publication credential out of the Claude version probe", async () => {
-  const previous = process.env.MARGOT_WRITE_TOKEN;
-  process.env.MARGOT_WRITE_TOKEN = "test-only-publication-credential";
-  try {
-    await expect(fakeClaude()).resolves.toBeDefined();
-  } finally {
-    if (previous === undefined) delete process.env.MARGOT_WRITE_TOKEN;
-    else process.env.MARGOT_WRITE_TOKEN = previous;
-  }
 });
 it("keeps Margot's own checks out of the evidence a card and the voice receive", async () => {
   const withChecks = {
