@@ -132,11 +132,10 @@ export async function runCli(
     let result: Awaited<ReturnType<typeof run>>;
     try {
       result = await run(request);
-    } finally {
-      // Written whatever the review's end, like the previous reviewer's always() upload.
-      await writeDiagnostics(outputFile, responses).catch((error: unknown) => {
-        throw new InputError(`cannot write diagnostics next to ${outputFile} (${code(error)})`);
-      });
+    } catch (error) {
+      // Written however the review ends, like the previous reviewer's always() upload.
+      await writeDiagnostics(outputFile, responses).catch(() => {});
+      throw error;
     }
     try {
       await writeFile(outputFile, `${JSON.stringify({ result, actions, responses }, null, 2)}\n`, {
@@ -144,6 +143,11 @@ export async function runCli(
       });
     } catch (error) {
       throw new InputError(`cannot write output file ${outputFile} (${code(error)})`);
+    }
+    try {
+      await writeDiagnostics(outputFile, responses);
+    } catch (error) {
+      throw new InputError(`cannot write diagnostics next to ${outputFile} (${code(error)})`);
     }
     if (result.kind !== "error") return 0;
     // The output file is removed with the run's working files; the run log keeps the reason.
