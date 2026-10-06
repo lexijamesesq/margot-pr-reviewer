@@ -247,7 +247,8 @@ export function nextLedger(
     ),
   );
   for (const card of cards) {
-    // Fixed-ness is inferred from absence: no card parses a `Resolved:` section. A MINOR
+    // Fixed-ness is inferred from absence; a card's `Resolved:` section is evidence for the
+    // voice, not a ledger signal. A MINOR
     // entry, which can no longer block from round two, is fixed without a ruling once its
     // card stops raising it.
     const raised = (key: string) =>
