@@ -237,9 +237,9 @@ describe("voice publication safeguards", () => {
       expect({ result, publications }).toMatchObject({
         result: {
           kind: "error",
-          stage: "voice",
+          stage: "template-gate",
           mergeEligible: false,
-          diagnostic: "Comment not template-compliant: risk line has no classification",
+          diagnostic: "held — comment not template-compliant: risk line has no classification",
         },
         publications: [],
       });
@@ -297,9 +297,9 @@ describe("the comment's card rows", () => {
     expect({ result, publications }).toMatchObject({
       result: {
         kind: "error",
-        stage: "render",
+        stage: "template-gate",
         diagnostic:
-          "Comment not template-compliant: safety: its shown finding has no plain-language comment",
+          "held — comment not template-compliant: safety: its shown finding has no plain-language comment",
       },
       publications: [],
     });

@@ -135,7 +135,7 @@ export function shownFindingGap(review: ReviewCore): string | null {
   for (const [name, findings] of visibleFindings(review)) {
     const first = findings[0];
     if (first && !labelSentence(first.what))
-      return `Comment not template-compliant: ${name}: its shown finding has no plain-language comment`;
+      return `held — comment not template-compliant: ${name}: its shown finding has no plain-language comment`;
   }
   return null;
 }

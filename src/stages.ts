@@ -18,6 +18,7 @@ export const stages = {
   risk: "risk",
   voice: "voice",
   render: "render",
+  templateGate: "template-gate",
   publicationProgress: "publication-progress",
   publicationHead: "publication-head",
   publication: "publication",

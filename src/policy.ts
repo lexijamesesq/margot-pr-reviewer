@@ -193,7 +193,7 @@ export function validateVoice(cards: Card[], voice: Voice): void {
  * The voice's own ERROR is exempt. A saved verdict is replayed as it was posted. */
 export function requireRiskLine(voice: Voice): void {
   if (voice.outcome !== "ERROR" && !voice.risk?.trim())
-    throw new Error("Comment not template-compliant: risk line has no classification");
+    throw new Error("held — comment not template-compliant: risk line has no classification");
 }
 export function decide(
   classification: Classification,

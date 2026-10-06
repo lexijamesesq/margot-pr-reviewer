@@ -382,6 +382,7 @@ export async function review(
               ),
             );
             validateVoice(cards, voice);
+            stage = stages.templateGate;
             requireRiskLine(voice);
           }
         }
@@ -420,7 +421,7 @@ export async function review(
           core.decision.holdReasons.push("fallback-risk");
       }
       // The comment's card rows each need a plain sentence; one without is not posted.
-      stage = stages.render;
+      stage = stages.templateGate;
       const gap = shownFindingGap(core);
       if (gap) throw new Error(gap);
       result = { ...core, ...nextLedger(scope, cards, voice, core, config, facts) };

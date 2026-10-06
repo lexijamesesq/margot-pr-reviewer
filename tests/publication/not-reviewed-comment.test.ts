@@ -113,3 +113,20 @@ it("returns the error result, naming the failed comment write, when the comment 
   });
   expect(run.final?.conclusion).toBe("action_required");
 });
+it("posts no comment and titles the check a poster error when the template gate holds the comment", async () => {
+  const run = await runPublication("stage-error", stages.templateGate);
+  const output = (run.final?.output ?? {}) as { title?: string; summary?: string };
+  expect({
+    kind: run.result.kind,
+    conclusion: run.final?.conclusion,
+    title: output.title,
+    summary: output.summary,
+    comments: comments(run),
+  }).toEqual({
+    kind: "error",
+    conclusion: "action_required",
+    title: "not reviewed: poster error",
+    summary: "Distinctive diagnostic detail.",
+    comments: [],
+  });
+});
