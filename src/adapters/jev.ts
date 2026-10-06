@@ -114,10 +114,12 @@ const partialDistribution = z
   })
   .refine((levels) => Object.keys(levels).length > 0);
 /**
- * One risk dimension, read conservatively: any non-empty distribution is rated by its tail,
- * whatever it sums to; with none, the level of Jev's score, and with no score level 2. An
- * unreadable confidence is null, which keeps the cautious band: the no-council floor lowers
- * nothing, so a band above LOW is held or ruled by the voice as usual.
+ * One risk dimension, read conservatively: any non-empty distribution is kept, with missing
+ * levels read as 0 and the dimension marked `partial`; with none, the level of Jev's score,
+ * and with no score level 2. `rate()` rates a well-formed distribution by its tail and a
+ * malformed one, partial or off its sum, at no lower than Jev's rounded score. An unreadable
+ * confidence is null, which keeps the cautious band: the no-council floor lowers nothing, so
+ * a band above LOW is held or ruled by the voice as usual.
  */
 function riskDimension(answer: unknown) {
   const raw = (answer && typeof answer === "object" ? answer : {}) as Record<string, unknown>;

@@ -4,7 +4,6 @@ import { runInstanceCommand } from "../../src/instance-cli.js";
 import { base, captureError, head } from "../helpers/instance.js";
 
 type File = { filename: string; previous_filename?: string; status?: string };
-/** A GitHub that serves one PR's files and checks and records every check-run it is sent. */
 /** One complete diff section per file: an edit, or a pure rename. */
 const diffOf = (files: File[]) =>
   files
@@ -14,6 +13,7 @@ const diffOf = (files: File[]) =>
         : `diff --git a/${f.filename} b/${f.filename}\n--- a/${f.filename}\n+++ b/${f.filename}\n@@ -1 +1 @@\n-old\n+new\n`,
     )
     .join("");
+/** A GitHub that serves one PR's files and checks and records every check-run it is sent. */
 function gitHub(
   options: {
     files: File[];
