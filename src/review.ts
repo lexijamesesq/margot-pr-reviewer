@@ -296,7 +296,7 @@ export async function review(
       const recalled = standingCards(scope);
       const ledgerOpen = recalled.length > 0;
       if (reviewPath(classification, null, config, ledgerOpen).routing) {
-        const { documentationSubstantive: _documentationSubstantive, ...functionalRouteQuestions } =
+        const { documentation_substantive: _substance, ...functionalRouteQuestions } =
           routeQuestions;
         const questions =
           classification === "documentation" ? routeQuestions : functionalRouteQuestions;
@@ -306,10 +306,9 @@ export async function review(
           files: scope.files,
           fileCount: scope.files.length,
         };
+        // Routing reads the whole PR, as risk does; the cards read this round's scope.
         routeAnswer = routeSchema.parse(
-          await call(stages.route, (c) =>
-            services.route(scopedFacts, classification, questions, c),
-          ),
+          await call(stages.route, (c) => services.route(facts, classification, questions, c)),
         );
         const path = reviewPath(classification, routeAnswer, config, ledgerOpen);
         if (path.council) {
