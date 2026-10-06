@@ -136,6 +136,7 @@ export async function fakeClaude(
     cliEnvironment?: NodeJS.ProcessEnv;
     references?: Record<string, { repository: string; head: string }>;
     ownChecks?: string[];
+    classification?: "functional" | "documentation" | "mechanical";
     /** Replaces the tools the fixture reviewer's frontmatter grants. */
     reviewerTools?: string[];
     /** A file the fake CLI appends each invocation's arguments to. */
@@ -267,7 +268,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
         ? await adapter.voice(
             {
               facts: options.facts ?? facts,
-              classification: "functional",
+              classification: options.classification ?? "functional",
               cards: [],
               rating: {} as never,
               agent: "publish:margot",
@@ -279,7 +280,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, pro
             {
               facts: options.facts ?? facts,
               name: "safety",
-              classification: "functional",
+              classification: options.classification ?? "functional",
               agent: "publish:pr-reviewer",
               round,
             },

@@ -439,3 +439,14 @@ it("grants the check-run tool to a card whose bundle lists it, and Margot's own 
   await expect(fakeClaude({ tools: listed })).rejects.toThrow("exactly the requested tools");
   await expect(fakeClaude({ reviewerTools: listed, tools: listed })).resolves.toBeDefined();
 });
+it("tells the voice how documentation findings are ruled, and only for documentation", async () => {
+  const rule = "Documentation accuracy findings go back to the author as CHANGES_REQUESTED";
+  const documentation = await fakeClaude({ role: "voice", classification: "documentation" });
+  const functional = await fakeClaude({ role: "voice" });
+  const card = await fakeClaude({ classification: "documentation" });
+  expect({
+    documentation: documentation.stdin.includes(rule),
+    functional: functional.stdin.includes(rule),
+    card: card.stdin.includes(rule),
+  }).toEqual({ documentation: true, functional: false, card: false });
+});
