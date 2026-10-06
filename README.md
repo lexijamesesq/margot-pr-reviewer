@@ -172,6 +172,10 @@ required checks, protected paths, allowed skipped checks, and authority applied.
 With `--authority true` the review publishes to GitHub, and `--run-url` must name
 this run; without authority it runs in shadow mode and publishes nothing.
 
+For a benchmark shadow run, `--reviewer-model <model>` overrides the card reviewers'
+model and `--fresh true` makes the review fresh, reading no earlier ledger; both are
+refused with `--authority true`, so a benchmark never publishes.
+
 Every classified stop exits **75** and prints `stop_reason=<reason>` (one of
 `superseded`, `merged`, `closed`, `draft`, `fork`, `conflict`, `empty`); a
 superseded stop also prints `live_sha=<current head>`. Both lines are appended

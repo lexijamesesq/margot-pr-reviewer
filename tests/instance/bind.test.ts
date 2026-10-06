@@ -391,3 +391,35 @@ it("prints the usage for --help without failing", async () => {
     help: expect.stringMatching(/^Usage: margot-instance /),
   });
 });
+it("binds a benchmark shadow run: the reviewer model overridden and no prior ledger", async () => {
+  const fixture = await bindCommandFixture("false");
+  await runInstanceCommand(
+    [...fixture.args, "--reviewer-model", "claude-haiku-4-5", "--fresh", "true"],
+    { GH_TOKEN: "read-token" },
+    fixture.client as never,
+  );
+  const bound = JSON.parse(await readFile(join(fixture.directory, "config.json"), "utf8"));
+  expect({
+    reviewerModel: bound.claude.reviewerModel,
+    fresh: bound.github.freshShadow,
+    publication: bound.review.publication,
+  }).toEqual({ reviewerModel: "claude-haiku-4-5", fresh: true, publication: "none" });
+});
+it("refuses a benchmark override on a run with publication authority", async () => {
+  for (const extra of [
+    ["--reviewer-model", "claude-haiku-4-5"],
+    ["--fresh", "true"],
+  ]) {
+    const fixture = await bindCommandFixture("true");
+    const error = await captureError(() =>
+      runInstanceCommand(
+        [...fixture.args, ...extra],
+        { GH_TOKEN: "read-token" },
+        fixture.client as never,
+      ),
+    );
+    expect((error as Error).message).toBe(
+      "--reviewer-model and --fresh are for a shadow benchmark run and cannot have --authority true",
+    );
+  }
+});

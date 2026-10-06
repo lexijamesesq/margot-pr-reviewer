@@ -139,6 +139,8 @@ export async function runInstanceCommand(
       "protected-paths",
       "allowed-skipped-checks",
       "run-url",
+      "reviewer-model",
+      "fresh",
     ]);
     const phase = required(input, "phase");
     if (phase !== "triage" && phase !== "review") throw new Error("--phase is invalid");
@@ -157,6 +159,8 @@ export async function runInstanceCommand(
           protectedPaths: list(input, "protected-paths"),
           allowedSkippedChecks: list(input, "allowed-skipped-checks"),
           ...(input["run-url"] ? { runUrl: input["run-url"] } : {}),
+          ...(input["reviewer-model"] ? { reviewerModel: input["reviewer-model"] } : {}),
+          ...(input.fresh !== undefined ? { fresh: bool(input, "fresh") } : {}),
         },
         environment.GH_TOKEN,
         client,
