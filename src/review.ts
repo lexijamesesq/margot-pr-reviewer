@@ -19,6 +19,7 @@ import {
   reviewPath,
   selectCards,
   validateVoice,
+  verifiedTriage,
 } from "./policy.js";
 import { classificationQuestions, riskQuestions, routeQuestions } from "./questions.js";
 import { render, shownFindingGap } from "./render.js";
@@ -196,12 +197,7 @@ export async function review(
     } else {
       // The review never asks again: it takes the class from the verified triage for this
       // head, and is functional without one.
-      const verified =
-        facts.triage &&
-        config.trustedTriageActors.includes(facts.triage.actor) &&
-        facts.triage.head === request.head
-          ? facts.triage
-          : null;
+      const verified = verifiedTriage(facts.triage, config.trustedTriageActors, request.head);
       if (verified) {
         classification = verified.classification;
         classSource = "jev";

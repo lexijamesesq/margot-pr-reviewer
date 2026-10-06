@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseCard } from "../src/adapters/prose.js";
 import { recordedServices, review } from "../src/index.js";
-import { assignFindingIds, mandatory, needsVoice, rate } from "../src/policy.js";
+import { assignFindingIds, mandatory, needsVoice, rate, verifiedTriage } from "../src/policy.js";
 import { configSchema, factsSchema } from "../src/schemas.js";
 import { readRecording } from "./helpers/recordings.js";
 
@@ -71,4 +71,24 @@ describe("ownership clearance", () => {
       results: [false, false, false, false, false, true, true, true],
     });
   });
+});
+it("trusts a triage only from a trusted actor and bound to the head", () => {
+  const triage = { actor: "triage", head: "a".repeat(40), classification: "mechanical" as const };
+  expect({
+    trusted: verifiedTriage(triage, ["triage"], "a".repeat(40)),
+    untrusted: verifiedTriage(triage, ["other"], "a".repeat(40)),
+    otherHead: verifiedTriage(triage, ["triage"], "b".repeat(40)),
+    none: verifiedTriage(null, ["triage"], "a".repeat(40)),
+  }).toEqual({ trusted: triage, untrusted: null, otherHead: null, none: null });
+});
+it("keeps the triage-trust rule and the self-instrument hold wording in one place each", async () => {
+  const { readdir, readFile } = await import("node:fs/promises");
+  const root = new URL("../src/", import.meta.url);
+  const files = (await readdir(root, { recursive: true })).filter((f) => f.endsWith(".ts"));
+  const text = (await Promise.all(files.map((f) => readFile(new URL(f, root), "utf8")))).join("\n");
+  const count = (needle: string) => text.split(needle).length - 1;
+  expect({
+    trust: count("trustedTriageActors.includes") + count("trustedActors.includes"),
+    held: count("self-instrument: held for the operator's approval"),
+  }).toEqual({ trust: 1, held: 1 });
 });

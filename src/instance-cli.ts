@@ -102,7 +102,7 @@ export async function runInstanceCommand(
   environment: NodeJS.ProcessEnv,
   client?: Pick<Octokit, "rest">,
   /** The GitHub client for a token; self-instrument reads with GH_TOKEN and posts with MARGOT_WRITE_TOKEN. */
-  githubFor: (token: string) => Pick<Octokit, "rest" | "paginate"> = (token) =>
+  githubFor: (token: string) => Pick<Octokit, "rest" | "paginate" | "request"> = (token) =>
     githubClient({ token, retries: 0 }),
 ) {
   const [command, ...rest] = args;

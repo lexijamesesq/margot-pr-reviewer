@@ -199,6 +199,14 @@ export function requireRiskLine(voice: Voice): void {
   if (voice.outcome !== "ERROR" && !voice.risk?.trim())
     throw new Error("held — comment not template-compliant: risk line has no classification");
 }
+/** A triage the review may take its class from: posted by a trusted actor, for this head. */
+export function verifiedTriage<T extends { actor: string; head: string }>(
+  triage: T | null | undefined,
+  trustedActors: string[],
+  head: string,
+): T | null {
+  return triage && trustedActors.includes(triage.actor) && triage.head === head ? triage : null;
+}
 /**
  * The protected-path hold: a functional change to a protected path, or a rename or move whose
  * old or new name is protected in any class. `paths` names every protected current or previous

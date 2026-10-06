@@ -104,7 +104,8 @@ it("names every matched file in the authority hold summary", async () => {
     matched:
       protectedResult.kind === "reviewed" ? protectedResult.decision.authorityPaths : undefined,
   }).toMatchObject({
-    held: "This PR changes files Margot's own review depends on (the configured protected paths). Margot does not approve such a change by itself; it waits for a maintainer's approval.\n\nMatched:\n- `.github/workflows/review.yml`\n- `config/review.json`",
+    // The previous reviewer's wording, with the matched paths sorted.
+    held: "This PR changes Margot's own config, the estate ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n- `.github/workflows/review.yml`\n- `config/review.json`",
     clear: "No functional change to a protected path (class: mechanical).",
     matched: [".github/workflows/ci.yml"],
   });

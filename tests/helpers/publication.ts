@@ -383,7 +383,7 @@ export async function runPublication(
       ];
       value.decision.rating.band = "HIGH";
       if (mode === "authority-summary")
-        value.decision.authorityPaths = [".github/workflows/review.yml", "config/review.json"];
+        value.decision.authorityPaths = ["config/review.json", ".github/workflows/review.yml"];
     }
     const report = render(value);
     const publication = await publisher.publish(

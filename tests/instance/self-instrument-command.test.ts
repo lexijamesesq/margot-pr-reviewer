@@ -5,11 +5,30 @@ import { base, captureError, head } from "../helpers/instance.js";
 
 type File = { filename: string; previous_filename?: string; status?: string };
 /** A GitHub that serves one PR's files and checks and records every check-run it is sent. */
+/** One complete diff section per file: an edit, or a pure rename. */
+const diffOf = (files: File[]) =>
+  files
+    .map((f) =>
+      f.previous_filename
+        ? `diff --git a/${f.previous_filename} b/${f.filename}\nsimilarity index 100%\nrename from ${f.previous_filename}\nrename to ${f.filename}\n`
+        : `diff --git a/${f.filename} b/${f.filename}\n--- a/${f.filename}\n+++ b/${f.filename}\n@@ -1 +1 @@\n-old\n+new\n`,
+    )
+    .join("");
 function gitHub(
-  options: { files: File[]; triage?: string | null; triageSlug?: string; prHead?: string } = {
+  options: {
+    files: File[];
+    triage?: string | null;
+    triageSlug?: string;
+    prHead?: string;
+    /** The whole-PR diff GitHub serves; by default the files' own. */
+    diff?: string;
+    /** The head a second read of the PR reports. */
+    headAfter?: string;
+  } = {
     files: [],
   },
 ) {
+  let pullReads = 0;
   const posts: { token: string; body: Record<string, unknown> }[] = [];
   const triageText =
     options.triage === null
@@ -37,8 +56,22 @@ function gitHub(
       });
       return reply({ id: 1 }, 201);
     }
-    if (target.pathname === "/repos/example/project/pulls/7")
-      return reply({ head: { sha: options.prHead ?? head }, base: { sha: base } });
+    if (target.pathname === "/repos/example/project/pulls/7") {
+      if (new Headers(init?.headers).get("accept")?.includes("diff")) {
+        const response = new Response(options.diff ?? diffOf(options.files), {
+          headers: { "content-type": "text/plain" },
+        });
+        Object.defineProperty(response, "url", { value: target.href });
+        return response;
+      }
+      pullReads++;
+      return reply({
+        head: {
+          sha: pullReads > 1 && options.headAfter ? options.headAfter : (options.prHead ?? head),
+        },
+        base: { sha: base },
+      });
+    }
     if (target.pathname === "/repos/example/project/pulls/7/files") return reply(options.files);
     if (target.pathname === `/repos/example/project/commits/${head}/check-runs`)
       return reply({
@@ -153,6 +186,41 @@ it("posts with a custom check name and caps the summary at 900 characters", asyn
 });
 it("refuses a moved head and posts nothing", async () => {
   const github = gitHub({ files: [], prHead: "f".repeat(40) });
+  const error = await captureError(() =>
+    runInstanceCommand(args(), environment, undefined, github.client),
+  );
+  expect({ message: (error as Error).message, posts: github.posts }).toEqual({
+    message: "PR head moved: the self-instrument check is for the live head only",
+    posts: [],
+  });
+});
+it("holds a protected path the diff names even when GitHub's file listing omits it", async () => {
+  const github = gitHub({
+    files: [{ filename: "src/a.ts" }],
+    diff: diffOf([{ filename: "src/a.ts" }, { filename: ".github/workflows/ci.yml" }]),
+  });
+  const [posted] = await post(github);
+  expect(posted?.body).toMatchObject({
+    conclusion: "neutral",
+    output: { summary: expect.stringContaining("- `.github/workflows/ci.yml`") },
+  });
+});
+it("holds, never clears, when the change cannot be read completely", async () => {
+  const github = gitHub({
+    files: [{ filename: "src/a.ts" }],
+    diff: "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,5 +1,5 @@\n-old\n",
+  });
+  const [posted] = await post(github);
+  expect(posted?.body).toMatchObject({
+    conclusion: "neutral",
+    output: {
+      title: "self-instrument: held for the operator's approval",
+      summary: expect.stringContaining("could not be read completely"),
+    },
+  });
+});
+it("refuses a head that moves while the change is read, and posts nothing", async () => {
+  const github = gitHub({ files: [{ filename: "src/a.ts" }], headAfter: "f".repeat(40) });
   const error = await captureError(() =>
     runInstanceCommand(args(), environment, undefined, github.client),
   );
