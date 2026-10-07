@@ -47,20 +47,23 @@ echo "$PACKAGE_SHA256  margot-pr-reviewer.tgz" | sha256sum --check
 npm install --ignore-scripts --save-exact ./margot-pr-reviewer.tgz
 ```
 
-A live (non-recorded) review needs more than Node: the exact Claude Code CLI
-pinned at the configuration's `claude.executable` (its version is checked
-against `claude.version`), a Claude credential in the process environment
-(`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`), and the review card bundle —
-a clean git checkout of the review skills at `claude.pluginDirectory`, pinned
-to the exact commit named in `review.cardBundle.commit`.
+A live (non-recorded) review needs more than Node: Docker and the runtime image, a
+Claude credential in the process environment (`CLAUDE_CODE_OAUTH_TOKEN` or
+`ANTHROPIC_API_KEY`), the review card bundle — a clean git checkout of the review
+skills at `claude.pluginDirectory`, pinned to the exact commit named in
+`review.cardBundle.commit` — and a checkout of the pull request's base at
+`claude.container.work`. The Claude Code CLI at `claude.executable` is used on the
+host only by the decision fallback, which asks Claude when Jev is unreachable; that
+call checks the CLI's version against `claude.version`.
 
 Every card and voice runs in its own `docker run` of the runtime image built from
 `runtime/` (Claude Code, gh, git, jq, ripgrep and the Linear MCP server, each
 pinned by build argument). The configuration's `claude.container.image` names that
-image by digest; build it with `CLAUDE_CODE_VERSION` equal to `claude.version`
-(`docker build -f runtime/Dockerfile .` from the installed release package, which
-ships `runtime/`, or from a checkout after `npm run build`). The build asserts the
-version and that every flag the package passes exists in `claude --help`.
+image by digest. Claude Code's version in the image is not checked at run time: the
+image build installs `CLAUDE_CODE_VERSION`, asserts it, and checks that every flag
+the package passes exists in `claude --help`, and the digest pin fixes it from then
+on. Build it as [Setting up your own instance](#setting-up-your-own-instance) step 4
+shows.
 The container has a read-only root and no capabilities, and mounts two read-only
 directories: the base-sha checkout at `claude.container.work`, which the reviewers
 see at `/work`, and the card bundle. Reviewers read the pull request head with `gh`
@@ -71,6 +74,76 @@ skill; the voice may use only `gh api` and `gh pr diff`. The Claude credential,
 `GH_TOKEN` and the ticketing configuration reach the container by environment,
 never on its command line. `claude.container.docker` names the docker executable
 (default `docker`).
+
+## Setting up your own instance
+
+1. **Create a GitHub App** and install it on every repository Margot reviews, and on
+   any repository in `claude.references`. Give it read and write access to checks,
+   contents and pull requests, and read access to actions. The workflow mints two
+   tokens from it: a read token (contents, pull requests, checks and actions, read)
+   and a write token (checks, contents and pull requests, write; contents write lets
+   a held verdict disable auto-merge). From the App's settings: its App ID is
+   `publisher.appId`; its bot login, `<app-slug>[bot]`, is `publisher.actor` and goes
+   in `review.trustedLedgerActors`; its slug goes in `review.trustedTriageActors`.
+   `review.trustedCheckActors` lists the slugs of the Apps that post your required
+   checks (`github-actions` for checks run by GitHub Actions). The samples' names:
+
+   | Name in the samples | Kind | Holds |
+   | --- | --- | --- |
+   | `YOUR_MARGOT_APP_CLIENT_ID` | variable | the App's client ID |
+   | `EXAMPLE_MARGOT_APP_KEY` | secret | a private key generated for the App |
+   | `EXAMPLE_CLAUDE_OAUTH_TOKEN` | secret | a Claude Code OAuth token (`claude setup-token`); pass `ANTHROPIC_API_KEY` instead to use an API key |
+   | `EXAMPLE_JEV_KEY` | secret | your Jev API key |
+   | `EXAMPLE_TICKETING_CREDENTIAL` | secret | the ticketing server's credential, under the name in `claude.ticketing.env` |
+   | `YOUR_MARGOT_DEPLOYMENT_JSON`, `YOUR_MARGOT_CONFIG_JSON` | variables | `deployment.json` and the configuration (the self-hosted sample reads them from `/trusted/margot/` instead) |
+   | `MARGOT_APP_ID: "123456"` | value | the App ID again, for the closer |
+   | `YOUR_ORG`, `YOUR_REPOSITORY`, `YOUR_REVIEW_REPOSITORY`, `YOUR_REFERENCE_REPOSITORY` | values | your owner, a reviewed repository, the repository that runs the workflow, a `claude.references` repository |
+   | `YOUR_REVIEW_RUNNER`, `YOUR_REQUIRED_CHECK`, `YOUR_AUTHORITY_PATH` | values | your self-hosted runner's label, your required checks, your protected paths |
+
+2. **Jev.** Margot requires [Jev](https://typesafe.ai), a third-party scoring service
+   from TypeSafe. Get an API key from TypeSafe for `JEV_KEY`, and set `jev.model` to a
+   Jev model version they provide.
+3. **The card bundle.** Set `review.cardBundle.commit` to a commit of
+   [publish-skills](https://github.com/lexijamesesq/publish-skills) compatible with
+   your release; for this release, `0c6819c3a4706b47bd280b29560aeebe6dbd41ad`. A fork
+   works too. The workflow checks it out at `claude.pluginDirectory`.
+4. **Build, push and pin the runtime image**, from the installed release package (it
+   ships `runtime/`), or from a checkout after `npm run build`. Both build arguments
+   are required: `CLAUDE_CODE_VERSION` equal to `claude.version`, and
+   `MCP_LINEAR_VERSION`, the `@tacticlaunch/mcp-linear` version (for example `1.4.3`).
+   Push it to a registry your review runners can pull from, and put the pushed
+   image's `name@sha256:…` in `claude.container.image`:
+
+   ```sh
+   docker build -f runtime/Dockerfile --build-arg CLAUDE_CODE_VERSION=2.1.290 \
+     --build-arg MCP_LINEAR_VERSION=1.4.3 -t YOUR_REGISTRY/margot-runtime:YOUR_TAG .
+   docker push YOUR_REGISTRY/margot-runtime:YOUR_TAG
+   docker image inspect --format '{{index .RepoDigests 0}}' YOUR_REGISTRY/margot-runtime:YOUR_TAG
+   ```
+
+5. **`deployment.json` from a release** (see `samples/deployment.sample.json`):
+   `version`; `packageReference`, the release asset's URL,
+   `https://github.com/YOUR_ORG/margot-pr-reviewer/releases/download/vVERSION/margot-pr-reviewer-VERSION.tgz`;
+   `packageSha256`; and, optionally, `packageIntegrity`, npm's `sha512-…` integrity of
+   the same file:
+
+   ```sh
+   curl --fail --location --silent --show-error "$PACKAGE_URL" --output margot-pr-reviewer.tgz
+   shasum -a 256 margot-pr-reviewer.tgz                                    # packageSha256
+   echo "sha512-$(openssl dgst -sha512 -binary margot-pr-reviewer.tgz | base64 | tr -d '\n')"  # packageIntegrity
+   ```
+
+6. **Ticketing.** The image carries `mcp-linear`, the `@tacticlaunch/mcp-linear`
+   server. To let the cards read Linear tickets, set `claude.ticketing` with
+   `"command": "mcp-linear"`, the server and tool names the card bundle's
+   `agents/pr-reviewer.md` grants (its `mcpServers` and `tools` frontmatter: at the
+   commit above, `linear-tactic` and its three `mcp__linear-tactic__…` tools), and in
+   `env` the variable holding a Linear token (`LINEAR_OAUTH_ACCESS_TOKEN`). Without
+   Linear, omit `claude.ticketing`: the cards then run without ticket tools.
+7. **The base checkout.** Before `margot-review`, the workflow checks out the pull
+   request's base commit, from the bound `request.json`, at `claude.container.work`;
+   `margot-review` refuses any other checkout. The samples' "Check out the pull
+   request's base" step does it.
 
 ## Configuration
 
@@ -91,7 +164,8 @@ names, the review app's actor and id, and the run URL); `bind-request` fails wit
 Without `--authority true` the review runs in shadow mode and publishes nothing.
 
 `claude.executable`, `claude.pluginDirectory` and `claude.container.work` may use
-`${MARGOT_ROOT}`, which `margot-instance bind-request` resolves. A `claude.references` entry may name a `ref` (a branch or tag) in place of `head`; `bind-request` resolves it to its commit for each run.
+`${MARGOT_ROOT}`, which `margot-instance bind-request` resolves. The workflow creates
+the checkout at `claude.container.work` (step 7 above). A `claude.references` entry may name a `ref` (a branch or tag) in place of `head`; `bind-request` resolves it to its commit for each run.
 
 The ticketing server and tool names in `claude.ticketing` must match those the card
 bundle's `pr-reviewer` agent grants; a card run refuses tools the agent does not grant.
@@ -107,7 +181,7 @@ server (`mcp-linear`); `bind-request` refuses a placeholder or a path under the 
 | `JEV_KEY` | API key for Jev. Required by `margot-review`. |
 | `GH_TOKEN` | GitHub token that reaches the target repository (the workflow's own `github.token` does not, when it runs in a review repository). Read access for `margot-review` and `bind-request`. For `close-stranded-check` it is the review App's `checks: write` token. |
 | `MARGOT_WRITE_TOKEN` | The review App's installation token, minted for the target repository with checks, contents and pull-request write access, so publication is made as the App. Required for GitHub publication. |
-| `MARGOT_OWNED_TIER` | Protected-path ownership tier: `none`, `owned`, or `required_owned`. Missing or invalid holds the review. |
+| `MARGOT_OWNED_TIER` | How strongly the changed files are owned under your code-ownership rules, as your dispatcher computes it: `required_owned` (files whose owners must approve), `owned`, or `none`. It raises Jev's scrutiny. Missing or invalid holds the review. |
 | `MARGOT_CLASSIFICATION` | The request's dispatched classification (`functional`, `documentation`, or `mechanical`). It can only make the review stricter than the verified triage's class. |
 | `MARGOT_TRIAGE` | Used only when no classification is set: `mechanical` leaves the verified triage's class in place, and any other non-empty value makes the review functional. |
 | names listed in `claude.ticketing.env` | Forwarded only to the ticketing MCP server. |
@@ -133,8 +207,9 @@ failed stage and diagnostic to stderr, and 0 otherwise, including for held resul
    `margot-instance validate-deployment` to confirm the target repository is
    enrolled and to decide whether this run has GitHub publication authority.
 2. **`review`** — runs `margot-instance bind-request` to resolve the request and
-   configuration for the PR, then runs `margot-review` to produce and publish
-   the result.
+   configuration for the PR, checks out the PR's base, pulls the runtime image when
+   it is absent, runs `margot-review` to produce and publish the result, and copies
+   each reviewer's output to the run summary.
 3. **`close-stranded-check`** — runs on a normal (non-self-hosted) runner with
    `if: always()`. If the earlier jobs did not successfully publish a result, it
    closes any review check this run owns so the PR is not left with a check
@@ -145,6 +220,10 @@ GitHub-hosted runners: it keeps the deployment and configuration in GitHub
 variables, installs the pinned Claude CLI, fetches the card bundle at its pinned
 commit, and adds a `triage` job ahead of `review`. Choose it when you have no
 runner of your own to hold trusted files.
+
+Neither workflow triggers on its own. A separate workflow in each reviewed
+repository, on `pull_request`, dispatches it with the pull request's repository,
+number and head sha; each sample's header shows the `gh workflow run` call.
 
 ## Instance commands
 
