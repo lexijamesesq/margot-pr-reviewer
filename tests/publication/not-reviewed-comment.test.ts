@@ -130,6 +130,19 @@ it("posts no comment and titles the check a poster error when the template gate 
     comments: [],
   });
 });
+it("puts the reason a publication write failed in the check summary", async () => {
+  const run = await runPublication("review-fail");
+  const output = (run.final?.output ?? {}) as { title?: string; summary?: string };
+  expect({ conclusion: run.final?.conclusion, title: output.title }).toEqual({
+    conclusion: "action_required",
+    title: "Margot: not reviewed (error)",
+  });
+  expect(output.summary).not.toContain("Publication or evaluation failed");
+  expect(output.summary).toMatch(/Recorded write failure/u);
+  const long = await runPublication("review-fail", "voice", undefined, undefined, "x".repeat(2000));
+  const longSummary = ((long.final?.output ?? {}) as { summary?: string }).summary ?? "";
+  expect(Array.from(longSummary).length).toBe(900);
+});
 it("puts an error result's diagnostic in the check summary, capped at 900, keeping its title", async () => {
   const short = await runPublication("stage-error", "voice");
   const long = await runPublication("stage-error", "voice", undefined, "x".repeat(2000));
