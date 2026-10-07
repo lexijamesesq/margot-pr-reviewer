@@ -39,7 +39,10 @@ Margot requires Node 22 or later (see `engines` in `package.json`).
 Margot is not on the npm registry. GitHub shows each release asset's SHA-256
 digest on the repository's
 [Releases page](https://github.com/lexijamesesq/margot-pr-reviewer/releases); pin it
-when you choose a release, and verify every install against the pin:
+when you choose a release, and verify every install against the pin. You may install
+the upstream release directly: `PACKAGE_URL` is the release asset's URL,
+`https://github.com/lexijamesesq/margot-pr-reviewer/releases/download/vX.Y.Z/margot-pr-reviewer-X.Y.Z.tgz`,
+and `PACKAGE_SHA256` its digest from the Releases page:
 
 ```sh
 curl --fail --location --silent --show-error "$PACKAGE_URL" --output margot-pr-reviewer.tgz
@@ -109,7 +112,8 @@ never on its command line. `claude.container.docker` names the docker executable
    works too. The workflow checks it out at `claude.pluginDirectory`.
 4. **Build, push and pin the runtime image**, from the installed release package (it
    ships `runtime/`), or from a checkout after `npm run build`. Both build arguments
-   are required: `CLAUDE_CODE_VERSION` equal to `claude.version`, and
+   are required: `CLAUDE_CODE_VERSION` equal to `claude.version` (set `claude.version` to
+   it, for example `2.1.290`; the sample's `0.0.0` is a placeholder), and
    `MCP_LINEAR_VERSION`, the `@tacticlaunch/mcp-linear` version (for example `1.4.3`).
    Push it to a registry your review runners can pull from, and put the pushed
    image's `name@sha256:…` in `claude.container.image`:
@@ -123,7 +127,8 @@ never on its command line. `claude.container.docker` names the docker executable
 
 5. **`deployment.json` from a release** (see `samples/deployment.sample.json`):
    `version`; `packageReference`, the release asset's URL,
-   `https://github.com/YOUR_ORG/margot-pr-reviewer/releases/download/vVERSION/margot-pr-reviewer-VERSION.tgz`;
+   `https://github.com/YOUR_ORG/margot-pr-reviewer/releases/download/vVERSION/margot-pr-reviewer-VERSION.tgz`,
+   where `YOUR_ORG` is the owner you install from, upstream (`lexijamesesq`) or your fork;
    `packageSha256`; and, optionally, `packageIntegrity`, npm's `sha512-…` integrity of
    the same file:
 
@@ -181,7 +186,7 @@ server (`mcp-linear`); `bind-request` refuses a placeholder or a path under the 
 | `JEV_KEY` | API key for Jev. Required by `margot-review`. |
 | `GH_TOKEN` | GitHub token that reaches the target repository (the workflow's own `github.token` does not, when it runs in a review repository). Read access for `margot-review` and `bind-request`. For `close-stranded-check` it is the review App's `checks: write` token. |
 | `MARGOT_WRITE_TOKEN` | The review App's installation token, minted for the target repository with checks, contents and pull-request write access, so publication is made as the App. Required for GitHub publication. |
-| `MARGOT_OWNED_TIER` | How strongly the changed files are owned under your code-ownership rules, as your dispatcher computes it: `required_owned` (files whose owners must approve), `owned`, or `none`. It raises Jev's scrutiny. Missing or invalid holds the review. |
+| `MARGOT_OWNED_TIER` | How strongly the changed files are owned under your code-ownership rules, as your dispatcher computes it: `required_owned` (files whose owners must approve), `owned`, or `none`. It raises Jev's scrutiny. Missing or invalid holds the review: a dispatcher that does not compute tiers passes `none`, since `unknown`, the samples' default, holds every review. |
 | `MARGOT_CLASSIFICATION` | The request's dispatched classification (`functional`, `documentation`, or `mechanical`). It can only make the review stricter than the verified triage's class. |
 | `MARGOT_TRIAGE` | Used only when no classification is set: `mechanical` leaves the verified triage's class in place, and any other non-empty value makes the review functional. |
 | names listed in `claude.ticketing.env` | Forwarded only to the ticketing MCP server. |
