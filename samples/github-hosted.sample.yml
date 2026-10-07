@@ -13,7 +13,8 @@
 # variable and EXAMPLE_MARGOT_APP_KEY a secret. Minted tokens last an hour, so each job
 # mints its own. GH_TOKEN is the read token, MARGOT_WRITE_TOKEN the publication token
 # (it must come from the App, whose bot is publisher.actor), and the closer's GH_TOKEN
-# is a checks-write token. The jobs' own permissions stay at contents: read. The read
+# is a checks-write token. The jobs' own permissions stay at contents: read; the review job adds packages:
+# read, used with the workflow token to pull the runtime image. The read
 # token also covers YOUR_REFERENCE_REPOSITORY, which must belong to the same owner as
 # the target, since one installation token is scoped to one owner.
 #
@@ -296,7 +297,7 @@ jobs:
       # log in to your own registry otherwise.
       - name: Pull the reviewers' runtime image
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
         run: |
           set -euo pipefail
