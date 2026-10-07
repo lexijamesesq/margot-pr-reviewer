@@ -90,6 +90,8 @@ export async function runPublication(
   mode: PublicationMode = "clear",
   errorStage = "voice",
   holdReasons?: string[],
+  /** The error result's diagnostic in the `stage-error` family of modes. */
+  diagnostic = "Distinctive diagnostic detail.",
 ) {
   const writes: {
     method: string;
@@ -271,7 +273,7 @@ export async function runPublication(
       return {
         kind: "error",
         stage: errorStage,
-        diagnostic: "Distinctive diagnostic detail.",
+        diagnostic,
         mergeEligible: false,
       };
     }

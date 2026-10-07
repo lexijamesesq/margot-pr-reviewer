@@ -130,3 +130,20 @@ it("posts no comment and titles the check a poster error when the template gate 
     comments: [],
   });
 });
+it("puts an error result's diagnostic in the check summary, capped at 900, keeping its title", async () => {
+  const short = await runPublication("stage-error", "voice");
+  const long = await runPublication("stage-error", "voice", undefined, "x".repeat(2000));
+  const output = (run: typeof short) =>
+    (run.final?.output ?? {}) as { title?: string; summary?: string };
+  expect({
+    conclusion: short.final?.conclusion,
+    title: output(short).title,
+    summary: output(short).summary,
+    capped: Array.from(output(long).summary ?? "").length,
+  }).toEqual({
+    conclusion: "action_required",
+    title: "Margot: not reviewed (error)",
+    summary: "Distinctive diagnostic detail.",
+    capped: 900,
+  });
+});

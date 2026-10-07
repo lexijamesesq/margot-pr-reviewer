@@ -367,6 +367,7 @@ export function checkText(review: Review): string {
     `can auto-merge: ${review.decision.mergeEligible ? "True" : "False"}`,
     ...adherenceLines(review),
     `band_reason: ${review.decision.rating.rationale}`,
+    ...(review.voice?.finding ? [`setting finding: ${review.voice.finding}`] : []),
     "pipeline_ok: true",
     `vector: ${JSON.stringify(review.riskAnswer?.dimensions ?? {})}`,
     `owned tier: ${review.decision.ownedPathTier ?? "unknown"}`,
