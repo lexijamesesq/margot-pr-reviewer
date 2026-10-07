@@ -122,10 +122,8 @@ It writes the result to `OUTPUT.json`, and `diagnostics.json` beside it: each ca
 raw block, duration, turns and models, the voice's raw prose, and each re-ask of a
 malformed Jev answer (`jevRetries`) and, for a completed review, the advisory
 template-adherence check (`adherence`), with no tool output, token or environment. It
-is written however the review ends, for the host to keep.
-
-It exits 1 when the result is an error, printing the failed stage and diagnostic to
-stderr, and 0 otherwise, including for held results.
+is written however the review ends, for the host to keep. It exits 1 when the result is an error, printing the
+failed stage and diagnostic to stderr, and 0 otherwise, including for held results.
 
 ## Running it in GitHub Actions
 
