@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.4
+
+- When posting fails after the review returned (the review itself, a hold, or the check), the error check's summary carries that failure's reason, capped at 900 characters, as the previous reviewer's `error_check` did. It no longer shows the fixed "Publication or evaluation failed" text.
+
 ## 0.9.3
 
 - The check text carries the voice's `finding` as `setting finding: <finding>` right after `band_reason:`, as the previous reviewer's poster wrote it.

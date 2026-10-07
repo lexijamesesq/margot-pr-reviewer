@@ -277,11 +277,9 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
     let notReviewed: string | undefined;
     // A comment that fails the template gate is held as the poster's own error: the check
     // says so and nothing is posted on the pull request.
-    let errorOutput = {
-      title: "Margot: not reviewed (error)",
-      summary:
-        "Publication or evaluation failed; no clearance. The review run's log has the diagnostic.",
-    };
+    const defaultErrorSummary =
+      "Publication or evaluation failed; no clearance. The review run's log has the diagnostic.";
+    let errorOutput = { title: "Margot: not reviewed (error)", summary: defaultErrorSummary };
     const context = () => ({ signal: AbortSignal.timeout(60000) });
     try {
       await check(
@@ -365,6 +363,13 @@ export function githubPublisher(client: Octokit, input: z.infer<typeof publisher
           diagnostic: `${error.message}${refusalFailures.length ? `; ${refusalFailures.join("; ")}` : ""}`,
         };
       }
+      // A failure after the review returned (posting it, the hold, the check) carries its
+      // own reason into the check, as the previous reviewer's error_check did.
+      if (errorOutput.summary === defaultErrorSummary)
+        errorOutput = {
+          ...errorOutput,
+          summary: Array.from(errorMessage(error)).slice(0, 900).join(""),
+        };
       const failures: string[] = [];
       // Each cleanup is independent; inability to write can never become a successful result.
       const cleanups: [string, () => Promise<unknown>][] = [
