@@ -92,6 +92,8 @@ export async function runPublication(
   holdReasons?: string[],
   /** The error result's diagnostic in the `stage-error` family of modes. */
   diagnostic = "Distinctive diagnostic detail.",
+  /** The message GitHub returns for a failed write. */
+  writeFailure = "Recorded write failure",
 ) {
   const writes: {
     method: string;
@@ -171,7 +173,7 @@ export async function runPublication(
           body.name === publisherOptions.checks.review &&
           body.conclusion === "success")
       )
-        return new Response(JSON.stringify({ message: "Recorded write failure" }), { status: 422 });
+        return new Response(JSON.stringify({ message: writeFailure }), { status: 422 });
       if (mode === "cleanup-fail") {
         const message =
           path === "/graphql"
