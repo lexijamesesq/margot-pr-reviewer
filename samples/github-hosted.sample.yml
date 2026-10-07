@@ -2,7 +2,10 @@
 # and the configuration JSON (see config.sample.json) as GitHub variables; nothing
 # trusted lives on a runner. The card bundle (publish-skills,
 # https://github.com/lexijamesesq/publish-skills) is fetched at the commit the
-# configuration pins. Every secret and value below is a placeholder.
+# configuration pins. The cards and the voice run in the runtime image, which carries the
+# ticketing server; the review job pulls it and checks out the pull request's base. The
+# Claude CLI installed beside the release is for the decision fallback. Every secret and
+# value below is a placeholder.
 #
 # Tokens: github.token reaches only the repository this workflow runs in, so every
 # GitHub call uses a token minted from the review GitHub App, scoped to the target
@@ -10,7 +13,8 @@
 # variable and EXAMPLE_MARGOT_APP_KEY a secret. Minted tokens last an hour, so each job
 # mints its own. GH_TOKEN is the read token, MARGOT_WRITE_TOKEN the publication token
 # (it must come from the App, whose bot is publisher.actor), and the closer's GH_TOKEN
-# is a checks-write token. The jobs' own permissions stay at contents: read. The read
+# is a checks-write token. The jobs' own permissions stay at contents: read; the review job adds packages:
+# read, used with the workflow token to pull the runtime image. The read
 # token also covers YOUR_REFERENCE_REPOSITORY, which must belong to the same owner as
 # the target, since one installation token is scoped to one owner.
 #
@@ -190,6 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: read
     outputs:
       published: ${{ steps.review.outputs.published }}
       stop_reason: ${{ steps.bind.outputs.stop_reason }}
@@ -222,11 +227,6 @@ jobs:
           npm rebuild --prefix "$MARGOT_ROOT" @anthropic-ai/claude-code
           echo "MARGOT_ROOT=$MARGOT_ROOT" >> "$GITHUB_ENV"
           echo "CLAUDE_CONFIG_DIR=$MARGOT_ROOT/claude-state" >> "$GITHUB_ENV"
-      # config.sample.json names a ticketing server; install it beside the release so the
-      # review's MCP servers all start. Replace the package with your own.
-      - name: Install your ticketing MCP server here
-        run: |
-          npm install --prefix "$MARGOT_ROOT" --ignore-scripts --save-exact YOUR_TICKETING_MCP_SERVER_PACKAGE
       - name: Check out the card bundle at its pinned commit
         run: |
           set -euo pipefail
@@ -257,6 +257,7 @@ jobs:
           permission-contents: read
           permission-pull-requests: read
           permission-checks: read
+          permission-actions: read
       - name: Bind trusted configuration to the requested PR
         id: bind
         env:
@@ -273,6 +274,41 @@ jobs:
             --required-checks '["YOUR_REQUIRED_CHECK"]' \
             --protected-paths '["YOUR_AUTHORITY_PATH/**"]' \
             --allowed-skipped-checks '[]' --run-url "$RUN_URL"
+      - name: Check out the pull request's base read-only for the reviewers
+        env:
+          GH_TOKEN: ${{ steps.read.outputs.token }}
+          TARGET_REPO: ${{ inputs.repo }}
+        run: |
+          set -euo pipefail
+          # The base the bound request records, which the review verifies the checkout against.
+          base=$(jq -er .base "$MARGOT_ROOT/request.json")
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]]
+          work="$MARGOT_ROOT/work"
+          git init --quiet "$work"
+          git -C "$work" remote add origin "https://github.com/$TARGET_REPO"
+          # The token reaches git through a credential helper reading the environment,
+          # never on the command line.
+          git -C "$work" -c credential.helper= \
+            -c "credential.helper=!f() { echo username=x-access-token; echo \"password=\$GH_TOKEN\"; }; f" \
+            fetch --quiet --depth 1 origin "$base"
+          git -C "$work" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$work" rev-parse HEAD)" = "$base"
+      # This sample's image is on GHCR, read with the workflow's own token (packages: read);
+      # log in to your own registry otherwise.
+      - name: Pull the reviewers' runtime image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          image=$(jq -r .claude.container.image "$RUNNER_TEMP/trusted/config.json")
+          if ! docker image inspect "$image" >/dev/null 2>&1; then
+            export DOCKER_CONFIG="$MARGOT_ROOT/docker-config"
+            mkdir -p "$DOCKER_CONFIG"
+            printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$ACTOR" --password-stdin
+            docker pull --quiet "$image"
+            rm -rf "$DOCKER_CONFIG"
+          fi
       - name: Mint the publication token (target repository)
         id: write
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -303,6 +339,35 @@ jobs:
           published=$(jq -r 'if .result.publication == null then "" else "true" end' \
             "$MARGOT_ROOT/result.json")
           echo "published=$published" >> "$GITHUB_OUTPUT"
+      # Each reviewer's output, verbatim, in this run's summary: a mechanical echo of
+      # diagnostics.json, each block in a tilde fence so its own content renders literally.
+      - name: Reviewer output (verbatim) to the run summary
+        if: always()
+        # Display only: it never changes the job's result.
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          diagnostics="$MARGOT_ROOT/diagnostics.json"
+          [ -s "$diagnostics" ] || exit 0
+          n="$(jq -r '(.cards // []) | length' "$diagnostics" 2>/dev/null || echo 0)"
+          [ "$n" -gt 0 ] 2>/dev/null || exit 0
+          {
+            echo "## Margot — reviewer output (verbatim)"
+            echo
+            jq -r '.cards[] | "### " + .card + "\n\n~~~\n" + ((.raw // "") as $r | if $r == "" then "(no output — reviewer did not complete)" elif ($r | length) > 20000 then ($r[0:20000] + "\n… (truncated — full output in the diagnostics artifact)") else $r end) + "\n~~~\n"' "$diagnostics"
+          } >> "$GITHUB_STEP_SUMMARY"
+      # The only durable copy of each reviewer's raw output and the voice's prose once the
+      # run ends, kept 90 days.
+      - name: Upload the review's diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: margot-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/margot/diagnostics.json
+            ${{ runner.temp }}/margot/result.json
+          retention-days: 90
+          if-no-files-found: warn
 
   close-stranded-check:
     needs: [route, triage, review]
@@ -356,6 +421,7 @@ jobs:
           TARGET_REPO: ${{ inputs.repo }}
           PR_NUMBER: ${{ inputs.pr }}
           HEAD_SHA: ${{ inputs.sha }}
+          # Placeholder: your App's numeric App ID, the same number as publisher.appId.
           MARGOT_APP_ID: "123456"
           RUNS_URL_PREFIX: ${{ github.server_url }}/${{ github.repository }}/actions/runs/
           RUN_ID: ${{ github.run_id }}

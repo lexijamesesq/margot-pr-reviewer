@@ -64,7 +64,7 @@
     "container": {
       "docker": "docker",
       "image": "YOUR_REGISTRY/margot-runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "work": "${MARGOT_ROOT}/base"
+      "work": "${MARGOT_ROOT}/work"
     },
     "references": {
       "YOUR_REFERENCE_NAME": {
