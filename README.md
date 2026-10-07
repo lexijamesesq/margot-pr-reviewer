@@ -206,10 +206,12 @@ failed stage and diagnostic to stderr, and 0 otherwise, including for held resul
 1. **`route`** — installs the exact release bytes, verifies them, and runs
    `margot-instance validate-deployment` to confirm the target repository is
    enrolled and to decide whether this run has GitHub publication authority.
-2. **`review`** — runs `margot-instance bind-request` to resolve the request and
+2. **`review`** — installs the pinned Claude CLI and fetches the card bundle at its
+   pinned commit, runs `margot-instance bind-request` to resolve the request and
    configuration for the PR, checks out the PR's base, pulls the runtime image when
-   it is absent, runs `margot-review` to produce and publish the result, and copies
-   each reviewer's output to the run summary.
+   it is absent, runs `margot-review` to produce and publish the result, copies
+   each reviewer's output to the run summary, and keeps `diagnostics.json` and
+   `result.json` as a 90-day artifact.
 3. **`close-stranded-check`** — runs on a normal (non-self-hosted) runner with
    `if: always()`. If the earlier jobs did not successfully publish a result, it
    closes any review check this run owns so the PR is not left with a check
