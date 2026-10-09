@@ -91,3 +91,9 @@ it("keeps the triage-trust rule in one place", async () => {
     trust: count("trustedTriageActors.includes") + count("trustedActors.includes"),
   }).toEqual({ trust: 1 });
 });
+
+it("rejects the retired size-cap setting instead of silently ignoring it", () => {
+  expect(() => configSchema.parse({ ...config, mechanicalDiffLineCap: 1 })).toThrow(
+    "mechanicalDiffLineCap",
+  );
+});

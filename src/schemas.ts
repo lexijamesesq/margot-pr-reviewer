@@ -99,7 +99,6 @@ export const configSchema = z
     riskTailThreshold: probability,
     confidenceThreshold: probability,
     noCouncilConfidenceFloor: probability,
-    mechanicalDiffLineCap: z.number().int().positive().default(2000),
     timeoutMs: z.number().int().positive(),
     publication: z.enum(["record", "none", "github"]),
     mergeActor: text.optional(),

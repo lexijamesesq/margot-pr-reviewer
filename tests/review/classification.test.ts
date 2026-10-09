@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { jevAdapter } from "../../src/adapters/jev.js";
 import { riskQuestions } from "../../src/questions.js";
-import { checkText } from "../../src/render.js";
+import { checkText, render } from "../../src/render.js";
 import { cardNames, factsSchema } from "../../src/schemas.js";
 import {
   asDocumentation,
@@ -195,7 +195,7 @@ describe("trusted triage", () => {
 
   it("preserves the classifier lane for an oversized diff", async () => {
     const { result, calls } = await reviewed(
-      recorded("council-clear", withTriage({}), withConfig({ mechanicalDiffLineCap: 1 })),
+      recorded("council-clear", withTriage({}), withFacts({ diff: "unchanged\n".repeat(2001) })),
     );
     expect(calls).not.toContain("classification");
     expect(result).toMatchObject({
@@ -213,6 +213,8 @@ describe("trusted triage", () => {
       decision: { mergeEligible: true },
       provenance: { classification: "fallback", decision_source: "jev" },
     });
+    expect(checkText(result)).toContain("classification_source: fallback");
+    expect(render(result)).toContain("Classification: mechanical (source: fallback)");
   });
 
   it("classifies oversized triage input instead of overriding it", async () => {
@@ -220,7 +222,7 @@ describe("trusted triage", () => {
       recorded(
         "mechanical-bump",
         withRequest({ phase: "triage" }),
-        withConfig({ mechanicalDiffLineCap: 1 }),
+        withFacts({ diff: "unchanged\n".repeat(2001) }),
       ),
     );
     expect(calls).toContain("classification");

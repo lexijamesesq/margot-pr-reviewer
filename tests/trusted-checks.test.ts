@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import {
   checkExternalId,
@@ -6,7 +7,7 @@ import {
   reviewRequestId,
   textIdentity,
 } from "../src/check-identity.js";
-import { evaluateRequiredChecks } from "../src/trusted-checks.js";
+import { evaluateChecks, evaluateRequiredChecks } from "../src/trusted-checks.js";
 
 const r = {
   repository: "example/project",
@@ -107,3 +108,37 @@ it("keeps the complete machine record when human check text is capped", () => {
   expect(readCheckRecord(text)).toEqual(record);
   expect(() => readCheckRecord(`${text}\n${checkMetadataText(record)}`)).toThrow("ambiguous");
 });
+
+const envelope = () =>
+  JSON.parse(
+    readFileSync(new URL("./fixtures/trusted-checks-envelope.json", import.meta.url), "utf8"),
+  );
+it("evaluates the authenticated live envelope and excludes its own review checks", () => {
+  const input = envelope();
+  input.config.review.requiredChecks.push("review / margot", "review / triage");
+  expect(evaluateChecks(input)).toEqual({ green: true, pending: [], failing: [] });
+});
+it.each(["app", "name"])("rejects forged triage %s at the evaluator boundary", (field) => {
+  const input = envelope();
+  if (field === "app") input.triage.app.id = 15368;
+  else input.triage.name = "untrusted triage";
+  expect(() => evaluateChecks(input)).toThrow();
+});
+it.each(["head", "base"])("rejects a moved live pull %s at the evaluator boundary", (field) => {
+  const input = envelope();
+  input.pull[field].sha = "f".repeat(40);
+  expect(() => evaluateChecks(input)).toThrow();
+});
+it.each(["ci / checks", "trusted-scan / trusted-scan"])(
+  "requires the mandatory policy for %s",
+  (name) => {
+    const input = envelope();
+    input.config.review.requiredChecks = input.config.review.requiredChecks.filter(
+      (n: string) => n !== name,
+    );
+    expect(() => evaluateChecks(input)).toThrow("Mandatory App reporter policy required");
+    const wrongReporter = envelope();
+    wrongReporter.config.review.requiredCheckReporters[name] = 15368;
+    expect(() => evaluateChecks(wrongReporter)).toThrow("Mandatory App reporter policy required");
+  },
+);

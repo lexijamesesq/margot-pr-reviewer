@@ -32,7 +32,6 @@
       "riskTailThreshold": 0.3,
       "confidenceThreshold": 0.3,
       "noCouncilConfidenceFloor": 0.3,
-      "mechanicalDiffLineCap": 2000,
       "timeoutMs": 900000,
       "publication": "record",
       "mergeActor": "YOUR_MERGE_ACTOR",

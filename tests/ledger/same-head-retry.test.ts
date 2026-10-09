@@ -243,7 +243,7 @@ it("runs the council again when Margot's review configuration changed", async ()
   f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
   r.facts = f;
   const config = configSchema.parse(r.config);
-  r.config = { ...config, mechanicalDiffLineCap: config.mechanicalDiffLineCap + 1 };
+  r.config = { ...config, routeThreshold: config.routeThreshold + 0.01 };
   const s = recordedServices(r);
   expect(await review(r.request, r.config, s)).toMatchObject({ kind: "reviewed" });
   expect(s.calls.map((c) => c.name)).toContain("route");

@@ -164,8 +164,8 @@ A review run takes two JSON files: a request and a configuration.
   merges it once approved; unset, the hold says only "approve it to merge it".
 
 GitHub mode: with `margot-instance bind-request --authority true` the review publishes
-its comment and check runs to the pull request. That needs the `publisher` block (the three check
-names, the review app's actor and id, and the run URL); `bind-request` fails without it.
+its comment and check runs to the pull request. That needs the `publisher` block (`triage` and `review` check names, plus `code` and `text` when `handoff` is configured,
+the review app's actor and id, and the run URL); `bind-request` fails without it.
 Without `--authority true` the review runs in shadow mode and publishes nothing.
 
 `claude.executable`, `claude.pluginDirectory` and `claude.container.work` may use
@@ -205,7 +205,20 @@ carries `triageCheckId`. Review independently fetches that exact check and valid
 its reporter, successful completion, repository, PR, base and head, plus the trusted
 actor. Missing or mismatched evidence fails without another classification. Raw
 `classification`/`triage` request fields and their former environment overrides are
-removed; deploy this interface with the matching instance release. The retired `self-instrument` command and `publisher.checks.authority` field are also rejected. Protected-path approval holds remain part of the review decision; no separate self-instrument status is posted.
+removed; deploy this interface with the matching instance release.
+
+The authenticated classifier selects the mechanical, documentation or functional
+lane using the same thresholds whether Jev or its configured fallback answers. A
+fallback classification adds no merge hold; existing routing and risk fallback
+holds still apply. Diff size does not override that lane, and the retired
+`mechanicalDiffLineCap` setting is rejected.
+
+Both the comment and check text identify the classification source. The existing
+`decision_source` field describes routing/risk decision provenance;
+`classification_source` separately names the initial classifier. The retired
+`self-instrument` command and `publisher.checks.authority` field are also rejected.
+Protected-path approval holds remain part of the review decision; no separate
+self-instrument status is posted.
 
 It writes the result to `OUTPUT.json`, and `diagnostics.json` beside it: each card's
 raw block, duration, turns and models, the voice's raw prose, and each re-ask of a
@@ -366,7 +379,7 @@ could not be completed at all and is always held.
 
 The package's main entry exports:
 
-- `review(request, config, services)` — runs a review and returns a `ReviewResult` (`classified`, `reviewed`, `held` or `error`).
+- `review(request, config, services)` — runs a review and returns a `ReviewResult` (`classified`, `reviewed`, `held`, `already_published` or `error`).
 - `recordedServices(recording)` — builds `Services` from a JSON recording such as those under `recordings/`, for offline review.
 - `liveServices(config, credentials, onResponse?)` and `liveConfigSchema` — the live implementation `margot-review` runs on.
 

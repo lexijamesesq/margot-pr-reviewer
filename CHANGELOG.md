@@ -2,6 +2,8 @@
 
 ## 0.10.0
 
+- Authorized fallback classification uses the same lane thresholds without an added classification hold; diff size no longer overrides the classifier. Remove the inert `mechanicalDiffLineCap` setting from the strict interface. Check text and review comments now display classification provenance separately from the existing routing/risk decision source.
+
 - Classification uses bounded Jev retries and the configured fallback, records which provider decided, and fails explicitly when both providers fail.
 - Migrated review consumes an authenticated, revision-bound classification check instead of classifying again. Trusted code/text checks bind publication and review handoff to the current pull request, with recovery and duplicate-publication guards.
 - Remove the dedicated self-instrument command, status publication and authority check configuration. Independent protected-path approval holds and ordinary review publication remain.

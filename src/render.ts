@@ -264,6 +264,7 @@ export function render(review: Review): string {
     `### ${outcomeIcons[decision.outcome]} ${decision.outcome}`,
     `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}**${risk ? ` — ${risk}` : ""}`,
     `> ${firstSentences(rationale, 2)}`,
+    `Classification: ${review.classification} (source: ${review.provenance.classification})`,
     ...(fallbackNotice(review.decision.holdReasons)
       ? [`> ⚠️ _${fallbackNotice(review.decision.holdReasons)}, so nothing was auto-merged._`]
       : []),
@@ -323,6 +324,7 @@ export function checkText(review: Review): string {
     `decision_source: ${review.provenance.decision_source ?? "jev"}`,
     `verdict_source: ${verdictSource}`,
     `class: ${review.classification}`,
+    `classification_source: ${review.provenance.classification}`,
     `summoned: ${summoned.join(", ") || "none"}`,
     `convergence: ${JSON.stringify(review.convergence)}`,
     `can auto-merge: ${review.decision.mergeEligible ? "True" : "False"}`,
