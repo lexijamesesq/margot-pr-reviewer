@@ -8,7 +8,7 @@ default_stages: [pre-commit]
 
 repos:
   - repo: https://github.com/lexijamesesq/dotty
-    rev: v2026.10.09
+    rev: v2026.10.09-2
     hooks:
       - id: gitleaks-staged
       - id: gitleaks-pre-push
@@ -33,7 +33,7 @@ repos:
       - id: shellcheck
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.10
+    rev: v0.17.0
     hooks:
       - id: ruff
       - id: ruff-format
