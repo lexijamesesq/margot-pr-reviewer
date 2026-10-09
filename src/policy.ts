@@ -23,7 +23,6 @@ export function classify(
   answer: z.infer<typeof classificationSchema>,
   config: ReviewConfig,
 ): Classification {
-  if (answer.source !== "jev") return "functional";
   return classNames.find((name) => answer[name] >= config.classificationThreshold) ?? "functional";
 }
 /** A standing ledger entry puts a mechanical or editorial change on the full path: routing,
@@ -214,7 +213,7 @@ export function verifiedTriage<T extends { actor: string; head: string }>(
 /**
  * The protected-path hold: a functional change to a protected path, or a rename or move whose
  * old or new name is protected in any class. `paths` names every protected current or previous
- * name. The preflight self-instrument check and publication share it.
+ * name. This is an approval decision independent of check publication.
  */
 export function authorityHold(
   files: { path: string; previousPath?: string | undefined }[],

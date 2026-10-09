@@ -501,7 +501,7 @@ it("keeps Margot's own checks out of the evidence a card and the voice receive",
     (
       JSON.parse(stdin.split("\n").at(-1) ?? "{}") as { facts: { checks: { name: string }[] } }
     ).facts.checks.map((check) => `${check.name}`);
-  const ownChecks = ["review / margot", "review / triage", "review / self-instrument"];
+  const ownChecks = ["review / margot", "review / triage"];
   const card = await fakeClaude({ facts: withChecks, ownChecks });
   const voice = await fakeClaude({ facts: withChecks, ownChecks, role: "voice" });
   // The configured publisher's check names are Margot's own.

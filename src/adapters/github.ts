@@ -1,14 +1,9 @@
 import { Octokit } from "octokit";
 import parseDiff from "parse-diff";
+import { authenticateTriageCheck } from "../check-identity.js";
 import { diffIsComplete } from "../diff.js";
 import { errorMessage } from "../errors.js";
-import {
-  checkConclusions,
-  classNames,
-  factsSchema,
-  probability,
-  requestSchema,
-} from "../schemas.js";
+import { checkConclusions, factsSchema, requestSchema } from "../schemas.js";
 import type { CallContext, ReviewRequest } from "../types.js";
 import { execute } from "./process.js";
 
@@ -111,7 +106,7 @@ export function githubAdapter(
           ...p,
           ref: r.head,
           per_page: 100,
-          filter: "latest",
+          filter: "all",
         }),
         client.paginate(client.rest.pulls.listReviews, { ...p, per_page: 100 }).catch((error) => {
           console.warn(
@@ -121,19 +116,36 @@ export function githubAdapter(
           return [];
         }),
       ]);
+      let triage = null;
+      if (r.phase === "review") {
+        if (
+          r.triageCheckId === undefined ||
+          options.triageAppId === undefined ||
+          options.triageCheckName === undefined
+        )
+          throw new Error(
+            "Authenticated triage check ID and trusted publisher configuration required",
+          );
+        const { data } = await client.rest.checks.get({ ...p, check_run_id: r.triageCheckId });
+        triage = authenticateTriageCheck(data, r, {
+          appId: options.triageAppId,
+          name: options.triageCheckName,
+        }).facts;
+      }
       const after = await pull(r, c);
       if (
         after.head.sha !== r.head ||
         after.base.sha !== r.base ||
         after.body !== before.body ||
-        after.title !== before.title
+        after.title !== before.title ||
+        after.head.ref !== before.head.ref ||
+        after.base.ref !== before.base.ref
       )
         throw new Error("PR changed while reading facts");
       const { diffText, files: diffFiles } = changedFiles(diff.data, files);
       const historyReviews = options.shadowBeforeHead
         ? reviews.filter((v) => v.commit_id !== r.head)
         : reviews;
-      const triage = triageFromChecks(checks, r, options);
       return factsSchema.parse({
         repository: r.repository,
         pr: r.pr,
@@ -141,6 +153,8 @@ export function githubAdapter(
         head: r.head,
         title: before.title,
         body: before.body ?? "",
+        headRefName: before.head.ref,
+        baseRefName: before.base.ref,
         author: before.user.login,
         diff: diffText,
         complete: true,
@@ -149,6 +163,11 @@ export function githubAdapter(
         checks: checks.map((check) => ({
           name: check.name,
           actor: check.app?.slug ?? "unknown",
+          appId: check.app?.id,
+          externalId: check.external_id,
+          detailsUrl: check.details_url,
+          outputText: check.output.text,
+          status: check.status,
           head: check.head_sha,
           ...(check.started_at ? { startedAt: check.started_at } : {}),
           id: check.id,
@@ -187,7 +206,7 @@ export function githubAdapter(
 /**
  * The PR's changed files: every file the whole-PR diff names, with every hunk complete, plus
  * every file GitHub's listing names. Throws when the diff is incomplete or disagrees with a
- * complete listing. The review's facts and the self-instrument preflight both read it.
+ * complete listing used by the review facts.
  */
 export function changedFiles(
   diffData: unknown,
@@ -240,70 +259,6 @@ export function changedFiles(
         ...(f.previous_filename ? { previousPath: f.previous_filename } : {}),
       });
   return { diffText, files: diffFiles };
-}
-/**
- * The verified triage for this head: the latest completed triage check the configured App
- * posted on it, whose machine output is a Jev answer bound to the head. Anything else is null,
- * which conservatively requires functional review.
- */
-export function triageFromChecks(
-  checks: {
-    id: number;
-    name: string;
-    status: string;
-    head_sha: string;
-    started_at?: string | null;
-    app?: { id?: number; slug?: string } | null;
-    output?: { text?: string | null };
-  }[],
-  r: { base: string; head: string },
-  options: { triageAppId?: number; triageCheckName?: string },
-) {
-  let triage = null;
-  const latest = checks
-    .filter(
-      (check) =>
-        options.triageAppId !== undefined &&
-        options.triageCheckName !== undefined &&
-        check.name === options.triageCheckName &&
-        check.status === "completed" &&
-        check.head_sha === r.head &&
-        check.app?.id === options.triageAppId,
-    )
-    .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? "") || b.id - a.id)[0];
-  if (latest?.started_at && Number.isInteger(latest.id)) {
-    try {
-      const machine = JSON.parse(latest.output?.text ?? "");
-      const classification =
-        "classification" in machine
-          ? machine.classification
-          : typeof machine.mechanical === "boolean"
-            ? machine.mechanical
-              ? "mechanical"
-              : "functional"
-            : null;
-      if (
-        machine.head_sha === r.head &&
-        machine.decision_source === "jev" &&
-        classNames.includes(classification)
-      )
-        triage = {
-          actor: latest.app?.slug ?? "unknown",
-          base: r.base,
-          head: r.head,
-          classification,
-          ...(probability.safeParse(machine.mechanical_probability).success
-            ? { mechanicalProbability: machine.mechanical_probability }
-            : {}),
-        };
-    } catch (error) {
-      // Unreadable triage conservatively requires functional review.
-      console.warn(
-        `Margot: triage check output unreadable (${errorMessage(error)}); requiring functional review`,
-      );
-    }
-  }
-  return triage;
 }
 export function githubClient(options: { token?: string; gh?: string; retries?: number }) {
   return new Octokit({

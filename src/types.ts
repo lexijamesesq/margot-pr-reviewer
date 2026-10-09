@@ -63,6 +63,12 @@ export type RoundScope = {
   entries: Ledger["entries"];
 };
 export type ReviewResult =
+  | {
+      kind: "already_published";
+      request: ReviewRequest;
+      native_review_id: number;
+      review_check_id: number;
+    }
   | ({
       kind: "reviewed";
       report: string;
@@ -80,8 +86,10 @@ export type ReviewResult =
       kind: "classified";
       request: ReviewRequest;
       classification: Classification;
-      decision_source?: string;
+      decision_source: "jev" | "fallback";
       mechanical_probability?: number | null;
+      /** Present only after authenticated live publication/readback. */
+      triage_check_id?: number;
     }
   | { kind: "error"; stage: string; diagnostic: string; mergeEligible: false };
 export type CallContext = { signal: AbortSignal };

@@ -18,11 +18,15 @@
 # token also covers YOUR_REFERENCE_REPOSITORY, which must belong to the same owner as
 # the target, since one installation token is scoped to one owner.
 #
-# Nothing here triggers on its own: a workflow in the target repository, on
-# pull_request, dispatches this one through the API with the pull request it is about:
-#   gh workflow run margot-review.yml --repo YOUR_ORG/YOUR_REVIEW_REPOSITORY \
-#     -f repo="$GITHUB_REPOSITORY" -f pr="${{ github.event.number }}" -f sha="${{ github.event.pull_request.head.sha }}"
+# The trusted target producer dispatches this workflow through margot-instance
+# trusted-checks after authenticated code and current-text checks. Inputs below are
+# its bound identity, never raw classification authority. Configure handoff.ref as
+# the protected immutable instance tag and keep this workflow at that tag.
 name: Margot review
+run-name: Margot ${{ inputs.repo }}#${{ inputs.pr }} ${{ inputs.request_id }}
+concurrency:
+  group: margot-${{ inputs.repo }}-${{ inputs.pr }}
+  cancel-in-progress: true
 on:
   workflow_dispatch:
     inputs:
@@ -43,18 +47,26 @@ on:
         type: string
         required: false
         default: unknown
-      classification:
-        description: mechanical, documentation, or functional
+      base_sha:
+        description: bound base commit
         type: string
-        required: false
-        default: ""
-      triage:
-        description: triage answer for this head
+        required: true
+      triage_check_id:
+        description: authenticated triage check ID
         type: string
-        required: false
-        default: ""
+        required: true
+      workflow_ref:
+        description: configured immutable instance tag
+        type: string
+        required: true
+      request_id:
+        description: canonical request hash (lookup only)
+        type: string
+        required: true
+
 permissions:
   contents: read
+  actions: read
 jobs:
   route:
     runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
@@ -98,9 +110,10 @@ jobs:
     runs-on: [self-hosted, YOUR_REVIEW_RUNNER]
     permissions:
       contents: read
+      actions: read
       packages: read
     outputs:
-      published: ${{ steps.review.outputs.published }}
+      published: ${{ steps.admission.outputs.disposition == 'completed' && 'true' || steps.review.outputs.published }}
       stop_reason: ${{ steps.bind.outputs.stop_reason }}
       live_sha: ${{ steps.bind.outputs.live_sha }}
     steps:
@@ -166,13 +179,18 @@ jobs:
           TARGET_REPO: ${{ inputs.repo }}
           PR_NUMBER: ${{ inputs.pr }}
           HEAD_SHA: ${{ inputs.sha }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BASE_SHA: ${{ inputs.base_sha }}
+          TRIAGE_CHECK_ID: ${{ inputs.triage_check_id }}
+          WORKFLOW_REF: ${{ inputs.workflow_ref }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: |
           "$MARGOT_ROOT/node_modules/.bin/margot-instance" bind-request \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
+            --base "$BASE_SHA" --triage-check-id "$TRIAGE_CHECK_ID" \
             --phase review --authority "${{ needs.route.outputs.authority }}" \
             --margot-root "$MARGOT_ROOT" --config /trusted/margot/config.json \
-            --required-checks '["YOUR_REQUIRED_CHECK"]' \
+            --required-checks '["ci / checks","trusted-scan / trusted-scan"]' \
+            --required-check-reporters '{"ci / checks":123456,"trusted-scan / trusted-scan":123456}' \
             --protected-paths '["YOUR_AUTHORITY_PATH/**"]' \
             --allowed-skipped-checks '[]' --run-url "$RUN_URL"
       - name: Check out the pull request's base read-only for the reviewers
@@ -223,21 +241,40 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-checks: write
+      - name: Authenticate admission before review work
+        id: admission
+        env:
+          GH_TOKEN: ${{ steps.read.outputs.token }}
+          MARGOT_WRITE_TOKEN: ${{ steps.write.outputs.token }}
+          MARGOT_RUN_TOKEN: ${{ github.token }}
+          MARGOT_ACTIONS_TOKEN: ${{ github.token }}
+          INSTANCE_REF: ${{ github.ref }}
+          WORKFLOW_REF: ${{ inputs.workflow_ref }}
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: |
+          set -euo pipefail
+          configured_ref=$(jq -er '.handoff.ref' "$MARGOT_ROOT/config.json")
+          [ "$INSTANCE_REF" = "refs/tags/$configured_ref" ]
+          [ "$WORKFLOW_REF" = "$configured_ref" ]
+          "$MARGOT_ROOT/node_modules/.bin/margot-instance" review-admission \
+            --request-file "$MARGOT_ROOT/request.json" --config "$MARGOT_ROOT/config.json" \
+            --request-id "$REQUEST_ID" --output-file "$MARGOT_ROOT/admission.json"
       - name: Review the bound request
+        if: steps.admission.outputs.disposition != 'completed'
         id: review
         env:
           GH_TOKEN: ${{ steps.read.outputs.token }}
           MARGOT_WRITE_TOKEN: ${{ steps.write.outputs.token }}
+          MARGOT_RUN_TOKEN: ${{ github.token }}
+          MARGOT_ACTIONS_TOKEN: ${{ github.token }}
           MARGOT_OWNED_TIER: ${{ inputs.owned_tier }}
-          MARGOT_CLASSIFICATION: ${{ inputs.classification }}
-          MARGOT_TRIAGE: ${{ inputs.triage }}
           JEV_KEY: ${{ secrets.EXAMPLE_JEV_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.EXAMPLE_CLAUDE_OAUTH_TOKEN }}
           YOUR_TICKETING_CREDENTIAL_ENV_VAR: ${{ secrets.EXAMPLE_TICKETING_CREDENTIAL }}
         run: |
           "$MARGOT_ROOT/node_modules/.bin/margot-review" \
             "$MARGOT_ROOT/request.json" "$MARGOT_ROOT/config.json" "$MARGOT_ROOT/result.json"
-          published=$(jq -r 'if .result.publication == null then "" else "true" end' \
+          published=$(jq -r 'if .result.kind == "already_published" or .result.publication != null then "true" else "" end' \
             "$MARGOT_ROOT/result.json")
           echo "published=$published" >> "$GITHUB_OUTPUT"
       # Each reviewer's output, verbatim, in this run's summary: a mechanical echo of
@@ -276,6 +313,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -319,10 +357,16 @@ jobs:
           TARGET_REPO: ${{ inputs.repo }}
           PR_NUMBER: ${{ inputs.pr }}
           HEAD_SHA: ${{ inputs.sha }}
+          BASE_SHA: ${{ inputs.base_sha }}
+          TRIAGE_CHECK_ID: ${{ inputs.triage_check_id }}
+          WORKFLOW_REF: ${{ inputs.workflow_ref }}
           # Placeholder: your App's numeric App ID, the same number as publisher.appId.
           MARGOT_APP_ID: "123456"
+          MARGOT_REVIEW_ACTOR: "YOUR_REVIEW_APP[bot]"
           RUNS_URL_PREFIX: ${{ github.server_url }}/${{ github.repository }}/actions/runs/
           RUN_ID: ${{ github.run_id }}
+          OWN_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          MARGOT_RUN_TOKEN: ${{ github.token }}
           ROUTE_RESULT: ${{ needs.route.result }}
           REVIEW_RESULT: ${{ needs.review.result }}
           PUBLISHED: ${{ needs.review.outputs.published }}
@@ -331,7 +375,8 @@ jobs:
         run: |
           "$MARGOT_ROOT/node_modules/.bin/margot-instance" close-stranded-check \
             --repository "$TARGET_REPO" --pr "$PR_NUMBER" --head "$HEAD_SHA" \
-            --app-id "$MARGOT_APP_ID" --check-name "review / margot" \
-            --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
+            --app-id "$MARGOT_APP_ID" --review-actor "$MARGOT_REVIEW_ACTOR" --check-name "review / margot" \
+            --base "$BASE_SHA" --triage-check-id "$TRIAGE_CHECK_ID" --workflow-ref "$WORKFLOW_REF" \
+            --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" --own-run-url "$OWN_RUN_URL" \
             --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
             --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"

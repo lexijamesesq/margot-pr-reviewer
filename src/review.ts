@@ -1,4 +1,4 @@
-import { diffLineCount } from "./diff.js";
+import { authenticateTriageFacts, textIdentity } from "./check-identity.js";
 import { errorMessage } from "./errors.js";
 import {
   configHash,
@@ -34,7 +34,7 @@ import {
   bundleSchema,
   cardSchema,
   classificationSchema,
-  classNames,
+  type classNames,
   configSchema,
   disableAutoMergeSchema,
   factsSchema,
@@ -45,12 +45,12 @@ import {
   shaSchema,
   voiceSchema,
 } from "./schemas.js";
-import { type CardStage, cardStage, type Stage, stages } from "./stages.js";
+import { type CardStage, cardStage, classificationLimits, type Stage, stages } from "./stages.js";
+import { evaluateRequiredChecks } from "./trusted-checks.js";
 import type {
   Adherence,
   Bundle,
   Card,
-  Facts,
   Review,
   ReviewCore,
   ReviewPhaseTitle,
@@ -64,20 +64,6 @@ function ticket(body: string): { label: string; url: string } | null {
   return match?.[0] && match[1] ? { label: match[1], url: match[0] } : null;
 }
 
-type CheckFact = Facts["checks"][number];
-function currentCheck(runs: CheckFact[]): CheckFact | undefined {
-  let current: CheckFact | undefined;
-  for (const run of runs) {
-    if (!current) current = run;
-    else if ((run.startedAt ?? "") > (current.startedAt ?? "")) current = run;
-    else if (
-      (run.startedAt ?? "") === (current.startedAt ?? "") &&
-      (run.id ?? 0) > (current.id ?? 0)
-    )
-      current = run;
-  }
-  return current;
-}
 const optionalAdherence = (value: Adherence | undefined) =>
   value === undefined ? {} : { adherence: value };
 /**
@@ -137,10 +123,15 @@ export async function review(
         return await Promise.race([
           run({ signal: controller.signal }),
           new Promise<never>((_, reject) => {
-            timer = setTimeout(() => {
-              controller.abort();
-              reject(new Error(`${name} timed out`));
-            }, config.timeoutMs);
+            timer = setTimeout(
+              () => {
+                controller.abort();
+                reject(new Error(`${name} timed out`));
+              },
+              name === stages.classification
+                ? Math.min(config.timeoutMs, classificationLimits.stageMs)
+                : config.timeoutMs,
+            );
           }),
         ]);
       } finally {
@@ -226,77 +217,75 @@ export async function review(
     )
       cached = undefined;
     stage = stages.triage;
-    const oversized = diffLineCount(facts.diff) > config.mechanicalDiffLineCap;
     let classification: (typeof classNames)[number] = "functional";
-    let classSource = "diff_too_large";
+    let classSource: string;
     let mechanicalProbability: number | null = null;
     if (request.phase === "triage") {
-      // The triage is the one classification: it asks Jev.
-      if (!oversized) {
-        const answer = classificationSchema.parse(
-          await call(stages.classification, (c) =>
-            services.classify(facts, classificationQuestions, c),
-          ),
-        );
-        classification = classify(answer, config);
-        classSource = answer.source;
-        if (answer.source === "jev") mechanicalProbability = answer.mechanical;
-      }
-    } else {
-      // The review never asks again: it takes the class from the verified triage for this
-      // head, and is functional without one.
-      const verified = verifiedTriage(facts.triage, config.trustedTriageActors, request.head);
-      if (verified) {
-        classification = verified.classification;
-        classSource = "jev";
-        mechanicalProbability = verified.mechanicalProbability ?? null;
-      } else classSource = "triage_unavailable";
-      // An oversized diff is never lowered below functional.
-      if (oversized && classification !== "functional") {
-        classification = "functional";
-        classSource = "diff_too_large";
-      }
-      // Nothing dispatched (no class and no triage) means no override: the verified triage's
-      // class stands. A dispatched class only ever makes the review stricter.
-      const dispatched = request.classification
-        ? (classNames.find((name) => name === request.classification) ?? "functional")
-        : request.triage === "mechanical"
-          ? "mechanical"
-          : request.triage
-            ? "functional"
-            : undefined;
-      if (dispatched && classNames.indexOf(dispatched) < classNames.indexOf(classification)) {
-        classification = dispatched;
-        classSource = "dispatch";
-      }
-    }
-    if (cached && classification !== cached.review.classification) cached = undefined;
-    if (request.phase === "triage")
+      const answer = classificationSchema.parse(
+        await call(stages.classification, (context) =>
+          services.classify(facts, classificationQuestions, context),
+        ),
+      );
+      classification = classify(answer, config);
       return {
         kind: "classified",
         request,
         classification,
-        decision_source: classSource,
-        mechanical_probability: mechanicalProbability,
+        decision_source: answer.source,
+        mechanical_probability: answer.mechanical,
       };
-    stage = stages.checks;
-    for (const name of config.requiredChecks) {
-      // One name can carry several runs on one head: a workflow's concurrency cancels a
-      // superseded run and the cancelled one stays in the list beside the current one.
-      // The current run decides (most recent start, then id), as the required-check floor
-      // gate does; with no recency recorded, the first listed wins.
-      const check = currentCheck(facts.checks.filter((c) => c.name === name));
-      if (
-        !check ||
-        check.head !== request.head ||
-        !(
-          check.conclusion === "success" ||
-          (check.conclusion === "skipped" && config.allowedSkippedChecks.includes(name))
-        ) ||
-        !config.trustedCheckActors.includes(check.actor)
-      )
-        throw new Error(`Required check not trusted and green: ${name}`);
     }
+    // The live adapter authenticates the exact check; independently bind the normalized facts
+    // and preserve the existing actor trust check (recordings are also untrusted inputs).
+    if (
+      !facts.triage ||
+      config.trustedTriageAppId === undefined ||
+      config.trustedTriageCheckName === undefined
+    )
+      throw new Error("Authenticated triage evidence and trusted publisher configuration required");
+    const verified = authenticateTriageFacts(facts.triage, request, {
+      appId: config.trustedTriageAppId,
+      name: config.trustedTriageCheckName,
+    });
+    if (!verifiedTriage(verified, config.trustedTriageActors, request.head))
+      throw new Error("Triage actor is not trusted");
+    classification = verified.classification;
+    classSource = verified.decisionSource;
+    mechanicalProbability = verified.mechanicalProbability ?? null;
+    if (cached && classification !== cached.review.classification) cached = undefined;
+    stage = stages.checks;
+    const floor = evaluateRequiredChecks(
+      request,
+      {
+        ...config,
+        requiredChecks: config.requiredChecks.filter(
+          (name) => !config.ownCheckNames?.includes(name),
+        ),
+        ...(config.trustedCodeCheckName ? { codeName: config.trustedCodeCheckName } : {}),
+        ...(config.trustedTextCheckName ? { textName: config.trustedTextCheckName } : {}),
+        ...(config.trustedWorkflowRef ? { workflowRef: config.trustedWorkflowRef } : {}),
+        controlAppId: config.trustedTriageAppId,
+      },
+      facts.checks.map((check) => ({
+        id: check.id ?? 1,
+        name: check.name,
+        head_sha: check.head,
+        app: { id: check.appId, slug: check.actor },
+        external_id: check.externalId ?? null,
+        details_url: check.detailsUrl ?? null,
+        status: check.status ?? (check.conclusion === "pending" ? "in_progress" : "completed"),
+        conclusion: check.conclusion === "pending" ? null : check.conclusion,
+        started_at: check.startedAt,
+        output: { text: check.outputText ?? null },
+      })),
+      facts.headRefName !== undefined && facts.baseRefName !== undefined
+        ? textIdentity(facts.title, facts.body, facts.headRefName, facts.baseRefName)
+        : undefined,
+    );
+    if (!floor.green)
+      throw new Error(
+        `Required check not trusted and green: ${[...floor.failing, ...floor.pending].join(", ")}`,
+      );
     let comparison: unknown;
     const compare = services.compare;
     if (prior && prior.head !== request.head && !cached && compare) {

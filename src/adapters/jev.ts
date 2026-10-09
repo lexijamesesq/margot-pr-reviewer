@@ -12,6 +12,7 @@ import {
   routeSchema,
   sumsToOne,
 } from "../schemas.js";
+import { classificationLimits } from "../stages.js";
 import type { AdherenceInput, CallContext, Card, Facts, Services } from "../types.js";
 import { decisionFallback } from "./decision-fallback.js";
 
@@ -155,6 +156,47 @@ function riskDimension(answer: unknown) {
     probabilities,
   };
 }
+async function classificationDeadline<T>(
+  parent: CallContext,
+  milliseconds: number,
+  label: string,
+  run: (context: CallContext) => Promise<T>,
+): Promise<T> {
+  parent.signal.throwIfAborted();
+  const controller = new AbortController();
+  const cancel = () => controller.abort(parent.signal.reason);
+  parent.signal.addEventListener("abort", cancel, { once: true });
+  let stopped: () => void = () => {};
+  const aborted = new Promise<never>((_, reject) => {
+    stopped = () => reject(controller.signal.reason);
+    controller.signal.addEventListener("abort", stopped, { once: true });
+  });
+  const timer = setTimeout(() => controller.abort(new Error(`${label} timed out`)), milliseconds);
+  try {
+    const result = await Promise.race([run({ signal: controller.signal }), aborted]);
+    parent.signal.throwIfAborted();
+    controller.signal.throwIfAborted();
+    return result;
+  } finally {
+    clearTimeout(timer);
+    parent.signal.removeEventListener("abort", cancel);
+    controller.signal.removeEventListener("abort", stopped);
+  }
+}
+function classificationPause(signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const cancel = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", cancel);
+      resolve();
+    }, classificationLimits.retryDelayMs);
+    signal.addEventListener("abort", cancel, { once: true });
+  });
+}
 export function jevAdapter(options: {
   key: string;
   model: string;
@@ -168,7 +210,12 @@ export function jevAdapter(options: {
   onJevRetry?: (retry: { question: string; attempt: number; reason: string }) => void;
 }) {
   const transport = options.fetch ?? fetch;
-  async function ask(questions: object, state: unknown, c: CallContext) {
+  async function ask(
+    questions: object,
+    state: unknown,
+    c: CallContext,
+    retries = options.retries ?? 4,
+  ) {
     const raw = await pRetry(
       async () => {
         let response: Response;
@@ -199,7 +246,7 @@ export function jevAdapter(options: {
         }
       },
       {
-        retries: options.retries ?? 4,
+        retries,
         minTimeout: options.minTimeout ?? 1000,
         maxTimeout: 8000,
         randomize: true,
@@ -258,34 +305,65 @@ export function jevAdapter(options: {
         { type: "noul", instructions },
       ]),
     );
-  const classify: Services["classify"] = async (facts, questions, c) => {
-    let a: Record<string, unknown>;
-    try {
-      a = (
-        await decide(
-          "classification",
-          (answers) => unreadableNouls(answers, Object.keys(questions)),
-          nouls(questions),
-          classificationState(facts),
-          c,
-        )
-      ).answers;
-    } catch (error) {
-      console.warn(
-        `Margot: classification unavailable (${errorMessage(error)}); assuming functional`,
-      );
-      return { source: "jev_unreachable", functional: 1, documentation: 0, mechanical: 0 };
-    }
-    // An unreadable answer to any class question classifies the change as functional.
-    if (unreadableNouls(a, Object.keys(questions))) {
-      console.warn("Margot: Jev's classification answer is unreadable; classifying as functional");
-      return { source: "jev", functional: 1, documentation: 0, mechanical: 0 };
-    }
-    return classificationSchema.parse({
-      source: "jev",
-      ...Object.fromEntries(Object.keys(questions).map((k) => [k, noul.parse(a[k]).noul])),
-    });
-  };
+  const classify: Services["classify"] = async (facts, questions, parent) =>
+    classificationDeadline(
+      parent,
+      classificationLimits.stageMs,
+      "Classification stage",
+      async (stage) => {
+        const query = nouls(questions);
+        const state = classificationState(facts);
+        const parse = (answers: Record<string, unknown>, source: "jev" | "fallback") =>
+          classificationSchema.parse({
+            source,
+            ...Object.fromEntries(
+              Object.keys(questions).map((key) => [key, noul.parse(answers[key]).noul]),
+            ),
+          });
+        for (let attempt = 1; attempt <= classificationLimits.jevAttempts; attempt++) {
+          stage.signal.throwIfAborted();
+          try {
+            return await classificationDeadline(
+              stage,
+              classificationLimits.jevMs,
+              "Jev classification",
+              async (context) => parse(await ask(query, state, context, 0), "jev"),
+            );
+          } catch (error) {
+            stage.signal.throwIfAborted();
+            console.warn(
+              `Margot: classification attempt ${attempt} failed (${errorMessage(error)})`,
+            );
+            if (attempt < classificationLimits.jevAttempts) {
+              options.onJevRetry?.({
+                question: "classification",
+                attempt: attempt + 1,
+                reason: errorMessage(error),
+              });
+              await classificationPause(stage.signal);
+            }
+          }
+        }
+        stage.signal.throwIfAborted();
+        console.warn("Margot: Jev classification exhausted; using the fallback decider");
+        return classificationDeadline(
+          stage,
+          classificationLimits.fallbackMs,
+          "Fallback classification",
+          async (context) =>
+            parse(
+              await (options.fallback ?? decisionFallback)(
+                query,
+                state,
+                context,
+                options.fallbackClaude,
+                "classification",
+              ),
+              "fallback",
+            ),
+        );
+      },
+    );
   const route: Services["route"] = async (facts, classification, questions, c) => {
     const documentation = classification === "documentation";
     const { documentation_substantive: substance, ...cardQuestions } = questions;

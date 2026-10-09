@@ -1,0 +1,42 @@
+{
+  "request": {
+    "input": {
+      "repository": "example/project",
+      "pr": 277,
+      "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "triage_check_id": 9007199254740991,
+      "workflow_ref": "v2026.10.08.1"
+    },
+    "digest": "9bb29a4ca9aa433d04daec41ba335e664e9fa7f1df1d15c3656ad22656283156"
+  },
+  "texts": [
+    {
+      "input": [
+        "Café ☕\n",
+        null,
+        "feature/é",
+        "main"
+      ],
+      "digest": "42e235a12314e3a589df128d237f49d564a383325b264be2180ec0175397b383"
+    },
+    {
+      "input": [
+        "Café ☕\n",
+        "",
+        "feature/é",
+        "main"
+      ],
+      "digest": "e53fa858842a0e6cfff72be2b7e7f5099d505531104d4cb1fbd348d43d2b968d"
+    },
+    {
+      "input": [
+        " Café ☕\n",
+        "body\r\nnext",
+        "feature/é",
+        "main"
+      ],
+      "digest": "4aa32973c5bf6d1bf9dd22c1ea4c770565d3146ca1490e5f0d7f61ffeb12d543"
+    }
+  ]
+}

@@ -200,45 +200,6 @@ function labelSentence(value: string): string {
   return cut ? `${cut}.` : "";
 }
 
-/**
- * The self-instrument check, in the previous reviewer's wording: held (neutral) with the
- * matched protected paths sorted, or clear (success) naming the class. A change that could
- * not be read completely is held, never cleared. The summary is capped at 900 characters.
- */
-export function selfInstrumentCheck(input: {
-  hold: boolean;
-  paths: string[];
-  classification: string;
-  unreadable?: string;
-}) {
-  const output =
-    input.hold || input.unreadable !== undefined
-      ? {
-          conclusion: "neutral" as const,
-          title: "self-instrument: held for the operator's approval",
-          summary: [
-            "This PR changes Margot's own config, the estate ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.",
-            ...(input.unreadable === undefined
-              ? []
-              : [`The change could not be read completely (${input.unreadable}), so it is held.`]),
-            ...(input.paths.length
-              ? [
-                  `Matched:\n${[...input.paths]
-                    .sort()
-                    .map((path) => `- \`${path}\``)
-                    .join("\n")}`,
-                ]
-              : []),
-          ].join("\n\n"),
-        }
-      : {
-          conclusion: "success" as const,
-          title: "self-instrument: clear",
-          summary: `No functional change to a protected path (class: ${input.classification}).`,
-        };
-  return { ...output, summary: Array.from(output.summary).slice(0, 900).join("") };
-}
-
 /** The comment's risk label: the voice's, or the one code gives a verdict it reached alone. */
 export function riskLabel(review: ReviewCore): string {
   return normalized(review.voice ? (review.voice.risk ?? "") : codeVerdict(review).risk);
@@ -303,6 +264,7 @@ export function render(review: Review): string {
     `### ${outcomeIcons[decision.outcome]} ${decision.outcome}`,
     `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}**${risk ? ` — ${risk}` : ""}`,
     `> ${firstSentences(rationale, 2)}`,
+    `Classification: ${review.classification} (source: ${review.provenance.classification})`,
     ...(fallbackNotice(review.decision.holdReasons)
       ? [`> ⚠️ _${fallbackNotice(review.decision.holdReasons)}, so nothing was auto-merged._`]
       : []),
@@ -362,6 +324,7 @@ export function checkText(review: Review): string {
     `decision_source: ${review.provenance.decision_source ?? "jev"}`,
     `verdict_source: ${verdictSource}`,
     `class: ${review.classification}`,
+    `classification_source: ${review.provenance.classification}`,
     `summoned: ${summoned.join(", ") || "none"}`,
     `convergence: ${JSON.stringify(review.convergence)}`,
     `can auto-merge: ${review.decision.mergeEligible ? "True" : "False"}`,

@@ -5,6 +5,7 @@ import { Octokit } from "octokit";
 import { claudeAdapter } from "../../src/adapters/claude.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { execute } from "../../src/adapters/process.js";
+import { checkExternalId } from "../../src/check-identity.js";
 import { cliServices } from "../../src/cli-services.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
 import type { Card } from "../../src/types.js";
@@ -79,6 +80,27 @@ export function github(
     } else if (url.pathname.endsWith("/check-runs")) {
       const runs = overrides.checkRuns ?? [];
       data = { total_count: runs.length, check_runs: runs };
+    } else if (/\/check-runs\/\d+$/.test(url.pathname)) {
+      data = {
+        id: request.triageCheckId,
+        name: "review / triage",
+        app: { id: 4862659, slug: "triage-app" },
+        status: "completed",
+        conclusion: "success",
+        head_sha: request.head,
+        external_id: checkExternalId(request),
+        output: {
+          text: JSON.stringify({
+            version: 1,
+            repository: request.repository,
+            pr: request.pr,
+            base_sha: request.base,
+            head_sha: request.head,
+            classification: "mechanical",
+            decision_source: "jev",
+          }),
+        },
+      };
     } else if (url.pathname.endsWith("/reviews")) {
       if (overrides.historyFailure) throw new Error("History unavailable");
       data = overrides.ledger
@@ -111,7 +133,11 @@ export function github(
     throttle: { enabled: false },
   });
   return {
-    adapter: githubAdapter(client, { shadowBeforeHead: overrides.shadowBeforeHead ?? false }),
+    adapter: githubAdapter(client, {
+      shadowBeforeHead: overrides.shadowBeforeHead ?? false,
+      triageAppId: 4862659,
+      triageCheckName: "review / triage",
+    }),
     calls,
   };
 }

@@ -94,11 +94,14 @@ export type BindRequestInput = {
   repository: string;
   pr: number;
   expectedHead: string;
+  expectedBase?: string;
   phase: "triage" | "review";
+  triageCheckId?: number;
   authority: boolean;
   margotRoot: string;
   config: unknown;
   requiredChecks: string[];
+  requiredCheckReporters?: Record<string, number>;
   protectedPaths: string[];
   allowedSkippedChecks: string[];
   runUrl?: string;
@@ -208,6 +211,8 @@ function prepareRequest(
 
 function bindPrepared(input: BindRequestInput, prepared: ReturnType<typeof prepareRequest>) {
   const { pull, repository } = prepared;
+  if (input.expectedBase !== undefined && shaSchema.parse(input.expectedBase) !== pull.base.sha)
+    throw new Error("PR base differs from dispatched revision");
   const suppliedConfig = liveConfigSchema.parse(input.config);
   const config = structuredClone(suppliedConfig);
   if (input.authority) {
@@ -216,6 +221,8 @@ function bindPrepared(input: BindRequestInput, prepared: ReturnType<typeof prepa
     config.publisher.runUrl = input.runUrl;
   }
   config.review.requiredChecks = input.requiredChecks;
+  if (input.requiredCheckReporters)
+    config.review.requiredCheckReporters = input.requiredCheckReporters;
   config.review.protectedPaths = input.protectedPaths;
   config.review.allowedSkippedChecks = input.allowedSkippedChecks;
   config.review.publication = input.authority ? "github" : "none";
@@ -261,6 +268,8 @@ function bindPrepared(input: BindRequestInput, prepared: ReturnType<typeof prepa
     base: pull.base.sha,
     head: pull.head.sha,
     phase: input.phase,
+    ...(config.handoff ? { workflowRef: config.handoff.ref } : {}),
+    ...(input.triageCheckId === undefined ? {} : { triageCheckId: input.triageCheckId }),
   });
   return { request, config: boundConfig };
 }

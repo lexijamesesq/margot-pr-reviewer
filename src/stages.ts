@@ -31,3 +31,12 @@ export type CardStage = `card:${string}`;
 
 /** The stage of one council card's review. */
 export const cardStage = (card: string): CardStage => `card:${card}`;
+
+/** Initial classification budgets; routing and risk retain their existing limits. */
+export const classificationLimits = {
+  jevAttempts: 2,
+  retryDelayMs: 1_000,
+  jevMs: 15_000,
+  fallbackMs: 90_000,
+  stageMs: 130_000,
+} as const;

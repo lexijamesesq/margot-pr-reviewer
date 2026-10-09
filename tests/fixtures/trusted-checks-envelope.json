@@ -1,0 +1,169 @@
+{
+  "request": {
+    "repository": "example/project",
+    "pr": 7,
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "phase": "review",
+    "triageCheckId": 101,
+    "workflowRef": "v0.10.0"
+  },
+  "config": {
+    "review": {
+      "protectedPaths": [
+        "YOUR_AUTHORITY_PATH/**"
+      ],
+      "trustedCheckActors": [
+        "margot"
+      ],
+      "trustedTriageActors": [
+        "margot"
+      ],
+      "requiredChecks": [
+        "ci / checks",
+        "trusted-scan / trusted-scan"
+      ],
+      "allowedSkippedChecks": [],
+      "cardBundle": {
+        "commit": "0000000000000000000000000000000000000000"
+      },
+      "classificationThreshold": 0.6,
+      "routeThreshold": 0.35,
+      "riskTailThreshold": 0.3,
+      "confidenceThreshold": 0.3,
+      "noCouncilConfidenceFloor": 0.3,
+      "timeoutMs": 900000,
+      "publication": "record",
+      "mergeActor": "YOUR_MERGE_ACTOR",
+      "calibration": false,
+      "trustedLedgerActors": [
+        "YOUR_REVIEW_APP[bot]"
+      ],
+      "requiredCheckReporters": {
+        "ci / checks": 4862659,
+        "trusted-scan / trusted-scan": 4862659
+      }
+    },
+    "github": {
+      "gh": "YOUR_GH_EXECUTABLE",
+      "freshShadow": false,
+      "shadowBeforeHead": false
+    },
+    "publisher": {
+      "checks": {
+        "triage": "review / triage",
+        "review": "review / margot",
+          "code": "ci / checks",
+        "text": "trusted-scan / trusted-scan"
+      },
+      "actor": "margot[bot]",
+      "appId": 4862659,
+      "runUrl": "https://github.com/example/project/actions/runs/1/attempts/1"
+    },
+    "jev": {
+      "model": "YOUR_JEV_VERSION",
+      "url": "https://api.typesafe.ai/v1/systemone"
+    },
+    "claude": {
+      "executable": "${MARGOT_ROOT}/node_modules/.bin/claude",
+      "ticketing": {
+        "server": "YOUR_TICKETING_MCP_SERVER_NAME",
+        "command": "mcp-linear",
+        "args": [
+          "YOUR_SERVER_ARGUMENT"
+        ],
+        "env": [
+          "YOUR_TICKETING_CREDENTIAL_ENV_VAR"
+        ],
+        "tools": [
+          "mcp__YOUR_TICKETING_MCP_SERVER_NAME__YOUR_READ_TOOL"
+        ]
+      },
+      "version": "0.0.0",
+      "pluginDirectory": "${MARGOT_ROOT}/publish-skills",
+      "reviewerModel": "YOUR_REVIEWER_MODEL",
+      "container": {
+        "docker": "docker",
+        "image": "YOUR_REGISTRY/margot-runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "work": "${MARGOT_ROOT}/work"
+      },
+      "references": {
+        "YOUR_REFERENCE_NAME": {
+          "repository": "YOUR_ORG/YOUR_REFERENCE_REPOSITORY",
+          "head": "0000000000000000000000000000000000000000"
+        }
+      }
+    },
+    "handoff": {
+      "repository": "example/margot",
+      "workflow": "review.yml",
+      "ref": "v0.10.0"
+    }
+  },
+  "pull": {
+    "state": "open",
+    "draft": false,
+    "title": "Title",
+    "body": "Body",
+    "head": {
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "ref": "branch",
+      "repo": {
+        "full_name": "example/project"
+      }
+    },
+    "base": {
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ref": "main"
+    }
+  },
+  "checks": [
+    {
+      "id": 201,
+      "name": "ci / checks",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "external_id": "margot:v1:[\"example/project\",7,\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]",
+      "details_url": "https://github.com/example/project/actions/runs/1/attempts/1",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 4862659,
+        "slug": "margot"
+      },
+      "output": {
+        "text": "<!-- margot-check:v1 eyJ2ZXJzaW9uIjoxLCJraW5kIjoiY29kZSIsInJlcG9zaXRvcnkiOiJleGFtcGxlL3Byb2plY3QiLCJwciI6NywiYmFzZV9zaGEiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiaGVhZF9zaGEiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwidHJpYWdlX2NoZWNrX2lkIjoxMDEsIndvcmtmbG93X3JlZiI6InYwLjEwLjAiLCJyZXF1ZXN0X2lkIjoiOTRiZDI2ZmRhZDFhMmViMmY0ZjEyMjY4MzY4MzJiYTEwOTFiYzg3MGNhMTZhZDAzMzQ1NmVjMTY1NmY0ODdjOCIsInBoYXNlIjoiY29tcGxldGUiLCJvd25lcl9ydW5fdXJsIjoiaHR0cHM6Ly9naXRodWIuY29tL2V4YW1wbGUvcHJvamVjdC9hY3Rpb25zL3J1bnMvMS9hdHRlbXB0cy8xIiwiaGFuZG9mZiI6ImFjY2VwdGVkIn0= -->"
+      }
+    },
+    {
+      "id": 202,
+      "name": "trusted-scan / trusted-scan",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "external_id": "margot:v1:[\"example/project\",7,\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]",
+      "details_url": "https://github.com/example/project/actions/runs/1/attempts/1",
+      "status": "completed",
+      "conclusion": "success",
+      "app": {
+        "id": 4862659,
+        "slug": "margot"
+      },
+      "output": {
+        "text": "<!-- margot-check:v1 eyJ2ZXJzaW9uIjoxLCJraW5kIjoidGV4dCIsInJlcG9zaXRvcnkiOiJleGFtcGxlL3Byb2plY3QiLCJwciI6NywiYmFzZV9zaGEiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiaGVhZF9zaGEiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwidHJpYWdlX2NoZWNrX2lkIjoxMDEsIndvcmtmbG93X3JlZiI6InYwLjEwLjAiLCJyZXF1ZXN0X2lkIjoiOTRiZDI2ZmRhZDFhMmViMmY0ZjEyMjY4MzY4MzJiYTEwOTFiYzg3MGNhMTZhZDAzMzQ1NmVjMTY1NmY0ODdjOCIsInBoYXNlIjoiY29tcGxldGUiLCJvd25lcl9ydW5fdXJsIjoiaHR0cHM6Ly9naXRodWIuY29tL2V4YW1wbGUvcHJvamVjdC9hY3Rpb25zL3J1bnMvMS9hdHRlbXB0cy8xIiwiaGFuZG9mZiI6ImFjY2VwdGVkIiwidGV4dF9kaWdlc3QiOiIzMDM1MWU1NGY3ZDZmN2Y4OGNmOTAyZDUzOTE1NzgxY2Y2Mjg4NmYwMDQ5YThmNWE3ZWE0YTU3YzMzNzU0ZDJlIn0= -->"
+      }
+    }
+  ],
+  "triage": {
+    "id": 101,
+    "name": "review / triage",
+    "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "external_id": "margot:v1:[\"example/project\",7,\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]",
+    "status": "completed",
+    "conclusion": "success",
+    "app": {
+      "id": 4862659,
+      "slug": "margot"
+    },
+    "output": {
+      "text": "{\"version\":1,\"repository\":\"example/project\",\"pr\":7,\"base_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"head_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"classification\":\"mechanical\",\"decision_source\":\"jev\"}"
+    }
+  }
+}

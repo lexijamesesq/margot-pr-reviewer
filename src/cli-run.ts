@@ -17,8 +17,8 @@ Options:
   --help, -h     Print this help and exit.
   --version, -v  Print the package version and exit.
 
-Environment: JEV_KEY (required); GH_TOKEN, MARGOT_WRITE_TOKEN, MARGOT_OWNED_TIER,
-MARGOT_CLASSIFICATION and MARGOT_TRIAGE are optional. See the README.
+Environment: JEV_KEY (required); GH_TOKEN, MARGOT_WRITE_TOKEN and MARGOT_OWNED_TIER
+are optional. See the README.
 `;
 
 /** A failure whose message names the input at fault and is safe to print. */
@@ -123,13 +123,7 @@ export async function runCli(
       throw new InputError(usage);
     const request = parseInput(
       requestSchema,
-      {
-        ...((await readJson(requestFile, "request")) as object),
-        ...(environment.MARGOT_CLASSIFICATION !== undefined
-          ? { classification: environment.MARGOT_CLASSIFICATION }
-          : {}),
-        ...(environment.MARGOT_TRIAGE !== undefined ? { triage: environment.MARGOT_TRIAGE } : {}),
-      },
+      await readJson(requestFile, "request"),
       "request",
       requestFile,
     );

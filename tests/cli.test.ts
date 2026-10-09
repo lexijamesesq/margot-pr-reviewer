@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readRecording } from "./helpers/recordings.js";
 
 // The real services unless a test asks for a scripted run that reports two responses.
-const scripted = vi.hoisted(() => ({ on: false }));
+const scripted = vi.hoisted(() => ({ on: false, request: undefined as unknown }));
 vi.mock("../src/cli-services.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/cli-services.js")>();
   return {
@@ -16,7 +16,8 @@ vi.mock("../src/cli-services.js", async (importOriginal) => {
       const onJevRetry = args[3];
       return {
         actions: [],
-        run: async () => {
+        run: async (request: unknown) => {
+          scripted.request = request;
           onJevRetry?.({
             question: "risk",
             attempt: 2,
@@ -202,6 +203,25 @@ it("writes diagnostics.json beside the output after a successful review", async 
         adherence: { status: "unchecked" },
       },
     });
+  } finally {
+    scripted.on = false;
+  }
+});
+
+it("does not accept retired classification environment overrides", async () => {
+  scripted.on = true;
+  try {
+    const result = await invoke({
+      environment: {
+        JEV_KEY: "test-only",
+        MARGOT_CLASSIFICATION: "functional",
+        MARGOT_TRIAGE: "functional",
+      },
+    });
+    expect(result.code).toBe(0);
+    expect(scripted.request).toEqual(recording.request);
+    expect(scripted.request).not.toHaveProperty("classification");
+    expect(scripted.request).not.toHaveProperty("triage");
   } finally {
     scripted.on = false;
   }

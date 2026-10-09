@@ -6,7 +6,7 @@
     "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "0000000000000000000000000000000000000006",
     "phase": "review",
-    "classification": "mechanical"
+    "triageCheckId": 101
   },
   "config": {
     "protectedPaths": [],
@@ -32,7 +32,12 @@
     "calibration": false,
     "trustedLedgerActors": [
       "reviewer[bot]"
-    ]
+    ],
+    "trustedTriageAppId": 4862659,
+    "trustedTriageCheckName": "review / triage",
+    "requiredCheckReporters": {
+      "ci": 42
+    }
   },
   "facts": {
     "repository": "example/project",
@@ -58,7 +63,8 @@
         "name": "ci",
         "actor": "checks-app",
         "head": "0000000000000000000000000000000000000006",
-        "conclusion": "success"
+        "conclusion": "success",
+        "appId": 42
       }
     ],
     "history": {
@@ -79,7 +85,17 @@
       "actor": "triage-app",
       "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "head": "0000000000000000000000000000000000000006",
-      "classification": "functional"
+      "classification": "functional",
+      "checkId": 101,
+      "repository": "example/project",
+      "pr": 6,
+      "decisionSource": "jev",
+      "appId": 4862659,
+      "version": 1,
+      "name": "review / triage",
+      "status": "completed",
+      "conclusion": "success",
+      "externalId": "margot:v1:[\"example/project\",6,\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"0000000000000000000000000000000000000006\"]"
     },
     "autoMergeArmed": true,
     "ownedPathTier": "none"

@@ -164,8 +164,8 @@ A review run takes two JSON files: a request and a configuration.
   merges it once approved; unset, the hold says only "approve it to merge it".
 
 GitHub mode: with `margot-instance bind-request --authority true` the review publishes
-its comment and check runs to the pull request. That needs the `publisher` block (the three check
-names, the review app's actor and id, and the run URL); `bind-request` fails without it.
+its comment and check runs to the pull request. That needs the `publisher` block (`triage` and `review` check names, plus `code` and `text` when `handoff` is configured,
+the review app's actor and id, and the run URL); `bind-request` fails without it.
 Without `--authority true` the review runs in shadow mode and publishes nothing.
 
 `claude.executable`, `claude.pluginDirectory` and `claude.container.work` may use
@@ -187,8 +187,9 @@ server (`mcp-linear`); `bind-request` refuses a placeholder or a path under the 
 | `GH_TOKEN` | GitHub token that reaches the target repository (the workflow's own `github.token` does not, when it runs in a review repository). Read access for `margot-review` and `bind-request`. For `close-stranded-check` it is the review App's `checks: write` token. |
 | `MARGOT_WRITE_TOKEN` | The review App's installation token, minted for the target repository with checks, contents and pull-request write access, so publication is made as the App. Required for GitHub publication. |
 | `MARGOT_OWNED_TIER` | How strongly the changed files are owned under your code-ownership rules, as your dispatcher computes it: `required_owned` (files whose owners must approve), `owned`, or `none`. It raises Jev's scrutiny. Missing or invalid holds the review: a dispatcher that does not compute tiers passes `none`, since `unknown`, the samples' default, holds every review. |
-| `MARGOT_CLASSIFICATION` | The request's dispatched classification (`functional`, `documentation`, or `mechanical`). It can only make the review stricter than the verified triage's class. |
-| `MARGOT_TRIAGE` | Used only when no classification is set: `mechanical` leaves the verified triage's class in place, and any other non-empty value makes the review functional. |
+| `MARGOT_RUN_TOKEN` | Native workflow token for current run/attempt evidence. |
+| `MARGOT_ACTIONS_TOKEN` | Private instance Actions and tag evidence; the hosted producer reuses its scoped dispatch token. |
+| `MARGOT_DISPATCH_TOKEN` | Producer-only private instance dispatch permission; never forwarded to the review model. |
 | names listed in `claude.ticketing.env` | Forwarded only to the ticketing MCP server. |
 
 ## Running `margot-review`
@@ -196,6 +197,28 @@ server (`mcp-linear`); `bind-request` refuses a placeholder or a path under the 
 ```sh
 margot-review REQUEST.json CONFIG.json OUTPUT.json
 ```
+
+A live triage run returns `kind: "classified"` and `triage_check_id` only after
+confirming its App-owned version-1 check through GitHub. Pass that ID to
+`margot-instance bind-request --triage-check-id ID` for review; the bound request
+carries `triageCheckId`. Review independently fetches that exact check and validates
+its reporter, successful completion, repository, PR, base and head, plus the trusted
+actor. Missing or mismatched evidence fails without another classification. Raw
+`classification`/`triage` request fields and their former environment overrides are
+removed; deploy this interface with the matching instance release.
+
+The authenticated classifier selects the mechanical, documentation or functional
+lane using the same thresholds whether Jev or its configured fallback answers. A
+fallback classification adds no merge hold; existing routing and risk fallback
+holds still apply. Diff size does not override that lane, and the retired
+`mechanicalDiffLineCap` setting is rejected.
+
+Both the comment and check text identify the classification source. The existing
+`decision_source` field describes routing/risk decision provenance;
+`classification_source` separately names the initial classifier. The retired
+`self-instrument` command and `publisher.checks.authority` field are also rejected.
+Protected-path approval holds remain part of the review decision; no separate
+self-instrument status is posted.
 
 It writes the result to `OUTPUT.json`, and `diagnostics.json` beside it: each card's
 raw block, duration, turns and models, the voice's raw prose, and each re-ask of a
@@ -225,12 +248,12 @@ failed stage and diagnostic to stderr, and 0 otherwise, including for held resul
 `samples/github-hosted.sample.yml` is the same workflow for a team that has only
 GitHub-hosted runners: it keeps the deployment and configuration in GitHub
 variables, installs the pinned Claude CLI, fetches the card bundle at its pinned
-commit, and adds a `triage` job ahead of `review`. Choose it when you have no
+commit. Classification belongs to the trusted target producer. Choose it when you have no
 runner of your own to hold trusted files.
 
 Neither workflow triggers on its own. A separate workflow in each reviewed
 repository, on `pull_request`, dispatches it with the pull request's repository,
-number and head sha; each sample's header shows the `gh workflow run` call.
+number, base/head SHAs, triage check ID, configured immutable instance tag and canonical request ID through `trusted-checks`. The receiver recomputes that identity before opening a waiting check. A completed authenticated publication is a no-op; active work is reclaimed by a replacement invocation.
 
 ## Instance commands
 
@@ -272,11 +295,40 @@ to `GITHUB_OUTPUT` when that variable is set.
 ```sh
 margot-instance bind-request \
   --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
+  --base "$BASE_SHA" --triage-check-id "$TRIAGE_CHECK_ID" \
   --phase review --authority false --margot-root "$MARGOT_ROOT" \
-  --config /trusted/config.json --required-checks '["ci / checks"]' \
+  --config /trusted/config.json --required-checks '["ci / checks","trusted-scan / trusted-scan"]' \
+  --required-check-reporters '{"ci / checks":123456,"trusted-scan / trusted-scan":123456}' \
   --protected-paths '[".github/**"]' --allowed-skipped-checks '[]' \
   --run-url "$RUN_URL"
 ```
+
+### Trusted checks and review admission
+
+`evaluate-checks --input-file INPUT.json --output-file OUTPUT.json` evaluates the raw
+`request`, trusted `config`, live `pull`, `checks` and exact `triage` API response.
+It returns `green`, `pending` and `failing`; the existing host waiter owns polling.
+Each required context has a numeric `review.requiredCheckReporters` entry, filtered
+before recency. Code and current-text checks require successful authenticated v1
+metadata; their skipped conclusions cannot authorize review.
+
+`trusted-checks` runs `begin`, `code-passed`, `finish` and failure cleanup against a
+bound request/config and disposable `--context-file`. The code producer completes
+history/classification before `code-passed` refreshes `text_file` for the trusted
+scanner. `finish --text-outcome success|failure|cancelled` rechecks that exact text,
+records code plus handoff disposition together, and attempts dispatch at most once.
+A metadata invocation only scans current text and reuses code evidence; its reread
+window is 30 seconds. Failed or uncertain handoff leaves text non-green until
+actual native evidence permits reuse or recovery.
+
+`review-admission --request-file REQUEST.json --config CONFIG.json --request-id ID
+--output-file OUTPUT.json` returns `admitted` with the owned check ID, or `completed`
+with authenticated native review/check IDs. Run it before waiting-check mutation or
+floor work. `margot-review` independently repeats admission before model calls and
+returns `kind: "already_published"` for completed work. A native review whose check
+receipt was lost is recovered through its bot identity, head and full request marker.
+All run ownership URLs include `/attempts/ATTEMPT`; `handoff.ref` is the configured
+immutable tag, never a caller-selected branch.
 
 ### `close-stranded-check`
 
@@ -290,30 +342,11 @@ Exits 0 after closing or finding nothing to close, and 2 on a GitHub read or wri
 ```sh
 margot-instance close-stranded-check \
   --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
-  --app-id "$MARGOT_APP_ID" --check-name "review / margot" \
-  --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" \
+  --app-id "$MARGOT_APP_ID" --review-actor "$MARGOT_REVIEW_ACTOR" --check-name "review / margot" \
+  --base "$BASE_SHA" --triage-check-id "$TRIAGE_CHECK_ID" --workflow-ref "$WORKFLOW_REF" \
+  --own-runs "$RUNS_URL_PREFIX" --own-run-id "$RUN_ID" --own-run-url "$RUN_URL" \
   --route-result "$ROUTE_RESULT" --review-result "$REVIEW_RESULT" \
   --published "$PUBLISHED" --stop-reason "$STOP_REASON" --live-sha "$LIVE_SHA"
-```
-
-### `self-instrument`
-
-Posts the self-instrument check for a pull request's live head, before the floor, as
-the previous reviewer's preflight did. A functional change to a protected path, or a
-rename or move of one in any class, is held (`neutral`, "held for the operator's
-approval", listing the matched paths); anything else is `success` ("clear", naming the
-class). The class is the verified triage's for the head (the triage check
-`--triage-check-name`, default `review / triage`, posted by `--app-id` and trusted
-through `--trusted-triage-actors`), or functional without one. `--check-name` defaults
-to `review / self-instrument`. It reads with `GH_TOKEN` and posts with
-`MARGOT_WRITE_TOKEN`, and refuses a head that is no longer the PR's. Publication posts
-the same check again.
-
-```sh
-margot-instance self-instrument \
-  --repository YOUR_ORG/YOUR_REPOSITORY --pr 1 --head "$HEAD_SHA" \
-  --protected-paths '["YOUR_AUTHORITY_PATH/**"]' --app-id "$MARGOT_APP_ID" \
-  --trusted-triage-actors '["triage-app"]'
 ```
 
 ## What Margot posts
@@ -346,7 +379,7 @@ could not be completed at all and is always held.
 
 The package's main entry exports:
 
-- `review(request, config, services)` — runs a review and returns a `ReviewResult` (`classified`, `reviewed`, `held` or `error`).
+- `review(request, config, services)` — runs a review and returns a `ReviewResult` (`classified`, `reviewed`, `held`, `already_published` or `error`).
 - `recordedServices(recording)` — builds `Services` from a JSON recording such as those under `recordings/`, for offline review.
 - `liveServices(config, credentials, onResponse?)` and `liveConfigSchema` — the live implementation `margot-review` runs on.
 

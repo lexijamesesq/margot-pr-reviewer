@@ -98,20 +98,19 @@ it("replays a saved verdict that carried no risk line, as it was posted", async 
     calls: ["facts", "head"],
   });
 });
-it("replays the saved result under the current request when dispatch fields differ", async () => {
+it("rejects retired dispatch overrides before replaying a saved result", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");
   const f = factsSchema.parse(r.facts);
   f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
   r.facts = f;
-  r.request = { ...(r.request as object), triage: "mechanical", classification: "" };
-  const s = recordedServices(r);
-  const retry = await review(r.request, r.config, s);
-  expect({
-    calls: s.calls.map((c) => c.name),
-    replayed: retry.kind === "reviewed" && retry.request,
-  }).toEqual({ calls: ["facts", "head"], replayed: r.request });
+  r.request = { ...(r.request as object), classification: "mechanical" };
+  const services = recordedServices(r);
+  const retry = await review(r.request, r.config, services);
+  expect(retry).toMatchObject({ kind: "error", stage: "input" });
+  expect(services.calls).toEqual([]);
 });
+
 type Scripted = Awaited<ReturnType<typeof margot>>["r"] & {
   route: { source: string };
   voice: { outcome: string };
@@ -244,7 +243,7 @@ it("runs the council again when Margot's review configuration changed", async ()
   f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
   r.facts = f;
   const config = configSchema.parse(r.config);
-  r.config = { ...config, mechanicalDiffLineCap: config.mechanicalDiffLineCap + 1 };
+  r.config = { ...config, routeThreshold: config.routeThreshold + 0.01 };
   const s = recordedServices(r);
   expect(await review(r.request, r.config, s)).toMatchObject({ kind: "reviewed" });
   expect(s.calls.map((c) => c.name)).toContain("route");
