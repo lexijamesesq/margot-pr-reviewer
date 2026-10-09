@@ -1,6 +1,7 @@
 import { type Recording, recordedServices } from "../../src/adapters/recorded.js";
+import { checkExternalId } from "../../src/check-identity.js";
 import { review } from "../../src/review.js";
-import { cardNames, dimensions } from "../../src/schemas.js";
+import { cardNames, dimensions, requestSchema } from "../../src/schemas.js";
 import type { ReviewResult } from "../../src/types.js";
 import { readRecording } from "./recordings.js";
 
@@ -107,7 +108,7 @@ export const withFiles =
 export const withChecks =
   (...checks: Obj[]): Change =>
   (draft) => {
-    draft.facts.checks = checks;
+    draft.facts.checks = checks.map((check) => ({ appId: 42, ...check }));
   };
 /** Edits the first recorded check run. */
 export const withCheck =
@@ -118,6 +119,7 @@ export const withCheck =
 export const checkRun = (conclusion: string, id: number, startedAt: string): Obj => ({
   name: "ci",
   actor: "checks-app",
+  appId: 42,
   head: currentHead,
   conclusion,
   startedAt,
@@ -128,6 +130,16 @@ export const withTriage =
   (draft) => {
     draft.facts.triage = {
       actor: "triage-app",
+      version: 1,
+      name: "review / triage",
+      status: "completed",
+      conclusion: "success",
+      externalId: checkExternalId(requestSchema.parse(draft.request)),
+      checkId: 101,
+      appId: 4862659,
+      repository: draft.request.repository,
+      pr: draft.request.pr,
+      decisionSource: "jev",
       base: "a".repeat(40),
       head: currentHead,
       classification: "mechanical",
@@ -137,7 +149,7 @@ export const withTriage =
 
 // --- Changes to what the services answered ---
 
-/** No verified triage for this head, so the review asks Jev to classify. */
+/** Missing authenticated triage must stop review without classifying. */
 export const withoutTriage = (): Change => withFacts({ triage: null });
 export const withClassification =
   (fields: Obj): Change =>

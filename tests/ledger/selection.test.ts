@@ -158,9 +158,12 @@ for (const [name, pageTwoFails] of [
     }) as typeof fetch;
     const client = new Octokit({ request: { fetch: transport } });
     const f = factsSchema.parse(
-      await githubAdapter(client).facts(requestSchema.parse(source.request), {
-        signal: AbortSignal.timeout(3000),
-      }),
+      await githubAdapter(client).facts(
+        { ...requestSchema.parse(source.request), phase: "triage" },
+        {
+          signal: AbortSignal.timeout(3000),
+        },
+      ),
     );
     if (pageTwoFails) {
       expect(f.history.complete).toBe(false);

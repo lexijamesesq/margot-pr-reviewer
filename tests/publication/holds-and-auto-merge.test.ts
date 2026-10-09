@@ -94,7 +94,7 @@ it("disarms auto-merge before holding the check, with no rating or native review
   expect(output.text).toContain("Review history unavailable");
   expect(output.text).not.toMatch(/outcome:|band:/u);
 });
-it("disarms auto-merge and retains the approval when the head moves afterward", async () => {
+it("does not disarm a newer head and retains the prior approval when the head moves afterward", async () => {
   const run = await runPublication("head-after-approval");
   expect({
     kind: run.result.kind,
@@ -107,8 +107,8 @@ it("disarms auto-merge and retains the approval when the head moves afterward", 
     kind: "error",
     approved: true,
     dismissed: false,
-    disarmed: true,
-    armed: false,
+    disarmed: false,
+    armed: true,
     approvalRemains: true,
   });
 });

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as githubModule from "../../src/adapters/github.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { liveServices } from "../../src/adapters/live.js";
+import { checkExternalId } from "../../src/check-identity.js";
 import { diffLineCount } from "../../src/diff.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
 import { context, github, request } from "../helpers/adapters.js";
@@ -209,7 +210,7 @@ describe("GitHub triage and diff size", () => {
   const seed = recording();
   const request = requestSchema.parse(seed.request);
   const context = () => ({ signal: AbortSignal.timeout(3000) });
-  it("uses only the newest triage check matching the configured App and check name", async () => {
+  it("GETs the exact dispatched triage ID and preserves fallback provenance", async () => {
     const files = Symbol("files"),
       checks = Symbol("checks"),
       reviews = Symbol("reviews");
@@ -223,18 +224,25 @@ describe("GitHub triage and diff size", () => {
       id,
       name,
       status: "completed",
+      conclusion: "success",
+      external_id: checkExternalId(request),
       head_sha: request.head,
       app: { id: app, slug: "triage-app" },
       started_at: `2026-10-02T00:00:0${id}Z`,
       output: {
         text: JSON.stringify({
+          version: 1,
+          repository: request.repository,
+          pr: request.pr,
+          base_sha: request.base,
           head_sha: request.head,
-          decision_source: "jev",
+          decision_source: "fallback",
           classification,
           ...extra,
         }),
       },
     });
+    let receiptOverride: (v: ReturnType<typeof check>) => unknown = (v) => v;
     const diff = "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n-old\n+new\n";
     const client = {
       rest: {
@@ -254,7 +262,19 @@ describe("GitHub triage and diff size", () => {
           listFiles: files,
           listReviews: reviews,
         },
-        checks: { listForRef: checks },
+        checks: {
+          listForRef: checks,
+          get: async ({ check_run_id }: { check_run_id: number }) => {
+            expect(check_run_id).toBe(request.triageCheckId);
+            return {
+              data: receiptOverride(
+                check(check_run_id, 321, "custom / triage", "documentation", {
+                  mechanical_probability: 0.4,
+                }),
+              ),
+            };
+          },
+        },
       },
       request: async () => ({ data: diff }),
       paginate: async (method: symbol) =>
@@ -274,7 +294,7 @@ describe("GitHub triage and diff size", () => {
       readFileSync(new URL("../../samples/config.sample.json", import.meta.url), "utf8"),
     );
     config.publisher = {
-      checks: { triage: "custom / triage", review: "custom / review", authority: "authority" },
+      checks: { triage: "custom / triage", review: "custom / review" },
       actor: "custom[bot]",
       appId: 321,
       runUrl: "https://example.invalid/run/1",
@@ -284,16 +304,70 @@ describe("GitHub triage and diff size", () => {
       const result = factsSchema.parse(
         await liveServices(config, { jevKey: "unused" }).services.facts(request, context()),
       );
-      const unconfigured = await githubAdapter(client).facts(request, context());
-      expect({ triage: result.triage, unconfigured: unconfigured.triage }).toMatchObject({
+      await expect(githubAdapter(client).facts(request, context())).rejects.toThrow(
+        "trusted publisher configuration",
+      );
+      expect({ triage: result.triage }).toMatchObject({
         triage: {
           actor: "triage-app",
           head: request.head,
           classification: "documentation",
           mechanicalProbability: 0.4,
+          decisionSource: "fallback",
         },
-        unconfigured: null,
       });
+      for (const patch of [
+        { id: 102 },
+        { name: "other" },
+        { app: { id: 15368, slug: "triage-app" } },
+        { status: "in_progress" },
+        { conclusion: "failure" },
+        { conclusion: "skipped" },
+        { head_sha: "f".repeat(40) },
+        { external_id: "foreign" },
+        { output: { text: "bad JSON" } },
+      ]) {
+        receiptOverride = (v) => ({ ...v, ...patch });
+        await expect(
+          githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
+            request,
+            context(),
+          ),
+        ).rejects.toThrow();
+      }
+      for (const patch of [
+        { version: 2 },
+        { pr: 999 },
+        { repository: "foreign/repo" },
+        { base_sha: "f".repeat(40) },
+        { head_sha: "f".repeat(40) },
+      ]) {
+        receiptOverride = (v) => ({
+          ...v,
+          output: { text: JSON.stringify({ ...JSON.parse(v.output.text), ...patch }) },
+        });
+        await expect(
+          githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
+            request,
+            context(),
+          ),
+        ).rejects.toThrow();
+      }
+      receiptOverride = () => {
+        throw new Error("missing check");
+      };
+      await expect(
+        githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
+          request,
+          context(),
+        ),
+      ).rejects.toThrow("missing check");
+      await expect(
+        githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
+          { ...request, triageCheckId: undefined },
+          context(),
+        ),
+      ).rejects.toThrow("check ID");
     } finally {
       clientSpy.mockRestore();
     }
@@ -313,7 +387,7 @@ it("refuses GitHub write authority for a shadow history selection", async () => 
   config.review.publication = "github";
   config.github.shadowBeforeHead = true;
   config.publisher = {
-    checks: { triage: "triage", review: "review", authority: "authority" },
+    checks: { triage: "triage", review: "review" },
     actor: "example[bot]",
     appId: 1,
     runUrl: "https://example.invalid/run/1",
@@ -329,6 +403,7 @@ it("keeps the conclusion GitHub recorded for every check run", async () => {
     head_sha: request.head,
     started_at: "2026-10-01T00:00:00Z",
     app: { id: 1, slug: "github-actions" },
+    output: { text: null },
   });
   const facts = await github({
     checkRuns: [

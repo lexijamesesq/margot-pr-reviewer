@@ -6,7 +6,7 @@
     "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "head": "0000000000000000000000000000000000000007",
     "phase": "review",
-    "classification": "mechanical"
+    "triageCheckId": 101
   },
   "config": {
     "protectedPaths": [],
@@ -29,7 +29,12 @@
     "noCouncilConfidenceFloor": 0.3,
     "timeoutMs": 1000,
     "publication": "record",
-    "calibration": false
+    "calibration": false,
+    "trustedTriageAppId": 4862659,
+    "trustedTriageCheckName": "review / triage",
+    "requiredCheckReporters": {
+      "ci": 42
+    }
   },
   "facts": {
     "repository": "example/project",
@@ -52,7 +57,8 @@
         "name": "ci",
         "actor": "checks-app",
         "head": "0000000000000000000000000000000000000007",
-        "conclusion": "success"
+        "conclusion": "success",
+        "appId": 42
       }
     ],
     "history": {
@@ -63,7 +69,17 @@
       "actor": "triage-app",
       "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "head": "0000000000000000000000000000000000000007",
-      "classification": "functional"
+      "classification": "functional",
+      "checkId": 101,
+      "repository": "example/project",
+      "pr": 7,
+      "decisionSource": "jev",
+      "appId": 4862659,
+      "version": 1,
+      "name": "review / triage",
+      "status": "completed",
+      "conclusion": "success",
+      "externalId": "margot:v1:[\"example/project\",7,\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"0000000000000000000000000000000000000007\"]"
     },
     "autoMergeArmed": true,
     "ownedPathTier": "none"

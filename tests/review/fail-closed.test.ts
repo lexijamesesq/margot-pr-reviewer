@@ -39,10 +39,10 @@ const rejections: Rejection[] = [
     stage: "facts",
   },
   {
-    when: "the classification came from the fallback",
+    when: "the classification has an unknown source",
     change: (draft) => {
       withRequest({ phase: "triage" })(draft);
-      withClassification({ source: "fallback" })(draft);
+      withClassification({ source: "unknown" })(draft);
     },
     stage: "classification",
   },

@@ -49,15 +49,13 @@ describe("classification precedence", () => {
     }
   });
 
-  it("reviews as functional without asking when there is no verified triage", async () => {
-    const { result, calls } = await reviewed(
+  it("rejects missing triage without asking another classifier", async () => {
+    const { result, calls } = await reviewRecording(
       recorded("mechanical-bump", withoutTriage(), withClassification(classifiedAs(0, 0, 1))),
     );
     expect(calls).not.toContain("classification");
-    expect(result).toMatchObject({
-      classification: "functional",
-      provenance: { classification: "triage_unavailable" },
-    });
+    expect(calls).not.toContain("route");
+    expect(result).toMatchObject({ kind: "error", stage: "triage" });
   });
 });
 
@@ -89,15 +87,30 @@ describe("the triage phase's class", () => {
     });
   });
 
+  it.each(["documentation", "mechanical"])(
+    "uses fallback probabilities for the %s lane",
+    async (lane) => {
+      expect(
+        await triaged(
+          withClassification({
+            source: "fallback",
+            functional: 0,
+            documentation: 0,
+            mechanical: 0,
+            [lane]: 0.9,
+          }),
+        ),
+      ).toMatchObject({ kind: "classified", classification: lane, decision_source: "fallback" });
+    },
+  );
+
   it("names Jev as the triage's source only when Jev classified the head", async () => {
     expect(
-      await triaged(
-        withClassification({ source: "jev_unreachable", functional: 1, documentation: 0 }),
-      ),
+      await triaged(withClassification({ source: "fallback", functional: 1, documentation: 0 })),
     ).toMatchObject({
       kind: "classified",
       classification: "functional",
-      decision_source: "jev_unreachable",
+      decision_source: "fallback",
     });
   });
 });
@@ -122,15 +135,12 @@ describe("trusted triage", () => {
     });
   });
 
-  it("keeps the dispatcher's stricter class over a verified mechanical triage", async () => {
-    const { result, calls } = await reviewed(
-      recorded("council-clear", withTriage({}), withRequest({ classification: "functional" })),
+  it.each(["classification", "triage"])("rejects raw %s overrides", async (field) => {
+    const { result, calls } = await reviewRecording(
+      recorded("council-clear", withRequest({ [field]: "mechanical" })),
     );
-    expect(calls).not.toContain("classification");
-    expect(result).toMatchObject({
-      classification: "functional",
-      provenance: { classification: "dispatch" },
-    });
+    expect(result).toMatchObject({ kind: "error", stage: "input" });
+    expect(calls).toEqual([]);
   });
 
   it("keeps a verified triage's class when no class is dispatched", async () => {
@@ -148,46 +158,76 @@ describe("trusted triage", () => {
     }
   });
 
-  it("reviews as functional without asking when the triage actor is untrusted", async () => {
-    const { result, calls } = await reviewed(
-      recorded(
-        "council-clear",
-        withTriage({ actor: "forger" }),
-        withClassification(classifiedAs(0, 0, 1)),
-      ),
-    );
+  it.each([
+    { actor: "forger" },
+    { appId: 15368 },
+    { checkId: 102 },
+    { repository: "other/repo" },
+    { pr: 999 },
+    { head: "b".repeat(40) },
+    { base: "b".repeat(40) },
+  ])("rejects mismatched normalized triage %j without model calls", async (fields) => {
+    const { result, calls } = await reviewRecording(recorded("council-clear", withTriage(fields)));
+    expect(result).toMatchObject({ kind: "error", stage: "triage" });
     expect(calls).not.toContain("classification");
-    expect(result.classification).toBe("functional");
+    expect(calls).not.toContain("route");
+  });
+  it.each([
+    { name: "other" },
+    { externalId: "foreign" },
+    { status: "in_progress" },
+    { conclusion: "failure" },
+    { conclusion: "skipped" },
+    { version: 2 },
+  ])("rejects malformed recorded check receipt %j", async (fields) => {
+    const { result, calls } = await reviewRecording(recorded("council-clear", withTriage(fields)));
+    expect(result.kind).toBe("error");
+    expect(calls).not.toContain("classification");
+    expect(calls).not.toContain("route");
+  });
+  it("requires trusted numeric App configuration", async () => {
+    const { result, calls } = await reviewRecording(
+      recorded("council-clear", withConfig({ trustedTriageAppId: 15368 })),
+    );
+    expect(result).toMatchObject({ kind: "error", stage: "triage" });
+    expect(calls).not.toContain("route");
   });
 
-  it("reviews as functional without asking when the triage is for a different head", async () => {
-    const { result, calls } = await reviewed(
-      recorded(
-        "council-clear",
-        withTriage({ head: "b".repeat(40) }),
-        withClassification(classifiedAs(0, 0, 1)),
-      ),
-    );
-    expect(calls).not.toContain("classification");
-    expect(result.classification).toBe("functional");
-  });
-
-  it("binds a triage receipt to the head, not the base", async () => {
-    const { result, calls } = await reviewed(
-      recorded("council-clear", withTriage({ base: "b".repeat(40) })),
-    );
-    expect(calls).not.toContain("classification");
-    expect(result.classification).toBe("mechanical");
-  });
-
-  it("reviews an oversized diff as functional without asking, even with a verified triage", async () => {
+  it("preserves the classifier lane for an oversized diff", async () => {
     const { result, calls } = await reviewed(
       recorded("council-clear", withTriage({}), withConfig({ mechanicalDiffLineCap: 1 })),
     );
     expect(calls).not.toContain("classification");
     expect(result).toMatchObject({
-      classification: "functional",
-      provenance: { classification: "diff_too_large" },
+      classification: "mechanical",
+      provenance: { classification: "jev" },
+    });
+  });
+
+  it("does not add a merge hold for initial fallback classification", async () => {
+    const { result } = await reviewed(
+      recorded("council-clear", withTriage({ decisionSource: "fallback" })),
+    );
+    expect(result).toMatchObject({
+      classification: "mechanical",
+      decision: { mergeEligible: true },
+      provenance: { classification: "fallback", decision_source: "jev" },
+    });
+  });
+
+  it("classifies oversized triage input instead of overriding it", async () => {
+    const { result, calls } = await reviewRecording(
+      recorded(
+        "mechanical-bump",
+        withRequest({ phase: "triage" }),
+        withConfig({ mechanicalDiffLineCap: 1 }),
+      ),
+    );
+    expect(calls).toContain("classification");
+    expect(result).toMatchObject({
+      kind: "classified",
+      classification: "mechanical",
+      decision_source: "jev",
     });
   });
 
@@ -281,27 +321,6 @@ describe("classification provenance and availability", () => {
       ),
     );
     expect(result).toMatchObject({ kind: "classified", mechanical_probability: 0.87 });
-  });
-
-  it("uses the requested functional classification", async () => {
-    const { result } = await reviewed(mechanical(withRequest({ classification: "functional" })));
-    expect(result).toMatchObject({
-      classification: "functional",
-      provenance: { classification: "dispatch" },
-    });
-  });
-
-  it("reviews as functional when trusted triage is unavailable", async () => {
-    const { result } = await reviewed(mechanical(withFacts({ triage: null })));
-    expect(result).toMatchObject({
-      classification: "functional",
-      provenance: { classification: "triage_unavailable" },
-    });
-  });
-
-  it("reviews as functional when the requested classification is invalid", async () => {
-    const { result } = await reviewed(mechanical(withRequest({ classification: "garbage" })));
-    expect(result.classification).toBe("functional");
   });
 
   it("reviews a documentation change on outage routing and keeps its decision source", async () => {

@@ -1,6 +1,7 @@
 import { Octokit } from "octokit";
 import { githubPublisher } from "../../src/adapters/publish.js";
 import { recordedServices } from "../../src/adapters/recorded.js";
+import { checkExternalId } from "../../src/check-identity.js";
 import { render } from "../../src/render.js";
 import { review } from "../../src/review.js";
 import { requestSchema } from "../../src/schemas.js";
@@ -9,7 +10,7 @@ import { readRecording } from "./recordings.js";
 
 // Shared fakes for the publication tests. `runPublication(mode)` runs the GitHub publisher against an
 // in-memory GitHub whose `mode` names the one thing that is different about this run:
-//   clear, hold, authority, authority-summary, calibration, triage, phase-titles, voice-error
+//   clear, hold, authority, calibration, triage, phase-titles, voice-error
 //     - the review the publisher is given (default `clear`: a clean approval);
 //   closed, fork, draft, base - the pull request is not reviewable;
 //   start-fail, review-fail, final-fail - the write named by the mode is rejected by GitHub;
@@ -23,7 +24,6 @@ export type PublicationMode =
   | "clear"
   | "hold"
   | "authority"
-  | "authority-summary"
   | "calibration"
   | "triage"
   | "phase-titles"
@@ -80,7 +80,6 @@ export const publisherOptions = {
   checks: {
     triage: "review / triage",
     review: "review / margot",
-    authority: "review / self-instrument",
   },
   actor: "reviewer[bot]",
   appId: 42,
@@ -104,6 +103,7 @@ export async function runPublication(
   if (mode === "retry")
     stored.set(89, {
       id: 89,
+      external_id: checkExternalId(mechanicalRequest),
       name: publisherOptions.checks.review,
       head_sha: mechanicalRequest.head,
       app: { id: publisherOptions.appId },
@@ -114,6 +114,7 @@ export async function runPublication(
   if (mode === "adopt")
     stored.set(88, {
       id: 88,
+      external_id: checkExternalId(mechanicalRequest),
       name: publisherOptions.checks.review,
       head_sha: mechanicalRequest.head,
       app: { id: publisherOptions.appId },
@@ -213,7 +214,7 @@ export async function runPublication(
           ...stored.get(id),
           ...body,
           id,
-          app: { id: defect("identity") ? 999 : publisherOptions.appId },
+          app: { id: defect("identity") ? 999 : publisherOptions.appId, slug: "triage-app" },
         };
         stored.set(id, data as Record<string, unknown>);
         if (
@@ -230,12 +231,6 @@ export async function runPublication(
           merged = true;
           armed = false;
         }
-        if (
-          mode === "head" &&
-          body.name === publisherOptions.checks.authority &&
-          body.conclusion === "success"
-        )
-          moved = true;
       }
     }
     const response = new Response(JSON.stringify(data), {
@@ -358,6 +353,7 @@ export async function runPublication(
         kind: "classified",
         request,
         classification: "documentation",
+        decision_source: "jev",
         mechanical_probability: 0.12,
       };
     if (mode === "phase-titles") {
@@ -373,10 +369,7 @@ export async function runPublication(
       value.decision.mergeEligible = false;
       value.decision.holdReasons = ["error"];
     }
-    if (
-      ["hold", "authority", "authority-summary", "calibration"].includes(mode) ||
-      mode === "disarm-fail"
-    ) {
+    if (["hold", "authority", "calibration"].includes(mode) || mode === "disarm-fail") {
       value.decision.mergeEligible = false;
       value.decision.holdReasons = holdReasons ?? [
         mode.startsWith("authority")
@@ -386,10 +379,9 @@ export async function runPublication(
             : "risk",
       ];
       value.decision.rating.band = "HIGH";
-      if (mode === "authority-summary")
-        value.decision.authorityPaths = ["config/review.json", ".github/workflows/review.yml"];
     }
     const report = render(value);
+    if (mode === "head") moved = true;
     const publication = await publisher.publish(
       { expectedHead: mechanicalRequest.head, review: value, report },
       { signal: AbortSignal.timeout(3000) },
@@ -411,8 +403,7 @@ export async function runPublication(
       v.name ===
       (mode === "triage" ? publisherOptions.checks.triage : publisherOptions.checks.review),
   );
-  const authority = [...stored.values()].find((v) => v.name === publisherOptions.checks.authority);
-  return { result, writes, reviews, dismissedIds, evaluated, armed, final, authority };
+  return { result, writes, reviews, dismissedIds, evaluated, armed, final };
 }
 export function tallyReview() {
   const value = structuredClone(mechanicalReview);

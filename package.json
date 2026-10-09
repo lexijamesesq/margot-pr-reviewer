@@ -1,6 +1,6 @@
 {
   "name": "margot-pr-reviewer",
-  "version": "0.9.4",
+  "version": "0.10.0",
   "description": "Margot, the PR reviewer: review, convergence and GitHub publication",
   "author": "lexijamesesq",
   "repository": {

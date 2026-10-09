@@ -343,6 +343,12 @@ export function nextLedger(
   counts.standing = [...entries.values()].filter((e) => e.status === "standing").length;
   if (counts.standing > 0 && core.decision.outcome === "APPROVED")
     throw new Error("Approval contradicts standing ledger");
+  // Transport identity remains on the live result; old ledger readers reject new request fields.
+  const {
+    triageCheckId: _triageCheckId,
+    workflowRef: _workflowRef,
+    ...receiptRequest
+  } = core.request;
   const ledger = ledgerSchema.parse({
     v: 2,
     head: core.request.head,
@@ -363,7 +369,7 @@ export function nextLedger(
     receipt: {
       configHash: configHash(config),
       evidenceHash: evidenceHash(facts),
-      review: core,
+      review: { ...core, request: receiptRequest },
       counts,
     },
   });

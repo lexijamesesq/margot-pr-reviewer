@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0
+
+- Classification uses bounded Jev retries and the configured fallback, records which provider decided, and fails explicitly when both providers fail.
+- Migrated review consumes an authenticated, revision-bound classification check instead of classifying again. Trusted code/text checks bind publication and review handoff to the current pull request, with recovery and duplicate-publication guards.
+- Remove the dedicated self-instrument command, status publication and authority check configuration. Independent protected-path approval holds and ordinary review publication remain.
+- This strict interface requires the matching migrated instance configuration and workflows. Existing legacy instances remain pinned to the immutable 0.9.4 package and their matching configuration.
+
 ## 0.9.4
 
 - When posting fails after the review returned (the review itself, a hold, or the check), the error check's summary carries that failure's reason, capped at 900 characters, as the previous reviewer's `error_check` did. It no longer shows the fixed "Publication or evaluation failed" text.

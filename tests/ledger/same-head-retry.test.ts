@@ -98,20 +98,19 @@ it("replays a saved verdict that carried no risk line, as it was posted", async 
     calls: ["facts", "head"],
   });
 });
-it("replays the saved result under the current request when dispatch fields differ", async () => {
+it("rejects retired dispatch overrides before replaying a saved result", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");
   const f = factsSchema.parse(r.facts);
   f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
   r.facts = f;
-  r.request = { ...(r.request as object), triage: "mechanical", classification: "" };
-  const s = recordedServices(r);
-  const retry = await review(r.request, r.config, s);
-  expect({
-    calls: s.calls.map((c) => c.name),
-    replayed: retry.kind === "reviewed" && retry.request,
-  }).toEqual({ calls: ["facts", "head"], replayed: r.request });
+  r.request = { ...(r.request as object), classification: "mechanical" };
+  const services = recordedServices(r);
+  const retry = await review(r.request, r.config, services);
+  expect(retry).toMatchObject({ kind: "error", stage: "input" });
+  expect(services.calls).toEqual([]);
 });
+
 type Scripted = Awaited<ReturnType<typeof margot>>["r"] & {
   route: { source: string };
   voice: { outcome: string };

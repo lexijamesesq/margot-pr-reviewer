@@ -81,7 +81,7 @@ it("trusts a triage only from a trusted actor and bound to the head", () => {
     none: verifiedTriage(null, ["triage"], "a".repeat(40)),
   }).toEqual({ trusted: triage, untrusted: null, otherHead: null, none: null });
 });
-it("keeps the triage-trust rule and the self-instrument hold wording in one place each", async () => {
+it("keeps the triage-trust rule in one place", async () => {
   const { readdir, readFile } = await import("node:fs/promises");
   const root = new URL("../src/", import.meta.url);
   const files = (await readdir(root, { recursive: true })).filter((f) => f.endsWith(".ts"));
@@ -89,6 +89,5 @@ it("keeps the triage-trust rule and the self-instrument hold wording in one plac
   const count = (needle: string) => text.split(needle).length - 1;
   expect({
     trust: count("trustedTriageActors.includes") + count("trustedActors.includes"),
-    held: count("self-instrument: held for the operator's approval"),
-  }).toEqual({ trust: 1, held: 1 });
+  }).toEqual({ trust: 1 });
 });

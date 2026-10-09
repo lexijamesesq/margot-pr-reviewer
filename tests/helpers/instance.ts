@@ -1,6 +1,12 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  boundIdentity,
+  checkExternalId,
+  checkMetadataText,
+  reviewRequestId,
+} from "../../src/check-identity.js";
 import type { BindRequestInput } from "../../src/instance.js";
 
 export const margotRootPlaceholder = `\${MARGOT_ROOT}`;
@@ -63,7 +69,6 @@ export const config = {
     checks: {
       triage: "review / triage",
       review: "review / margot",
-      authority: "review / authority",
     },
     actor: "reviewer[bot]",
     appId: 1,
@@ -149,6 +154,11 @@ export function closeCommandArgs(overrides: Record<string, string> = {}) {
     "app-id": "42",
     "own-runs": "https://github.com/example/control/actions/runs/",
     "own-run-id": "1",
+    "own-run-url": "https://github.com/example/control/actions/runs/1/attempts/1",
+    base: "b".repeat(40),
+    "triage-check-id": "101",
+    "workflow-ref": "v0.10.0",
+    "review-actor": "margot[bot]",
     "route-result": "success",
     "review-result": "success",
     published: "false",
@@ -162,8 +172,51 @@ export function closeCommandArgs(overrides: Record<string, string> = {}) {
 }
 export function closeCommandClient(options: { failPulls?: boolean; calls?: string[] } = {}) {
   const writes: Record<string, unknown>[] = [];
+  const request = {
+    repository: "example/project",
+    pr: 7,
+    head,
+    base: "b".repeat(40),
+    triageCheckId: 101,
+    workflowRef: "v0.10.0",
+    phase: "review" as const,
+  };
+  let stored: Record<string, unknown> = {
+    id: 88,
+    name: "review / margot",
+    head_sha: head,
+    app: { id: 42 },
+    status: "in_progress",
+    conclusion: null,
+    external_id: checkExternalId(request),
+    details_url: "https://github.com/example/control/actions/runs/1/attempts/1",
+    output: {
+      text: checkMetadataText({
+        version: 1,
+        kind: "review",
+        repository: request.repository,
+        pr: 7,
+        head_sha: head,
+        base_sha: request.base,
+        workflow_ref: request.workflowRef,
+        triage_check_id: 101,
+        request_id: reviewRequestId(boundIdentity(request, request.workflowRef)),
+        owner_run_url: "https://github.com/example/control/actions/runs/1/attempts/1",
+        phase: "waiting",
+      }),
+    },
+  };
   const client = {
     rest: {
+      actions: {
+        getWorkflowRun: async () => ({
+          data: { id: 1, repository: { full_name: "example/control" }, run_attempt: 1 },
+        }),
+      },
+      pulls: {
+        listReviews: async () => ({ data: [] }),
+        get: async () => ({ data: { head: { sha: head }, base: { sha: request.base } } }),
+      },
       repos: {
         listPullRequestsAssociatedWithCommit: async () => {
           options.calls?.push("pulls");
@@ -172,20 +225,12 @@ export function closeCommandClient(options: { failPulls?: boolean; calls?: strin
         },
       },
       checks: {
-        listForRef: async () => ({
-          data: {
-            check_runs: [
-              {
-                id: 88,
-                status: "in_progress",
-                details_url: "https://github.com/example/control/actions/runs/1",
-              },
-            ],
-          },
-        }),
+        listForRef: async () => ({ data: { check_runs: [stored] } }),
+        get: async () => ({ data: stored }),
         update: async (input: Record<string, unknown>) => {
           writes.push(input);
-          return { data: input };
+          stored = { ...stored, ...input };
+          return { data: stored };
         },
       },
     },

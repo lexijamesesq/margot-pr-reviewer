@@ -7,10 +7,11 @@
       "YOUR_CHECK_APP"
     ],
     "trustedTriageActors": [
-      "triage-app"
+      "YOUR_REVIEW_APP"
     ],
     "requiredChecks": [
-      "YOUR_REQUIRED_CHECK"
+      "ci / checks",
+      "trusted-scan / trusted-scan"
     ],
     "allowedSkippedChecks": [],
     "cardBundle": {
@@ -28,7 +29,11 @@
     "calibration": false,
     "trustedLedgerActors": [
       "YOUR_REVIEW_APP[bot]"
-    ]
+    ],
+    "requiredCheckReporters": {
+      "ci / checks": 123456,
+      "trusted-scan / trusted-scan": 123456
+    }
   },
   "github": {
     "gh": "YOUR_GH_EXECUTABLE",
@@ -39,11 +44,12 @@
     "checks": {
       "triage": "review / triage",
       "review": "review / margot",
-      "authority": "review / self-instrument"
+      "code": "ci / checks",
+      "text": "trusted-scan / trusted-scan"
     },
     "actor": "YOUR_REVIEW_APP[bot]",
-    "appId": 1,
-    "runUrl": "https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/1"
+    "appId": 123456,
+    "runUrl": "https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/1/attempts/1"
   },
   "jev": {
     "model": "YOUR_JEV_VERSION",
@@ -54,9 +60,15 @@
     "ticketing": {
       "server": "YOUR_TICKETING_MCP_SERVER_NAME",
       "command": "mcp-linear",
-      "args": ["YOUR_SERVER_ARGUMENT"],
-      "env": ["YOUR_TICKETING_CREDENTIAL_ENV_VAR"],
-      "tools": ["mcp__YOUR_TICKETING_MCP_SERVER_NAME__YOUR_READ_TOOL"]
+      "args": [
+        "YOUR_SERVER_ARGUMENT"
+      ],
+      "env": [
+        "YOUR_TICKETING_CREDENTIAL_ENV_VAR"
+      ],
+      "tools": [
+        "mcp__YOUR_TICKETING_MCP_SERVER_NAME__YOUR_READ_TOOL"
+      ]
     },
     "version": "0.0.0",
     "pluginDirectory": "${MARGOT_ROOT}/publish-skills",
@@ -72,5 +84,10 @@
         "head": "0000000000000000000000000000000000000000"
       }
     }
+  },
+  "handoff": {
+    "repository": "YOUR_ORG/YOUR_CONTROL_REPOSITORY",
+    "workflow": "margot-review.yml",
+    "ref": "v0.10.0"
   }
 }

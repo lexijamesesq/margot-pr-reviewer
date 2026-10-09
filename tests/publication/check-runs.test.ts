@@ -67,48 +67,29 @@ it("overwrites the verdict check text after a later failure so merge automation 
     hasText: typeof output.text === "string" && output.text.length > 0,
   }).toMatchObject({ kind: "error", staleApproval: "", hasText: true });
 });
-it("keeps the self-instrument check neutral on an authority hold", async () => {
-  expect({ conclusion: (await runPublication("authority")).authority?.conclusion }).toMatchObject({
-    conclusion: "neutral",
-  });
-});
-it("names every matched file in the authority hold summary", async () => {
-  const held = await runPublication("authority-summary");
-  const clear = await runPublication("clear");
-  const protectedRecording = structuredClone(authorChangesRecording);
-  (
-    protectedRecording.config as {
-      protectedPaths: string[];
+it.each(["clear", "authority"] as const)(
+  "does not post the retired check for %s while retaining its approval decision",
+  async (mode) => {
+    const run = await runPublication(mode);
+    expect(run.writes.some((w) => w.body.name === "review / self-instrument")).toBe(false);
+    expect(run.final?.name).toBe(publisherOptions.checks.review);
+    expect(run.result.kind).toBe("reviewed");
+    expect(run.reviews.some((r) => r.state === "APPROVED")).toBe(mode === "clear");
+    if (mode === "authority") {
+      expect(run.armed).toBe(false);
+      expect(run.final?.conclusion).toBe("neutral");
     }
-  ).protectedPaths = [".github/**"];
-  const protectedResult = await review(
-    protectedRecording.request,
-    protectedRecording.config,
-    recordedServices(protectedRecording),
-  );
-  expect({
-    held: (
-      held.authority?.output as
-        | {
-            summary?: string;
-          }
-        | undefined
-    )?.summary,
-    clear: (
-      clear.authority?.output as
-        | {
-            summary?: string;
-          }
-        | undefined
-    )?.summary,
-    matched:
-      protectedResult.kind === "reviewed" ? protectedResult.decision.authorityPaths : undefined,
-  }).toMatchObject({
-    // The previous reviewer's wording, with the matched paths sorted.
-    held: "This PR changes Margot's own config, the estate ownership map, or a gate workflow — a surface that could disarm the gate. Margot does not approve it herself; it merges on the operator's approval.\n\nMatched:\n- `.github/workflows/review.yml`\n- `config/review.json`",
-    clear: "No functional change to a protected path (class: mechanical).",
-    matched: [".github/workflows/ci.yml"],
-  });
+  },
+);
+it("retains protected paths in the independent approval decision", async () => {
+  const recording = structuredClone(authorChangesRecording);
+  (recording.config as { protectedPaths: string[] }).protectedPaths = [".github/**"];
+  const result = await review(recording.request, recording.config, recordedServices(recording));
+  expect(result.kind).toBe("reviewed");
+  if (result.kind !== "reviewed") throw new Error("Expected review");
+  expect(result.decision.authorityPaths).toEqual([".github/workflows/ci.yml"]);
+  expect(result.decision.holdReasons).toContain("review-authority");
+  expect(result.decision.mergeEligible).toBe(false);
 });
 it("never lets calibration satisfy the review check", async () => {
   expect({ conclusion: (await runPublication("calibration")).final?.conclusion }).toMatchObject({
@@ -182,8 +163,8 @@ for (const [name, mode] of [
     }).toMatchObject({
       kind: "error",
       evaluated: false,
-      writes: 1,
-      title: `Margot: not reviewed: ${mode === "base" ? "stale" : mode}`,
+      writes: 0,
+      title: undefined,
     });
   });
 it("never writes the triage check from a review run", async () => {

@@ -9,6 +9,7 @@ export async function decisionFallback(
   state: unknown,
   context: CallContext,
   claude: { executable: string; version: string; reviewerModel: string },
+  purpose: "classification" | "review" = "review",
 ): Promise<Record<string, unknown>> {
   const properties = Object.fromEntries(
     Object.entries(questions).map(([name, question]) => {
@@ -33,7 +34,7 @@ export async function decisionFallback(
     required: Object.keys(properties),
     additionalProperties: false,
   };
-  const prompt = `You are Margot's FALLBACK decider. Jev is unavailable. Judge ONLY the supplied change description. Answer every question. A noul is the probability [0,1] that review is needed. A score is an integer 0–3 against the supplied anchors. Your degraded decision cannot auto-merge. When uncertain prefer review and the higher score. Return only the required JSON.\n\n=== CHANGE DESCRIPTION (state) ===\n${JSON.stringify(state)}\n\n=== QUESTIONS ===\n${JSON.stringify(questions)}`;
+  const prompt = `You are Margot's FALLBACK decider. Jev is unavailable. Judge ONLY the supplied change description. Answer every question. ${purpose === "classification" ? "For each class question, a noul is the probability [0,1] that its proposition holds. Classify the change only; do not decide approval or merge eligibility." : "A noul is the probability [0,1] that review is needed. A score is an integer 0–3 against the supplied anchors. Your degraded decision cannot auto-merge. When uncertain prefer review and the higher score."} Return only the required JSON.\n\n=== CHANGE DESCRIPTION (state) ===\n${JSON.stringify(state)}\n\n=== QUESTIONS ===\n${JSON.stringify(questions)}`;
   await assertClaudeVersion(claude.executable, claude.version, context);
   const raw = await execute(
     claude.executable,

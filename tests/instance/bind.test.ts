@@ -423,3 +423,44 @@ it("refuses a benchmark override on a run with publication authority", async () 
     );
   }
 });
+it("carries a safe triage check ID into the bound review request", async () => {
+  expect(
+    (await bindRequest(bindInput({ triageCheckId: 9007199254740991 }), readPull())).request
+      .triageCheckId,
+  ).toBe(9007199254740991);
+});
+it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+  "refuses invalid triage check ID %s",
+  async (triageCheckId) => {
+    await expect(bindRequest(bindInput({ triageCheckId }), readPull())).rejects.toThrow();
+  },
+);
+it("binds --triage-check-id through the actual CLI file interface", async () => {
+  const fixture = await bindCommandFixture("true");
+  await runInstanceCommand(
+    [...fixture.args, "--triage-check-id", "101"],
+    { GH_TOKEN: "read-token" },
+    fixture.client as never,
+  );
+  const root = fixture.args[fixture.args.indexOf("--margot-root") + 1] as string;
+  expect(JSON.parse(await readFile(join(root, "request.json"), "utf8")).triageCheckId).toBe(101);
+});
+
+it("rejects the retired authority-check config while accepting the remaining publisher", async () => {
+  const source = JSON.parse(
+    await readFile(new URL("../../samples/config.sample.json", import.meta.url), "utf8"),
+  );
+  expect(liveConfigSchema.safeParse(source).success).toBe(true);
+  source.publisher.checks.authority = "review / self-instrument";
+  expect(liveConfigSchema.safeParse(source).success).toBe(false);
+});
+it("refuses the retired self-instrument command before creating a GitHub client", async () => {
+  let clients = 0;
+  await expect(
+    runInstanceCommand(["self-instrument"], {}, undefined, () => {
+      clients++;
+      throw new Error("unexpected client");
+    }),
+  ).rejects.toThrow("Usage:");
+  expect(clients).toBe(0);
+});

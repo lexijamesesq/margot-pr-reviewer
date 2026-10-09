@@ -1,5 +1,12 @@
 import { Octokit } from "octokit";
 import { expect, it } from "vitest";
+import {
+  boundIdentity,
+  checkExternalId,
+  checkMetadataText,
+  readCheckRecord,
+  reviewRequestId,
+} from "../src/check-identity.js";
 import { type CloseStrandedCheckInput, closeStrandedCheck } from "../src/closer.js";
 
 const head = "a".repeat(40);
@@ -15,6 +22,11 @@ async function wire(mode: string, checkName = "review / margot") {
     checkName,
     ownRuns,
     ownRunId: "1",
+    ownRunUrl: `${ownRuns}1/attempts/1`,
+    base: "b".repeat(40),
+    triageCheckId: 101,
+    workflowRef: "v0.10.0",
+    reviewActor: "margot[bot]",
     routeResult: "failure",
     reviewResult: "success",
     published: "",
@@ -50,6 +62,43 @@ async function wire(mode: string, checkName = "review / margot") {
   if (mode === "floor-named") input.blockingChecks = "pending: ci / checks, lint";
   if (mode === "floor-blank") input.blockingChecks = "  ";
   if (mode === "prototype-key") input.stopReason = "toString";
+  const request = {
+    repository: input.repository,
+    pr: 7,
+    base: input.base,
+    head,
+    phase: "review" as const,
+    triageCheckId: 101,
+    workflowRef: input.workflowRef,
+  };
+  const details =
+    mode === "other-run" ? `${ownRuns}2/attempts/1` : mode === "no-run" ? "" : input.ownRunUrl;
+  let stored: Record<string, unknown> = {
+    id: 88,
+    name: checkName,
+    head_sha: head,
+    app: { id: 42 },
+    status: "in_progress",
+    conclusion: null,
+    details_url: details,
+    external_id: checkExternalId(request),
+    output: {
+      text: checkMetadataText({
+        version: 1,
+        kind: "review",
+        repository: request.repository,
+        pr: 7,
+        base_sha: request.base,
+        head_sha: head,
+        workflow_ref: request.workflowRef,
+        triage_check_id: 101,
+        request_id: reviewRequestId(boundIdentity(request, request.workflowRef)),
+        owner_run_url: details || input.ownRunUrl,
+        phase: "waiting",
+      }),
+    },
+  };
+  let listedNative = false;
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     const target = new URL(String(url));
     const method = init?.method ?? "GET";
@@ -72,17 +121,7 @@ async function wire(mode: string, checkName = "review / margot") {
       const name = target.searchParams.get("check_name");
       if (mode === "check-error")
         return response({ message: "Recorded check read failure" }, 500, url);
-      let checkRuns: Record<string, unknown>[] = [
-        {
-          id: 88,
-          name,
-          head_sha: head,
-          app: { id: 42 },
-          status: "in_progress",
-          details_url:
-            mode === "other-run" ? `${ownRuns}2` : mode === "no-run" ? "" : `${ownRuns}1`,
-        },
-      ];
+      let checkRuns: Record<string, unknown>[] = [stored];
       if (mode === "other-name") {
         checkRuns = name === "custom / review" ? checkRuns : [];
       } else if (mode === "no-open") {
@@ -90,12 +129,73 @@ async function wire(mode: string, checkName = "review / margot") {
       }
       return response({ check_runs: checkRuns, total_count: checkRuns.length }, 200, url);
     }
+    if (
+      method === "GET" &&
+      (target.pathname.endsWith("/reviews") || target.pathname.endsWith("/reviews/90"))
+    ) {
+      listedNative = true;
+      if (mode === "owner-during-native")
+        stored = {
+          ...stored,
+          details_url: `${ownRuns}2/attempts/1`,
+          output: {
+            text: checkMetadataText({
+              ...readCheckRecord((stored.output as { text: string }).text),
+              owner_run_url: `${ownRuns}2/attempts/1`,
+            }),
+          },
+        };
+      const state = mode === "native-approved" ? "APPROVED" : "COMMENTED";
+      const native = {
+        id: 90,
+        commit_id: head,
+        state,
+        user: { login: "margot[bot]", type: "Bot" },
+        body: checkMetadataText({
+          ...readCheckRecord((stored.output as { text: string }).text),
+          review_state: state as "APPROVED" | "COMMENTED",
+          retryable: false,
+        }),
+      };
+      return response(
+        target.pathname.endsWith("/90") ? native : mode.startsWith("native-") ? [native] : [],
+        200,
+        url,
+      );
+    }
+    if (method === "GET" && target.pathname.endsWith("/actions/runs/1"))
+      return response(
+        {
+          id: 1,
+          repository: { full_name: "example/control" },
+          run_attempt: mode === "old-attempt" ? 2 : 1,
+        },
+        200,
+        url,
+      );
+    if (method === "GET" && target.pathname.endsWith("/pulls/7"))
+      return response(
+        {
+          head: {
+            sha:
+              mode === "moved-head" || (mode === "head-during-native" && listedNative)
+                ? "f".repeat(40)
+                : head,
+          },
+          base: { sha: mode === "moved-base" ? "f".repeat(40) : input.base },
+        },
+        200,
+        url,
+      );
+    if (method === "GET" && target.pathname.endsWith("/check-runs/88"))
+      return response(stored, 200, url);
     if (method === "PATCH" && /\/check-runs\/88$/.test(target.pathname)) {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       writes.push(body);
       if (mode === "patch-error")
         return response({ message: "Recorded check write failure" }, 500, url);
-      return response({ id: 88, ...body }, 200, url);
+      stored = { ...stored, ...body };
+      return response(stored, 200, url);
     }
     return response({ message: "Unexpected recorded request" }, 404, url);
   }) as typeof fetch;
@@ -182,14 +282,14 @@ it("leaves completed checks alone", async () => {
 it("leaves a check adopted by another run to that run", async () => {
   expect((await wire("other-run")).decision).toMatchObject({
     action: "left",
-    message: expect.stringContaining("belongs to run 2"),
+    message: expect.stringContaining("owned by this request and run"),
   });
 });
-it("closes a caller check that has no run owner", async () => {
+it("refuses a caller check that has no run owner", async () => {
   const result = await wire("no-run");
   expect({ action: result.decision.action, writes: result.writes.length }).toMatchObject({
-    action: "closed",
-    writes: 1,
+    action: "left",
+    writes: 0,
   });
 });
 for (const [name, reason, conclusion, title] of [
@@ -338,3 +438,27 @@ it("treats a stop reason that is only an inherited object key as unknown", async
     },
   });
 });
+
+for (const mode of ["old-attempt", "moved-head", "moved-base"])
+  it(`refuses cleanup after ${mode}`, async () => {
+    const result = await wire(mode);
+    expect(result.decision.action).toBe("error");
+    expect(result.writes).toHaveLength(0);
+  });
+
+for (const mode of ["native-approved", "native-held"])
+  it(`leaves an authenticated ${mode} publication untouched after a lost App receipt`, async () => {
+    const result = await wire(mode);
+    expect(result.decision).toMatchObject({
+      action: "left",
+      message: expect.stringContaining("native publication 90"),
+    });
+    expect(result.writes).toHaveLength(0);
+  });
+
+for (const mode of ["owner-during-native", "head-during-native"])
+  it(`refences after native history before cleanup when ${mode}`, async () => {
+    const result = await wire(mode);
+    expect(result.decision.action).toBe("error");
+    expect(result.writes).toHaveLength(0);
+  });

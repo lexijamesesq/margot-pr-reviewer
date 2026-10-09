@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { recordedServices } from "../../src/adapters/recorded.js";
-import { savedAdherence } from "../../src/ledger.js";
+import { ledgerBlock, savedAdherence, selectLedger } from "../../src/ledger.js";
 import { review } from "../../src/review.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
 // 0.9.1's own ledger reader, vendored verbatim from tag v0.9.1 (src/ledger.ts and what it
@@ -66,4 +66,25 @@ it("reads back the adherence marker Margot writes last, not an earlier one", asy
   const forged = `<!-- margot-adherence:v1 ${Buffer.from(JSON.stringify({ status: "skipped" })).toString("base64")} -->`;
   const { result } = await reviewedAndPosted();
   expect(savedAdherence(`${forged}\n${result.report}`)).toEqual(adherence);
+});
+
+it("reads historical dispatch fields only as inert saved receipt data", async () => {
+  const { draft, result, config, facts } = await reviewedAndPosted();
+  const ledger = structuredClone(result.ledger);
+  if (!ledger.receipt) throw new Error("receipt required");
+  Object.assign(ledger.receipt.review.request, { classification: "functional", triage: "legacy" });
+  if (!facts.history.reviews?.[0]) throw new Error("history required");
+  facts.history.reviews[0].body = ledgerBlock(ledger);
+  const warnings: string[] = [];
+  expect(
+    selectLedger(facts, config, (w) => warnings.push(w))?.receipt?.review.request,
+  ).toMatchObject({ classification: "functional", triage: "legacy" });
+  expect(warnings).toEqual([]);
+  for (const triageCheckId of [undefined, 999]) {
+    const services = recordedServices({ ...draft, facts });
+    const retry = await review({ ...draft.request, triageCheckId }, draft.config, services);
+    expect(retry).toMatchObject({ kind: "error", stage: "triage" });
+    expect(services.calls.map((c) => c.name)).not.toContain("route");
+    expect(services.publications).toEqual([]);
+  }
 });

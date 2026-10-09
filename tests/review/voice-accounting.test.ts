@@ -184,7 +184,8 @@ describe("voice publication safeguards", () => {
     return recorded(
       "mechanical-bump",
       (draft) => {
-        draft.request = { ...requestSchema.parse(draft.request), classification: "functional" };
+        draft.request = requestSchema.parse(draft.request);
+        Object.assign(draft.facts.triage as object, { classification: "functional" });
       },
       withRoute({
         source: "jev",

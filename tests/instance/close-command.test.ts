@@ -6,8 +6,9 @@ it("maps the close-stranded-check command into the guarded closer", async () => 
   const { client, writes } = closeCommandClient();
   const result = await runInstanceCommand(
     closeCommandArgs({ published: "false" }),
-    { GH_TOKEN: "write-token" },
+    { GH_TOKEN: "write-token", MARGOT_RUN_TOKEN: "native-token" },
     client,
+    () => client,
   );
   expect(result).toMatchObject({ action: "closed" });
   expect(writes).toHaveLength(1);
@@ -16,7 +17,12 @@ it("maps the close-stranded-check command into the guarded closer", async () => 
 it("maps a closer GitHub failure to exit 2", async () => {
   const { client } = closeCommandClient({ failPulls: true });
   const error = await captureError(() =>
-    runInstanceCommand(closeCommandArgs(), { GH_TOKEN: "write-token" }, client),
+    runInstanceCommand(
+      closeCommandArgs(),
+      { GH_TOKEN: "write-token", MARGOT_RUN_TOKEN: "native-token" },
+      client,
+      () => client,
+    ),
   );
   expect(error).toBeInstanceOf(Error);
   expect((error as Error).message).toContain("could not read the pull requests");
@@ -36,7 +42,12 @@ it("rejects a malformed closer repository before GitHub", async () => {
   const { client } = closeCommandClient({ calls });
   const repository = "example";
   const error = await captureError(() =>
-    runInstanceCommand(closeCommandArgs({ repository }), { GH_TOKEN: "write-token" }, client),
+    runInstanceCommand(
+      closeCommandArgs({ repository }),
+      { GH_TOKEN: "write-token", MARGOT_RUN_TOKEN: "native-token" },
+      client,
+      () => client,
+    ),
   );
   expect(error).toBeInstanceOf(Error);
   expect((error as Error).message).toContain("Repository must be owner/name");
@@ -47,8 +58,9 @@ it("maps --blocking-checks into the floor stop's title", async () => {
   const { client, writes } = closeCommandClient();
   await runInstanceCommand(
     closeCommandArgs({ published: "false", "blocking-checks": "failing: ci / checks" }),
-    { GH_TOKEN: "write-token" },
+    { GH_TOKEN: "write-token", MARGOT_RUN_TOKEN: "native-token" },
     client,
+    () => client,
   );
   expect(writes[0]).toMatchObject({
     output: { title: "Margot: preflight — failing: ci / checks — waiting for the next push" },

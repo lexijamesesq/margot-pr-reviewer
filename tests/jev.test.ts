@@ -54,6 +54,9 @@ function jev(
     key: "test-only",
     model: "test-model",
     fallbackClaude: pinnedClaude,
+    fallback: async () => {
+      throw new Error("fallback unavailable");
+    },
     retries: 1,
     minTimeout: 1,
     onJevRetry: (retry) => retries.push(retry),
@@ -115,14 +118,14 @@ it("classifies the code change alone: files, tier and the whole diff, in one req
   });
 });
 describe("a malformed Jev answer takes the conservative default", () => {
-  it("classifies as functional when any class answer is unreadable", async () => {
-    expect(
-      await jev({ ...classes, mechanical: { type: "noul", noul: "yes" } }).adapter.classify(
+  it("fails classification when both providers cannot supply valid probabilities", async () => {
+    await expect(
+      jev({ ...classes, mechanical: { type: "noul", noul: "yes" } }).adapter.classify(
         facts,
         classificationQuestions,
         context(),
       ),
-    ).toEqual({ source: "jev", functional: 1, documentation: 0, mechanical: 0 });
+    ).rejects.toThrow("fallback unavailable");
   });
   it("summons a card whose routing answer is missing or unreadable", async () => {
     const { documentation_substantive: _substance, ...functional } = routeQuestions;
@@ -188,22 +191,21 @@ it("retries a transient Jev response and recovers", async () => {
   await j.adapter.classify(facts, classificationQuestions, context());
   expect(j.attempts()).toBe(2);
 });
-it("treats Jev authentication failures as terminal", async () => {
+it("retries classification once after a Jev authentication failure", async () => {
   const j = jev(classes, { failures: 1, status: 401 });
   const answer = (await j.adapter.classify(facts, classificationQuestions, context())) as {
     source: string;
   };
-  expect(answer.source).toBe("jev_unreachable");
-  expect(j.attempts()).toBe(1);
+  expect(answer.source).toBe("jev");
+  expect(j.attempts()).toBe(2);
 });
-it("requests functional review during a classifier outage", async () => {
+it("returns an explicit classification error after both providers fail", async () => {
   const j = jev(classes, { failures: 3 });
   const services = { ...recordedServices(recording), classify: j.adapter.classify };
   const result = await review({ ...request, phase: "triage" }, recording.config, services);
   expect(result).toMatchObject({
-    kind: "classified",
-    classification: "functional",
-    decision_source: "jev_unreachable",
+    kind: "error",
+    stage: "classification",
   });
 });
 it("preserves risk levels in Jev score distributions", async () => {
@@ -407,16 +409,21 @@ describe("fallback decisions", () => {
       fetch: async () => new Response("{}", { status: 503 }),
       fallback,
     });
-  it("requests functional review without fallback classification during a Jev outage", async () => {
-    let calls = 0;
-    const adapter = outage(async () => {
-      calls++;
-      return {};
-    });
-    const result = await adapter.classify(facts, classificationQuestions, context());
-    expect({ answer: result, calls }).toMatchObject({
-      answer: { source: "jev_unreachable", functional: 1 },
-      calls: 0,
+  it("rejects malformed fallback classification instead of fabricating a lane", async () => {
+    const fallback = vi.fn(async () => ({}));
+    await expect(
+      outage(fallback).classify(facts, classificationQuestions, context()),
+    ).rejects.toThrow();
+    expect(fallback).toHaveBeenCalledTimes(1);
+  });
+  it("preserves fallback probabilities and provenance", async () => {
+    expect(
+      await outage(async () => classes).classify(facts, classificationQuestions, context()),
+    ).toEqual({
+      source: "fallback",
+      functional: 0,
+      documentation: 0,
+      mechanical: 1,
     });
   });
   it("routes functional reviews through the fallback during a Jev outage", async () => {
@@ -514,6 +521,24 @@ describe("fallback decisions", () => {
       spy.mockRestore();
     }
   });
+  it("uses class probabilities without importing the review fallback hold prompt", async () => {
+    const prompts: string[] = [];
+    const spy = vi.spyOn(processAdapter, "execute").mockImplementation(async (_file, args) => {
+      if (args[0] === "--version") return "1.0.0 (Claude Code)";
+      prompts.push(present(args[1]));
+      return JSON.stringify({ result: { mechanical: { noul: 1 } } });
+    });
+    try {
+      const questions = { mechanical: { type: "noul", instructions: "Mechanical?" } };
+      await decisionFallback(questions, "diff", context(), pinnedClaude, "classification");
+      await decisionFallback(questions, "diff", context(), pinnedClaude);
+      expect(prompts[0]).toContain("probability [0,1] that its proposition holds");
+      expect(prompts[0]).not.toContain("degraded decision cannot auto-merge");
+      expect(prompts[1]).toContain("Your degraded decision cannot auto-merge");
+    } finally {
+      spy.mockRestore();
+    }
+  });
   it("refuses a Claude CLI that is not the pinned version", async () => {
     const calls: string[][] = [];
     const spy = vi.spyOn(processAdapter, "execute").mockImplementation(async (_file, args) => {
@@ -556,7 +581,9 @@ describe("Jev failure diagnostics", () => {
     });
     try {
       const j = jev({}, { failures: 99, status });
-      const result = await j.adapter.classify(facts, classificationQuestions, context());
+      const result = await j.adapter
+        .classify(facts, classificationQuestions, context())
+        .catch((error) => error);
       return { result, warnings: warnings.join("\n"), attempts: j.attempts() };
     } finally {
       warn.mockRestore();
@@ -566,14 +593,14 @@ describe("Jev failure diagnostics", () => {
     "reports a rejected credential (HTTP %i) as authentication",
     async (status) => {
       const { result, warnings } = await classifyDuring(status);
-      expect(result).toMatchObject({ source: "jev_unreachable", functional: 1 });
+      expect(result).toBeInstanceOf(Error);
       expect(warnings).toContain(`Jev authentication rejected (HTTP ${status})`);
       expect(warnings).not.toContain("Jev unavailable");
     },
   );
   it("reports a server error as an outage, not an authentication failure", async () => {
     const { result, warnings } = await classifyDuring(503);
-    expect(result).toMatchObject({ source: "jev_unreachable", functional: 1 });
+    expect(result).toBeInstanceOf(Error);
     expect(warnings).toContain("Jev unavailable (HTTP 503)");
     expect(warnings).not.toContain("authentication");
   });
@@ -585,11 +612,16 @@ describe("Jev failure diagnostics", () => {
         model: "test-model",
         fallbackClaude: pinnedClaude,
         retries: 0,
+        fallback: async () => {
+          throw new Error("fallback unavailable");
+        },
         fetch: async () => {
           throw new Error("connect ETIMEDOUT");
         },
       });
-      await adapter.classify(facts, classificationQuestions, context());
+      await expect(adapter.classify(facts, classificationQuestions, context())).rejects.toThrow(
+        "fallback unavailable",
+      );
       expect(String(warn.mock.calls[0]?.[0])).toContain(
         "Jev transport unavailable: connect ETIMEDOUT",
       );
@@ -789,5 +821,125 @@ describe("the advisory template-adherence check", () => {
         },
       },
     });
+  });
+});
+
+describe("bounded initial classification", () => {
+  const setup = (
+    fetch: NonNullable<Parameters<typeof jevAdapter>[0]["fetch"]>,
+    fallback: NonNullable<Parameters<typeof jevAdapter>[0]["fallback"]>,
+  ) =>
+    jevAdapter({
+      key: "test",
+      model: "test",
+      fallbackClaude: pinnedClaude,
+      retries: 4,
+      fetch,
+      fallback,
+    });
+  it("bounds each Jev attempt at 15 seconds, waits one second, then bounds fallback at 90 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      const fetch = vi.fn(async (_input, init) => {
+        signals.push(init?.signal as AbortSignal);
+        return await new Promise<Response>(() => {});
+      });
+      const fallback = vi.fn(async (_questions, _state, context) => {
+        signals.push(context.signal);
+        return await new Promise<Record<string, unknown>>(() => {});
+      });
+      const result = setup(fetch, fallback).classify(facts, classificationQuestions, {
+        signal: new AbortController().signal,
+      });
+      const rejected = expect(result).rejects.toThrow("Fallback classification timed out");
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(signals[0]?.aborted).toBe(true);
+      await vi.advanceTimersByTimeAsync(999);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(fallback).toHaveBeenCalledTimes(1);
+      expect(signals[1]?.aborted).toBe(true);
+      await vi.advanceTimersByTimeAsync(89999);
+      expect(signals[2]?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await rejected;
+      expect(signals[2]?.aborted).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it.each(["attempt", "pause", "fallback"])("parent cancellation wins during %s", async (phase) => {
+    vi.useFakeTimers();
+    try {
+      const parent = new AbortController();
+      const fetch = vi.fn(async () =>
+        phase === "attempt"
+          ? await new Promise<Response>(() => {})
+          : new Response("{}", { status: 503 }),
+      );
+      const fallback = vi.fn(async () => await new Promise<Record<string, unknown>>(() => {}));
+      const result = setup(fetch, fallback).classify(facts, classificationQuestions, {
+        signal: parent.signal,
+      });
+      const rejected = expect(result).rejects.toThrow("parent cancelled");
+      await vi.advanceTimersByTimeAsync(phase === "fallback" ? 1000 : 0);
+      parent.abort(new Error("parent cancelled"));
+      await rejected;
+      await vi.advanceTimersByTimeAsync(130000);
+      expect(fetch).toHaveBeenCalledTimes(phase === "fallback" ? 2 : 1);
+      expect(fallback).toHaveBeenCalledTimes(phase === "fallback" ? 1 : 0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it.each(["jev", "fallback"])(
+    "rejects a valid late %s response after parent cancellation",
+    async (provider) => {
+      vi.useFakeTimers();
+      try {
+        const parent = new AbortController();
+        const fallback = vi.fn(async () => {
+          parent.abort(new Error("parent cancelled"));
+          return classes;
+        });
+        const fetch = vi.fn(async () => {
+          if (provider === "fallback") return new Response("{}", { status: 503 });
+          parent.abort(new Error("parent cancelled"));
+          return new Response(JSON.stringify({ model: "test", answers: classes }));
+        });
+        const result = setup(fetch, fallback).classify(facts, classificationQuestions, {
+          signal: parent.signal,
+        });
+        const rejected = expect(result).rejects.toThrow("parent cancelled");
+        await vi.advanceTimersByTimeAsync(1000);
+        await rejected;
+        expect(fallback).toHaveBeenCalledTimes(provider === "fallback" ? 1 : 0);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+  it("caps the enclosing review classification stage at 130 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      const services = {
+        ...recordedServices(recording),
+        classify: async () => await new Promise<never>(() => {}),
+      };
+      const result = review(
+        { ...request, phase: "triage" },
+        { ...configSchema.parse(recording.config), timeoutMs: 900000 },
+        services,
+      );
+      await vi.advanceTimersByTimeAsync(130000);
+      expect(await result).toMatchObject({ kind: "error", stage: "classification" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

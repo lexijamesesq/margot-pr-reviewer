@@ -20,6 +20,8 @@ export function liveServices(
     ownedPathTier?: unknown;
     githubToken?: string;
     writeToken?: string;
+    actionsToken?: string;
+    runToken?: string;
     ticketingEnvironment?: Record<string, string>;
   },
   onResponse?: ClaudeOptions["onResponse"],
@@ -32,6 +34,10 @@ export function liveServices(
     const missing = [
       ...(config.publisher ? [] : ["the `publisher` configuration"]),
       ...(credentials.writeToken ? [] : ["the MARGOT_WRITE_TOKEN environment variable"]),
+      ...(config.handoff &&
+      (!credentials.actionsToken || !credentials.runToken || !credentials.githubToken)
+        ? ["MARGOT_ACTIONS_TOKEN, MARGOT_RUN_TOKEN and GH_TOKEN"]
+        : []),
       ...(config.github.freshShadow ? ["`github.freshShadow` must be false"] : []),
       ...(config.github.shadowBeforeHead ? ["`github.shadowBeforeHead` must be false"] : []),
     ];
@@ -45,6 +51,17 @@ export function liveServices(
       ? githubPublisher(
           githubClient(credentials.writeToken ? { token: credentials.writeToken, retries: 0 } : {}),
           config.publisher,
+          config.handoff
+            ? {
+                config,
+                clients: {
+                  read: githubClient({ token: credentials.githubToken ?? "", retries: 0 }),
+                  write: githubClient({ token: credentials.writeToken ?? "", retries: 0 }),
+                  actions: githubClient({ token: credentials.actionsToken ?? "", retries: 0 }),
+                  runs: githubClient({ token: credentials.runToken ?? "", retries: 0 }),
+                },
+              }
+            : undefined,
         )
       : undefined;
   const github = githubAdapter(
@@ -79,7 +96,13 @@ export function liveServices(
     }),
     ...claudeAdapter({
       ...config.claude,
-      ...(config.publisher ? { ownChecks: Object.values(config.publisher.checks) } : {}),
+      ...(config.publisher
+        ? {
+            ownChecks: Object.values(config.publisher.checks).filter(
+              (name): name is string => name !== undefined,
+            ),
+          }
+        : {}),
       ...(credentials.githubToken ? { githubToken: credentials.githubToken } : {}),
       ...(credentials.ticketingEnvironment
         ? { ticketingEnvironment: credentials.ticketingEnvironment }
@@ -115,7 +138,24 @@ export function liveServices(
     services,
     actions,
     run: (request: ReviewRequest) => {
-      const evaluate = () => review(request, config.review, services);
+      const evaluate = () =>
+        review(
+          request,
+          {
+            ...config.review,
+            ...(config.publisher
+              ? {
+                  trustedTriageAppId: config.publisher.appId,
+                  trustedTriageCheckName: config.publisher.checks.triage,
+                  trustedCodeCheckName: config.publisher.checks.code,
+                  trustedTextCheckName: config.publisher.checks.text,
+                  trustedWorkflowRef: config.handoff?.ref,
+                  ownCheckNames: [config.publisher.checks.review, config.publisher.checks.triage],
+                }
+              : {}),
+          },
+          services,
+        );
       return publisher ? publisher.run(request, evaluate) : evaluate();
     },
   };
