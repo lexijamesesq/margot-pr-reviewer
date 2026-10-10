@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
-import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import type { Octokit } from "octokit";
-import { z } from "zod";
 import { githubClient } from "./adapters/github.js";
 import { closeStrandedCheck, shouldCloseStrandedCheck } from "./closer.js";
 import { errorMessage } from "./errors.js";
@@ -16,7 +15,6 @@ import {
   writeGitHubOutput,
 } from "./instance.js";
 import { shaSchema } from "./schemas.js";
-import { evaluateChecks, reviewAdmission, trustedChecks } from "./trusted-checks.js";
 
 type Options = Record<string, string | undefined>;
 
@@ -96,102 +94,15 @@ function positiveInteger(input: Options, name: string) {
 }
 
 const usage =
-  "Usage: margot-instance <validate-deployment|bind-request|evaluate-checks|trusted-checks|review-admission|close-stranded-check> [named arguments]";
+  "Usage: margot-instance <validate-deployment|bind-request|close-stranded-check> [named arguments]";
 
 export async function runInstanceCommand(
   args: string[],
   environment: NodeJS.ProcessEnv,
   client?: Pick<Octokit, "rest">,
-  /** Construct each explicitly scoped GitHub client from its workflow credential. */
-  githubFor: (token: string) => Pick<Octokit, "rest" | "paginate" | "request"> = (token) =>
-    githubClient({ token, retries: 0 }),
 ) {
   const [command, ...rest] = args;
   if (args.length === 1 && (command === "--help" || command === "-h")) return { help: usage };
-  if (command === "trusted-checks" || command === "review-admission") {
-    const input = named(rest, [
-      "operation",
-      "kind",
-      "request-file",
-      "config",
-      "context-file",
-      "output-file",
-      "result-file",
-      "text-outcome",
-      "failure",
-      "run-url",
-      "request-id",
-    ]);
-    if (
-      !environment.GH_TOKEN ||
-      !environment.MARGOT_WRITE_TOKEN ||
-      !environment.MARGOT_RUN_TOKEN ||
-      !environment.MARGOT_ACTIONS_TOKEN
-    )
-      throw new Error(
-        "GH_TOKEN, MARGOT_WRITE_TOKEN, MARGOT_RUN_TOKEN and MARGOT_ACTIONS_TOKEN required",
-      );
-    const config = JSON.parse(await readFile(required(input, "config"), "utf8"));
-    if (input["run-url"]) config.publisher = { ...config.publisher, runUrl: input["run-url"] };
-    const request = JSON.parse(await readFile(required(input, "request-file"), "utf8"));
-    const clients = {
-      read: githubFor(environment.GH_TOKEN) as Octokit,
-      write: githubFor(environment.MARGOT_WRITE_TOKEN) as Octokit,
-      runs: githubFor(environment.MARGOT_RUN_TOKEN) as Octokit,
-      actions: githubFor(environment.MARGOT_ACTIONS_TOKEN) as Octokit,
-      ...(environment.MARGOT_DISPATCH_TOKEN
-        ? { dispatch: githubFor(environment.MARGOT_DISPATCH_TOKEN) as Octokit }
-        : {}),
-    };
-    const result =
-      command === "review-admission"
-        ? await reviewAdmission(request, config, clients, required(input, "request-id"))
-        : await trustedChecks(
-            {
-              operation: z
-                .enum(["begin", "code-passed", "finish", "fail"])
-                .parse(required(input, "operation")),
-              kind: z.enum(["code", "text"]).parse(required(input, "kind")),
-              request,
-              config,
-              contextFile: required(input, "context-file"),
-              ...(input["result-file"]
-                ? { result: JSON.parse(await readFile(input["result-file"], "utf8")) }
-                : {}),
-              ...(input["text-outcome"]
-                ? {
-                    textOutcome: z
-                      .enum(["success", "failure", "cancelled"])
-                      .parse(input["text-outcome"]),
-                  }
-                : {}),
-              ...(input.failure
-                ? { failure: z.enum(["failure", "cancelled"]).parse(input.failure) }
-                : {}),
-            },
-            clients,
-          );
-    await writeFile(required(input, "output-file"), `${JSON.stringify(result)}\n`, { mode: 0o600 });
-    const outputs = Object.entries(result)
-      .filter(([, v]) => v !== undefined)
-      .map(([k, v]) => {
-        if (/[\r\n]/.test(String(v))) throw new Error("Multiline step output refused");
-        return `${k}=${String(v)}\n`;
-      })
-      .join("");
-    if (environment.GITHUB_OUTPUT) await appendFile(environment.GITHUB_OUTPUT, outputs);
-    if ("retryable" in result && result.retryable)
-      throw new CommandError("Trusted work incomplete; explicit recovery required", 1);
-    return result;
-  }
-  if (command === "evaluate-checks") {
-    const input = named(rest, ["input-file", "output-file"]);
-    const result = evaluateChecks(
-      JSON.parse(await readFile(required(input, "input-file"), "utf8")),
-    );
-    await writeFile(required(input, "output-file"), `${JSON.stringify(result)}\n`, { mode: 0o600 });
-    return result;
-  }
   if (command === "validate-deployment") {
     const input = named(rest, [
       "deployment",
@@ -217,8 +128,8 @@ export async function runInstanceCommand(
       "pr",
       "head",
       "base",
-      "phase",
       "triage-check-id",
+      "phase",
       "authority",
       "margot-root",
       "config",
@@ -240,10 +151,10 @@ export async function runInstanceCommand(
           pr: Number(required(input, "pr")),
           expectedHead: required(input, "head"),
           ...(input.base ? { expectedBase: input.base } : {}),
-          phase,
           ...(input["triage-check-id"] === undefined
             ? {}
-            : { triageCheckId: Number(input["triage-check-id"]) }),
+            : { triageCheckId: positiveInteger(input, "triage-check-id") }),
+          phase,
           authority: bool(input, "authority"),
           margotRoot: required(input, "margot-root"),
           configFile: required(input, "config"),
@@ -275,12 +186,6 @@ export async function runInstanceCommand(
       "check-name",
       "own-runs",
       "own-run-id",
-      "review-actor",
-      "own-run-url",
-      "base",
-      "triage-check-id",
-      "workflow-ref",
-      "check-id",
       "route-result",
       "review-result",
       "published",
@@ -302,12 +207,6 @@ export async function runInstanceCommand(
       checkName: input["check-name"] || "review / margot",
       ownRuns,
       ownRunId: required(input, "own-run-id"),
-      ownRunUrl: required(input, "own-run-url"),
-      reviewActor: required(input, "review-actor"),
-      base: shaSchema.parse(required(input, "base")),
-      triageCheckId: positiveInteger(input, "triage-check-id"),
-      workflowRef: required(input, "workflow-ref"),
-      ...(input["check-id"] ? { checkId: positiveInteger(input, "check-id") } : {}),
       routeResult: required(input, "route-result"),
       reviewResult: required(input, "review-result"),
       published,
@@ -321,12 +220,6 @@ export async function runInstanceCommand(
     const decision = await closeStrandedCheck(
       closeInput,
       client ?? githubClient({ token: environment.GH_TOKEN, retries: 0 }),
-      githubFor(
-        environment.MARGOT_RUN_TOKEN ??
-          (() => {
-            throw new Error("MARGOT_RUN_TOKEN required");
-          })(),
-      ),
     );
     if (decision.action === "error") throw new CommandError(decision.message, 2);
     return decision;

@@ -26,10 +26,6 @@ export function cliServices(
       ownedPathTier: environment.MARGOT_OWNED_TIER?.trim() || "unknown",
       ...(environment.GH_TOKEN ? { githubToken: environment.GH_TOKEN } : {}),
       ...(environment.MARGOT_WRITE_TOKEN ? { writeToken: environment.MARGOT_WRITE_TOKEN } : {}),
-      ...(environment.MARGOT_ACTIONS_TOKEN
-        ? { actionsToken: environment.MARGOT_ACTIONS_TOKEN }
-        : {}),
-      ...(environment.MARGOT_RUN_TOKEN ? { runToken: environment.MARGOT_RUN_TOKEN } : {}),
       ...(Object.keys(ticketingEnvironment).length ? { ticketingEnvironment } : {}),
     },
     onResponse,

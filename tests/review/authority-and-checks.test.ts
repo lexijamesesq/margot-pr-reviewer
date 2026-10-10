@@ -81,12 +81,15 @@ describe("required checks", () => {
   it.each([
     ["is missing", withChecks()],
     ["comes from an actor that is not trusted", withCheck({ actor: "forger" })],
+    ["uses an untrusted App ID despite the trusted actor", withCheck({ appId: 15368 })],
     ["ran against a stale head", withCheck({ head: "b".repeat(40) })],
     ["did not succeed", withCheck({ conclusion: "failure" })],
     ["concluded neutral", withCheck({ conclusion: "neutral" })],
     ["was cancelled", withCheck({ conclusion: "cancelled" })],
   ])("errors at the checks stage when the required check %s", async (_cause, change) => {
-    const { result } = await reviewRecording(recorded("council-clear", change));
+    const { result } = await reviewRecording(
+      recorded("council-clear", withConfig({ requiredCheckReporters: { ci: 42 } }), change),
+    );
     expect(result).toMatchObject({ kind: "error", stage: "checks", mergeEligible: false });
   });
 

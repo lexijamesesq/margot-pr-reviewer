@@ -1,12 +1,6 @@
 import type { Octokit } from "octokit";
-import {
-  authenticateCheckRecord,
-  authenticateNativeReview,
-  checkExternalId,
-  checkMetadataText,
-} from "./check-identity.js";
 import { errorMessage } from "./errors.js";
-import { repositorySchema, requestSchema, shaSchema } from "./schemas.js";
+import { repositorySchema, shaSchema } from "./schemas.js";
 
 const openStates = new Set(["queued", "in_progress"]);
 
@@ -18,12 +12,6 @@ export type CloseStrandedCheckInput = {
   checkName: string;
   ownRuns: string;
   ownRunId: string;
-  ownRunUrl: string;
-  base: string;
-  triageCheckId: number;
-  workflowRef: string;
-  reviewActor: string;
-  checkId?: number;
   routeResult: string;
   reviewResult: string;
   published: string;
@@ -117,28 +105,11 @@ export function shouldCloseStrandedCheck(input: CloseStrandedCheckInput) {
 export async function closeStrandedCheck(
   input: CloseStrandedCheckInput,
   client: CheckClient,
-  runsClient: CheckClient = client,
 ): Promise<CloseStrandedCheckDecision> {
   const repository = repositorySchema.parse(input.repository);
   const head = shaSchema.parse(input.head);
   const [owner, repo] = repository.split("/") as [string, string];
   const short = head.slice(0, 7);
-  const request = requestSchema.parse({
-    repository,
-    pr: input.pr,
-    base: input.base,
-    head,
-    phase: "review",
-    triageCheckId: input.triageCheckId,
-    workflowRef: input.workflowRef,
-  });
-  const expected = {
-    appId: input.appId,
-    name: input.checkName,
-    workflowRef: input.workflowRef,
-    kind: "review" as const,
-    bound: true,
-  };
   if (!shouldCloseStrandedCheck(input)) return { action: "left", message: "nothing to close" };
 
   let pulls: Pulls;
@@ -183,7 +154,7 @@ export async function closeStrandedCheck(
         ref: head,
         check_name: input.checkName,
         app_id: input.appId,
-        filter: "all",
+        filter: "latest",
       })
     ).data.check_runs;
   } catch (error) {
@@ -192,68 +163,21 @@ export async function closeStrandedCheck(
       message: `could not read check-runs on ${short} — left untouched (${errorMessage(error)})`,
     };
   }
-  let check: Checks[number] | undefined;
-  for (const candidate of checks) {
-    if (input.checkId !== undefined && candidate.id !== input.checkId) continue;
-    if (
-      candidate.name !== input.checkName ||
-      candidate.app?.id !== input.appId ||
-      candidate.external_id !== checkExternalId(request) ||
-      !openStates.has(candidate.status)
-    )
-      continue;
-    try {
-      authenticateCheckRecord(candidate, request, expected);
-    } catch {
-      continue;
-    }
-    if (candidate.details_url === input.ownRunUrl) {
-      check = candidate;
-      break;
-    }
-  }
+  const check = checks.find((candidate) => openStates.has(candidate.status));
   if (!check)
     return {
       action: "left",
-      message: `no open margot check owned by this request and run on ${short} — nothing to close`,
+      message: `no open margot check on ${short} — nothing to close`,
     };
+
   const checkId = String(check.id);
-  const suffix = input.ownRunUrl.startsWith(input.ownRuns)
-    ? input.ownRunUrl.slice(input.ownRuns.length)
-    : "";
-  const attempt = suffix.match(/^(\d+)\/attempts\/(\d+)$/);
-  const nativeRepository = input.ownRuns.match(
-    /^https:\/\/github.com\/([^/]+\/[^/]+)\/actions\/runs\/$/,
-  )?.[1];
-  if (!attempt || attempt[1] !== input.ownRunId || !nativeRepository)
-    return { action: "error", message: "Attempt-qualified owned run required" };
-  const [runOwner = "", runRepo = ""] = nativeRepository.split("/");
-  async function fence() {
-    const run = (
-      await runsClient.rest.actions.getWorkflowRun({
-        owner: runOwner,
-        repo: runRepo,
-        run_id: Number(attempt?.[1]),
-      })
-    ).data;
-    if (
-      run.repository.full_name !== nativeRepository ||
-      run.run_attempt !== Number(attempt?.[2]) ||
-      run.id !== Number(attempt?.[1])
-    )
-      throw new Error("Native attempt superseded");
-    const pull = (await client.rest.pulls.get({ owner, repo, pull_number: input.pr })).data;
-    if (pull.head.sha !== head || pull.base.sha !== input.base)
-      throw new Error("Live revision moved; leave newer work untouched");
-    const owned = authenticateCheckRecord(
-      (await client.rest.checks.get({ owner, repo, check_run_id: Number(checkId) })).data,
-      request,
-      expected,
-    );
-    if (owned.record.owner_run_url !== input.ownRunUrl || !openStates.has(owned.check.status))
-      throw new Error("Check superseded or completed");
-    return owned;
-  }
+  const details = check.details_url ?? "";
+  if (details.startsWith(input.ownRuns) && details.slice(input.ownRuns.length) !== input.ownRunId)
+    return {
+      action: "left",
+      message: `check ${checkId} belongs to run ${details.slice(input.ownRuns.length)} — left to that run`,
+    };
+
   const stopped: [string, string] =
     input.routeResult !== "success"
       ? ["route", input.routeResult]
@@ -276,65 +200,14 @@ export async function closeStrandedCheck(
       ? stopChecks.cancelled(context)
       : stopChecks.unknown(context);
   try {
-    await fence();
-    // The final App receipt may have been lost after the native POST. Never replace
-    // a completed native publication with a cleanup failure.
-    for (let page = 1; ; page++) {
-      const reviews = (
-        await client.rest.pulls.listReviews({
-          owner,
-          repo,
-          pull_number: input.pr,
-          per_page: 100,
-          page,
-        })
-      ).data;
-      for (const candidate of reviews) {
-        try {
-          authenticateNativeReview(candidate, request, input.reviewActor, input.workflowRef);
-        } catch {
-          continue;
-        }
-        const native = (
-          await client.rest.pulls.getReview({
-            owner,
-            repo,
-            pull_number: input.pr,
-            review_id: candidate.id,
-          })
-        ).data;
-        if (native.id !== candidate.id) throw new Error("Native review ID mismatch");
-        authenticateNativeReview(native, request, input.reviewActor, input.workflowRef);
-        await fence();
-        return {
-          action: "left",
-          message: `native publication ${native.id} is complete — left for receipt recovery`,
-        };
-      }
-      if (reviews.length < 100) break;
-    }
-    const owned = await fence();
-    const text = checkMetadataText({ ...owned.record, phase: "failed", retryable: true });
     await client.rest.checks.update({
       owner,
       repo,
       check_run_id: check.id,
       status: "completed",
       conclusion: output.conclusion,
-      output: { title: output.title, summary: output.summary, text },
+      output: { title: output.title, summary: output.summary },
     });
-    const confirmed = authenticateCheckRecord(
-      (await client.rest.checks.get({ owner, repo, check_run_id: Number(checkId) })).data,
-      request,
-      expected,
-    );
-    if (
-      confirmed.check.status !== "completed" ||
-      confirmed.check.conclusion !== output.conclusion ||
-      confirmed.record.owner_run_url !== input.ownRunUrl ||
-      !confirmed.record.retryable
-    )
-      throw new Error("Cleanup write not confirmed");
   } catch (error) {
     return {
       action: "error",

@@ -1,31 +1,12 @@
 import type { Octokit } from "octokit";
 import type { z } from "zod";
-import {
-  authenticateCheckRecord,
-  authenticateTriageCheck,
-  type CheckRecord,
-  checkExternalId,
-  checkMetadataText,
-} from "../check-identity.js";
+import { authenticateTriageCheck, checkExternalId } from "../check-identity.js";
 import { errorMessage } from "../errors.js";
 import { holdReason } from "../policy.js";
 import { checkSummary, checkText } from "../render.js";
-import {
-  checkRecordSchema,
-  publisherSchema,
-  requestSchema,
-  triagePayloadSchema,
-} from "../schemas.js";
+import { publisherSchema, requestSchema, triagePayloadSchema } from "../schemas.js";
 import { type Stage, stages } from "../stages.js";
-import {
-  assertInvocation,
-  nativePublication,
-  recordFor,
-  reviewAdmission,
-  type TrustedClients,
-} from "../trusted-checks.js";
 import type { CallContext, ReviewRequest, ReviewResult, Services } from "../types.js";
-import type { LiveConfig } from "./live.js";
 
 // What the pull request is told when an error comes once the council has begun. An error
 // at any other stage ends as a check only; "publication-head" is a stale-head stop, which
@@ -55,22 +36,13 @@ class PublicationRefusal extends Error {
 export function githubPublisher(
   client: Octokit,
   input: z.infer<typeof publisherSchema>,
-  trusted?: { config: LiveConfig; clients: TrustedClients },
+  readClient: Octokit = client,
 ) {
   const config = publisherSchema.parse(input);
-  const readClient = trusted?.clients.read ?? client;
   const ids = new Map<string, number>();
   let active: ReviewRequest | undefined;
   // Set once the native review is on the pull request, so a later failure never says "not reviewed".
   let reviewPosted = false;
-  let reviewAttempted = false;
-  let publishedRecord: CheckRecord | undefined;
-  function identityConfig(r: ReviewRequest) {
-    if (!r.workflowRef) return undefined;
-    if (!trusted || trusted.config.handoff?.ref !== r.workflowRef)
-      throw new Error("Trusted review workflow configuration required");
-    return trusted;
-  }
   // The refusal the guard last raised, so a review that failed on it is refused, not errored.
   let refused: PublicationRefusal | undefined;
   const refuse = (reason: RefusalReason) => (refused = new PublicationRefusal(reason));
@@ -82,35 +54,20 @@ export function githubPublisher(
     return { owner, repo, pull_number: r.pr, request: { signal: c.signal } };
   };
   async function assertCurrentRun(r: ReviewRequest, c: CallContext) {
-    const migration = identityConfig(r);
-    if (migration)
-      await assertInvocation(
-        migration.clients.runs,
-        r,
-        migration.config,
-        r.phase === "triage" ? "code" : "review",
-      );
     const primary = checkName(active);
     const id = ids.get(primary);
     if (id) {
       const owned = (await client.rest.checks.get({ ...params(r, c), check_run_id: id })).data;
       if (
-        owned.id !== id ||
-        owned.name !== primary ||
-        owned.external_id !== checkExternalId(r) ||
+        (r.phase === "triage" &&
+          (owned.id !== id ||
+            owned.name !== primary ||
+            owned.external_id !== checkExternalId(r))) ||
         owned.details_url !== config.runUrl ||
         owned.head_sha !== r.head ||
         owned.app?.id !== config.appId
       )
         throw new Error("Publication superseded by another run");
-      if (migration && r.phase === "review")
-        authenticateCheckRecord(owned, r, {
-          appId: config.appId,
-          name: primary,
-          workflowRef: r.workflowRef as string,
-          kind: "review",
-          bound: true,
-        });
     }
   }
   async function guard(r: ReviewRequest, c: CallContext, allowMerged = false) {
@@ -133,34 +90,23 @@ export function githubPublisher(
     text: string | undefined,
     c: CallContext,
   ) {
-    const migration = identityConfig(r);
-    const marker =
-      migration && name === config.checks.review
-        ? (publishedRecord ?? {
-            ...recordFor(r, migration.config, "review", conclusion ? "failed" : "waiting"),
-            ...(conclusion ? { retryable: true } : {}),
-          })
-        : undefined;
+    const isTriage = name === config.checks.triage;
     const payload = {
       ...params(r, c),
       name,
       head_sha: r.head,
-      external_id: checkExternalId(r),
+      ...(isTriage ? { external_id: checkExternalId(r) } : {}),
       details_url: config.runUrl,
       status: conclusion ? ("completed" as const) : ("in_progress" as const),
       ...(conclusion ? { conclusion } : {}),
       output: {
         title,
         summary,
-        ...(marker
-          ? { text: checkMetadataText(marker, text) }
-          : text
-            ? { text: capCheckText(text) }
-            : {}),
+        ...(text ? { text: capCheckText(text) } : {}),
       },
     };
     let id = ids.get(name);
-    if (!id && !(migration && name === config.checks.review)) {
+    if (!id) {
       const checks = await client.paginate(client.rest.checks.listForRef, {
         ...params(r, c),
         ref: r.head,
@@ -174,14 +120,14 @@ export function githubPublisher(
             v.name === name &&
             v.head_sha === r.head &&
             v.app?.id === config.appId &&
-            v.external_id === checkExternalId(r),
+            (!isTriage || v.external_id === checkExternalId(r)),
         )
         .sort((a, b) => b.id - a.id)[0];
       // A same-head retry finds the previous run's check already completed. GitHub does
       // not reopen a completed check-run, so a retry opens a new one rather than
       // failing on the readback of a PATCH that could not take.
       if (existing && !(payload.status === "in_progress" && existing.status === "completed")) {
-        if (!Number.isSafeInteger(existing.id) || existing.id <= 0)
+        if (isTriage && (!Number.isSafeInteger(existing.id) || existing.id <= 0))
           throw new Error("Invalid check adoption ID");
         id = existing.id;
       }
@@ -191,9 +137,9 @@ export function githubPublisher(
       : await client.rest.checks.create(payload);
     const mismatches = [
       !Number.isSafeInteger(data.id) || data.id <= 0 ? "id" : "",
-      id !== undefined && data.id !== id ? "changed id" : "",
-      data.external_id !== payload.external_id ? "external_id" : "",
-      data.details_url !== config.runUrl ? "details_url" : "",
+      isTriage && id !== undefined && data.id !== id ? "changed id" : "",
+      isTriage && data.external_id !== payload.external_id ? "external_id" : "",
+      isTriage && data.details_url !== config.runUrl ? "details_url" : "",
       data.head_sha !== r.head ? `head_sha=${data.head_sha}` : "",
       data.name !== name ? `name=${data.name}` : "",
       data.app?.id !== config.appId ? `app=${data.app?.id}` : "",
@@ -202,6 +148,10 @@ export function githubPublisher(
     ].filter(Boolean);
     if (mismatches.length)
       throw new Error(`Invalid check write receipt for ${name}: ${mismatches.join(", ")}`);
+    if (!isTriage) {
+      ids.set(name, data.id);
+      return data;
+    }
     const persisted = (await client.rest.checks.get({ ...params(r, c), check_run_id: data.id }))
       .data;
     if (
@@ -218,17 +168,6 @@ export function githubPublisher(
       (persisted.output.text ?? undefined) !== payload.output.text
     )
       throw new Error(`Check write not confirmed for ${name}`);
-    if (marker) {
-      const authenticated = authenticateCheckRecord(persisted, r, {
-        appId: config.appId,
-        name,
-        workflowRef: r.workflowRef as string,
-        kind: "review",
-        bound: true,
-      });
-      if (JSON.stringify(authenticated.record) !== JSON.stringify(checkRecordSchema.parse(marker)))
-        throw new Error("Review identity write not confirmed");
-    }
     // Only authenticated persisted ownership may be reused by subsequent writes/cleanup.
     ids.set(name, data.id);
     return persisted;
@@ -271,7 +210,7 @@ export function githubPublisher(
     await assertCurrentRun(r, c);
     const current = (await readClient.rest.pulls.get(params(r, c))).data;
     return (
-      current.head.sha === r.head && current.base.sha === r.base && current.auto_merge === null
+      current.auto_merge === null && current.head.sha === r.head && current.base.sha === r.base
     );
   };
   async function triage(
@@ -336,22 +275,11 @@ export function githubPublisher(
     // Margot never dismisses her own earlier approvals: a new head gets a new review, and
     // branch protection handles stale approvals.
     await guard(r, c);
-    const migration = identityConfig(r);
-    const nativeMarker = migration
-      ? {
-          ...recordFor(r, migration.config, "review", "waiting"),
-          review_state: decision.mergeEligible ? ("APPROVED" as const) : ("COMMENTED" as const),
-          retryable: decision.outcome === "ERROR" || decision.holdReasons.includes("calibration"),
-        }
-      : undefined;
-    // Keep the complete native report/ledger. Check-output capping must not truncate memory.
-    const nativeBody = nativeMarker ? `${report}\n${checkMetadataText(nativeMarker)}` : report;
-    reviewAttempted = true;
     const { data } = await client.rest.pulls.createReview({
       ...params(r, c),
       commit_id: r.head,
       event: decision.mergeEligible ? "APPROVE" : "COMMENT",
-      body: nativeBody,
+      body: report,
     });
     reviewPosted = true;
     if (
@@ -363,26 +291,6 @@ export function githubPublisher(
       data.state !== (decision.mergeEligible ? "APPROVED" : "COMMENTED")
     )
       throw new Error("Invalid native review receipt");
-    if (nativeMarker && migration) {
-      // The native GET, not the mutation response, authenticates the publication receipt.
-      if (!nativeMarker.retryable)
-        await nativePublication(migration.clients, r, migration.config, data.id);
-      else {
-        const persisted = (
-          await migration.clients.read.rest.pulls.getReview({ ...params(r, c), review_id: data.id })
-        ).data;
-        if (
-          persisted.id !== data.id ||
-          persisted.body !== nativeBody ||
-          persisted.commit_id !== r.head ||
-          persisted.user?.login !== config.actor ||
-          persisted.user.type !== "Bot" ||
-          persisted.state !== nativeMarker.review_state
-        )
-          throw new Error("Native publication write not confirmed");
-      }
-      publishedRecord = { ...nativeMarker, phase: "published", native_review_id: data.id };
-    }
     if (!decision.mergeEligible && !(await disableAutoMerge(r, c)))
       throw new Error("Auto-merge disable was not confirmed");
     // Review first, then disarm held PRs, then conclude the required check.
@@ -427,18 +335,6 @@ export function githubPublisher(
     let errorOutput = { title: "Margot: not reviewed (error)", summary: defaultErrorSummary };
     const context = () => ({ signal: AbortSignal.timeout(60000) });
     try {
-      const migration = identityConfig(r);
-      if (migration && r.phase === "review") {
-        const admission = await reviewAdmission(r, migration.config, migration.clients);
-        if (admission.disposition === "completed")
-          return {
-            kind: "already_published",
-            request: r,
-            native_review_id: admission.native_review_id,
-            review_check_id: admission.review_check_id,
-          };
-        ids.set(config.checks.review, admission.review_check_id);
-      }
       await check(
         r,
         checkName(r),
@@ -487,8 +383,7 @@ export function githubPublisher(
           result.mechanical_probability ?? null,
         );
         return { ...result, triage_check_id };
-      } else if (result.kind === "already_published") return result;
-      else if (!result.publication || result.publication.recorded)
+      } else if (!result.publication || result.publication.recorded)
         throw new Error("Missing live publication receipt");
       return result;
     } catch (error) {
@@ -503,8 +398,7 @@ export function githubPublisher(
           );
         }
         try {
-          if (!ids.has(checkName(r)))
-            throw new Error("No authenticated check receipt for refusal cleanup");
+          if (!ids.has(checkName(r))) throw new Error("No owned check to close");
           await assertCurrentRun(r, context());
           await writeCheck(
             r,
@@ -532,7 +426,6 @@ export function githubPublisher(
           ...errorOutput,
           summary: Array.from(errorMessage(error)).slice(0, 900).join(""),
         };
-      publishedRecord = undefined;
       const failures: string[] = [];
       // Each cleanup is independent; inability to write can never become a successful result.
       const cleanups: [string, () => Promise<unknown>][] = [
@@ -572,7 +465,7 @@ export function githubPublisher(
       // The check is closed first; the author then gets the reason in the conversation too.
       // Nothing is said when the review is already on the pull request, or when the head
       // has moved, the pull request has closed or this run has been superseded.
-      if (notReviewed !== undefined && !reviewPosted && !reviewAttempted) {
+      if (notReviewed !== undefined && !reviewPosted) {
         // A deliberate refusal (closed, draft, fork, stale) skips the comment quietly; any
         // other failure to confirm the pull request is recorded, so a skip is never silent.
         const stillCurrent = await guard(r, context()).then(

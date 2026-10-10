@@ -60,20 +60,3 @@ describe("merge actor configuration", () => {
     }).toEqual({ configured: "merge-bot", unset: undefined });
   });
 });
-
-it("bound review refuses a policy that omits both mandatory contexts", async () => {
-  const copy = structuredClone(mechanicalBump);
-  const request = { ...mechanicalRequest, workflowRef: "v0.10.0" };
-  const services = recordedServices(copy);
-  const result = await review(
-    request,
-    { ...(copy.config as object), requiredChecks: [] },
-    services,
-  );
-  expect(result).toMatchObject({
-    kind: "error",
-    diagnostic: expect.stringContaining("Required check not trusted"),
-  });
-  expect(services.calls.map((c) => c.name)).not.toContain("route");
-  expect(services.publications).toEqual([]);
-});

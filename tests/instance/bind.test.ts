@@ -454,13 +454,6 @@ it("rejects the retired authority-check config while accepting the remaining pub
   source.publisher.checks.authority = "review / self-instrument";
   expect(liveConfigSchema.safeParse(source).success).toBe(false);
 });
-it("refuses the retired self-instrument command before creating a GitHub client", async () => {
-  let clients = 0;
-  await expect(
-    runInstanceCommand(["self-instrument"], {}, undefined, () => {
-      clients++;
-      throw new Error("unexpected client");
-    }),
-  ).rejects.toThrow("Usage:");
-  expect(clients).toBe(0);
+it("refuses the retired self-instrument command", async () => {
+  await expect(runInstanceCommand(["self-instrument"], {})).rejects.toThrow("Usage:");
 });
