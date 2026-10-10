@@ -58,6 +58,7 @@ export function githubPublisher(
   trusted?: { config: LiveConfig; clients: TrustedClients },
 ) {
   const config = publisherSchema.parse(input);
+  const readClient = trusted?.clients.read ?? client;
   const ids = new Map<string, number>();
   let active: ReviewRequest | undefined;
   // Set once the native review is on the pull request, so a later failure never says "not reviewed".
@@ -114,7 +115,7 @@ export function githubPublisher(
   }
   async function guard(r: ReviewRequest, c: CallContext, allowMerged = false) {
     refused = undefined;
-    const { data } = await client.rest.pulls.get(params(r, c));
+    const { data } = await readClient.rest.pulls.get(params(r, c));
     await assertCurrentRun(r, c);
     const merged = allowMerged && data.merged;
     if (!merged && data.state !== "open") throw refuse("closed");
@@ -257,7 +258,7 @@ export function githubPublisher(
       throw new Error("Review check was not confirmed after publication");
   }
   const disableAutoMerge: Services["disableAutoMerge"] = async (r, c) => {
-    const { data: pr } = await client.rest.pulls.get(params(r, c));
+    const { data: pr } = await readClient.rest.pulls.get(params(r, c));
     await assertCurrentRun(r, c);
     if (!pr.auto_merge) return true;
     if (!ids.has(checkName(active))) throw new Error("No authenticated check receipt for disarm");
@@ -268,7 +269,7 @@ export function githubPublisher(
       { id: pr.node_id, request: { signal: c.signal } },
     );
     await assertCurrentRun(r, c);
-    const current = (await client.rest.pulls.get(params(r, c))).data;
+    const current = (await readClient.rest.pulls.get(params(r, c))).data;
     return (
       current.head.sha === r.head && current.base.sha === r.base && current.auto_merge === null
     );
