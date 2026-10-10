@@ -29,6 +29,13 @@ it("accepts a skipped required check only when it is explicitly configured as al
   }).toMatchObject({
     kind: "reviewed",
   });
+  expect(
+    await review(
+      mechanicalRequest,
+      { ...config, allowedSkippedChecks: [] },
+      recordedServices(copy),
+    ),
+  ).toMatchObject({ kind: "error", stage: "checks", mergeEligible: false });
 });
 it("preserves mechanical classification for a 2005-line candidate", async () => {
   const copy = structuredClone(mechanicalBump);
