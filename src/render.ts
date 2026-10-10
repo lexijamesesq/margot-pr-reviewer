@@ -169,13 +169,13 @@ function cardRows(review: Review): { rows: string[]; findings: number } {
     const shared = owners.get(key) ?? [name];
     if (rendered.has(key)) {
       const primary = shared[0] ?? name;
-      return `* ℹ️ \`${name}\` — Same finding as \`${primary}\`. \`${first.location}\``;
+      return `* ℹ️ \`${name}\` — Same finding as \`${primary}\`.`;
     }
     rendered.add(key);
     const labels = shared.map((owner) => `\`${owner}\``).join(" + ");
     const icon = findings.some((finding) => finding.tag === "issue") ? "⚠️" : "ℹ️";
     const count = findings.length > 1 ? ` (${findings.length})` : "";
-    return `* ${icon} ${labels}${count} — ${sentence(firstSentence(first.what))} \`${first.location}\``;
+    return `* ${icon} ${labels}${count} — ${sentence(firstSentence(first.what))}`;
   });
   return { rows, findings: owners.size };
 }
