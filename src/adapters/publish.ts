@@ -168,7 +168,7 @@ export function githubPublisher(
       (persisted.output.text ?? undefined) !== payload.output.text
     )
       throw new Error(`Check write not confirmed for ${name}`);
-    // Only authenticated persisted ownership may be reused by subsequent writes/cleanup.
+    // Only authenticated persisted triage ownership may be reused by later triage writes/cleanup.
     ids.set(name, data.id);
     return persisted;
   }
@@ -200,7 +200,7 @@ export function githubPublisher(
     const { data: pr } = await readClient.rest.pulls.get(params(r, c));
     await assertCurrentRun(r, c);
     if (!pr.auto_merge) return true;
-    if (!ids.has(checkName(active))) throw new Error("No authenticated check receipt for disarm");
+    if (!ids.has(checkName(active))) throw new Error("No validated check write receipt for disarm");
     if (pr.head.sha !== r.head || pr.base.sha !== r.base)
       throw new Error("PR revision moved before disarm");
     await client.graphql(
@@ -440,7 +440,7 @@ export function githubPublisher(
           "write error check",
           () => {
             if (!ids.has(checkName(r)))
-              throw new Error("No authenticated check receipt for cleanup");
+              throw new Error("No validated check write receipt for cleanup");
             return check(
               r,
               checkName(r),
