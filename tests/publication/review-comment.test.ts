@@ -110,7 +110,7 @@ it("renders the first two sentences of a long rationale", () => {
     rationale: "> First sentence. Second sentence.",
   });
 });
-it("renders bounded prose for a long finding while the check keeps its full text", () => {
+it("renders bounded prose without a location suffix while the check keeps full details", () => {
   const value = structuredClone(authorChangesReview);
   const finding = value.cards.flatMap((card) => card.findings)[0];
   if (!finding) throw new Error("finding fixture required");
@@ -122,9 +122,9 @@ it("renders bounded prose for a long finding while the check keeps its full text
   expect({
     row,
     fullFindingInComment: report.includes(finding.what),
-    fullFindingInCheck: check.includes(finding.what),
+    fullFindingInCheck: check.includes(`${finding.location} · ${finding.what}`),
   }).toMatchObject({
-    row: `* ⚠️ \`principal-engineer\` — ${Array.from({ length: 32 }, () => "word").join(" ")}… \`GUIDE.md:40\``,
+    row: `* ⚠️ \`principal-engineer\` — ${Array.from({ length: 32 }, () => "word").join(" ")}…`,
     fullFindingInComment: false,
     fullFindingInCheck: true,
   });
@@ -169,8 +169,10 @@ it("renders a shared defect once and points the second card to it", () => {
   second.what = first.what;
   second.location = first.location;
   const report = render(value);
-  expect(report).toContain("`principal-engineer` + `maintainable-no-slop`");
-  expect(report).toContain("`maintainable-no-slop` — Same finding as `principal-engineer`");
+  const rows = report.split("\n").filter((line) => line.startsWith("* "));
+  expect(rows).toContain(`* ⚠️ \`principal-engineer\` + \`maintainable-no-slop\` — ${first.what}`);
+  expect(rows).toContain("* ℹ️ `maintainable-no-slop` — Same finding as `principal-engineer`.");
+  expect(checkText(value)).toContain(`${first.location} · ${first.what}`);
   expect(
     report.match(new RegExp(first.what.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")),
   ).toHaveLength(1);
