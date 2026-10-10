@@ -1,31 +1,8 @@
-import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import {
-  authenticateTriageCheck,
-  checkExternalId,
-  reviewRequestId,
-  textIdentity,
-} from "../src/check-identity.js";
+import { authenticateTriageCheck, checkExternalId } from "../src/check-identity.js";
 import { requestSchema } from "../src/schemas.js";
 import { readRecording } from "./helpers/recordings.js";
 
-const vectors = JSON.parse(
-  readFileSync(new URL("./fixtures/check-identity-v1.json", import.meta.url), "utf8"),
-);
-it("matches shared compact UTF-8 integer and exact-text fixture vectors", () => {
-  expect(reviewRequestId(vectors.request.input)).toBe(vectors.request.digest);
-  for (const v of vectors.texts)
-    expect(textIdentity(v.input[0], v.input[1], v.input[2], v.input[3])).toBe(v.digest);
-  expect(textIdentity("Café ☕\n", "", "feature/é", "main")).toBe(vectors.texts[0].digest);
-  expect(vectors.texts[0].digest).not.toBe(vectors.texts[1].digest);
-});
-it.each(["277", 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
-  "rejects non-safe-integer identity %s",
-  (id) => {
-    for (const key of ["pr", "triage_check_id"])
-      expect(() => reviewRequestId({ ...vectors.request.input, [key]: id })).toThrow();
-  },
-);
 const request = requestSchema.parse(readRecording("mechanical-bump").request);
 const payload = {
   version: 1,

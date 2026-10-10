@@ -29,6 +29,13 @@ it("accepts a skipped required check only when it is explicitly configured as al
   }).toMatchObject({
     kind: "reviewed",
   });
+  expect(
+    await review(
+      mechanicalRequest,
+      { ...config, allowedSkippedChecks: [] },
+      recordedServices(copy),
+    ),
+  ).toMatchObject({ kind: "error", stage: "checks", mergeEligible: false });
 });
 it("preserves mechanical classification for a 2005-line candidate", async () => {
   const copy = structuredClone(mechanicalBump);
@@ -59,21 +66,4 @@ describe("merge actor configuration", () => {
       unset: mechanicalReview.presentation?.mergeActor,
     }).toEqual({ configured: "merge-bot", unset: undefined });
   });
-});
-
-it("bound review refuses a policy that omits both mandatory contexts", async () => {
-  const copy = structuredClone(mechanicalBump);
-  const request = { ...mechanicalRequest, workflowRef: "v0.10.0" };
-  const services = recordedServices(copy);
-  const result = await review(
-    request,
-    { ...(copy.config as object), requiredChecks: [] },
-    services,
-  );
-  expect(result).toMatchObject({
-    kind: "error",
-    diagnostic: expect.stringContaining("Required check not trusted"),
-  });
-  expect(services.calls.map((c) => c.name)).not.toContain("route");
-  expect(services.publications).toEqual([]);
 });

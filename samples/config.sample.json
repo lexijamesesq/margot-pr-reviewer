@@ -7,11 +7,10 @@
       "YOUR_CHECK_APP"
     ],
     "trustedTriageActors": [
-      "YOUR_REVIEW_APP"
+      "triage-app"
     ],
     "requiredChecks": [
-      "ci / checks",
-      "trusted-scan / trusted-scan"
+      "YOUR_REQUIRED_CHECK"
     ],
     "allowedSkippedChecks": [],
     "cardBundle": {
@@ -29,10 +28,8 @@
     "trustedLedgerActors": [
       "YOUR_REVIEW_APP[bot]"
     ],
-    "requiredCheckReporters": {
-      "ci / checks": 123456,
-      "trusted-scan / trusted-scan": 123456
-    }
+    "trustedTriageAppId": 1,
+    "trustedTriageCheckName": "review / triage"
   },
   "github": {
     "gh": "YOUR_GH_EXECUTABLE",
@@ -42,13 +39,11 @@
   "publisher": {
     "checks": {
       "triage": "review / triage",
-      "review": "review / margot",
-      "code": "ci / checks",
-      "text": "trusted-scan / trusted-scan"
+      "review": "review / margot"
     },
     "actor": "YOUR_REVIEW_APP[bot]",
-    "appId": 123456,
-    "runUrl": "https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/1/attempts/1"
+    "appId": 1,
+    "runUrl": "https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/1"
   },
   "jev": {
     "model": "YOUR_JEV_VERSION",
@@ -83,10 +78,5 @@
         "head": "0000000000000000000000000000000000000000"
       }
     }
-  },
-  "handoff": {
-    "repository": "YOUR_ORG/YOUR_CONTROL_REPOSITORY",
-    "workflow": "margot-review.yml",
-    "ref": "v0.10.0"
   }
 }

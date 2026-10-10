@@ -1,4 +1,4 @@
-import { authenticateTriageFacts, textIdentity } from "./check-identity.js";
+import { authenticateTriageFacts } from "./check-identity.js";
 import { errorMessage } from "./errors.js";
 import {
   configHash,
@@ -46,11 +46,11 @@ import {
   voiceSchema,
 } from "./schemas.js";
 import { type CardStage, cardStage, classificationLimits, type Stage, stages } from "./stages.js";
-import { evaluateRequiredChecks } from "./trusted-checks.js";
 import type {
   Adherence,
   Bundle,
   Card,
+  Facts,
   Review,
   ReviewCore,
   ReviewPhaseTitle,
@@ -64,6 +64,20 @@ function ticket(body: string): { label: string; url: string } | null {
   return match?.[0] && match[1] ? { label: match[1], url: match[0] } : null;
 }
 
+type CheckFact = Facts["checks"][number];
+function currentCheck(runs: CheckFact[]): CheckFact | undefined {
+  let current: CheckFact | undefined;
+  for (const run of runs) {
+    if (!current) current = run;
+    else if ((run.id ?? 0) > (current.id ?? 0)) current = run;
+    else if (
+      (run.id ?? 0) === (current.id ?? 0) &&
+      (run.startedAt ?? "") > (current.startedAt ?? "")
+    )
+      current = run;
+  }
+  return current;
+}
 const optionalAdherence = (value: Adherence | undefined) =>
   value === undefined ? {} : { adherence: value };
 /**
@@ -254,38 +268,21 @@ export async function review(
     mechanicalProbability = verified.mechanicalProbability ?? null;
     if (cached && classification !== cached.review.classification) cached = undefined;
     stage = stages.checks;
-    const floor = evaluateRequiredChecks(
-      request,
-      {
-        ...config,
-        requiredChecks: config.requiredChecks.filter(
-          (name) => !config.ownCheckNames?.includes(name),
-        ),
-        ...(config.trustedCodeCheckName ? { codeName: config.trustedCodeCheckName } : {}),
-        ...(config.trustedTextCheckName ? { textName: config.trustedTextCheckName } : {}),
-        ...(config.trustedWorkflowRef ? { workflowRef: config.trustedWorkflowRef } : {}),
-        controlAppId: config.trustedTriageAppId,
-      },
-      facts.checks.map((check) => ({
-        id: check.id ?? 1,
-        name: check.name,
-        head_sha: check.head,
-        app: { id: check.appId, slug: check.actor },
-        external_id: check.externalId ?? null,
-        details_url: check.detailsUrl ?? null,
-        status: check.status ?? (check.conclusion === "pending" ? "in_progress" : "completed"),
-        conclusion: check.conclusion === "pending" ? null : check.conclusion,
-        started_at: check.startedAt,
-        output: { text: check.outputText ?? null },
-      })),
-      facts.headRefName !== undefined && facts.baseRefName !== undefined
-        ? textIdentity(facts.title, facts.body, facts.headRefName, facts.baseRefName)
-        : undefined,
-    );
-    if (!floor.green)
-      throw new Error(
-        `Required check not trusted and green: ${[...floor.failing, ...floor.pending].join(", ")}`,
-      );
+    for (const name of config.requiredChecks) {
+      const check = currentCheck(facts.checks.filter((c) => c.name === name));
+      if (
+        !check ||
+        check.head !== request.head ||
+        !(
+          check.conclusion === "success" ||
+          (check.conclusion === "skipped" && config.allowedSkippedChecks.includes(name))
+        ) ||
+        !config.trustedCheckActors.includes(check.actor) ||
+        (config.requiredCheckReporters?.[name] !== undefined &&
+          check.appId !== config.requiredCheckReporters[name])
+      )
+        throw new Error(`Required check not trusted and green: ${name}`);
+    }
     let comparison: unknown;
     const compare = services.compare;
     if (prior && prior.head !== request.head && !cached && compare) {

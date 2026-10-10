@@ -5,7 +5,6 @@ import { checkText, render } from "../../src/render.js";
 import { cardNames, factsSchema } from "../../src/schemas.js";
 import {
   asDocumentation,
-  type Change,
   classifiedAs,
   type Draft,
   recorded,
@@ -23,11 +22,6 @@ const pinnedClaude = {
   executable: "claude",
   version: "1.0.0",
   reviewerModel: "configured-reviewer-model",
-};
-
-/** A request from a host with no dispatcher: it carries no class. */
-const withoutDispatchedClass: Change = (draft) => {
-  delete draft.request.classification;
 };
 
 /** The question text the review sent Jev for one classification key. */
@@ -141,21 +135,6 @@ describe("trusted triage", () => {
     );
     expect(result).toMatchObject({ kind: "error", stage: "input" });
     expect(calls).toEqual([]);
-  });
-
-  it("keeps a verified triage's class when no class is dispatched", async () => {
-    for (const classification of ["mechanical", "documentation"]) {
-      const { result, calls } = await reviewed(
-        recorded(
-          "council-clear",
-          asDocumentation(1),
-          withTriage({ classification }),
-          withoutDispatchedClass,
-        ),
-      );
-      expect(calls).not.toContain("classification");
-      expect(result).toMatchObject({ classification, provenance: { classification: "jev" } });
-    }
   });
 
   it.each([

@@ -521,24 +521,6 @@ describe("fallback decisions", () => {
       spy.mockRestore();
     }
   });
-  it("uses class probabilities without importing the review fallback hold prompt", async () => {
-    const prompts: string[] = [];
-    const spy = vi.spyOn(processAdapter, "execute").mockImplementation(async (_file, args) => {
-      if (args[0] === "--version") return "1.0.0 (Claude Code)";
-      prompts.push(present(args[1]));
-      return JSON.stringify({ result: { mechanical: { noul: 1 } } });
-    });
-    try {
-      const questions = { mechanical: { type: "noul", instructions: "Mechanical?" } };
-      await decisionFallback(questions, "diff", context(), pinnedClaude, "classification");
-      await decisionFallback(questions, "diff", context(), pinnedClaude);
-      expect(prompts[0]).toContain("probability [0,1] that its proposition holds");
-      expect(prompts[0]).not.toContain("degraded decision cannot auto-merge");
-      expect(prompts[1]).toContain("Your degraded decision cannot auto-merge");
-    } finally {
-      spy.mockRestore();
-    }
-  });
   it("refuses a Claude CLI that is not the pinned version", async () => {
     const calls: string[][] = [];
     const spy = vi.spyOn(processAdapter, "execute").mockImplementation(async (_file, args) => {

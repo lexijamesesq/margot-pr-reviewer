@@ -63,12 +63,6 @@ export type RoundScope = {
   entries: Ledger["entries"];
 };
 export type ReviewResult =
-  | {
-      kind: "already_published";
-      request: ReviewRequest;
-      native_review_id: number;
-      review_check_id: number;
-    }
   | ({
       kind: "reviewed";
       report: string;

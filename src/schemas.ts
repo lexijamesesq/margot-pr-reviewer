@@ -60,15 +60,6 @@ export const triagePayloadSchema = z
     (v) => v.mechanical === undefined || v.mechanical === (v.classification === "mechanical"),
     "Mechanical compatibility field must agree with classification",
   );
-export const reviewIdentitySchema = z.strictObject({
-  repository: repositorySchema,
-  pr: checkIdSchema,
-  base_sha: shaSchema,
-  head_sha: shaSchema,
-  triage_check_id: checkIdSchema,
-  // Selected from trusted instance configuration, never a dispatch-supplied reference.
-  workflow_ref: text,
-});
 export const requestSchema = z.strictObject({
   repository: repositorySchema,
   pr: checkIdSchema,
@@ -85,10 +76,6 @@ export const configSchema = z
     trustedTriageActors: z.array(text),
     trustedTriageAppId: checkIdSchema.optional(),
     trustedTriageCheckName: text.optional(),
-    trustedCodeCheckName: text.optional(),
-    trustedTextCheckName: text.optional(),
-    trustedWorkflowRef: text.optional(),
-    ownCheckNames: z.array(text).optional(),
     trustedLedgerActors: z.array(text).default([]),
     requiredChecks: z.array(text),
     requiredCheckReporters: z.record(text, checkIdSchema).optional(),
@@ -137,8 +124,6 @@ export const factsSchema = z.strictObject({
   head: shaSchema,
   title: text,
   body: z.string(),
-  headRefName: z.string().optional(),
-  baseRefName: z.string().optional(),
   author: text,
   diff: text,
   complete: z.boolean(),
@@ -149,10 +134,6 @@ export const factsSchema = z.strictObject({
       name: text,
       actor: text,
       appId: checkIdSchema.optional(),
-      externalId: z.string().nullable().optional(),
-      detailsUrl: z.string().nullable().optional(),
-      outputText: z.string().nullable().optional(),
-      status: z.string().optional(),
       head: shaSchema,
       // GitHub's own conclusion, or `pending` while the run is not complete.
       conclusion: z.enum(checkConclusions),
@@ -295,8 +276,6 @@ export const publisherSchema = z.strictObject({
   checks: z.strictObject({
     triage: text,
     review: text,
-    code: text.optional(),
-    text: text.optional(),
   }),
   actor: text,
   appId: z.number().int().positive(),
@@ -475,51 +454,3 @@ export const comparisonSchema = z.strictObject({
   diff: z.string(),
   complete: z.boolean(),
 });
-
-/** App-owned control records; private PR text is represented only by its digest. */
-export const checkRecordSchema = z
-  .strictObject({
-    version: z.literal(1),
-    kind: z.enum(["code", "text", "review"]),
-    repository: repositorySchema,
-    pr: checkIdSchema,
-    base_sha: shaSchema,
-    head_sha: shaSchema,
-    workflow_ref: text,
-    triage_check_id: checkIdSchema.optional(),
-    request_id: z
-      .string()
-      .regex(/^[a-f0-9]{64}$/)
-      .optional(),
-    phase: z.enum([
-      "checking",
-      "code_passed",
-      "text_passed",
-      "waiting",
-      "published",
-      "failed",
-      "complete",
-    ]),
-    owner_run_url: z.url(),
-    text_digest: z
-      .string()
-      .regex(/^[a-f0-9]{64}$/)
-      .optional(),
-    handoff: z.enum(["accepted", "not_sent_text_failed", "failed", "uncertain"]).optional(),
-    native_review_id: checkIdSchema.optional(),
-    review_state: z.enum(["APPROVED", "COMMENTED"]).optional(),
-    retryable: z.boolean().optional(),
-  })
-  .superRefine((v, ctx) => {
-    const bound = v.triage_check_id !== undefined && v.request_id !== undefined;
-    if (
-      (v.triage_check_id === undefined) !== (v.request_id === undefined) ||
-      (["code_passed", "text_passed", "waiting", "published"].includes(v.phase) && !bound) ||
-      (v.kind === "text" && v.text_digest === undefined) ||
-      (v.phase === "published" &&
-        (v.kind !== "review" || !v.native_review_id || !v.review_state)) ||
-      (v.kind === "code" && v.phase === "complete" && (!bound || !v.handoff)) ||
-      (v.kind === "text" && v.phase === "complete" && (!bound || v.handoff !== "accepted"))
-    )
-      ctx.addIssue({ code: "custom", message: "Incomplete or inconsistent control record" });
-  });

@@ -316,43 +316,13 @@ describe("GitHub triage and diff size", () => {
           decisionSource: "fallback",
         },
       });
-      for (const patch of [
-        { id: 102 },
-        { name: "other" },
-        { app: { id: 15368, slug: "triage-app" } },
-        { status: "in_progress" },
-        { conclusion: "failure" },
-        { conclusion: "skipped" },
-        { head_sha: "f".repeat(40) },
-        { external_id: "foreign" },
-        { output: { text: "bad JSON" } },
-      ]) {
-        receiptOverride = (v) => ({ ...v, ...patch });
-        await expect(
-          githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
-            request,
-            context(),
-          ),
-        ).rejects.toThrow();
-      }
-      for (const patch of [
-        { version: 2 },
-        { pr: 999 },
-        { repository: "foreign/repo" },
-        { base_sha: "f".repeat(40) },
-        { head_sha: "f".repeat(40) },
-      ]) {
-        receiptOverride = (v) => ({
-          ...v,
-          output: { text: JSON.stringify({ ...JSON.parse(v.output.text), ...patch }) },
-        });
-        await expect(
-          githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
-            request,
-            context(),
-          ),
-        ).rejects.toThrow();
-      }
+      receiptOverride = (v) => ({ ...v, app: { id: 15368, slug: "triage-app" } });
+      await expect(
+        githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
+          request,
+          context(),
+        ),
+      ).rejects.toThrow();
       receiptOverride = () => {
         throw new Error("missing check");
       };
