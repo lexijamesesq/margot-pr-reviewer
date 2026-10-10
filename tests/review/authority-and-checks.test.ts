@@ -86,6 +86,13 @@ describe("required checks", () => {
     ["did not succeed", withCheck({ conclusion: "failure" })],
     ["concluded neutral", withCheck({ conclusion: "neutral" })],
     ["was cancelled", withCheck({ conclusion: "cancelled" })],
+    [
+      "has a newer queued run with no start time after an older success",
+      withChecks(checkRun("success", 1, "2026-10-01T21:35:42Z"), {
+        ...checkRun("pending", 2, ""),
+        startedAt: undefined,
+      }),
+    ],
   ])("errors at the checks stage when the required check %s", async (_cause, change) => {
     const { result } = await reviewRecording(
       recorded("council-clear", withConfig({ requiredCheckReporters: { ci: 42 } }), change),

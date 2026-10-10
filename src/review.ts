@@ -69,10 +69,10 @@ function currentCheck(runs: CheckFact[]): CheckFact | undefined {
   let current: CheckFact | undefined;
   for (const run of runs) {
     if (!current) current = run;
-    else if ((run.startedAt ?? "") > (current.startedAt ?? "")) current = run;
+    else if ((run.id ?? 0) > (current.id ?? 0)) current = run;
     else if (
-      (run.startedAt ?? "") === (current.startedAt ?? "") &&
-      (run.id ?? 0) > (current.id ?? 0)
+      (run.id ?? 0) === (current.id ?? 0) &&
+      (run.startedAt ?? "") > (current.startedAt ?? "")
     )
       current = run;
   }
