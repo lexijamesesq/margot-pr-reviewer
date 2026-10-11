@@ -478,9 +478,11 @@ describe("fallback decisions", () => {
   it("asks Haiku for structured decisions with bound evidence and no tools", async () => {
     const spy = vi.spyOn(processAdapter, "execute");
     let flags: string[] = [];
-    spy.mockImplementation(async (_file, args) => {
+    let input: string | undefined;
+    spy.mockImplementation(async (_file, args, options) => {
       if (args[0] === "--version") return "1.0.0 (Claude Code)";
       flags = args;
+      input = options?.input;
       return JSON.stringify({
         result: JSON.stringify({ lens: { noul: 0.9 }, exposure: { score: 2 } }),
       });
@@ -503,7 +505,7 @@ describe("fallback decisions", () => {
         tools: flags[forbidden + 1],
         strict: flags.includes("--strict-mcp-config"),
         sources: flags[flags.indexOf("--setting-sources") + 1],
-        state: present(flags[1]).includes(JSON.stringify({ diff: facts.diff })),
+        state: present(input).includes(JSON.stringify({ diff: facts.diff })),
         required: schema.required,
       }).toMatchObject({
         answers: {

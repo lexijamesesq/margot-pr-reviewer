@@ -40,7 +40,6 @@ export async function decisionFallback(
     claude.executable,
     [
       "-p",
-      prompt,
       "--json-schema",
       JSON.stringify(schema),
       "--output-format",
@@ -56,7 +55,7 @@ export async function decisionFallback(
       "--tools",
       "",
     ],
-    { signal: context.signal, env: claudeEnvironment(process.env) },
+    { signal: context.signal, env: claudeEnvironment(process.env), input: prompt },
   );
   const envelope = JSON.parse(raw);
   if (envelope.is_error || String(envelope.subtype ?? "").startsWith("error"))
