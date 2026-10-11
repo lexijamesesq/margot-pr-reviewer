@@ -10,7 +10,6 @@ const outcomeIcons = {
   ERROR: "🚫",
 } as const;
 const bandIcons = { LOW: "🟢", MEDIUM: "🟡", HIGH: "🔴" } as const;
-const maxVisibleChars = 160;
 
 /** Every listed issue has exactly one fate; advisory issues remain open. */
 export function findingTally(review: Review) {
@@ -24,13 +23,6 @@ export function findingTally(review: Review) {
 
 const normalized = (value: string) => value.trim().replace(/\s+/gu, " ");
 
-function cutAtWord(value: string): string {
-  const text = normalized(value);
-  if (text.length <= maxVisibleChars) return text;
-  const boundary = text.slice(0, maxVisibleChars).lastIndexOf(" ");
-  return `${text.slice(0, boundary > 0 ? boundary : maxVisibleChars).trimEnd()}…`;
-}
-
 function firstSentences(value: string, count: number): string {
   return normalized(value)
     .split(/(?<=[.!?]) +/u)
@@ -38,7 +30,7 @@ function firstSentences(value: string, count: number): string {
     .join(" ");
 }
 
-const firstSentence = (value: string) => cutAtWord(firstSentences(value, 1));
+const firstSentence = (value: string) => firstSentences(value, 1);
 const sentence = (value: string) => (/[.!?…]$/u.test(value) ? value : `${value}.`);
 
 function firstClause(value: string): string {
@@ -264,7 +256,6 @@ export function render(review: Review): string {
     `### ${outcomeIcons[decision.outcome]} ${decision.outcome}`,
     `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}**${risk ? ` — ${risk}` : ""}`,
     `> ${firstSentences(rationale, 2)}`,
-    `Classification: ${review.classification} (source: ${review.provenance.classification})`,
     ...(fallbackNotice(review.decision.holdReasons)
       ? [`> ⚠️ _${fallbackNotice(review.decision.holdReasons)}, so nothing was auto-merged._`]
       : []),

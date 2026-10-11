@@ -193,7 +193,7 @@ describe("trusted triage", () => {
       provenance: { classification: "fallback", decision_source: "jev" },
     });
     expect(checkText(result)).toContain("classification_source: fallback");
-    expect(render(result)).toContain("Classification: mechanical (source: fallback)");
+    expect(render(result)).not.toContain("Classification:");
   });
 
   it("classifies oversized triage input instead of overriding it", async () => {
