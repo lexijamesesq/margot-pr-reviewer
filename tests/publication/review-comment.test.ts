@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { checkSummary, checkText, render } from "../../src/render.js";
-import { present } from "../helpers/present.js";
 import { authorChangesReview, mechanicalReview } from "../helpers/publication.js";
 import {
   asDocumentation,
@@ -176,27 +175,6 @@ it("renders a shared defect once and points the second card to it", () => {
   expect(
     report.match(new RegExp(first.what.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")),
   ).toHaveLength(1);
-});
-describe("merge actor in the authority hold", () => {
-  function authorityHold(mergeActor?: string) {
-    const value = structuredClone(mechanicalReview);
-    value.decision.mergeEligible = false;
-    value.decision.holdReasons = ["review-authority"];
-    value.presentation = { ...present(value.presentation), ...(mergeActor ? { mergeActor } : {}) };
-    return render(value);
-  }
-  it("names the configured merge actor", () => {
-    expect(authorityHold("merge-bot")).toContain(
-      "Above my authority: it touches a protected path. Approve it and merge-bot merges it.",
-    );
-  });
-  it("names no merger when none is configured", () => {
-    const report = authorityHold();
-    expect(report).toContain(
-      "Above my authority: it touches a protected path. Approve it to merge it.",
-    );
-    expect(report).not.toContain("merges it");
-  });
 });
 describe("a verdict code reaches without the voice", () => {
   const head = (report: string) => report.split("\n").slice(1, 3);

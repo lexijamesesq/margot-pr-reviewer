@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { recordedServices } from "../../src/adapters/recorded.js";
 import { review } from "../../src/review.js";
-import { mechanicalBump, mechanicalRequest, mechanicalReview } from "../helpers/publication.js";
+import { mechanicalBump, mechanicalRequest } from "../helpers/publication.js";
 
 it("accepts a skipped required check only when it is explicitly configured as allowed to skip", async () => {
   const copy = structuredClone(mechanicalBump);
@@ -53,17 +53,4 @@ it("preserves mechanical classification for a 2005-line candidate", async () => 
     classificationCall: services.calls.some((call) => call.name === "classification"),
     routeCall: services.calls.some((call) => call.name === "route"),
   }).toMatchObject({ mechanical: true, classificationCall: false, routeCall: false });
-});
-describe("merge actor configuration", () => {
-  it("carries the configured merge actor from the configuration to the presentation", async () => {
-    const withActor = await review(
-      mechanicalRequest,
-      { ...(mechanicalBump.config as object), mergeActor: "merge-bot" },
-      recordedServices(mechanicalBump),
-    );
-    expect({
-      configured: withActor.kind === "reviewed" && withActor.presentation?.mergeActor,
-      unset: mechanicalReview.presentation?.mergeActor,
-    }).toEqual({ configured: "merge-bot", unset: undefined });
-  });
 });

@@ -101,15 +101,17 @@ never on its command line. `claude.container.docker` names the docker executable
    | `YOUR_MARGOT_DEPLOYMENT_JSON`, `YOUR_MARGOT_CONFIG_JSON` | variables | `deployment.json` and the configuration (the self-hosted sample reads them from `/trusted/margot/` instead) |
    | `MARGOT_APP_ID: "123456"` | value | the App ID again, for the closer |
    | `YOUR_ORG`, `YOUR_REPOSITORY`, `YOUR_REVIEW_REPOSITORY`, `YOUR_REFERENCE_REPOSITORY` | values | your owner, a reviewed repository, the repository that runs the workflow, a `claude.references` repository |
-   | `YOUR_REVIEW_RUNNER`, `YOUR_REQUIRED_CHECK`, `YOUR_AUTHORITY_PATH` | values | your self-hosted runner's label, your required checks, your protected paths |
+   | `YOUR_REVIEW_RUNNER`, `YOUR_REQUIRED_CHECK` | values | your self-hosted runner's label and your required checks |
 
 2. **Jev.** Margot requires [Jev](https://typesafe.ai), a third-party scoring service
    from TypeSafe. Get an API key from TypeSafe for `JEV_KEY`, and set `jev.model` to a
    Jev model version they provide.
 3. **The card bundle.** Set `review.cardBundle.commit` to a commit of
    [publish-skills](https://github.com/lexijamesesq/publish-skills) compatible with
-   your release; for this release, `0c6819c3a4706b47bd280b29560aeebe6dbd41ad`. A fork
-   works too. The workflow checks it out at `claude.pluginDirectory`.
+   your release. Use the reviewed, released bundle that applies ordinary review
+   to reviewer and prompt changes without a self-authority risk rule. A fork
+   works too. Record its exact commit; the workflow checks it out at
+   `claude.pluginDirectory`.
 4. **Build, push and pin the runtime image**, from the installed release package (it
    ships `runtime/`), or from a checkout after `npm run build`. Both build arguments
    are required: `CLAUDE_CODE_VERSION` equal to `claude.version` (set `claude.version` to
@@ -158,10 +160,8 @@ A review run takes two JSON files: a request and a configuration.
   (`triage` or `review`); a review carries the exact `triageCheckId`. See `samples/request.sample.json`.
 - **Configuration** — review policy, GitHub options, the Jev risk model, and the
   Claude executable and plugin directory. See `samples/config.sample.json` for
-  every key, including the review card bundle pin, protected paths, required
+  every key, including the review card bundle pin, required
   checks, trusted actors, and the classification/routing/risk thresholds.
-  `review.mergeActor` is optional: the name shown on a held pull request as who
-  merges it once approved; unset, the hold says only "approve it to merge it".
 
 GitHub mode: with `margot-instance bind-request --authority true` the review publishes
 its comment and check runs to the pull request. That needs the `publisher` block (the two check
@@ -265,7 +265,7 @@ Reads the PR through the GitHub API using `GH_TOKEN`. Before writing any
 configuration it classifies a merged, closed, superseded, draft, fork-head,
 conflicted, or empty request and stops instead. Otherwise it writes
 `request.json` and `config.json` under the given Margot root, with the supplied
-required checks, protected paths, allowed skipped checks, and authority applied.
+required checks, allowed skipped checks, and authority applied.
 `--base` rejects a moved base; `--triage-check-id` carries the exact classification
 receipt. `--required-check-reporters` accepts a JSON object of check names to App IDs.
 With `--authority true` the review publishes to GitHub, and `--run-url` must name
@@ -286,7 +286,7 @@ margot-instance bind-request \
   --base "$BASE_SHA" --triage-check-id "$TRIAGE_CHECK_ID" \
   --phase review --authority false --margot-root "$MARGOT_ROOT" \
   --config /trusted/config.json --required-checks '["ci / checks"]' \
-  --protected-paths '[".github/**"]' --allowed-skipped-checks '[]' \
+  --allowed-skipped-checks '[]' \
   --run-url "$RUN_URL"
 ```
 
@@ -327,11 +327,8 @@ risk score of a functional or mechanical change came from the fallback model
 rather than Jev (a documentation change is reviewed and not held for its
 routing); the review history
 could not be read or a trusted ledger in it is corrupt; the
-protected-path ownership tier could not be computed; calibration mode is on; the
-voice's outcome is anything other than APPROVED; a rename touches a protected
-path on either its old or new path; or the change is classified `functional`
-and touches a protected path. A documentation or mechanical edit to a protected
-path does not hold on that account alone. An `ERROR` outcome means the review
+ownership tier could not be computed; calibration mode is on; or the
+voice's outcome is anything other than APPROVED. An `ERROR` outcome means the review
 could not be completed at all and is always held.
 
 ## Library API

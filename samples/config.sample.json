@@ -1,8 +1,5 @@
 {
   "review": {
-    "protectedPaths": [
-      "YOUR_AUTHORITY_PATH/**"
-    ],
     "trustedCheckActors": [
       "YOUR_CHECK_APP"
     ],
@@ -23,7 +20,6 @@
     "noCouncilConfidenceFloor": 0.3,
     "timeoutMs": 900000,
     "publication": "record",
-    "mergeActor": "YOUR_MERGE_ACTOR",
     "calibration": false,
     "trustedLedgerActors": [
       "YOUR_REVIEW_APP[bot]"

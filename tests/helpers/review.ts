@@ -99,11 +99,6 @@ export const withFacts =
   (draft) => {
     Object.assign(draft.facts, fields);
   };
-export const withFiles =
-  (...paths: (string | Obj)[]): Change =>
-  (draft) => {
-    draft.facts.files = paths.map((file) => (typeof file === "string" ? { path: file } : file));
-  };
 /** Replaces the recorded required-check runs. */
 export const withChecks =
   (...checks: Obj[]): Change =>

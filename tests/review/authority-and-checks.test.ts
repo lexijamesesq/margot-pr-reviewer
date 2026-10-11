@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  asDocumentation,
   checkRun,
   recorded,
   reviewed,
@@ -8,66 +7,9 @@ import {
   withCheck,
   withChecks,
   withConfig,
-  withFacts,
-  withFiles,
 } from "../helpers/review.js";
 
-const protectGithubDirectory = withConfig({ protectedPaths: [".github/**"] });
-
-describe("protected paths", () => {
-  it("holds a functional change on a protected path for the review authority", async () => {
-    const { result } = await reviewed(recorded("council-clear", protectGithubDirectory));
-    expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["review-authority"]);
-  });
-
-  it("leaves ordinary documentation on a protected path with its author", async () => {
-    const { result } = await reviewed(
-      recorded("council-clear", asDocumentation(1), protectGithubDirectory),
-    );
-    expect(result.decision.mergeEligible).toBe(true);
-    expect(result.decision.holdReasons).toEqual([]);
-  });
-
-  it("holds a file renamed away from a protected path", async () => {
-    const { result } = await reviewed(
-      recorded(
-        "council-clear",
-        asDocumentation(1),
-        protectGithubDirectory,
-        withFiles({ path: "guide.md", previousPath: ".github/workflows/old.yml" }),
-      ),
-    );
-    expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["review-authority"]);
-  });
-
-  it("holds a file renamed onto a protected path", async () => {
-    const { result } = await reviewed(
-      recorded(
-        "council-clear",
-        asDocumentation(1),
-        protectGithubDirectory,
-        withFiles({ path: ".github/workflows/new.yml", previousPath: "guide.md" }),
-      ),
-    );
-    expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["review-authority"]);
-  });
-
-  it("protects the sixty-first file in the listing", async () => {
-    const sixtyFiles = Array.from({ length: 60 }, (_, index) => `file-${index}.ts`);
-    const { result } = await reviewed(
-      recorded(
-        "council-clear",
-        withFiles(...sixtyFiles, "authority.ts"),
-        withFacts({ fileCount: 61 }),
-        withConfig({ protectedPaths: ["authority.ts"] }),
-      ),
-    );
-    expect(result.decision.holdReasons).toEqual(["review-authority"]);
-  });
-
+describe("calibration", () => {
   it("never clears a calibration run", async () => {
     const { result } = await reviewed(
       recorded("mechanical-bump", withConfig({ calibration: true })),

@@ -3,8 +3,8 @@ import { recordedServices } from "../../src/adapters/recorded.js";
 import { ledgerBlock, savedAdherence, selectLedger } from "../../src/ledger.js";
 import { review } from "../../src/review.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
-// 0.9.1's own ledger reader, vendored verbatim from tag v0.9.1 (src/ledger.ts and what it
-// imports): the release a rollback would return to.
+// The ledger reader from tag v0.9.1. Its mutable schema/type fixtures omit retired
+// self-instrument fields; the historical ledger-reading implementation is unchanged.
 import { selectLedger as selectLedger091 } from "../fixtures/v0.9.1/ledger.js";
 import { recorded } from "../helpers/review.js";
 
@@ -68,17 +68,22 @@ it("reads back the adherence marker Margot writes last, not an earlier one", asy
   expect(savedAdherence(`${forged}\n${result.report}`)).toEqual(adherence);
 });
 
-it("reads historical dispatch fields only as inert saved receipt data", async () => {
+it("reads historical receipt fields only as inert saved data", async () => {
   const { draft, result, config, facts } = await reviewedAndPosted();
   const ledger = structuredClone(result.ledger);
   if (!ledger.receipt) throw new Error("receipt required");
   Object.assign(ledger.receipt.review.request, { classification: "functional", triage: "legacy" });
+  Object.assign(ledger.receipt.review.decision, { authorityPaths: ["src/policy.ts"] });
   if (!facts.history.reviews?.[0]) throw new Error("history required");
   facts.history.reviews[0].body = ledgerBlock(ledger);
   const warnings: string[] = [];
-  expect(
-    selectLedger(facts, config, (w) => warnings.push(w))?.receipt?.review.request,
-  ).toMatchObject({ classification: "functional", triage: "legacy" });
+  const saved = selectLedger(facts, config, (w) => warnings.push(w));
+  expect(saved?.receipt?.review.request).toMatchObject({
+    classification: "functional",
+    triage: "legacy",
+  });
+  expect(saved?.receipt?.review.decision).toBeDefined();
+  expect(saved?.receipt?.review.decision).not.toHaveProperty("authorityPaths");
   expect(warnings).toEqual([]);
   for (const triageCheckId of [undefined, 999]) {
     const services = recordedServices({ ...draft, facts });

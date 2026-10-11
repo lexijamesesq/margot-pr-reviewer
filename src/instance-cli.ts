@@ -135,7 +135,6 @@ export async function runInstanceCommand(
       "config",
       "required-checks",
       "required-check-reporters",
-      "protected-paths",
       "allowed-skipped-checks",
       "run-url",
       "reviewer-model",
@@ -162,7 +161,6 @@ export async function runInstanceCommand(
           ...(input["required-check-reporters"]
             ? { requiredCheckReporters: JSON.parse(input["required-check-reporters"]) }
             : {}),
-          protectedPaths: list(input, "protected-paths"),
           allowedSkippedChecks: list(input, "allowed-skipped-checks"),
           ...(input["run-url"] ? { runUrl: input["run-url"] } : {}),
           ...(input["reviewer-model"] ? { reviewerModel: input["reviewer-model"] } : {}),

@@ -1,4 +1,3 @@
-import picomatch from "picomatch";
 import type { z } from "zod";
 import {
   cardNames,
@@ -210,36 +209,6 @@ export function verifiedTriage<T extends { actor: string; head: string }>(
 ): T | null {
   return triage && trustedActors.includes(triage.actor) && triage.head === head ? triage : null;
 }
-/**
- * The protected-path hold: a functional change to a protected path, or a rename or move whose
- * old or new name is protected in any class. `paths` names every protected current or previous
- * name. This is an approval decision independent of check publication.
- */
-export function authorityHold(
-  files: { path: string; previousPath?: string | undefined }[],
-  classification: string,
-  protectedPaths: string[],
-): { hold: boolean; paths: string[] } {
-  const protectedPath = picomatch(protectedPaths, { dot: true });
-  const paths = [
-    ...new Set(
-      files.flatMap((file) =>
-        [file.path, ...(file.previousPath ? [file.previousPath] : [])].filter((path) =>
-          protectedPath(path),
-        ),
-      ),
-    ),
-  ];
-  const protectedRename = files.some(
-    (f) => f.previousPath && (protectedPath(f.path) || protectedPath(f.previousPath)),
-  );
-  return {
-    hold:
-      protectedRename ||
-      (classification === "functional" && files.some((f) => protectedPath(f.path))),
-    paths,
-  };
-}
 export function decide(
   classification: Classification,
   facts: Facts,
@@ -261,12 +230,6 @@ export function decide(
     !["none", "owned", "required_owned"].includes(facts.ownedPathTier)
   )
     holdReasons.push("ownership-uncomputed");
-  const { hold, paths: authorityPaths } = authorityHold(
-    facts.files,
-    classification,
-    config.protectedPaths,
-  );
-  if (hold) holdReasons.push("review-authority");
   if (finalRating.band !== "LOW") holdReasons.push("risk");
   if (config.calibration) holdReasons.push("calibration");
   const outcome = voice?.outcome ?? "APPROVED";
@@ -279,14 +242,12 @@ export function decide(
     rating: finalRating,
     mergeEligible: holdReasons.length === 0,
     holdReasons,
-    authorityPaths,
     ownedPathTier: typeof facts.ownedPathTier === "string" ? facts.ownedPathTier : "unknown",
   };
 }
 
 /** Every reason an approved review is held, most telling first; a missing "risk" sentence is filled with the band. */
 const holdSentences: [string, string][] = [
-  ["review-authority", "it touches a protected path"],
   ["fallback-risk", "the risk was scored by a fallback (reduced confidence)"],
   ["fallback-routing", "routing fell back to a simpler model (reduced confidence)"],
   // Saved by 0.6.12, before the step was recorded; a replayed receipt still carries it.
@@ -303,8 +264,7 @@ export function holdReason(decision: { holdReasons: string[]; rating: { band: st
 } {
   if (
     decision.holdReasons.includes("fallback-routing") &&
-    decision.holdReasons.includes("fallback-risk") &&
-    !decision.holdReasons.includes("review-authority")
+    decision.holdReasons.includes("fallback-risk")
   )
     return {
       reason: "fallback-risk",
