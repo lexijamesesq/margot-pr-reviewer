@@ -506,6 +506,7 @@ describe("fallback decisions", () => {
         strict: flags.includes("--strict-mcp-config"),
         sources: flags[flags.indexOf("--setting-sources") + 1],
         state: present(input).includes(JSON.stringify({ diff: facts.diff })),
+        promptInArguments: flags.includes(present(input)),
         required: schema.required,
       }).toMatchObject({
         answers: {
@@ -517,6 +518,7 @@ describe("fallback decisions", () => {
         strict: true,
         sources: "",
         state: true,
+        promptInArguments: false,
         required: ["lens", "exposure"],
       });
     } finally {
