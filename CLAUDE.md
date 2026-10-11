@@ -8,8 +8,11 @@ Production authority remains outside this package.
 
 ## Setup and checks
 
-Use Node 22 or later. Run `npm ci`, `npm run build`, `npm run lint`, `npm run typecheck`
-and `npm test`. Run `pre-commit run --all-files` before committing.
+Use Node 22 or later. Prepare this checkout with the maintained Dotty checkout's
+`scripts/prepare-checkout.sh <checkout>` before authoring. Native hooks run applicable
+local checks; fix findings. The existing hosted `ci / test` and `ci / package` jobs
+remain in `acceptance.yml` on `pull_request`. For focused package diagnostics, use
+`npm ci`, `npm run build`, `npm run lint`, `npm run typecheck` and `npm test`.
 The README explains package installation, API configuration and live prerequisites.
 
 ## Boundaries
@@ -26,3 +29,8 @@ Do not turn a missing or failed response into empty success. Never enable mergin
 Ledger history must be authenticated and complete. Treat recordings
 as external inputs, including those with reconstructed evidence. No live service
 calls belong in tests. Install hooks with `pre-commit install`; fix all findings.
+
+Before creating or editing a PR, validate the exact body file with Dotty's
+`.github/scripts/pr-body-check.py --template .github/pull_request_template.md --body-file <body-file>`.
+Publish that same file with `gh pr create --body-file` or `gh pr edit --body-file`
+through the enrolled author identity. Do not bypass native hooks.
