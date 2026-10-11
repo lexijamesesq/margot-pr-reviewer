@@ -110,7 +110,7 @@ it("renders the first two sentences of a long rationale", () => {
     rationale: "> First sentence. Second sentence.",
   });
 });
-it("renders bounded prose without a location suffix while the check keeps full details", () => {
+it("renders the complete first sentence without a location suffix while the check keeps full details", () => {
   const value = structuredClone(authorChangesReview);
   const finding = value.cards.flatMap((card) => card.findings)[0];
   if (!finding) throw new Error("finding fixture required");
@@ -124,7 +124,7 @@ it("renders bounded prose without a location suffix while the check keeps full d
     fullFindingInComment: report.includes(finding.what),
     fullFindingInCheck: check.includes(`${finding.location} · ${finding.what}`),
   }).toMatchObject({
-    row: `* ⚠️ \`principal-engineer\` — ${Array.from({ length: 32 }, () => "word").join(" ")}…`,
+    row: `* ⚠️ \`principal-engineer\` — ${first}.`,
     fullFindingInComment: false,
     fullFindingInCheck: true,
   });
