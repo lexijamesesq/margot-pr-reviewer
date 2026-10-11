@@ -1,8 +1,5 @@
 import { expect, it } from "vitest";
-import { recordedServices } from "../../src/adapters/recorded.js";
-import { review } from "../../src/review.js";
 import {
-  authorChangesRecording,
   mechanicalRequest,
   parseVerdictText,
   publisherOptions,
@@ -46,16 +43,6 @@ it("carries the lines merge automation parses to request the operator when the r
     title: "held for the operator: risk is HIGH",
   });
 });
-it("titles a hold with the reason the PR is held, not the band", async () => {
-  const run = await runPublication("authority");
-  expect({
-    title: (
-      (run.final?.output ?? {}) as {
-        title?: string;
-      }
-    ).title,
-  }).toMatchObject({ title: "held for the operator: it touches a protected path" });
-});
 it("overwrites the verdict check text after a later failure so merge automation never reads a stale approval", async () => {
   const run = await runPublication("review-fail");
   const output = (run.final?.output ?? {}) as {
@@ -66,30 +53,6 @@ it("overwrites the verdict check text after a later failure so merge automation 
     staleApproval: parseVerdictText(output.text).outcome,
     hasText: typeof output.text === "string" && output.text.length > 0,
   }).toMatchObject({ kind: "error", staleApproval: "", hasText: true });
-});
-it.each(["clear", "authority"] as const)(
-  "does not post the retired check for %s while retaining its approval decision",
-  async (mode) => {
-    const run = await runPublication(mode);
-    expect(run.writes.some((w) => w.body.name === "review / self-instrument")).toBe(false);
-    expect(run.final?.name).toBe(publisherOptions.checks.review);
-    expect(run.result.kind).toBe("reviewed");
-    expect(run.reviews.some((r) => r.state === "APPROVED")).toBe(mode === "clear");
-    if (mode === "authority") {
-      expect(run.armed).toBe(false);
-      expect(run.final?.conclusion).toBe("neutral");
-    }
-  },
-);
-it("retains protected paths in the independent approval decision", async () => {
-  const recording = structuredClone(authorChangesRecording);
-  (recording.config as { protectedPaths: string[] }).protectedPaths = [".github/**"];
-  const result = await review(recording.request, recording.config, recordedServices(recording));
-  expect(result.kind).toBe("reviewed");
-  if (result.kind !== "reviewed") throw new Error("Expected review");
-  expect(result.decision.authorityPaths).toEqual([".github/workflows/ci.yml"]);
-  expect(result.decision.holdReasons).toContain("review-authority");
-  expect(result.decision.mergeEligible).toBe(false);
 });
 it("never lets calibration satisfy the review check", async () => {
   expect({ conclusion: (await runPublication("calibration")).final?.conclusion }).toMatchObject({

@@ -29,7 +29,7 @@ it("binds trusted policy and current PR facts for authority", async () => {
   });
   expect(result.config.review).toMatchObject({
     requiredChecks: ["ci / checks"],
-    protectedPaths: [".github/**"],
+
     allowedSkippedChecks: ["ci / optional"],
     publication: "github",
   });
@@ -253,7 +253,7 @@ it("maps every bind-request CLI flag into the bound files", async () => {
   expect(bound.review).toMatchObject({
     publication: "none",
     requiredChecks: ["ci / required"],
-    protectedPaths: ["protected/**"],
+
     allowedSkippedChecks: ["ci / skipped"],
   });
   expect(bound.github.shadowBeforeHead).toBe(true);
@@ -378,12 +378,12 @@ it("keeps the live schema requiring head on every reference", () => {
 });
 it("names the flag whose value is not valid JSON", async () => {
   const fixture = await bindCommandFixture("false");
-  fixture.args[fixture.args.indexOf("--protected-paths") + 1] = "[protected/**";
+  fixture.args[fixture.args.indexOf("--required-checks") + 1] = "[ci/required";
   const error = await captureError(() =>
     runInstanceCommand(fixture.args, { GH_TOKEN: "read-token" }, fixture.client as never),
   );
   expect(error).toBeInstanceOf(Error);
-  expect((error as Error).message).toMatch(/^--protected-paths is not valid JSON: /);
+  expect((error as Error).message).toMatch(/^--required-checks is not valid JSON: /);
   expect(instanceExitCode(error)).toBe(1);
 });
 it("prints the usage for --help without failing", async () => {
@@ -444,16 +444,4 @@ it("binds --triage-check-id through the actual CLI file interface", async () => 
   );
   const root = fixture.args[fixture.args.indexOf("--margot-root") + 1] as string;
   expect(JSON.parse(await readFile(join(root, "request.json"), "utf8")).triageCheckId).toBe(101);
-});
-
-it("rejects the retired authority-check config while accepting the remaining publisher", async () => {
-  const source = JSON.parse(
-    await readFile(new URL("../../samples/config.sample.json", import.meta.url), "utf8"),
-  );
-  expect(liveConfigSchema.safeParse(source).success).toBe(true);
-  source.publisher.checks.authority = "review / self-instrument";
-  expect(liveConfigSchema.safeParse(source).success).toBe(false);
-});
-it("refuses the retired self-instrument command", async () => {
-  await expect(runInstanceCommand(["self-instrument"], {})).rejects.toThrow("Usage:");
 });

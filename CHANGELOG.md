@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0
+
+- Remove protected-path self-instrument holds and the merge-alert caller. Reviewer files follow ordinary ownership, risk and review policy without a special hold or risk floor.
+- Remove strict configuration keys `protectedPaths` and `mergeActor`, decision evidence `authorityPaths`, and the `bind-request --protected-paths` option. Deploy with matching instance configuration/workflows and a released review prompt bundle without the self-authority rule.
+- Read useful findings from older saved receipts while discarding retired decision evidence. The changed configuration hash causes an ordinary fresh review instead of replaying the old hold.
+
 ## 0.10.0
 
 - Authorized fallback classification uses the same lane thresholds without an added classification hold; diff size no longer overrides the classifier. Remove the inert `mechanicalDiffLineCap` setting from the strict interface. Check text and review comments now display classification provenance separately from the existing routing/risk decision source.

@@ -71,7 +71,6 @@ export const requestSchema = z.strictObject({
 });
 export const configSchema = z
   .strictObject({
-    protectedPaths: z.array(text),
     trustedCheckActors: z.array(text),
     trustedTriageActors: z.array(text),
     trustedTriageAppId: checkIdSchema.optional(),
@@ -88,7 +87,6 @@ export const configSchema = z
     noCouncilConfidenceFloor: probability,
     timeoutMs: z.number().int().positive(),
     publication: z.enum(["record", "none", "github"]),
-    mergeActor: text.optional(),
     calibration: z.boolean(),
   })
   .refine(
@@ -346,7 +344,6 @@ export const decisionSchema = z.strictObject({
   rating: ratingSchema,
   mergeEligible: z.boolean(),
   holdReasons: z.array(text),
-  authorityPaths: z.array(text).optional(),
   ownedPathTier: z.string().optional(),
 });
 /** The advisory template-adherence check: it informs calibration and never gates. */
@@ -413,6 +410,12 @@ export const ledgerSchema = z
         evidenceHash: text,
         // Historical dispatch fields are inert ledger memory, never accepted on a live request.
         review: reviewCoreSchema.extend({
+          // Discard only retired evidence from saved receipts; other fields stay strict.
+          decision: z.preprocess((value) => {
+            if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+            const { authorityPaths: _retired, ...decision } = value as Record<string, unknown>;
+            return decision;
+          }, decisionSchema),
           request: requestSchema.extend({
             classification: z.string().optional(),
             triage: z.string().optional(),

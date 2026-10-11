@@ -102,7 +102,6 @@ export type BindRequestInput = {
   config: unknown;
   requiredChecks: string[];
   requiredCheckReporters?: Record<string, number>;
-  protectedPaths: string[];
   allowedSkippedChecks: string[];
   runUrl?: string;
   /** A benchmark shadow run: the card reviewers' model for this run only. */
@@ -223,7 +222,6 @@ function bindPrepared(input: BindRequestInput, prepared: ReturnType<typeof prepa
   config.review.requiredChecks = input.requiredChecks;
   if (input.requiredCheckReporters)
     config.review.requiredCheckReporters = input.requiredCheckReporters;
-  config.review.protectedPaths = input.protectedPaths;
   config.review.allowedSkippedChecks = input.allowedSkippedChecks;
   config.review.publication = input.authority ? "github" : "none";
   config.github.shadowBeforeHead = !input.authority;

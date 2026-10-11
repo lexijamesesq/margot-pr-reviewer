@@ -3,8 +3,8 @@ import { recordedServices } from "../../src/adapters/recorded.js";
 import { ledgerBlock, savedAdherence, selectLedger } from "../../src/ledger.js";
 import { review } from "../../src/review.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
-// 0.9.1's own ledger reader, vendored verbatim from tag v0.9.1 (src/ledger.ts and what it
-// imports): the release a rollback would return to.
+// The ledger reader from tag v0.9.1. Its mutable schema/type fixtures omit retired
+// self-instrument fields; the historical ledger-reading implementation is unchanged.
 import { selectLedger as selectLedger091 } from "../fixtures/v0.9.1/ledger.js";
 import { recorded } from "../helpers/review.js";
 

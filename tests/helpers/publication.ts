@@ -10,7 +10,7 @@ import { readRecording } from "./recordings.js";
 
 // Shared fakes for the publication tests. `runPublication(mode)` runs the GitHub publisher against an
 // in-memory GitHub whose `mode` names the one thing that is different about this run:
-//   clear, hold, authority, calibration, triage, phase-titles, voice-error
+//   clear, hold, calibration, triage, phase-titles, voice-error
 //     - the review the publisher is given (default `clear`: a clean approval);
 //   closed, fork, draft, base - the pull request is not reviewable;
 //   start-fail, review-fail, final-fail - the write named by the mode is rejected by GitHub;
@@ -23,7 +23,6 @@ import { readRecording } from "./recordings.js";
 export type PublicationMode =
   | "clear"
   | "hold"
-  | "authority"
   | "calibration"
   | "triage"
   | "phase-titles"
@@ -369,15 +368,9 @@ export async function runPublication(
       value.decision.mergeEligible = false;
       value.decision.holdReasons = ["error"];
     }
-    if (["hold", "authority", "calibration"].includes(mode) || mode === "disarm-fail") {
+    if (["hold", "calibration"].includes(mode) || mode === "disarm-fail") {
       value.decision.mergeEligible = false;
-      value.decision.holdReasons = holdReasons ?? [
-        mode.startsWith("authority")
-          ? "review-authority"
-          : mode === "calibration"
-            ? "calibration"
-            : "risk",
-      ];
+      value.decision.holdReasons = holdReasons ?? [mode === "calibration" ? "calibration" : "risk"];
       value.decision.rating.band = "HIGH";
     }
     const report = render(value);

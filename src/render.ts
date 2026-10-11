@@ -77,17 +77,10 @@ function codeVerdict(review: ReviewCore): { risk: string; summary: string } {
   };
 }
 
-function authorityLine(review: Review): string | null {
+function approvalHoldLine(review: Review): string | null {
   if (review.decision.outcome !== "APPROVED" || review.decision.mergeEligible) return null;
-  const { reason, sentence } = holdReason(review.decision);
-  const { mergeActor } = review.presentation ?? {};
-  const next =
-    reason !== "review-authority"
-      ? "Yours to merge."
-      : mergeActor
-        ? `Approve it and ${mergeActor} merges it.`
-        : "Approve it to merge it.";
-  return `Above my authority: ${sentence}. ${next}`;
+  const { sentence } = holdReason(review.decision);
+  return `Above my authority: ${sentence}. Yours to merge.`;
 }
 
 function duration(value: number): string {
@@ -236,7 +229,7 @@ export function render(review: Review): string {
   const tally = findingTally(review);
   const presentation = defaultPresentation(review);
   const cards = cardRows(review);
-  const authority = authorityLine(review);
+  const approvalHold = approvalHoldLine(review);
   const cost = presentation.costUsd === null ? "$—" : `$${presentation.costUsd.toFixed(2)}`;
   const run = presentation.runUrl
     ? `[${presentation.runUrl.replace(/\/$/, "").split("/").at(-1)}](${presentation.runUrl})`
@@ -259,7 +252,7 @@ export function render(review: Review): string {
     ...(fallbackNotice(review.decision.holdReasons)
       ? [`> ⚠️ _${fallbackNotice(review.decision.holdReasons)}, so nothing was auto-merged._`]
       : []),
-    ...(authority ? ["", authority] : []),
+    ...(approvalHold ? ["", approvalHold] : []),
     ...(decision.outcome === "CLARIFICATION_REQUESTED" && clarification
       ? ["", `@${presentation.author}, your call: ${clarification}`]
       : []),

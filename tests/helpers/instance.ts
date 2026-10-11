@@ -24,7 +24,6 @@ export const route = (overrides: Record<string, unknown> = {}) => ({
 });
 export const config = {
   review: {
-    protectedPaths: [],
     trustedCheckActors: ["checks"],
     trustedTriageActors: ["triage"],
     trustedLedgerActors: ["reviewer[bot]"],
@@ -87,7 +86,7 @@ export const bindInput = (overrides: Partial<BindRequestInput> = {}): BindReques
   margotRoot: "/runtime/margot",
   config,
   requiredChecks: ["ci / checks"],
-  protectedPaths: [".github/**"],
+
   allowedSkippedChecks: ["ci / optional"],
   runUrl: "https://github.com/example/control/actions/runs/2",
   ...overrides,
@@ -130,8 +129,6 @@ export async function bindCommandFixture(authority: "true" | "false" = "false") 
       configFile,
       "--required-checks",
       '["ci / required"]',
-      "--protected-paths",
-      '["protected/**"]',
       "--allowed-skipped-checks",
       '["ci / skipped"]',
       "--run-url",

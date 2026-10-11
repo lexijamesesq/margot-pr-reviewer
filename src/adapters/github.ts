@@ -244,8 +244,7 @@ export function changedFiles(
     return { path, ...(previous ? { previousPath: previous } : {}) };
   });
   if (diffFiles.some((f) => !f.path)) throw new Error("Diff hunks are incomplete");
-  // Over-inclusion is the safe direction for the protected-path gate: a file GitHub lists
-  // that the diff did not name is still a changed file.
+  // A file GitHub lists that the diff did not name is still a changed file.
   for (const f of files)
     if (!diffFiles.some((d) => d.path === f.filename))
       diffFiles.push({

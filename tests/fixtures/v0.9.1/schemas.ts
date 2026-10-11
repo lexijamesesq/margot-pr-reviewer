@@ -54,7 +54,6 @@ export const requestSchema = z.strictObject({
 });
 export const configSchema = z
   .strictObject({
-    protectedPaths: z.array(text),
     trustedCheckActors: z.array(text),
     trustedTriageActors: z.array(text),
     trustedLedgerActors: z.array(text).default([]),
@@ -69,7 +68,6 @@ export const configSchema = z
     mechanicalDiffLineCap: z.number().int().positive().default(2000),
     timeoutMs: z.number().int().positive(),
     publication: z.enum(["record", "none", "github"]),
-    mergeActor: text.optional(),
     calibration: z.boolean(),
   })
   .refine(
@@ -244,7 +242,7 @@ export const referenceInputSchema = z
     message: "A reference gives exactly one of head or ref",
   });
 export const publisherSchema = z.strictObject({
-  checks: z.strictObject({ triage: text, review: text, authority: text }),
+  checks: z.strictObject({ triage: text, review: text }),
   actor: text,
   appId: z.number().int().positive(),
   runUrl: z.url(),
@@ -313,7 +311,6 @@ export const decisionSchema = z.strictObject({
   rating: ratingSchema,
   mergeEligible: z.boolean(),
   holdReasons: z.array(text),
-  authorityPaths: z.array(text).optional(),
   ownedPathTier: z.string().optional(),
 });
 export const reviewCoreSchema = z.strictObject({

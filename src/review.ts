@@ -476,7 +476,6 @@ export async function review(
         files: facts.fileCount,
         runUrl: metadata.runUrl ?? null,
         ticket: ticket(facts.body),
-        ...(config.mergeActor ? { mergeActor: config.mergeActor } : {}),
       },
     };
     stage = stages.render;
