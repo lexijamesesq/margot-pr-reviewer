@@ -1,5 +1,5 @@
 import { access } from "node:fs/promises";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { z } from "zod";
 import type { CallContext } from "../types.js";
 import { assertClaudeVersion, claudeEnvironment } from "./claude.js";
@@ -41,7 +41,7 @@ export async function decisionFallback(
   if (
     purpose === "classification" &&
     root &&
-    claude.executable === join(root, "node_modules/.bin/claude")
+    normalize(claude.executable) === join(root, "node_modules/.bin/claude")
   ) {
     context.signal.throwIfAborted();
     let missing = false;

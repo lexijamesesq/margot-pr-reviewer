@@ -204,7 +204,7 @@ it("retries classification once after a Jev authentication failure", async () =>
 });
 it("prepares only a missing native Claude after Jev is exhausted, then reuses it", async () => {
   const root = await mkdtemp(join(tmpdir(), "margot-fallback-"));
-  const executable = join(root, "node_modules/.bin/claude");
+  const executable = `${root}//node_modules/.bin/claude`;
   vi.stubEnv("MARGOT_ROOT", root);
   for (const name of [
     "GH_TOKEN",
