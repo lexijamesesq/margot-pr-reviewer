@@ -1,3 +1,5 @@
+import { access } from "node:fs/promises";
+import { join, normalize } from "node:path";
 import { z } from "zod";
 import type { CallContext } from "../types.js";
 import { assertClaudeVersion, claudeEnvironment } from "./claude.js";
@@ -35,6 +37,44 @@ export async function decisionFallback(
     additionalProperties: false,
   };
   const prompt = `You are Margot's FALLBACK decider. Jev is unavailable. Judge ONLY the supplied change description. Answer every question. ${purpose === "classification" ? "For each class question, a noul is the probability [0,1] that its proposition holds. Classify the change only; do not decide approval or merge eligibility." : "A noul is the probability [0,1] that review is needed. A score is an integer 0–3 against the supplied anchors. Your degraded decision cannot auto-merge. When uncertain prefer review and the higher score."} Return only the required JSON.\n\n=== CHANGE DESCRIPTION (state) ===\n${JSON.stringify(state)}\n\n=== QUESTIONS ===\n${JSON.stringify(questions)}`;
+  const root = process.env.MARGOT_ROOT;
+  if (
+    purpose === "classification" &&
+    root &&
+    normalize(claude.executable) === join(root, "node_modules/.bin/claude")
+  ) {
+    context.signal.throwIfAborted();
+    let missing = false;
+    try {
+      await access(claude.executable);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      missing = true;
+    }
+    if (missing) {
+      const env = Object.fromEntries(
+        ["USER", "PATH", "HOME", "TMPDIR", "NODE_EXTRA_CA_CERTS"].flatMap((key) =>
+          process.env[key] ? [[key, process.env[key]]] : [],
+        ),
+      );
+      await execute(
+        "npm",
+        [
+          "install",
+          "--prefix",
+          root,
+          "--ignore-scripts",
+          "--save-exact",
+          `@anthropic-ai/claude-code@${claude.version}`,
+        ],
+        { signal: context.signal, env },
+      );
+      await execute("npm", ["rebuild", "--prefix", root, "@anthropic-ai/claude-code"], {
+        signal: context.signal,
+        env,
+      });
+    }
+  }
   await assertClaudeVersion(claude.executable, claude.version, context);
   const raw = await execute(
     claude.executable,

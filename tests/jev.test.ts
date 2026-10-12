@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { decisionFallback } from "../src/adapters/decision-fallback.js";
 import { councilText, jevAdapter, jevState } from "../src/adapters/jev.js";
@@ -198,6 +201,82 @@ it("retries classification once after a Jev authentication failure", async () =>
   };
   expect(answer.source).toBe("jev");
   expect(j.attempts()).toBe(2);
+});
+it("prepares only a missing native Claude after Jev is exhausted, then reuses it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "margot-fallback-"));
+  const executable = `${root}//node_modules/.bin/claude`;
+  vi.stubEnv("MARGOT_ROOT", root);
+  for (const name of [
+    "GH_TOKEN",
+    "MARGOT_WRITE_TOKEN",
+    "JEV_KEY",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "ANTHROPIC_API_KEY",
+  ])
+    vi.stubEnv(name, "test-only-secret");
+  let failed = false;
+  let attempts = 0;
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const execute = vi.spyOn(processAdapter, "execute").mockImplementation(async (file, args) => {
+    if (file === "npm") {
+      expect(attempts).toBe(3); // One success, then both failed classification attempts.
+      if (args[0] === "rebuild") {
+        await mkdir(join(root, "node_modules/.bin"), { recursive: true });
+        await writeFile(executable, "installed CLI fixture");
+      }
+      return "";
+    }
+    return args[0] === "--version"
+      ? "1.0.0 (Claude Code)"
+      : JSON.stringify({ result: JSON.stringify(classes) });
+  });
+  try {
+    const adapter = jevAdapter({
+      key: "test-only",
+      model: "test-model",
+      fallbackClaude: { ...pinnedClaude, executable },
+      fetch: async () => {
+        attempts++;
+        return failed
+          ? new Response("{}", { status: 400 })
+          : new Response(JSON.stringify({ model: "test-model", answers: classes }));
+      },
+    });
+    expect(await adapter.classify(facts, classificationQuestions, context())).toMatchObject({
+      source: "jev",
+    });
+    expect(execute).not.toHaveBeenCalled();
+    failed = true;
+    expect(await adapter.classify(facts, classificationQuestions, context())).toMatchObject({
+      source: "fallback",
+    });
+    const install = execute.mock.calls.filter(([file]) => file === "npm");
+    expect(install.map(([, args]) => args)).toEqual([
+      [
+        "install",
+        "--prefix",
+        root,
+        "--ignore-scripts",
+        "--save-exact",
+        "@anthropic-ai/claude-code@1.0.0",
+      ],
+      ["rebuild", "--prefix", root, "@anthropic-ai/claude-code"],
+    ]);
+    for (const [, , options] of install) {
+      expect(Object.keys(options?.env ?? {})).not.toContain("GH_TOKEN");
+      expect(Object.values(options?.env ?? {})).not.toContain("test-only-secret");
+    }
+    expect(new Set(execute.mock.calls.map(([, , options]) => options?.signal)).size).toBe(1);
+    expect(await adapter.classify(facts, classificationQuestions, context())).toMatchObject({
+      source: "fallback",
+    });
+    expect(execute.mock.calls.filter(([file]) => file === "npm")).toHaveLength(2);
+  } finally {
+    execute.mockRestore();
+    warn.mockRestore();
+    vi.unstubAllEnvs();
+    await rm(root, { recursive: true, force: true });
+  }
 });
 it("returns an explicit classification error after both providers fail", async () => {
   const j = jev(classes, { failures: 3 });
