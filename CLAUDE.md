@@ -8,9 +8,9 @@ Production authority remains outside this package.
 
 ## Setup and checks
 
-Use Node 22 or later. Prepare this checkout with the maintained Dotty checkout's
-`scripts/prepare-checkout.sh <checkout>` before authoring. Native hooks run applicable
-local checks; fix findings. The existing hosted `ci / test` and `ci / package` jobs
+Use Node 22 or later. Existing estate Git templates install native hooks in new
+agent clones; retrofit an existing unprepared checkout once with
+`pre-commit install`. Native hooks run applicable local checks; fix findings. The existing hosted `ci / test` and `ci / package` jobs
 remain in `acceptance.yml` on `pull_request`. For focused package diagnostics, use
 `npm ci`, `npm run build`, `npm run lint`, `npm run typecheck` and `npm test`.
 The README explains package installation, API configuration and live prerequisites.
