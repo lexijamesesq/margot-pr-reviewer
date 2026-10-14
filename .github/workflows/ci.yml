@@ -20,8 +20,8 @@ jobs:
       MARGOT_JEV_KEY: ${{ secrets.MARGOT_JEV_KEY }}
       MARGOT_ANTHROPIC_TOKEN: ${{ secrets.MARGOT_ANTHROPIC_TOKEN }}
 
-  test:
-    name: ci / test
+  package:
+    name: ci / package validation
     needs: checks
     if: needs.checks.outputs.classification != 'mechanical' && needs.checks.outputs.classification != 'documentation'
     runs-on: ubuntu-latest
@@ -29,7 +29,7 @@ jobs:
     permissions:
       contents: read
     concurrency:
-      group: retained-acceptance-${{ github.event.pull_request.number }}
+      group: reviewer-package-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     steps:
       - name: Require the classified PR head
