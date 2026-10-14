@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Octokit } from "octokit";
+import { vi } from "vitest";
 import { claudeAdapter } from "../../src/adapters/claude.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { execute } from "../../src/adapters/process.js";
@@ -185,13 +186,34 @@ export async function fakeClaude(
 ) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-test-"));
   try {
+    // Keep model credentials synthetic even when the author's shell supplies real ones.
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-only-model-key");
+    vi.stubEnv("CLAUDE_CODE_OAUTH_TOKEN", "test-only-model-token");
+    vi.stubEnv("MARGOT_WRITE_TOKEN", "test-only-publication-credential");
+    vi.stubEnv("JEV_KEY", "test-only-jev-key");
+    vi.stubEnv("UNRELATED_SECRET", "test-only-unrelated-secret");
+    // The adapter also reads this checkout with Git: inherited routing must not redirect it.
+    for (const key of Object.keys(process.env))
+      if (key.startsWith("GIT_")) vi.stubEnv(key, undefined);
+    vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");
+    vi.stubEnv("GIT_CONFIG_NOSYSTEM", "1");
     const bundle = join(root, "bundle"),
       work = join(root, "base");
     await mkdir(work);
     // The base checkout is a real clean git checkout of the request's repository; the request's
     // base is its commit unless the test says otherwise.
-    const git = (...args: string[]) => execute("git", ["-C", work, ...args]);
-    await git("init", "-q");
+    const gitEnvironment = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+    );
+    const git = (...args: string[]) =>
+      execute(
+        "git",
+        ["-C", work, "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", ...args],
+        {
+          env: { ...gitEnvironment, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
+        },
+      );
+    await git("init", "-q", "--template=");
     await writeFile(join(work, "README.md"), "base\n");
     await git("add", "README.md");
     await git(
@@ -282,7 +304,10 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, arg
     program: argv[at + 1],
     args,
     mounts,
-    env: process.env,
+    env: Object.fromEntries([
+      "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "GH_TOKEN", "MARGOT_MCP_CONFIG",
+      "MARGOT_WRITE_TOKEN", "JEV_KEY", "UNRELATED_SECRET",
+    ].flatMap((key) => process.env[key] === undefined ? [] : [[key, process.env[key]]])),
     mcp,
     stdin: fs.readFileSync(0, "utf8"),
   }));
@@ -373,6 +398,7 @@ ${options.spawnLog ? `fs.appendFileSync(${JSON.stringify(options.spawnLog)}, arg
       base,
     };
   } finally {
+    vi.unstubAllEnvs();
     await rm(root, { recursive: true, force: true });
   }
 }

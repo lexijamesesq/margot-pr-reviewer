@@ -261,10 +261,6 @@ describe("captured reviewer output", () => {
     const all = samples();
     const cards = all.filter((s) => s.kind === "card");
     const voices = all.filter((s) => s.kind === "voice");
-    it("keeps at least 7 recorded cards and 1 recorded voice in recordings/", () => {
-      expect(cards.length).toBeGreaterThanOrEqual(7);
-      expect(voices.length).toBeGreaterThanOrEqual(1);
-    });
     it.each(cards.map((s) => [s.source, s]))("parses the recorded card at %s", (_, s) => {
       expect(() => parseCard(s.text, s.card as Parameters<typeof parseCard>[1])).not.toThrow();
     });

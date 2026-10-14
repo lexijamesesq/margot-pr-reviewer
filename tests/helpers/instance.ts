@@ -1,6 +1,7 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach } from "vitest";
 import type { BindRequestInput } from "../../src/instance.js";
 
 export const margotRootPlaceholder = `\${MARGOT_ROOT}`;
@@ -96,6 +97,11 @@ export const readPull =
   async () =>
     value;
 export const directories: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
 export async function captureError(operation: () => Promise<unknown>) {
   try {
     await operation();

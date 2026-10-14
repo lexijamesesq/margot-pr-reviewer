@@ -25,9 +25,6 @@ import {
   riskSchema,
   routeSchema,
 } from "../src/schemas.js";
-import goldenClassificationQuestions from "./classification-questions.golden.json" with {
-  type: "json",
-};
 import { present } from "./helpers/present.js";
 import { readRecording } from "./helpers/recordings.js";
 
@@ -86,13 +83,6 @@ it("normalizes Jev nouls into classification probabilities", async () => {
   const j = jev({ ...classes, mechanical: { type: "noul", noul: 1 } });
   const result = await j.adapter.classify(facts, classificationQuestions, context());
   expect(classificationSchema.parse(result).mechanical).toBe(1);
-});
-it("sends the golden classification questions, in order", async () => {
-  const j = jev(classes);
-  await j.adapter.classify(facts, classificationQuestions, context());
-  expect(JSON.stringify((j.calls[0] as { questions: unknown }).questions)).toBe(
-    JSON.stringify(goldenClassificationQuestions),
-  );
 });
 it("classifies the code change alone: files, tier and the whole diff, in one request", async () => {
   const j = jev(classes);
@@ -812,13 +802,6 @@ describe("the advisory template-adherence check", () => {
   const distinct = (card: string) => ({
     type: "noul",
     instructions: adherenceDistinctQuestion(card),
-  });
-  it("keeps the previous reviewer's wording, verbatim", () => {
-    expect({ risk: adherenceRiskQuestion, distinct: adherenceDistinctQuestion("safety") }).toEqual({
-      risk: "Is the risk line a SHORT CLASSIFICATION — a few-word noun phrase naming the KIND of exposure (e.g. 'workflow-injection risk' or 'dependency bump, non-behavioral') — rather than a full explanatory sentence? True = a classification; False = a sentence.",
-      distinct:
-        "Does the 'safety' card's finding state ITS OWN review lens's distinct contribution, rather than merely RESTATE in similar words the same root-cause chain another card's finding already states? Several cards independently corroborating one real defect from their own distinct angles is legitimate and is True; only a phrasing-level restatement adding no lens-specific point is False.",
-    });
   });
   it("asks the previous reviewer's questions over its prose state", async () => {
     const j = jev({

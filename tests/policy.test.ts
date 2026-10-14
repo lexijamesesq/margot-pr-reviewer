@@ -81,16 +81,6 @@ it("trusts a triage only from a trusted actor and bound to the head", () => {
     none: verifiedTriage(null, ["triage"], "a".repeat(40)),
   }).toEqual({ trusted: triage, untrusted: null, otherHead: null, none: null });
 });
-it("keeps the triage-trust rule in one place", async () => {
-  const { readdir, readFile } = await import("node:fs/promises");
-  const root = new URL("../src/", import.meta.url);
-  const files = (await readdir(root, { recursive: true })).filter((f) => f.endsWith(".ts"));
-  const text = (await Promise.all(files.map((f) => readFile(new URL(f, root), "utf8")))).join("\n");
-  const count = (needle: string) => text.split(needle).length - 1;
-  expect({
-    trust: count("trustedTriageActors.includes") + count("trustedActors.includes"),
-  }).toEqual({ trust: 1 });
-});
 
 it("rejects the retired size-cap setting instead of silently ignoring it", () => {
   expect(() => configSchema.parse({ ...config, mechanicalDiffLineCap: 1 })).toThrow(

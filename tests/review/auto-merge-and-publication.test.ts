@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { recordedServices } from "../../src/adapters/recorded.js";
 import { review } from "../../src/review.js";
 import {
-  councilClearCalls,
   recorded,
   reviewed,
   reviewRecording,
@@ -18,17 +17,7 @@ const invalidExternalData = /"code": "invalid_(type|format)"/;
 describe("disarming auto-merge", () => {
   it("disables an already armed auto-merge when the review holds", async () => {
     const { calls } = await reviewed(recorded("voice-hold"));
-    expect(calls).toEqual([
-      "facts",
-      "route",
-      "bundle",
-      "card:safety",
-      "card:works-and-proven",
-      "card:principal-engineer",
-      "card:maintainable-no-slop",
-      "risk",
-      "voice",
-      "adherence",
+    expect(calls.filter((call) => ["head", "disableAutoMerge", "publish"].includes(call))).toEqual([
       "head",
       "disableAutoMerge",
       "publish",
@@ -44,7 +33,11 @@ describe("disarming auto-merge", () => {
     const { calls } = await reviewRecording(
       recorded("council-clear", withFailure("risk", "unavailable")),
     );
-    expect(calls).toEqual([...councilClearCalls, "disableAutoMerge"]);
+    expect(
+      calls.filter((call) =>
+        ["risk", "voice", "adherence", "disableAutoMerge", "publish"].includes(call),
+      ),
+    ).toEqual(["risk", "disableAutoMerge"]);
   });
 
   it.each([

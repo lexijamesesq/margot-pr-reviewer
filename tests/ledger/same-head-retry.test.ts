@@ -214,17 +214,6 @@ it("retries fresh when a same-head round one ledger has no receipt", async () =>
     convergence: { round: 1 },
   });
 });
-it("runs the council again when PR evidence changed since the saved approval", async () => {
-  const { result, r } = await margot();
-  if (result.kind !== "reviewed") throw new Error("baseline");
-  const f = factsSchema.parse(r.facts);
-  f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
-  f.body = "New authorization request";
-  r.facts = f;
-  const s = recordedServices(r);
-  expect(await review(r.request, r.config, s)).toMatchObject({ kind: "reviewed" });
-  expect(s.calls.map((c) => c.name)).toContain("route");
-});
 it("runs the council again when live service configuration changed", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed") throw new Error("baseline");

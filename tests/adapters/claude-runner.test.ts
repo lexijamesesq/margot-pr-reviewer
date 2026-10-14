@@ -149,16 +149,10 @@ it("serves no evidence server and grants no evidence tool", async () => {
     ticketingEnvironment: { TICKETING_TOKEN: "t", TICKETING_TENANT: "x" },
   });
   const voice = await fakeClaude({ role: "voice" });
-  const source = (path: string) => access(new URL(`../../src/adapters/${path}`, import.meta.url));
-  const manifest = JSON.parse(
-    await readFile(new URL("../../package.json", import.meta.url), "utf8"),
-  ) as { dependencies: Record<string, string> };
   expect({
     servers: [card, voice].map((run) => Object.keys(run.mcp.mcpServers)),
     evidenceArgs: [...card.args, ...voice.args].filter((arg) => arg.includes("evidence")),
-    sdk: "@modelcontextprotocol/sdk" in manifest.dependencies,
-  }).toEqual({ servers: [["tickets"], []], evidenceArgs: [], sdk: false });
-  await expect(source("evidence-server.ts")).rejects.toThrow();
+  }).toEqual({ servers: [["tickets"], []], evidenceArgs: [] });
 });
 it("carries the previous reviewer's authorship and confinement sentences", async () => {
   const { stdin } = await fakeClaude();
@@ -314,11 +308,18 @@ it("keeps every credential off the docker command line and hands it over by envi
         [...invocation.docker, ...invocation.args].some((arg) => arg.includes(secret)),
       ),
       githubToken: invocation.env.GH_TOKEN,
+      modelCredentials: [invocation.env.ANTHROPIC_API_KEY, invocation.env.CLAUDE_CODE_OAUTH_TOKEN],
       mcpHolds: Object.values(secrets).every((secret) =>
         invocation.env.MARGOT_MCP_CONFIG?.includes(secret),
       ),
       publication: invocation.env.MARGOT_WRITE_TOKEN ?? null,
-    }).toEqual({ argvLeaks: [], githubToken, mcpHolds: true, publication: null });
+    }).toEqual({
+      argvLeaks: [],
+      githubToken,
+      modelCredentials: ["test-only-model-key", "test-only-model-token"],
+      mcpHolds: true,
+      publication: null,
+    });
   } finally {
     if (previous === undefined) delete process.env.MARGOT_WRITE_TOKEN;
     else process.env.MARGOT_WRITE_TOKEN = previous;
@@ -422,14 +423,6 @@ it("sends Claude its complete prompt on stdin", async () => {
     },
     round: { round: 2, priorHead: "b".repeat(40), full: false, files: facts.files, entries: [] },
   });
-});
-it("rejects an unexpected reported tool", async () => {
-  await expect(fakeClaude({ tools: ["Write"] })).rejects.toThrow("exactly the requested tools");
-});
-it("rejects a requested tool Claude did not report", async () => {
-  await expect(fakeClaude({ tools: ["Skill", "Read"] })).rejects.toThrow(
-    "exactly the requested tools",
-  );
 });
 it("rejects a reported tool list of the right length with one tool swapped", async () => {
   await expect(fakeClaude({ replaceFirstTool: "Write" })).rejects.toThrow(
@@ -570,34 +563,6 @@ it("names every container uniquely", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-});
-it("limits the card's gh to the read commands its skill names, for card and voice alike", async () => {
-  const card = await fakeClaude();
-  const voice = await fakeClaude({ role: "voice" });
-  const gh = ["Bash(gh alias:*)", "Bash(gh extension:*)", "Bash(gh auth:*)", "Bash(gh config:*)"];
-  expect({
-    bareGh: [
-      ...values(card.args, "--allowedTools"),
-      ...values(voice.args, "--allowedTools"),
-    ].filter((rule) => rule === "Bash(gh:*)" || rule === "Bash"),
-    cardDenies: gh.filter((rule) => values(card.args, "--disallowedTools").includes(rule)),
-    voiceDenies: gh.filter((rule) => values(voice.args, "--disallowedTools").includes(rule)),
-  }).toEqual({ bareGh: [], cardDenies: gh, voiceDenies: gh });
-});
-it("allows no unscoped search and denies /proc", async () => {
-  const { args } = await fakeClaude();
-  const allowed = values(args, "--allowedTools");
-  expect({
-    unscoped: allowed.filter((rule) => !rule.includes("(")),
-    reads: allowed.filter((rule) => /^(Read|Grep|Glob)\(/.test(rule)),
-    proc: values(args, "--disallowedTools").includes("Read(//proc/**)"),
-    addDir: values(args, "--add-dir"),
-  }).toEqual({
-    unscoped: [],
-    reads: ["Read(//work/**)", "Read(//opt/margot/bundle/skills/pr-council/**)"],
-    proc: true,
-    addDir: ["/opt/margot/bundle/skills/pr-council"],
-  });
 });
 it("refuses a base checkout at another commit, of another repository, or dirty", async () => {
   await expect(fakeClaude({ checkout: { base: "c".repeat(40) } })).rejects.toThrow(

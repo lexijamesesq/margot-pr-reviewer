@@ -246,6 +246,17 @@ it("requires GH_TOKEN before reading configuration or GitHub", async () => {
 });
 it("maps every bind-request CLI flag into the bound files", async () => {
   const fixture = await bindCommandFixture("false");
+  const reporters = { "ci / required": 424242 };
+  fixture.args.push(
+    "--base",
+    "c".repeat(40),
+    "--required-check-reporters",
+    JSON.stringify(reporters),
+  );
+  await expect(
+    runInstanceCommand(fixture.args, { GH_TOKEN: "read-token" }, fixture.client as never),
+  ).rejects.toThrow("PR base differs from dispatched revision");
+  fixture.args[fixture.args.indexOf("--base") + 1] = base;
   await runInstanceCommand(fixture.args, { GH_TOKEN: "read-token" }, fixture.client as never);
   const request = JSON.parse(await readFile(join(fixture.directory, "request.json"), "utf8"));
   const bound = JSON.parse(await readFile(join(fixture.directory, "config.json"), "utf8"));
@@ -253,9 +264,9 @@ it("maps every bind-request CLI flag into the bound files", async () => {
   expect(bound.review).toMatchObject({
     publication: "none",
     requiredChecks: ["ci / required"],
-
     allowedSkippedChecks: ["ci / skipped"],
   });
+  expect(bound.review.requiredCheckReporters).toEqual(reporters);
   expect(bound.github.shadowBeforeHead).toBe(true);
   expect(bound.publisher.runUrl).toBe("https://github.com/example/control/actions/runs/1");
 });

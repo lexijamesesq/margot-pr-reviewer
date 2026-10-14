@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { readRecording } from "./helpers/recordings.js";
 
 // The scripted review reports one card response, then ends in an error result or throws.
@@ -37,8 +37,16 @@ const sampleConfig = JSON.parse(
   await readFile(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
 );
 
+const directories: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+
 it("prints the failed stage and diagnostic when the review ends in an error", async () => {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-error-"));
+  directories.push(root);
   const request = join(root, "request.json");
   const config = join(root, "config.json");
   await writeFile(request, JSON.stringify(recording.request));
@@ -65,6 +73,7 @@ it.each([
   ending.throws = throws;
   try {
     const root = await mkdtemp(join(tmpdir(), "margot-cli-error-"));
+    directories.push(root);
     const request = join(root, "request.json");
     const config = join(root, "config.json");
     await writeFile(request, JSON.stringify(recording.request));

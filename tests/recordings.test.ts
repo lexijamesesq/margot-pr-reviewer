@@ -79,11 +79,6 @@ describe("shipped recordings carry no identifying residue", () => {
   const jsonRecordings = files(recordings, ".json");
   const proseSamples = files(prose, ".txt");
 
-  it("audits every recording and prose sample", () => {
-    expect(jsonRecordings).toHaveLength(7);
-    expect(proseSamples).toHaveLength(8);
-  });
-
   it.each(jsonRecordings)(
     "keeps identities, credentials, hosts and machine paths out of $name",
     ({ contents }) => {

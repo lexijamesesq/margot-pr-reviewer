@@ -19,3 +19,43 @@ jobs:
       MARGOT_APP_KEY: ${{ secrets.MARGOT_APP_KEY }}
       MARGOT_JEV_KEY: ${{ secrets.MARGOT_JEV_KEY }}
       MARGOT_ANTHROPIC_TOKEN: ${{ secrets.MARGOT_ANTHROPIC_TOKEN }}
+
+  test:
+    name: ci / test
+    needs: checks
+    if: needs.checks.outputs.classification != 'mechanical' && needs.checks.outputs.classification != 'documentation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: retained-acceptance-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Require the classified PR head
+        env:
+          CLASSIFICATION: ${{ needs.checks.outputs.classification }}
+          HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          [[ "$CLASSIFICATION" == functional && "$HEAD_SHA" == "$EVENT_HEAD" && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.checks.outputs.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm ci
+      - id: pack
+        run: echo "tarball=$(npm pack --silent --pack-destination "$RUNNER_TEMP")" >> "$GITHUB_OUTPUT"
+      - run: npx --yes publint@0.3.25 "$RUNNER_TEMP/$TARBALL"
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+      # The package is ESM-only; CommonJS and node10 resolution are unsupported.
+      - run: npx --yes @arethetypeswrong/cli@0.18.5 "$RUNNER_TEMP/$TARBALL" --ignore-rules no-resolution cjs-resolves-to-esm
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+      - run: node scripts/package-smoke.mjs "$RUNNER_TEMP/$TARBALL"
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}

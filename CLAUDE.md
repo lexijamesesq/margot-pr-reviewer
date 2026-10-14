@@ -10,9 +10,17 @@ Production authority remains outside this package.
 
 Use Node 22 or later. Existing estate Git templates install native hooks in new
 agent clones; retrofit an existing unprepared checkout once with
-`pre-commit install`. Native hooks run applicable local checks; fix findings. The existing hosted `ci / test` and `ci / package` jobs
-remain in `acceptance.yml` on `pull_request`. For focused package diagnostics, use
-`npm ci`, `npm run build`, `npm run lint`, `npm run typecheck` and `npm test`.
+`pre-commit install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg --hook-type prepare-commit-msg`.
+After `npm ci`, direct native pre-push hooks run typecheck, behavior tests and build
+for package source, tests, data, runtime, scripts, dependencies and configuration.
+Prose-only pushes skip these package commands. Native file filters can omit
+deletion-only changes; run the relevant commands manually for removals.
+Fix findings. `.github/workflows/ci.yml` preserves the shared `@v1` universal
+scan and Margot handoff, then runs one required `ci / test` package check on
+Ubuntu/Node22 for the authenticated functional class. Mechanical and documentation
+classes skip that package job. It packs once through `prepack` and validates the
+same archive with publint, ATTW and one installed smoke. For focused diagnostics,
+use `npm run build`, `npm run lint`, `npm run typecheck` and `npm test`.
 The README explains package installation, API configuration and live prerequisites.
 
 ## Boundaries

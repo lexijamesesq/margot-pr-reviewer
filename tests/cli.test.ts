@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readRecording } from "./helpers/recordings.js";
 
 // The real services unless a test asks for a scripted run that reports two responses.
@@ -50,6 +50,13 @@ const manifest = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
+const directories: string[] = [];
+afterEach(async () => {
+  await Promise.all(
+    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+
 async function invoke(
   options: {
     request?: unknown;
@@ -59,6 +66,7 @@ async function invoke(
   } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "margot-cli-run-"));
+  directories.push(root);
   const paths = {
     request: join(root, "request.json"),
     config: join(root, "config.json"),
@@ -78,10 +86,10 @@ async function invoke(
 
 describe("margot-review failure messages", () => {
   it("names a request file that does not exist", async () => {
-    const missing = join(tmpdir(), "margot-no-such-request.json");
-    const { code, stderr } = await invoke({
-      args: (p) => [missing, p.config, p.output],
+    const { code, stderr, paths } = await invoke({
+      args: (p) => [join(p.request, "..", "absent.json"), p.config, p.output],
     });
+    const missing = join(paths.request, "..", "absent.json");
     expect({ code, stderr }).toEqual({
       code: 1,
       stderr: `Review failed: cannot read request file ${missing} (ENOENT)\n`,
