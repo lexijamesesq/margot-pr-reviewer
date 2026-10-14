@@ -37,10 +37,15 @@ jobs:
           CLASSIFICATION: ${{ needs.checks.outputs.classification }}
           HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          [[ "$CLASSIFICATION" == functional && "$HEAD_SHA" == "$EVENT_HEAD" &&
-            "$HEAD_SHA" =~ ^[0-9a-f]{40}$ &&
-            ( ${ACTIONS_CACHE_MODE:-} == read || ${ACTIONS_CACHE_MODE:-} == none ) ]]
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { CLASSIFICATION, HEAD_SHA, EVENT_HEAD, ACTIONS_CACHE_MODE } = process.env;
+            if (CLASSIFICATION !== 'functional' || HEAD_SHA !== EVENT_HEAD ||
+                !/^[0-9a-f]{40}$/.test(HEAD_SHA ?? '') ||
+                !['read', 'none'].includes(ACTIONS_CACHE_MODE)) {
+              core.setFailed('Expected a functional PR, matching authenticated head, and read-only or disabled cache access.');
+            }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.checks.outputs.head_sha }}
