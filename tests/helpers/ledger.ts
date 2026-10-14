@@ -120,7 +120,7 @@ export const comparison = (text = diff()) => ({
   diff: text,
   complete: true,
 });
-export async function margot(classification = "mechanical", editorial = false) {
+export function margotRecording(classification = "mechanical", editorial = false) {
   const r = structuredClone(source);
   r.config = { ...config, publication: "none" };
   // The verified triage carries the class under test.
@@ -142,6 +142,10 @@ export async function margot(classification = "mechanical", editorial = false) {
   };
   r.cards = { safety: card() };
   r.voice = voice("established");
+  return r;
+}
+export async function margot(classification = "mechanical", editorial = false) {
+  const r = margotRecording(classification, editorial);
   const services = recordedServices(r);
   const result = await review(r.request, r.config, services);
   return { result, services, r };

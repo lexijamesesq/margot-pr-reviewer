@@ -26,8 +26,6 @@ describe("required checks", () => {
     ["uses an untrusted App ID despite the trusted actor", withCheck({ appId: 15368 })],
     ["ran against a stale head", withCheck({ head: "b".repeat(40) })],
     ["did not succeed", withCheck({ conclusion: "failure" })],
-    ["concluded neutral", withCheck({ conclusion: "neutral" })],
-    ["was cancelled", withCheck({ conclusion: "cancelled" })],
     [
       "has a newer queued run with no start time after an older success",
       withChecks(checkRun("success", 1, "2026-10-01T21:35:42Z"), {

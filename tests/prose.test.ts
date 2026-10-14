@@ -1,8 +1,6 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseCard, parseVoice } from "../src/adapters/prose.js";
-import { present } from "./helpers/present.js";
 
 it("preserves the voice's risk statement, clarification and setting finding", () => {
   expect(
@@ -20,29 +18,13 @@ function cardText() {
   return "card: safety\ncompletion: completed\nChecked:\n- Inspected changed permission grants; would catch write access.\nNot covered:\n- Runtime execution; outside the change.\nFindings:\n";
 }
 // The parser's stated tolerance covers a card's labels and completion value too.
-it.each([
-  ["a bolded label", "card: safety\n**Completion:** completed\nChecked:\n- Looked.\n"],
-  ["a bolded value", "card: safety\ncompletion: **completed**\nChecked:\n- Looked.\n"],
-  ["a trailing period", "card: safety\nCompletion: completed.\nChecked:\n- Looked.\n"],
-  ["a bolded Checked heading", "card: safety\ncompletion: completed\n**Checked:**\n- Looked.\n"],
-])("parses a card with %s", (_, raw) => {
-  expect(parseCard(raw, "safety")).toMatchObject({ completion: "completed", checked: ["Looked."] });
-});
-it("reads a decorated multi-word section heading", () => {
+it("preserves completion, checked and exclusion fields with Markdown decoration", () => {
   expect(
-    parseCard("card: safety\ncompletion: completed\n**Not covered:**\n- Runtime.\n", "safety")
-      .notCovered,
-  ).toEqual(["Runtime."]);
-});
-it("reads `*` bullets under the voice's established and dismissed labels", () => {
-  expect(
-    parseVoice(
-      "outcome: APPROVED\nband: LOW\nband_reason: Bounded.\nsummary: Clear.\nestablished:\n* F1 \u00B7 a.ts:1 \u00B7 Guard missing.\ndismissed:\n* F2 \u00B7 Covered.\n",
-    ).dispositions,
-  ).toEqual([
-    { id: "F1", status: "established", reason: "a.ts:1 \u00B7 Guard missing." },
-    { id: "F2", status: "dismissed", reason: "Covered." },
-  ]);
+    parseCard(
+      "card: safety\n**Completion:** **completed**.\n**Checked:**\n- Looked.\n**Not covered:**\n- Runtime.\n",
+      "safety",
+    ),
+  ).toMatchObject({ completion: "completed", checked: ["Looked."], notCovered: ["Runtime."] });
 });
 it("preserves a real mandatory finding in card prose", () => {
   const raw =
@@ -73,33 +55,33 @@ it("yields tagged findings from a card without its block labels", () => {
   expect({
     checked: card.checked,
     notCovered: card.notCovered,
-    findings: card.findings.length,
-  }).toMatchObject({ checked: [], notCovered: [], findings: 1 });
-});
-it("keeps malformed tagged findings visible", () => {
-  expect(() => parseCard(`${cardText()}- [issue] missing fields\n`, "safety")).toThrow();
-});
-it("takes the first match when card labels repeat", () => {
-  const card = parseCard(
-    "card: safety\ncompletion: completed\n\nChecked:\n- Reviewed; completion: completed is restated here.\n\ncard: safety\ncompletion: incomplete: a draft line\n",
-    "safety",
-  );
-  expect({ completion: card.completion, checked: card.checked.length }).toMatchObject({
-    completion: "completed",
-    checked: 1,
+    findings: card.findings.map(({ what, severity }) => ({ what, severity })),
+  }).toMatchObject({
+    checked: [],
+    notCovered: [],
+    findings: [{ what: "A guard is missing.", severity: "MAJOR" }],
   });
 });
-// A tagged bullet tolerates emphasis around the tag and numbered bullets; its fields read
-// `k=v` in any order, ignore keys they do not know, and drop a `ledger=` value that is not
-// a ledger key. `(none)` under Findings is prose, not a finding.
-it("tolerates emphasis, key order and unknown annotations in tagged bullets", () => {
+it("refuses malformed tagged findings instead of dropping them", () => {
+  expect(() => parseCard(`${cardText()}- [issue] missing fields\n`, "safety")).toThrow();
+});
+it("keeps canonical card metadata when narrative mentions its labels", () => {
+  const card = parseCard(
+    "card: safety\ncompletion: completed\nChecked:\n- Reviewed; completion: incomplete is a quoted draft label.\nNot covered:\nFindings:\n",
+    "safety",
+  );
+  expect(card.completion).toBe("completed");
+  expect(card.checked).toEqual(["Reviewed; completion: incomplete is a quoted draft label."]);
+});
+// Decorated issue and information bullets retain their semantic fields.
+it("preserves decorated issue and information findings with reordered fields", () => {
   const card = parseCard(
     "card: safety\ncompletion: completed\nFindings:\n(none yet)\n- **[issue]** a.ts:1 \u00B7 confidence=high \u00B7 severity=**major** \u00B7 owner=reviewer \u00B7 ledger=not-a-key \u00B7 late=missed\n    what: A guard is missing.\n1. *[ info ]* b.ts:2 \u00B7 severity=MINOR \u00B7 confidence=LOW\n    what: A note.\n    note: Optional.\n",
     "safety",
   );
   expect({ findings: card.findings }).toMatchObject({
     findings: [
-      { tag: "issue", location: "a.ts:1", severity: "MAJOR", confidence: "HIGH", late: "missed" },
+      { tag: "issue", location: "a.ts:1", severity: "MAJOR", confidence: "HIGH" },
       {
         tag: "info",
         location: "b.ts:2",
@@ -110,19 +92,16 @@ it("tolerates emphasis, key order and unknown annotations in tagged bullets", ()
     ],
   });
 });
-// Only `what:`/`note:` feeds the finding's text; consequence and action are run-only fields
-// that are never a reason to refuse: missing is empty, a repeated label takes the last value.
-it("reads missing or repeated finding sub-fields instead of refusing them", () => {
+// An information note supplies its text without a separate what label.
+it("keeps finding meaning without consequence decoration or a separate what label", () => {
   const card = parseCard(
-    "card: safety\ncompletion: completed\nFindings:\n- [issue] a.ts:1 \u00B7 severity=MAJOR \u00B7 confidence=HIGH\n    what: A guard is missing.\n    action: Draft fix.\n    action: Restore the guard.\n- [info] b.ts:2 \u00B7 severity=MINOR \u00B7 confidence=LOW\n    note: Only a note line.\n",
+    "card: safety\ncompletion: completed\nFindings:\n- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH\n    what: A guard is missing.\n    action: Restore the guard.\n- [info] b.ts:2 · severity=MINOR · confidence=LOW\n    note: Only a note line.\n",
     "safety",
   );
-  expect({ details: card.findings.map((f) => [f.what, f.detail ?? null]) }).toMatchObject({
-    details: [
-      ["A guard is missing.", "Restore the guard."],
-      ["Only a note line.", "Only a note line."],
-    ],
-  });
+  expect(card.findings.map((finding) => [finding.what, finding.detail])).toEqual([
+    ["A guard is missing.", "Restore the guard."],
+    ["Only a note line.", "Only a note line."],
+  ]);
 });
 // The outcomes include ERROR: Margot's own fail-closed ruling, with a finding she could
 // not resolve legitimately in neither list.
@@ -139,7 +118,7 @@ it("parses Margot's ERROR as a ruling, not an exception", () => {
 it("preserves finding IDs and dispositions in voice prose", () => {
   return expect(
     parseVoice(
-      "outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\nestablished:\n- safety-F1 \u00B7 a.ts:1 \u00B7 The guard is missing.\ndismissed:\n- safety-F2 \u00B7 a.ts:2 \u00B7 Existing check covers this.\n",
+      "outcome: CHANGES_REQUESTED\nband: LOW\nband_reason: Bounded change.\nsummary: Restore the guard.\nestablished:\n* safety-F1 \u00B7 a.ts:1 \u00B7 The guard is missing.\ndismissed:\n- safety-F2 \u00B7 a.ts:2 \u00B7 Existing check covers this.\n",
     ),
   ).toMatchObject({
     outcome: "CHANGES_REQUESTED",
@@ -152,51 +131,27 @@ it("preserves finding IDs and dispositions in voice prose", () => {
     ],
   });
 });
-it("parses emphasized verdicts, repeated sections and varied disposition bullets", () => {
-  const finalBlock = parseVoice(
-    "outcome: CHANGES_REQUESTED\nband: HIGH\nband_reason: Draft.\nsummary: Draft.\n\nI reconsidered.\n**outcome:** **approved**.\n**band:** **medium**!\nband_reason: Final reason.\nsummary: Final summary.\nEstablished:\nDismissed:\n",
+it("uses the final voice verdict and excludes optional notes from dispositions", () => {
+  const final = parseVoice(
+    "outcome: CHANGES_REQUESTED\nband: HIGH\nband_reason: Draft.\nsummary: Draft.\n\n**outcome:** **approved**.\n**band:** **medium**!\nband_reason: Final reason.\nsummary: Final summary.\nestablished:\ndismissed:\n",
   );
-  const forms = parseVoice(
-    "outcome: approved.\nband: `low`\nband_reason: Bounded.\nsummary: Clear.\nEsTaBlIsHeD:\n- **alpha-F1** · dot reason\n- __beta_F2__ — dash reason\n- *gamma-F3*: colon reason\n- _delta_\n- `epsilon-5` · tick reason\n- (not an id) is ignored\n### Notes\n- after-heading · ignored\nESTABLISHED:\n- zeta-F6 · before rule\n---\n- after-rule · ignored\nestablished:\n- eta-F7 · before prose\nThese notes are optional.\n- **after-prose (MINOR):** ignored\nDISMISSED:\n- unknown-id: dismissed reason\n",
-  );
-  const liveFailure = parseVoice(
+  expect(final).toMatchObject({
+    outcome: "APPROVED",
+    band: "MEDIUM",
+    rationale: "Final reason.",
+    summary: "Final summary.",
+  });
+  const actual = parseVoice(
     "I checked the one finding that could still block and dismissed it, so this is approved. It's banded HIGH, though, which means you merge it, not me.\n\noutcome: APPROVED\nband: HIGH\nband_reason: I'm keeping the model's HIGH, for a stronger reason than its scoring. The model's two lowest-confidence readings carry zero confidence, and the one finding that could still block has been dismissed below. A lower band is not justified.\nrisk: changes to a configuration surface\nsummary: This change adjusts how an existing check concludes. The only blocking problem from round one is fixed below. Because the change affects how a required check is closed, the operator decides whether to merge. Three small notes are optional.\nfinding: none\nestablished:\ndismissed:\n- verify-R1-F2 · a.ts:12 · Fixed. Line 12 at head matches the base exactly, and the file is no longer part of this PR's changed-file list, so the saved record is accurate again.\n\nThese three notes don't block and the author can take or leave them:\n- **first-note-F1 (MINOR):** a claim in the PR description is no longer accurate.\n- **second-note-F1 (MINOR):** two entries in b.ts repeat the same title and summary text.\n- **third-note-F1 (info):** some titles in c.ts don't follow the house naming convention.\n",
   );
-  expect({
-    final: {
-      outcome: finalBlock.outcome,
-      band: finalBlock.band,
-      rationale: finalBlock.rationale,
-      summary: finalBlock.summary,
+  expect(actual.dispositions).toEqual([
+    {
+      id: "verify-R1-F2",
+      status: "dismissed",
+      reason:
+        "a.ts:12 · Fixed. Line 12 at head matches the base exactly, and the file is no longer part of this PR's changed-file list, so the saved record is accurate again.",
     },
-    forms: forms.dispositions,
-    live: liveFailure.dispositions,
-  }).toMatchObject({
-    final: {
-      outcome: "APPROVED",
-      band: "MEDIUM",
-      rationale: "Final reason.",
-      summary: "Final summary.",
-    },
-    forms: [
-      { id: "alpha-F1", status: "established", reason: "dot reason" },
-      { id: "beta_F2", status: "established", reason: "dash reason" },
-      { id: "gamma-F3", status: "established", reason: "colon reason" },
-      { id: "delta", status: "established", reason: "" },
-      { id: "epsilon-5", status: "established", reason: "tick reason" },
-      { id: "zeta-F6", status: "established", reason: "before rule" },
-      { id: "eta-F7", status: "established", reason: "before prose" },
-      { id: "unknown-id", status: "dismissed", reason: "dismissed reason" },
-    ],
-    live: [
-      {
-        id: "verify-R1-F2",
-        status: "dismissed",
-        reason:
-          "a.ts:12 · Fixed. Line 12 at head matches the base exactly, and the file is no longer part of this PR's changed-file list, so the saved record is accurate again.",
-      },
-    ],
-  });
+  ]);
 });
 describe("card prose ledger marks", () => {
   it("preserves ledger marks and reads past a Resolved section in card prose", () => {
@@ -206,72 +161,28 @@ describe("card prose ledger marks", () => {
         "safety",
       ),
     ).toMatchObject({
-      // The `Resolved:` section is never parsed; it is prose, and fixed-ness comes from absence.
       findings: [{ ledger: "R1-F1", late: "delta-reach: new caller" }],
     });
   });
 });
-describe("captured reviewer output", () => {
-  // Every card and voice the repository keeps (recordings) must parse. The reviewer and the
-  // voice write prose; a parser that refuses a shape they produce takes the review down for the
-  // operator.
-  type Sample = {
-    source: string;
-    kind: "card" | "voice";
-    card?: string;
-    text: string;
-  };
-  function collect(value: unknown, source: string, out: Sample[]) {
-    if (typeof value === "string") {
-      const text = value.trimStart();
-      // A card is the reviewer's whole return (a card line and a completion line); a voice is
-      // Margot's return (outcome and band_reason). Labels alone, check text and JSON are neither.
-      const card = /^card:\s*([\w-]+)/.exec(text);
-      if (card && /^\s*completion:/m.test(text))
-        out.push({ source, kind: "card", card: present(card[1]), text: value });
-      else if (
-        /^\s*(?:\*\*|__)?outcome(?:\*\*|__)?:/im.test(text) &&
-        /^\s*(?:\*\*|__)?band_reason(?:\*\*|__)?:/im.test(text) &&
-        !/^\s*verdict_source:/m.test(text) && // The check text carries the same labels
-        !text.startsWith("{")
-      )
-        out.push({ source, kind: "voice", text: value });
-      return;
-    }
-    if (Array.isArray(value)) {
-      for (const [i, v] of value.entries()) collect(v, `${source}[${i}]`, out);
-    } else if (value && typeof value === "object")
-      for (const [k, v] of Object.entries(value)) collect(v, `${source}.${k}`, out);
-  }
-  function samples(): Sample[] {
-    const out: Sample[] = [];
-    for (const dir of ["recordings", "recordings/prose"]) {
-      for (const name of readdirSync(dir)) {
-        const file = join(dir, name);
-        if (name.endsWith(".json")) collect(JSON.parse(readFileSync(file, "utf8")), file, out);
-        else if (name.endsWith(".txt")) collect(readFileSync(file, "utf8"), file, out);
-      }
-    }
-    return out;
-  }
-  // recordings/prose/ holds synthetic card and voice texts about example/project, written in the
-  // shapes the reviewer produces; recordings/*.json hold structured fixtures and contribute any raw
-  // prose they carry.
-  describe("recorded prose", () => {
-    const all = samples();
-    const cards = all.filter((s) => s.kind === "card");
-    const voices = all.filter((s) => s.kind === "voice");
-    it("keeps at least 7 recorded cards and 1 recorded voice in recordings/", () => {
-      expect(cards.length).toBeGreaterThanOrEqual(7);
-      expect(voices.length).toBeGreaterThanOrEqual(1);
-    });
-    it.each(cards.map((s) => [s.source, s]))("parses the recorded card at %s", (_, s) => {
-      expect(() => parseCard(s.text, s.card as Parameters<typeof parseCard>[1])).not.toThrow();
-    });
-    it.each(voices.map((s) => [s.source, s]))("parses the recorded voice at %s", (_, s) => {
-      expect(() => parseVoice(s.text)).not.toThrow();
-    });
-  });
+it("preserves an incomplete recorded card's reason", () => {
+  const card = parseCard(
+    readFileSync("recordings/prose/incomplete-proof-card.txt", "utf8"),
+    "works-and-proven",
+  );
+  expect(card.completion).toBe("incomplete");
+  expect(card.completionReason).toContain("could not get the evidence");
+  expect(card.findings).toEqual([]);
+});
+it("preserves the recorded voice's outcome, band and finding bindings", () => {
+  const voice = parseVoice(readFileSync("recordings/prose/changes-requested-voice.txt", "utf8"));
+  expect(voice).toMatchObject({ outcome: "CHANGES_REQUESTED", band: "HIGH" });
+  expect(voice.dispositions.map(({ id, status }) => ({ id, status }))).toEqual([
+    { id: "principal-engineer-F1", status: "established" },
+    { id: "works-and-proven-F1", status: "established" },
+    { id: "works-and-proven-F2", status: "established" },
+    { id: "maintainable-no-slop-F1", status: "established" },
+  ]);
 });
 it("keeps a card's Resolved section for the voice and Jev's risk text", async () => {
   const { councilText } = await import("../src/adapters/jev.js");

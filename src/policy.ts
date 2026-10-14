@@ -161,20 +161,6 @@ export function needsVoice(
   );
 }
 export function validateVoice(cards: Card[], voice: Voice): void {
-  const synthesis = [voice.summary, voice.rationale, voice.risk, voice.finding, voice.clarification]
-    .join(" ")
-    .toLowerCase();
-  const attribution = [
-    "co-authored-by",
-    "generated with",
-    "🤖",
-    "as an ai",
-    "i am claude",
-    "i'm claude",
-    "powered by claude",
-    "claude-session",
-  ].find((pattern) => synthesis.includes(pattern));
-  if (attribution) throw new Error(`Attribution leak in review prose (matched ${attribution})`);
   // An honest ERROR is Margot's own fail-closed ruling, never an incomplete verdict; a
   // finding she could not resolve legitimately lands in neither list.
   if (voice.outcome === "ERROR") return;

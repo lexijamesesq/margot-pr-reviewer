@@ -132,25 +132,33 @@ it("has nothing to close for a published package", async () => {
   });
 });
 it("touches nothing when the commit-to-PR binding is unreadable", async () => {
-  expect((await wire("commit-error")).decision).toMatchObject({
+  const result = await wire("commit-error");
+  expect(result.writes).toEqual([]);
+  expect(result.decision).toMatchObject({
     action: "error",
     message: expect.stringContaining("pull requests"),
   });
 });
 it("leaves alone a SHA outside the requested PR", async () => {
-  expect((await wire("wrong-pr")).decision).toMatchObject({
+  const result = await wire("wrong-pr");
+  expect(result.writes).toEqual([]);
+  expect(result.decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("not a commit of PR #7"),
   });
 });
 it("refuses to close the requested PR's still-live head from a superseded claim", async () => {
-  expect((await wire("live-superseded")).decision).toMatchObject({
+  const result = await wire("live-superseded");
+  expect(result.writes).toEqual([]);
+  expect(result.decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("live head of open PR #7"),
   });
 });
 it("leaves a SHA that is another open PR's live head to that review", async () => {
-  expect((await wire("other-live")).decision).toMatchObject({
+  const result = await wire("other-live");
+  expect(result.writes).toEqual([]);
+  expect(result.decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("open PR #9"),
   });
@@ -168,24 +176,30 @@ it("closes the check named by --check-name and no other", async () => {
   expect((await wire("other-name")).decision.action).toBe("left");
 });
 it("touches nothing when the check list is unreadable", async () => {
-  expect((await wire("check-error")).decision).toMatchObject({
+  const result = await wire("check-error");
+  expect(result.writes).toEqual([]);
+  expect(result.decision).toMatchObject({
     action: "error",
     message: expect.stringContaining("check-runs"),
   });
 });
 it("leaves completed checks alone", async () => {
-  expect((await wire("no-open")).decision).toMatchObject({
+  const result = await wire("no-open");
+  expect(result.writes).toEqual([]);
+  expect(result.decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("no open margot check"),
   });
 });
 it("leaves a check adopted by another run to that run", async () => {
-  expect((await wire("other-run")).decision).toMatchObject({
+  const result = await wire("other-run");
+  expect(result.writes).toEqual([]);
+  expect(result.decision).toMatchObject({
     action: "left",
     message: expect.stringContaining("belongs to run 2"),
   });
 });
-it("closes a caller check that has no run owner", async () => {
+it("closes a pending check on the requested PR before a run owner is attached", async () => {
   const result = await wire("no-run");
   expect({ action: result.decision.action, writes: result.writes.length }).toMatchObject({
     action: "closed",
@@ -197,78 +211,73 @@ for (const [name, reason, conclusion, title] of [
     "closes a superseded head as skipped with the hosted wording",
     "superseded",
     "skipped",
-    `Margot: superseded by a newer push (${"f".repeat(7)})`,
+    `superseded by a newer push (${"f".repeat(7)})`,
   ],
-  [
-    "closes a merged PR as skipped with the hosted wording",
-    "merged",
-    "skipped",
-    "Margot: not reviewed: the PR was merged first",
-  ],
+  ["closes a merged PR as skipped with the hosted wording", "merged", "skipped", "merged"],
   [
     "closes a closed unmerged PR as cancelled with the hosted wording",
     "closed",
     "cancelled",
-    "Margot: not reviewed: the PR was closed first",
+    "closed",
   ],
-  [
-    "closes a draft PR as failure with the hosted wording",
-    "draft",
-    "failure",
-    "Margot: not reviewed: draft",
-  ],
-  [
-    "closes a fork-head PR as failure with the hosted wording",
-    "fork",
-    "failure",
-    "Margot: not reviewed: fork head",
-  ],
+  ["closes a draft PR as failure with the hosted wording", "draft", "failure", "draft"],
+  ["closes a fork-head PR as failure with the hosted wording", "fork", "failure", "fork"],
   [
     "closes a conflicted PR as failure with the hosted wording",
     "conflict",
     "failure",
-    "Margot: not reviewed: merge conflict (resolve before review)",
+    "merge conflict",
   ],
-  [
-    "closes an empty PR as failure with the hosted wording",
-    "empty",
-    "failure",
-    "Margot: not reviewed: empty (no changed files)",
-  ],
+  ["closes an empty PR as failure with the hosted wording", "empty", "failure", "empty"],
 ] as const)
   it(name, async () => {
     const result = await wire(reason);
     expect({ action: result.decision.action, write: result.writes[0] }).toMatchObject({
       action: "closed",
-      write: { conclusion, output: { title } },
+      write: { conclusion, output: { title: expect.stringContaining(title) } },
     });
   });
 it("closes as cancelled when the route is cancelled", async () => {
   expect({ write: (await wire("route-cancelled")).writes[0] }).toMatchObject({
-    write: { conclusion: "cancelled" },
+    write: {
+      conclusion: "cancelled",
+      output: { title: expect.stringContaining("route job cancelled") },
+    },
   });
 });
 it("takes a non-stale conclusion from the first stopped job", async () => {
   expect({ write: (await wire("route-failed-review-cancelled")).writes[0] }).toMatchObject({
-    write: { conclusion: "action_required" },
+    write: {
+      conclusion: "action_required",
+      output: { title: expect.stringContaining("route job failure") },
+    },
   });
 });
 it("closes as cancelled when the review is cancelled", async () => {
   expect({ write: (await wire("review-cancelled")).writes[0] }).toMatchObject({
-    write: { conclusion: "cancelled" },
+    write: {
+      conclusion: "cancelled",
+      output: { title: expect.stringContaining("review job cancelled") },
+    },
   });
 });
 it("names the stopped job when the review fails", async () => {
   const result = await wire("review-failed");
   expect({ write: result.writes[0] }).toMatchObject({
-    write: { output: { title: expect.stringContaining("review job failure") } },
+    write: {
+      conclusion: "action_required",
+      output: { title: expect.stringContaining("review job failure") },
+    },
   });
 });
 it("closes a selected package that did not publish", async () => {
   const result = await wire("selected");
   expect({ action: result.decision.action, write: result.writes[0] }).toMatchObject({
     action: "closed",
-    write: { output: { title: expect.stringContaining("package job did not publish") } },
+    write: {
+      conclusion: "action_required",
+      output: { title: expect.stringContaining("package job did not publish") },
+    },
   });
 });
 it("closes as cancelled when the package stop is cancelled", async () => {
@@ -276,36 +285,24 @@ it("closes as cancelled when the package stop is cancelled", async () => {
     write: { conclusion: "cancelled" },
   });
 });
-it("uses the preflight title for a floor stop", async () => {
-  expect({ write: (await wire("floor")).writes[0] }).toMatchObject({
-    write: {
-      output: {
-        title: "Margot: preflight — required checks not green — waiting for the next push",
-        summary:
-          "The required checks were not green when the review's wait ended, so Margot did not review this head. She reviews it when she is dispatched again: on the next push, or when the host re-dispatches her once the checks finish.",
-      },
+it("reports a required-check stop without claiming a review verdict", async () => {
+  const result = await wire("floor");
+  expect(result.writes[0]).toMatchObject({
+    conclusion: "action_required",
+    output: {
+      title: expect.stringMatching(/preflight.*required checks not green/i),
+      summary: expect.stringMatching(/did not review.*dispatched again/i),
     },
   });
 });
-it("names the checks that held the floor in its title, as the previous reviewer did", async () => {
+it("names the required checks that held the review", async () => {
   const named = (await wire("floor-named")).writes[0];
   const blank = (await wire("floor-blank")).writes[0];
-  const floor = (await wire("floor")).writes[0];
-  expect({
-    named: ((named?.output ?? {}) as { title?: string }).title,
-    blank: ((blank?.output ?? {}) as { title?: string }).title,
-    sameSummary:
-      ((named?.output ?? {}) as { summary?: string }).summary ===
-      ((floor?.output ?? {}) as { summary?: string }).summary,
-  }).toEqual({
-    named: "Margot: preflight — pending: ci / checks, lint — waiting for the next push",
-    blank: "Margot: preflight — required checks not green — waiting for the next push",
-    sameSummary: true,
+  expect(named?.output).toMatchObject({
+    title: expect.stringContaining("pending: ci / checks, lint"),
   });
-});
-it("says Margot stopped before a verdict for other failures", async () => {
-  expect({ write: (await wire("stopped")).writes[0] }).toMatchObject({
-    write: { output: { title: expect.stringContaining("stopped before a verdict") } },
+  expect(blank?.output).toMatchObject({
+    title: expect.stringContaining("required checks not green"),
   });
 });
 it("gives an unknown stop its own summary, apart from a cancelled one", async () => {
@@ -315,13 +312,8 @@ it("gives an unknown stop its own summary, apart from a cancelled one", async ()
     unknown: await summary("stopped"),
     cancelled: await summary("review-cancelled"),
   }).toMatchObject({
-    unknown: { summary: expect.stringContaining("read the run for the cause") },
-    cancelled: { summary: expect.stringContaining("was cancelled before it posted") },
-  });
-});
-it("writes a stop summary as a sentence, not a template", async () => {
-  expect((await wire("conflict")).writes[0]).toMatchObject({
-    output: { summary: expect.stringContaining("This PR has a merge conflict") },
+    unknown: { summary: expect.stringContaining("ended without posting a verdict") },
+    cancelled: { summary: expect.stringContaining("was cancelled") },
   });
 });
 it("reports a failed close as an error rather than a false receipt", async () => {

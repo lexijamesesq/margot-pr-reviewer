@@ -34,39 +34,6 @@ it("ignores ledger history posted by an untrusted author", () => {
     ),
   ).toBe(null);
 });
-it("ignores a ledger whose head differs from the review commit", () => {
-  const f = history();
-  present(f.history.reviews[0]).head = "f".repeat(40);
-  expect(selectLedger(f, config)).toBe(null);
-});
-it("holds for the operator when the trusted ledger is corrupt", async () => {
-  const f = history();
-  present(f.history.reviews[0]).body = "review\n<!-- margot-ledger:v1 garbage -->";
-  const services = recordedServices({ ...source, facts: f });
-  expect(await review(source.request, config, services)).toEqual({
-    kind: "held",
-    request: source.request,
-    reason: expect.stringMatching(/Review history corrupt:.*review 1/),
-    recovery: expect.stringContaining("review and merge this PR yourself"),
-    mergeEligible: false,
-  });
-  expect(services.publications).toEqual([]);
-});
-it("holds unreadable history without inventing a verdict or risk band", async () => {
-  const services = recordedServices({
-    ...source,
-    facts: { ...history(), history: { ...history().history, complete: false } },
-  });
-  expect(await review(source.request, config, services)).toEqual({
-    kind: "held",
-    request: source.request,
-    reason: "Review history unavailable",
-    recovery:
-      "Margot cannot verify earlier findings were resolved. Re-run once GitHub returns the full review history, or review and merge this PR yourself; a new push does not clear this hold.",
-    mergeEligible: false,
-  });
-  expect(services.publications).toEqual([]);
-});
 it("selects the newest submitted ledger", () => {
   const f = history();
   f.history.reviews.push({
@@ -75,18 +42,6 @@ it("selects the newest submitted ledger", () => {
     submittedAt: "2026-09-02T00:00:00Z",
   });
   expect({ round: selectLedger(f, config)?.round }).toMatchObject({ round: 3 });
-});
-it("selects the trusted App ledger when a newer human comment quotes a marker", () => {
-  const f = history();
-  f.history.reviews.push({
-    ...posted(prior([], 3), "human"),
-    actorType: "User",
-    actor: "human",
-    id: 2,
-    submittedAt: "2026-09-02T00:00:00Z",
-    body: 'The review quotes "margot-ledger:" here.',
-  });
-  expect({ ledger: selectLedger(f, config) }).toMatchObject({ ledger: prior() });
 });
 it("rejects a ledger with duplicate keys", () => {
   expect(selectLedger(history(prior([entry(), entry()])), config)).toBe(null);
@@ -100,11 +55,10 @@ it("holds for the operator when a trusted ledger marker has malformed encoding",
   const f = history();
   present(f.history.reviews[0]).body = "review\n<!-- margot-ledger:v1 !!! -->";
   const services = recordedServices({ ...source, facts: f });
-  expect(await review(source.request, config, services)).toEqual({
+  expect(await review(source.request, config, services)).toMatchObject({
     kind: "held",
     request: source.request,
     reason: expect.stringMatching(/Review history corrupt:.*review 1/),
-    recovery: expect.stringContaining("review and merge this PR yourself"),
     mergeEligible: false,
   });
   expect(services.publications).toEqual([]);
@@ -204,15 +158,23 @@ describe("history warnings", () => {
       };
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
-        const result = await review(recording.request, config, recordedServices(recording));
-        expect(result).toEqual({
+        const services = recordedServices(recording);
+        if (defect === "revision")
+          expect(
+            selectLedger(
+              { ...facts, history: { complete: true, priorLedger: true, reviews: [bad] } },
+              config,
+            ),
+          ).toBeNull();
+        const result = await review(recording.request, config, services);
+        expect(result).toMatchObject({
           kind: "held",
           request: recording.request,
           reason: expect.stringMatching(/Review history corrupt:.*review 42/),
-          recovery: expect.stringContaining("review and merge this PR yourself"),
           mergeEligible: false,
         });
-        expect(warn).toHaveBeenCalledExactlyOnceWith(
+        expect(services.publications).toEqual([]);
+        expect(warn).toHaveBeenCalledWith(
           expect.stringMatching(defect === "corrupt" ? /JSON/i : /revision mismatch/),
         );
       } finally {

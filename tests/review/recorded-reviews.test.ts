@@ -6,24 +6,16 @@ describe("reviews replayed from recordings", () => {
     const draft = recorded("council-clear");
     const { result } = await reviewed(draft);
     expect(result.routeAnswer).toEqual(draft.route);
-  });
-
-  it("records the risk answer Jev returned for a functional change", async () => {
-    const draft = recorded("council-clear");
-    const { result } = await reviewed(draft);
     expect(result.riskAnswer).toEqual(draft.risk);
-  });
-
-  it("records null Jev answers for a mechanical change because no question was asked", async () => {
-    const { result } = await reviewed(recorded("mechanical-bump"));
-    expect(result.routeAnswer).toBeNull();
-    expect(result.riskAnswer).toBeNull();
   });
 
   it("spends no Claude on a mechanical bump", async () => {
     const { result, calls } = await reviewed(recorded("mechanical-bump"));
     expect(result.cards).toEqual([]);
     expect(result.voice).toBeNull();
+    expect(result.routeAnswer).toBeNull();
+    expect(result.riskAnswer).toBeNull();
+    expect(result.adherence).toEqual({ status: "skipped" });
     expect(calls).toEqual(["facts", "head", "publish"]);
   });
 
@@ -34,18 +26,12 @@ describe("reviews replayed from recordings", () => {
   });
 
   it("runs the lenses the route selected, each by name through the pinned reviewer", async () => {
-    const { callInput } = await reviewed(recorded("council-clear"));
+    const draft = recorded("council-clear");
+    const { callInput } = await reviewed(draft);
     const inputs = councilClearCards.map((name) => callInput(`card:${name}`));
     expect(inputs.map(({ name, agent }) => ({ name, agent }))).toEqual(
-      councilClearCards.map((name) => ({ name, agent: "publish:pr-reviewer" })),
+      councilClearCards.map((name) => ({ name, agent: draft.bundle.reviewerAgent })),
     );
-  });
-
-  it("holds for the operator at the band the voice displayed", async () => {
-    const { result } = await reviewed(recorded("voice-hold"));
-    expect(result.decision.rating.band).toBe("MEDIUM");
-    expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["risk"]);
   });
 
   it("refuses to approve when the voice's accounting is malformed", async () => {
@@ -54,16 +40,12 @@ describe("reviews replayed from recordings", () => {
     expect(publications).toEqual([]);
   });
 
-  it("requests changes without merge eligibility when the author's findings stand", async () => {
-    const { result } = await reviewed(recorded("author-changes"));
-    expect(result.decision.outcome).toBe("CHANGES_REQUESTED");
-    expect(result.decision.mergeEligible).toBe(false);
-  });
-
   it("approves a second round that fixes both earlier minor findings", async () => {
     const { result } = await reviewed(recorded("prior-ledger"));
     expect(result.decision.outcome).toBe("APPROVED");
     expect(result.convergence).toMatchObject({ round: 2, standing: 0, fixed: 2, new: 0, late: 0 });
+    expect(result.ledger.entries.filter((entry) => entry.status === "fixed")).toHaveLength(2);
+    expect(result.ledger.entries.filter((entry) => entry.status === "standing")).toEqual([]);
   });
 
   it("ignores only the uncertain dimensions when no council runs", async () => {
@@ -75,25 +57,12 @@ describe("reviews replayed from recordings", () => {
 
   it("publishes exactly the rendered governing result", async () => {
     const { result, publications } = await reviewed(recorded("author-changes"));
-    expect(publications).toEqual([
-      {
-        expectedHead: result.request.head,
-        review: {
-          request: result.request,
-          classification: result.classification,
-          routeAnswer: result.routeAnswer,
-          riskAnswer: result.riskAnswer,
-          cards: result.cards,
-          voice: result.voice,
-          decision: result.decision,
-          provenance: result.provenance,
-          adherence: result.adherence,
-          ledger: result.ledger,
-          convergence: result.convergence,
-          presentation: result.presentation,
-        },
-        report: result.report,
-      },
-    ]);
+    expect(result.decision).toMatchObject({ outcome: "CHANGES_REQUESTED", mergeEligible: false });
+    expect(publications).toHaveLength(1);
+    expect(publications[0]).toMatchObject({
+      expectedHead: result.request.head,
+      report: result.report,
+      review: { decision: result.decision, cards: result.cards },
+    });
   });
 });

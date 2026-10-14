@@ -10,8 +10,22 @@ npm test            # Vitest; no live network calls, no paid models
 node scripts/package-smoke.mjs <tarball>   # installs a packed tarball and runs both executables
 ```
 
-This repository uses pre-commit hooks (`pre-commit install`). Fix findings rather
-than bypassing them.
+Existing estate Git templates install native hooks in new agent clones. For an
+existing checkout missing hooks, install them once from the repository root:
+
+```sh
+pre-commit validate-config .pre-commit-config.yaml
+pre-commit install --hook-type pre-commit --hook-type pre-push \
+  --hook-type commit-msg --hook-type prepare-commit-msg
+```
+
+After `npm ci`, native pre-push hooks run typecheck, behavior tests and build for
+changes under `src/`, `tests/`, `recordings/`, `runtime/`, `samples/` and `scripts/`,
+or to package manifests, TypeScript configuration and the hook configuration.
+Ordinary prose-only pushes skip these package commands. Native file filtering can
+omit deletion-only changes; run the commands above manually for relevant removals.
+Fix findings rather than bypassing hooks. Keep existing custom hooks and
+`core.hooksPath`; coordinate with their owner before integrating native hooks.
 
 ## Maintainer tooling
 

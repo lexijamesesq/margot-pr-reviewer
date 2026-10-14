@@ -1,8 +1,7 @@
 import { expect, it } from "vitest";
-import { selectLedger, standingCards } from "../../src/ledger.js";
+import { selectLedger } from "../../src/ledger.js";
 import { findingTally, render } from "../../src/render.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
-import type { RoundScope } from "../../src/types.js";
 import {
   mechanicalBump,
   mechanicalRequest,
@@ -23,26 +22,10 @@ it("reconciles New, Open and Closed with every listed finding, including dismiss
     visible: true,
   });
 });
-it("keeps closed entries and late attribution through later rounds", () => {
+it("counts findings from earlier rounds as open or closed, without calling them new", () => {
   const value = tallyReview();
   value.convergence.round = 3;
-  expect({ tally: findingTally(value) }).toMatchObject({ tally: { new: 0, open: 2, closed: 2 } });
-});
-it("neither recalls an advisory entry's card nor shows the entry to cards", async () => {
-  const value = tallyReview();
-  const advisory = value.ledger.entries.filter((e) => e.status === "advisory");
-  const scope: RoundScope = {
-    round: 3,
-    priorHead: mechanicalRequest.head,
-    full: false,
-    diff: "delta",
-    files: [],
-    entries: advisory,
-  };
-  expect({ advisory: advisory.length, recalled: standingCards(scope) }).toEqual({
-    advisory: 1,
-    recalled: [],
-  });
+  expect(findingTally(value)).toEqual({ new: 0, open: 2, closed: 2 });
 });
 it("keeps the posted ledger readable in its version 1 format with the receipt in its compressed field", () => {
   const body = render(mechanicalReview);

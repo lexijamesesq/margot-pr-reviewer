@@ -14,6 +14,11 @@ for (const [name, mode] of [
       kind: run.result.kind,
       approved: run.reviews.some((v) => v.state === "APPROVED"),
     }).toMatchObject({ kind: "error", approved: false });
+    if (mode === "start-fail") expect(run.evaluated).toBe(false);
+    if (mode === "review-fail") {
+      expect(run.writes.some((write) => write.body.conclusion === "success")).toBe(false);
+      expect(run.final?.conclusion).toBe("action_required");
+    }
   });
 for (const [name, mode] of [
   ["fails closed before approving when the head moves", "head"],
@@ -38,12 +43,10 @@ it("closes the gate without touching earlier reviews when evaluation errors", as
   expect({
     kind: run.result.kind,
     conclusion: run.final?.conclusion,
-    dismissed: run.reviews.some((v) => v.state === "DISMISSED"),
     newApproval: run.writes.some((w) => w.body.event === "APPROVE"),
   }).toMatchObject({
     kind: "error",
     conclusion: "action_required",
-    dismissed: false,
     newApproval: false,
   });
 });

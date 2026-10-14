@@ -1,25 +1,35 @@
-import { randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { recordedServices } from "../../src/adapters/recorded.js";
-import { ledgerBlock, nextLedger, roundScope, selectLedger } from "../../src/ledger.js";
-import { review } from "../../src/review.js";
+import { ledgerBlock, nextLedger, roundScope } from "../../src/ledger.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
 import type { Ledger } from "../../src/types.js";
-import { entry, prior } from "../helpers/ledger.js";
+import { entry, prior, core as reviewCore } from "../helpers/ledger.js";
 import { present } from "../helpers/present.js";
 import { readRecording } from "../helpers/recordings.js";
 
 it("keeps standing entries when the ledger exceeds its size budget", () => {
-  expect(ledgerBlock(prior([{ ...entry(), what: "x".repeat(50000) }])).length > 24000).toBe(true);
+  const standing = { ...entry(), what: "x".repeat(50000) };
+  const block = ledgerBlock(prior([standing]));
+  expect(block.length).toBeGreaterThan(24000);
+  const decoded = JSON.parse(Buffer.from(present(block.split(" ")[2]), "base64").toString());
+  expect(decoded.entries).toEqual([standing]);
 });
 it("drops the replay receipt before any dismissal when the ledger is over budget", () => {
   const dismissed = { ...entry("MAJOR", "dismissed"), key: "R1-F2" };
   const value = prior([entry(), dismissed]);
-  const bulky = {
-    ...value,
-    v: 2 as const,
-    receipt: { big: randomBytes(30000).toString("base64") },
-  } as unknown as Ledger;
+  const receipt = nextLedger(
+    { round: 1, priorHead: null, full: true, diff: "", files: [], entries: [] },
+    [],
+    null,
+    reviewCore([], null),
+    configSchema.parse(readRecording("council-clear").config),
+    factsSchema.parse(readRecording("council-clear").facts),
+  ).ledger.receipt;
+  if (!receipt) throw new Error("receipt required");
+  receipt.review.decision.rating.rationale = Array.from({ length: 2000 }, (_, index) =>
+    createHash("sha256").update(String(index)).digest("hex"),
+  ).join("");
+  const bulky: Ledger = { ...value, v: 2, receipt };
   const decoded = JSON.parse(
     Buffer.from(present(ledgerBlock(bulky).split(" ")[2]), "base64").toString(),
   );
@@ -50,6 +60,8 @@ it("drops this round's fixed entries before any dismissal when the ledger is ove
   );
   const kept = decoded.entries as { key: string; status: string }[];
   expect(keys(kept.filter((e) => e.status === "dismissed"))).toEqual(keys(dismissed));
+  expect(kept.filter((e) => e.status === "fixed").length).toBeLessThan(fixed.length);
+  expect(Buffer.from(JSON.stringify(decoded)).toString("base64").length).toBeLessThanOrEqual(24000);
 });
 describe("history retention and retries", () => {
   const recording = () => readRecording("mechanical-bump");
@@ -60,14 +72,6 @@ describe("history retention and retries", () => {
     trustedLedgerActors: ["margot[bot]"],
   });
   const ledger = (round = 1): Ledger => ({ v: 1, round, head: facts.head, entries: [] });
-  const posted = (value: Ledger, id = 1, actor = "margot[bot]") => ({
-    id,
-    actor,
-    actorType: "Bot",
-    head: value.head,
-    submittedAt: `2026-10-02T00:00:0${id}Z`,
-    body: ledgerBlock(value),
-  });
   it("reviews the full PR on a same-head re-run without a usable saved result", () => {
     // The delta from a head to itself is empty; reviewing it would let the council approve
     // nothing. Without the saved result, the whole PR is reviewed again in the same round.
@@ -78,13 +82,11 @@ describe("history retention and retries", () => {
     ["restarts a same-head first review with full scope", 1],
     ["reuses same-head later review scope and allocates new finding keys", 3],
   ] as const)
-    it(name, async () => {
+    it(name, () => {
       const scope = roundScope(facts, { ...ledger(round), head: facts.head }, undefined, true);
       let keys: string[] = [];
       if (round === 3) {
-        const r = recording();
-        const core = await review(r.request, r.config, recordedServices(r));
-        if (core.kind !== "reviewed") throw new Error("baseline");
+        const core = reviewCore([], null);
         const priorEntry = {
           key: "R3-F1",
           card: "safety" as const,
@@ -152,26 +154,6 @@ describe("history retention and retries", () => {
         ...(round === 3 ? { keys: ["R3-F1", "R3-F2"] } : {}),
       });
     });
-  it("skips a forged ledger for older history, and holds the PR on a corrupt trusted one", async () => {
-    const old = posted(ledger(2));
-    const corrupt = { ...posted(ledger(3), 2), body: "<!-- margot-ledger:v1 bm90LWpzb24= -->" };
-    const forged = posted(ledger(4), 3, "author");
-    const withHistory = (reviews: (typeof old)[]) => ({
-      ...facts,
-      history: { complete: true, priorLedger: true, reviews },
-    });
-    expect({
-      forgedSkipped: selectLedger(withHistory([old, forged]), config)?.round,
-      corruptHolds: await review(
-        seed.request,
-        config,
-        recordedServices({ ...seed, facts: withHistory([old, corrupt]) }),
-      ),
-    }).toMatchObject({
-      forgedSkipped: 2,
-      corruptHolds: { kind: "held", reason: expect.stringContaining("Review history corrupt") },
-    });
-  });
   it("prunes old dismissed entries while retaining standing and advisory findings", () => {
     const entries: Ledger["entries"] = Array.from({ length: 130 }, (_, i) => ({
       key: `R1-F${i + 1}`,

@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { liveServices } from "../../src/adapters/live.js";
 import { classificationQuestions } from "../../src/questions.js";
-import { liveConfigSchema } from "../../src/schemas.js";
 import { context, facts } from "../helpers/adapters.js";
 
 const sample = () =>
@@ -31,18 +30,20 @@ async function classifyUrl(jev: Record<string, unknown>) {
 describe("the Jev endpoint", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("calls the configured jev.url", async () => {
+  it("uses configured or default HTTPS endpoints and rejects HTTP before requesting", async () => {
     expect(await classifyUrl({ url: "https://jev.example.test/v1/score" })).toBe(
       "https://jev.example.test/v1/score",
     );
-  });
-
-  it("calls the TypeSafe endpoint when no url is configured", async () => {
+    vi.restoreAllMocks();
     expect(await classifyUrl({ url: undefined })).toBe("https://api.typesafe.ai/v1/systemone");
-  });
-
-  it("rejects a jev.url that is not https", () => {
-    const config = { ...sample(), jev: { model: "m", url: "http://jev.example.test" } };
-    expect(liveConfigSchema.safeParse(config).success).toBe(false);
+    vi.restoreAllMocks();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    expect(() =>
+      liveServices(
+        { ...sample(), jev: { model: "m", url: "http://jev.example.test" } },
+        { jevKey: "key" },
+      ),
+    ).toThrow();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

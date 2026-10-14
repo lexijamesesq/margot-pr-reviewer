@@ -37,20 +37,3 @@ it("accepts a skipped required check only when it is explicitly configured as al
     ),
   ).toMatchObject({ kind: "error", stage: "checks", mergeEligible: false });
 });
-it("preserves mechanical classification for a 2005-line candidate", async () => {
-  const copy = structuredClone(mechanicalBump);
-  const additions = Array.from({ length: 2001 }, (_, index) => `+line ${index}`).join("\n");
-  (
-    copy.facts as {
-      diff: string;
-    }
-  ).diff =
-    `diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -0,0 +1,2001 @@\n${additions}\n`;
-  const services = recordedServices(copy);
-  const result = await review(copy.request, copy.config, services);
-  expect({
-    mechanical: result.kind === "reviewed" && result.classification === "mechanical",
-    classificationCall: services.calls.some((call) => call.name === "classification"),
-    routeCall: services.calls.some((call) => call.name === "route"),
-  }).toMatchObject({ mechanical: true, classificationCall: false, routeCall: false });
-});

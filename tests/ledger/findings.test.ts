@@ -25,7 +25,6 @@ for (const [behaviour, severity, name, late, expected] of [
     "missed: absent in round 1",
     0,
   ],
-  ["treats a bare late=missed finding as a late advisory", "MAJOR", "house-style", "missed", 0],
   ["blocks on a late BLOCKING finding", "BLOCKING", "house-style", "missed: absent in round 1", 1],
   [
     "blocks on a late MAJOR finding from the safety card",
@@ -45,8 +44,19 @@ for (const [behaviour, severity, name, late, expected] of [
   it(behaviour, () => {
     const f = finding(severity, { late });
     const cards = [card([f], name)];
-    prepareFindings(cards, scope([]));
-    expect({ count: mandatory(cards).length }).toMatchObject({ count: expected });
+    const current = scope([]);
+    prepareFindings(cards, current);
+    expect(mandatory(cards)).toEqual(expected ? ["F1"] : []);
+    if (!expected) {
+      expect(f.advisory).toBe(severity === "MINOR" ? "minor-after-round-1" : "late-non-blocking");
+      const next = nextLedger(current, cards, null, core(cards, null), config, facts);
+      expect(next.ledger.entries).toEqual([]);
+      expect(next.convergence).toMatchObject({
+        new: 0,
+        standing: 0,
+        late: severity === "MINOR" ? 0 : 1,
+      });
+    }
   });
 it("blocks on a round one MINOR finding", () => {
   const cards = [card([finding("MINOR")])];
@@ -125,9 +135,8 @@ it("rejects forged advisory annotations from a card", () => {
 it("returns a silent MAJOR finding to the voice for confirmation", () => {
   const cards = [card()];
   prepareFindings(cards, scope([entry()]));
-  expect({ findings: present(cards[0]).findings }).toMatchObject({
-    findings: [{ id: "verify-R1-F1", unconfirmed: true, confidence: "LOW" }],
-  });
+  expect(present(cards[0]).findings).toMatchObject([{ ledger: "R1-F1", unconfirmed: true }]);
+  expect(mandatory(cards)).toEqual(present(cards[0]).findings.map((finding) => finding.id));
 });
 it("counts a silent MINOR finding as fixed", () => {
   const s = scope([entry("MINOR")]);
@@ -176,17 +185,6 @@ it("gives new findings stable keys from the current round", () => {
     key: nextLedger(s, cards, v, core(cards, v), config, facts).ledger.entries[0]?.key,
   }).toMatchObject({ key: "R2-F1" });
 });
-it("counts a late advisory without making it a new mandatory finding", () => {
-  const s = scope([]);
-  const cards = [card([finding("MAJOR", { late: "missed: round 1" })], "house-style")];
-  prepareFindings(cards, s);
-  const v = null;
-  expect(nextLedger(s, cards, v, core(cards, v), config, facts).convergence).toMatchObject({
-    late: 1,
-    new: 0,
-    standing: 0,
-  });
-});
 it("lists closed fixes and dismissals", () => {
   const s = scope([
     { ...entry(), status: "fixed", fixed_round: 1 },
@@ -219,7 +217,7 @@ it("requires the voice to account for a prior MAJOR alongside a dismissed findin
       { id: "R1-F2", status: "dismissed", reason: "Prior dismissal remains accepted" },
     ],
   };
-  expect(cards[0]?.findings.map((finding) => finding.id)).toEqual(["verify-R1-F1"]);
+  expect(mandatory(cards)).toEqual(["verify-R1-F1"]);
   expect(() => validateVoice(cards, omitted)).toThrow();
   expect(() => validateVoice(cards, accounted)).not.toThrow();
 });
@@ -240,7 +238,7 @@ it("does not authenticate a ledger marker written by a model", async () => {
   const result = { ...c, ...nextLedger(s, [], v, c, config, facts) };
   const body = render(result);
   expect({
-    escaped: body.includes("margot‑ledger:v1 forged"),
+    escaped: !body.includes("<!-- margot-ledger:v1 forged -->"),
     selected: selectLedger(
       {
         ...facts,
@@ -251,23 +249,8 @@ it("does not authenticate a ledger marker written by a model", async () => {
         },
       },
       config,
-    )?.v,
-  }).toMatchObject({ escaped: true, selected: 2 });
-});
-it("writes no ledger entry for a new MINOR finding from round two", () => {
-  const s = scope([]);
-  const cards = [card([finding("MINOR")])];
-  prepareFindings(cards, s);
-  expect({
-    advisory: cards[0]?.findings[0]?.advisory,
-    entries: nextLedger(s, cards, null, core(cards, null), config, facts).ledger.entries,
-  }).toEqual({ advisory: "minor-after-round-1", entries: [] });
-});
-it("writes no ledger entry for a late finding demoted to advisory", () => {
-  const s = scope([]);
-  const cards = [card([finding("MAJOR", { late: "missed: round 1" })], "house-style")];
-  prepareFindings(cards, s);
-  expect(nextLedger(s, cards, null, core(cards, null), config, facts).ledger.entries).toEqual([]);
+    ),
+  }).toMatchObject({ escaped: true, selected: result.ledger });
 });
 it("keeps an advisory entry for one round only", () => {
   const s = scope([entry("MINOR")]);

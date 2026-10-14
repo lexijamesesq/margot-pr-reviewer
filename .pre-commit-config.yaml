@@ -92,3 +92,27 @@ repos:
         types_or: [html]
         additional_dependencies: ["prettier@3.9.10"]
         stages: [pre-commit]
+
+  - repo: local
+    hooks:
+      - id: package-typecheck
+        name: Package typecheck
+        entry: npm run typecheck
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        files: '^(src/|tests/|recordings/|runtime/|samples/|scripts/|package(-lock)?\.json$|tsconfig(\.build)?\.json$|\.pre-commit-config\.yaml$)'
+      - id: package-tests
+        name: Package behavior tests
+        entry: npm test
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        files: '^(src/|tests/|recordings/|runtime/|samples/|scripts/|package(-lock)?\.json$|tsconfig(\.build)?\.json$|\.pre-commit-config\.yaml$)'
+      - id: package-build
+        name: Package build
+        entry: npm run build
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        files: '^(src/|tests/|recordings/|runtime/|samples/|scripts/|package(-lock)?\.json$|tsconfig(\.build)?\.json$|\.pre-commit-config\.yaml$)'

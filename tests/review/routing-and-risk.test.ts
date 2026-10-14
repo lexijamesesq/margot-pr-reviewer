@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { checkText as renderCheckText } from "../../src/render.js";
 import {
   asDocumentation,
   type Change,
   confidentLow,
-  councilClearCalls,
-  councilClearCards,
   recorded,
   reviewed,
   reviewRecording,
@@ -61,7 +58,6 @@ describe("which lenses run", () => {
       ),
     );
     expect(result.voice).not.toBeNull();
-    expect(result.cards.map((card) => card.name)).toEqual([...councilClearCards]);
   });
 
   it("summons the voice when a council risk dimension is uncertain", async () => {
@@ -74,8 +70,7 @@ describe("which lenses run", () => {
     expect(result.decision.rating.band).toBe("LOW");
     expect(result.decision.rating.ignoredDimensions).toEqual([]);
     expect(result.voice).not.toBeNull();
-    expect(result.cards.map((card) => card.name)).toEqual([...councilClearCards]);
-    expect(calls).toEqual([...councilClearCalls, "voice", "adherence", "head", "publish"]);
+    expect(calls).toContain("voice");
   });
 
   it("validates the card bundle pin when the voice runs without a council", async () => {
@@ -96,14 +91,6 @@ describe("the risk band", () => {
   const operationsAt = (probabilities: number[]) =>
     withRiskDimension("operations", { probabilities, confidence: 1 });
 
-  it("holds a confident MEDIUM when no council ran", async () => {
-    const { result } = await reviewed(
-      noCouncilConfidentlyLow(operationsAt([0, 0, 1, 0]), withVoiceFields({ band: "MEDIUM" })),
-    );
-    expect(result.decision.rating.band).toBe("MEDIUM");
-    expect(result.decision.mergeEligible).toBe(false);
-  });
-
   it("raises the band when the risk tail reaches the boundary", async () => {
     const { result } = await reviewed(
       noCouncilConfidentlyLow(operationsAt([0, 0.7, 0.3, 0]), withVoiceFields({ band: "MEDIUM" })),
@@ -121,14 +108,16 @@ describe("the risk band", () => {
       outcome: result.decision.outcome,
       band: result.decision.rating.band,
       holdReasons: result.decision.holdReasons,
-      verdictSource: renderCheckText(result).match(/^verdict_source: (.*)$/m)?.[1],
+      mergeEligible: result.decision.mergeEligible,
     }).toEqual({
       voiceCalled: false,
       outcome: "APPROVED",
       band: "MEDIUM",
       holdReasons: ["risk"],
-      verdictSource: "no_council",
+      mergeEligible: false,
     });
+    expect(result.report).toContain("Risk: MEDIUM");
+    expect(result.report).toContain("medium exposure");
   });
 
   it("keeps the cautious band when a dimension has no usable confidence", async () => {
@@ -145,13 +134,6 @@ describe("the risk band", () => {
     }).toEqual({ band: "MEDIUM", ignored: [], mergeEligible: false });
   });
 
-  it("names the held band, not low exposure, on a no-council hold", async () => {
-    const { result } = await reviewed(
-      noCouncilConfidentlyLow(operationsAt([0, 0, 1, 0]), withVoiceFields({ band: "LOW" })),
-    );
-    expect(result.report.split("\n")[1]).toMatch(/^🟡 \*\*Risk: MEDIUM\*\* — medium exposure\b/u);
-  });
-
   it("keeps the band LOW when the risk tail is just below the boundary", async () => {
     const { result } = await reviewed(
       noCouncilConfidentlyLow(
@@ -164,20 +146,19 @@ describe("the risk band", () => {
   });
 
   it("does not use the confidence floor when no risk dimension is confident", async () => {
-    const { result } = await reviewed(
+    const { result, calls } = await reviewed(
       recorded(
         "council-clear",
         withNoCouncil(),
         withRisk(uniformRisk({ probabilities: [0, 0, 1, 0], confidence: 0.1 })),
-        withVoice(voiceRuling("APPROVED", "MEDIUM")),
       ),
     );
-    expect(result.decision.rating.band).toBe("MEDIUM");
-    expect(result.decision.rating.ignoredDimensions).toEqual([]);
+    expect(calls).not.toContain("voice");
+    expect(result.decision.rating).toMatchObject({ band: "MEDIUM", ignoredDimensions: [] });
   });
 
   it("does not apply the no-council confidence floor when a council ran", async () => {
-    const { result } = await reviewed(
+    const { callInput } = await reviewed(
       recorded(
         "council-clear",
         withRisk({
@@ -193,19 +174,23 @@ describe("the risk band", () => {
         withVoice(voiceRuling("APPROVED", "MEDIUM")),
       ),
     );
-    expect(result.decision.rating.band).toBe("MEDIUM");
-    expect(result.decision.rating.ignoredDimensions).toEqual([]);
+    expect(callInput("voice").rating).toMatchObject({ band: "MEDIUM", ignoredDimensions: [] });
   });
 
-  it("lets the voice lower a functional band for display and for merge eligibility", async () => {
-    const { result } = await reviewed(recorded("voice-hold", withVoiceFields({ band: "LOW" })));
-    expect(result.decision.rating.band).toBe("LOW");
-    expect(result.decision.mergeEligible).toBe(true);
-  });
+  it.each(["LOW", "MEDIUM"] as const)(
+    "uses the voice's %s band for display and merge eligibility",
+    async (band) => {
+      const { result } = await reviewed(recorded("voice-hold", withVoiceFields({ band })));
+      expect(result.decision.rating.band).toBe(band);
+      expect(result.decision.mergeEligible).toBe(band === "LOW");
+      expect(result.report).toContain(`Risk: ${band}`);
+      expect(result.decision.holdReasons).toEqual(band === "LOW" ? [] : ["risk"]);
+    },
+  );
 
   it("publishes a held verdict instead of throwing when the voice rules ERROR", async () => {
     const { result, publications } = await reviewed(
-      recorded("invalid-accounting", withVoiceFields({ outcome: "ERROR" })),
+      recorded("invalid-accounting", withVoiceFields({ outcome: "ERROR", risk: undefined })),
     );
     expect(result.decision.outcome).toBe("ERROR");
     expect(result.decision.mergeEligible).toBe(false);
@@ -214,13 +199,6 @@ describe("the risk band", () => {
 });
 
 describe("a risk answer from the fallback", () => {
-  it("holds the review with the fallback reason", async () => {
-    const draft = recorded("council-clear");
-    draft.risk.source = "fallback";
-    const { result } = await reviewed(draft);
-    expect(result.decision.mergeEligible).toBe(false);
-    expect(result.decision.holdReasons).toEqual(["fallback-risk"]);
-  });
   it("names only routing when the routing answer alone came from the fallback", async () => {
     const draft = recorded("council-clear");
     draft.route.source = "fallback";

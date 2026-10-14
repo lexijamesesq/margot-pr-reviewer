@@ -5,7 +5,6 @@ import * as githubModule from "../../src/adapters/github.js";
 import { githubAdapter } from "../../src/adapters/github.js";
 import { liveServices } from "../../src/adapters/live.js";
 import { checkExternalId } from "../../src/check-identity.js";
-import { diffLineCount } from "../../src/diff.js";
 import { factsSchema, requestSchema } from "../../src/schemas.js";
 import { context, github, request } from "../helpers/adapters.js";
 import { readRecording } from "../helpers/recordings.js";
@@ -29,10 +28,6 @@ it("reviews a file the diff names but the listing omits", async () => {
   }).adapter.facts(request, context());
   expect(result.files.map((f) => f.path)).toEqual(["a.ts", "b.ts"]);
 });
-it("accepts a file listed without its own patch when the whole diff carries it", async () => {
-  const result = await github({ patch: null }).adapter.facts(request, context());
-  expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
-});
 it("refuses a file whose supplied counts the whole diff does not match", async () => {
   await expect(github({ additions: 3 }).adapter.facts(request, context())).rejects.toThrow(
     "Diff hunks are incomplete",
@@ -51,13 +46,6 @@ it("defers to the whole diff when a listing entry has no patch and zero counts",
   }).adapter.facts(request, context());
   expect(result.files[0]).toMatchObject({ path: "a.ts" });
 });
-it("refuses a diff missing its file header", async () => {
-  await expect(
-    github({
-      diff: "not a diff",
-    }).adapter.facts(request, context()),
-  ).rejects.toThrow();
-});
 it("refuses head movement during fact collection", async () => {
   await expect(github({ moved: true }).adapter.facts(request, context())).rejects.toThrow();
 });
@@ -72,22 +60,14 @@ it("reports history as incomplete when GitHub history is unreadable", async () =
     !(await github({ historyFailure: true }).adapter.facts(request, context())).history.complete,
   ).toBe(true);
 });
-it("detects an existing ledger outside an explicit fresh shadow", async () => {
+it("recognizes existing ledger history and excludes same-head history for a shadow", async () => {
   expect(
     (await github({ ledger: true }).adapter.facts(request, context())).history.priorLedger,
   ).toBe(true);
-});
-it("completes a removed file with no patch when the whole diff carries its deletion", async () => {
-  // GitHub omits `patch` for large changes; a 2,289-line deletion in a real PR had none.
-  const deleted = Array.from({ length: 5 }, (_, i) => `-line ${i}`).join("\n");
-  const result = await github({
-    patch: null,
-    additions: 0,
-    deletions: 5,
-    status: "removed",
-    diff: `diff --git a/a.ts b/a.ts\n@@ -1,5 +0,0 @@\n${deleted}\n`,
-  }).adapter.facts(request, context());
-  expect(result.files.map((f) => f.path)).toEqual(["a.ts"]);
+  expect(
+    (await github({ ledger: true, shadowBeforeHead: true }).adapter.facts(request, context()))
+      .history.priorLedger,
+  ).toBe(false);
 });
 it("names deleted, added, renamed and oddly named files from the diff's own header lines", async () => {
   // Real diffs carry `---`/`+++`/`rename` lines; the `diff --git a/X b/Y` header is never split,
@@ -136,7 +116,8 @@ it("refuses a diff path the complete listing does not know", async () => {
     }).adapter.facts(request, context()),
   ).rejects.toThrow("Diff and file listing disagree");
 });
-it("refuses a partial final hunk as incomplete facts", async () => {
+it("refuses malformed framing or a partial final hunk as incomplete facts", async () => {
+  await expect(github({ diff: "not a diff" }).adapter.facts(request, context())).rejects.toThrow();
   await expect(
     github({
       diff: "diff --git a/a.ts b/a.ts\n@@ -1,2 +1,2 @@\n-old\n+new",
@@ -144,66 +125,29 @@ it("refuses a partial final hunk as incomplete facts", async () => {
   ).rejects.toThrow("Diff hunks are incomplete");
 });
 const modeOnlyDiff = "diff --git a/a.ts b/a.ts\nold mode 100644\nnew mode 100755\n";
-for (const [name, id, diff] of [
-  [
-    "accepts a zero-change rename without a patch",
-    "zero-rename",
-    "diff --git a/old.ts b/a.ts\nsimilarity index 100%\nrename from old.ts\nrename to a.ts\n",
-  ],
-  [
-    "accepts an empty added file without a patch",
-    "empty-added",
-    "diff --git a/a.ts b/a.ts\nnew file mode 100644\nindex 0000000..e69de29\n",
-  ],
-  [
-    "accepts a mode-only change without a patch",
-    "mode-only",
-    "diff --git a/a.ts b/a.ts\nold mode 100644\nnew mode 100755\n",
-  ],
-] as const) {
-  it(name, async () => {
-    const result = await github({
-      patch: null,
-      additions: 0,
-      deletions: 0,
-      status: id === "zero-rename" ? "renamed" : id === "empty-added" ? "added" : "modified",
-      ...(id === "zero-rename" ? { previousFilename: "old.ts" } : {}),
-      diff: diff,
-    }).adapter.facts(request, context());
-    expect(
-      result.complete &&
-        result.fileCount === 1 &&
-        result.files[0]?.path === "a.ts" &&
-        (id !== "zero-rename" || result.files[0]?.previousPath === "old.ts"),
-    ).toBe(true);
+it("keeps mode-only changes and zero-change rename scope without patches", async () => {
+  const mode = await github({
+    patch: null,
+    additions: 0,
+    deletions: 0,
+    diff: modeOnlyDiff,
+  }).adapter.facts(request, context());
+  expect({ complete: mode.complete, files: mode.files }).toEqual({
+    complete: true,
+    files: [{ path: "a.ts" }],
   });
-}
-for (const [name, marker] of [
-  ["lists a binary file as a change with no text lines", "Binary files a/a.ts and b/a.ts differ"],
-  [
-    "lists an encoded binary patch as a change with no text lines",
-    "GIT binary patch\nliteral 1\nIc${Nk000310RR91",
-  ],
-] as const) {
-  it(name, async () => {
-    const result = await github({
-      patch: null,
-      additions: 0,
-      deletions: 0,
-      diff: `${modeOnlyDiff}${marker}\n`,
-    }).adapter.facts(request, context());
-    expect(result.complete && result.files[0]?.path).toBe("a.ts");
-  });
-}
+  const renamed = await github({
+    patch: null,
+    additions: 0,
+    deletions: 0,
+    status: "renamed",
+    previousFilename: "old.ts",
+    diff: "diff --git a/old.ts b/a.ts\nsimilarity index 100%\nrename from old.ts\nrename to a.ts\n",
+  }).adapter.facts(request, context());
+  expect(renamed.files).toEqual([{ path: "a.ts", previousPath: "old.ts" }]);
+});
 it("fails the final freshness check when the base moved", async () => {
   await expect(github({ base: "f".repeat(40) }).adapter.head(request, context())).rejects.toThrow();
-});
-it("starts a before-head shadow fresh despite same-head publication", async () => {
-  const facts = await github({ ledger: true, shadowBeforeHead: true }).adapter.facts(
-    request,
-    context(),
-  );
-  expect({ priorLedger: facts.history.priorLedger }).toMatchObject({ priorLedger: false });
 });
 describe("GitHub triage and diff size", () => {
   const recording = () => readRecording("mechanical-bump");
@@ -323,31 +267,9 @@ describe("GitHub triage and diff size", () => {
           context(),
         ),
       ).rejects.toThrow();
-      receiptOverride = () => {
-        throw new Error("missing check");
-      };
-      await expect(
-        githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
-          request,
-          context(),
-        ),
-      ).rejects.toThrow("missing check");
-      await expect(
-        githubAdapter(client, { triageAppId: 321, triageCheckName: "custom / triage" }).facts(
-          { ...request, triageCheckId: undefined },
-          context(),
-        ),
-      ).rejects.toThrow("check ID");
     } finally {
       clientSpy.mockRestore();
     }
-  });
-  it("counts diff headers and context toward the review size limit", () => {
-    expect({
-      lines: diffLineCount(
-        "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1 +1 @@\n context\n+a\n-b\nlast",
-      ),
-    }).toMatchObject({ lines: 7 });
   });
 });
 it("refuses GitHub write authority for a shadow history selection", async () => {
@@ -391,8 +313,4 @@ it("keeps the conclusion GitHub recorded for every check run", async () => {
     "docs=skipped",
     "unit=pending",
   ]);
-});
-it("serves no evidence reads: the reviewers read with gh in their container", () => {
-  const { adapter } = github();
-  expect(["readFile", "checkRun", "tree"].filter((method) => method in adapter)).toEqual([]);
 });

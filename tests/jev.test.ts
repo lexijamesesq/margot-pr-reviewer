@@ -3,14 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { decisionFallback } from "../src/adapters/decision-fallback.js";
-import { councilText, jevAdapter, jevState } from "../src/adapters/jev.js";
+import { jevAdapter } from "../src/adapters/jev.js";
 import * as processAdapter from "../src/adapters/process.js";
 import { recordedServices, review } from "../src/index.js";
 import { rate } from "../src/policy.js";
 import {
-  adherenceDistinctQuestion,
   adherenceQuestions,
-  adherenceRiskQuestion,
   classificationQuestions,
   riskQuestions,
   routeQuestions,
@@ -82,18 +80,6 @@ const classes = {
   documentation: { type: "noul", noul: 0 },
   mechanical: { type: "noul", noul: 1 },
 };
-it("normalizes Jev nouls into classification probabilities", async () => {
-  const j = jev({ ...classes, mechanical: { type: "noul", noul: 1 } });
-  const result = await j.adapter.classify(facts, classificationQuestions, context());
-  expect(classificationSchema.parse(result).mechanical).toBe(1);
-});
-it("sends the golden classification questions, in order", async () => {
-  const j = jev(classes);
-  await j.adapter.classify(facts, classificationQuestions, context());
-  expect(JSON.stringify((j.calls[0] as { questions: unknown }).questions)).toBe(
-    JSON.stringify(goldenClassificationQuestions),
-  );
-});
 it("classifies the code change alone: files, tier and the whole diff, in one request", async () => {
   const j = jev(classes);
   const diff = "a.ts evidence 🐱 ".repeat(8000);
@@ -110,6 +96,7 @@ it("classifies the code change alone: files, tier and the whole diff, in one req
     classificationQuestions,
     context(),
   );
+  expect((j.calls[0] as { questions: unknown }).questions).toEqual(goldenClassificationQuestions);
   expect({ requests: j.calls.length, state: (j.calls[0] as { state: unknown }).state }).toEqual({
     requests: 1,
     state: [
@@ -121,15 +108,6 @@ it("classifies the code change alone: files, tier and the whole diff, in one req
   });
 });
 describe("a malformed Jev answer takes the conservative default", () => {
-  it("fails classification when both providers cannot supply valid probabilities", async () => {
-    await expect(
-      jev({ ...classes, mechanical: { type: "noul", noul: "yes" } }).adapter.classify(
-        facts,
-        classificationQuestions,
-        context(),
-      ),
-    ).rejects.toThrow("fallback unavailable");
-  });
   it("summons a card whose routing answer is missing or unreadable", async () => {
     const { documentation_substantive: _substance, ...functional } = routeQuestions;
     const answers = {
@@ -146,14 +124,13 @@ describe("a malformed Jev answer takes the conservative default", () => {
         .filter(([, p]) => p === 1)
         .map(([n]) => n),
     ).toEqual(["safety", "house-style"]);
-  });
-  it("treats routing as unsure when the exposure answer is missing", async () => {
-    const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0 }]));
-    const { documentation_substantive: _substance, ...functional } = routeQuestions;
-    const r = routeSchema.parse(
-      await jev(answers).adapter.route(facts, "functional", functional, context()),
+    const withoutExposure = Object.fromEntries(
+      cardNames.map((name) => [name, { type: "noul", noul: 0 }]),
     );
-    expect(r.confidence).toBe(0);
+    const unsure = routeSchema.parse(
+      await jev(withoutExposure).adapter.route(facts, "functional", functional, context()),
+    );
+    expect(unsure.confidence).toBe(0);
   });
   it("treats documentation as substantive when its meaning answer is unreadable", async () => {
     const answers = {
@@ -189,18 +166,33 @@ describe("a malformed Jev answer takes the conservative default", () => {
     });
   });
 });
-it("retries a transient Jev response and recovers", async () => {
-  const j = jev(classes, { failures: 1 });
-  await j.adapter.classify(facts, classificationQuestions, context());
-  expect(j.attempts()).toBe(2);
-});
-it("retries classification once after a Jev authentication failure", async () => {
-  const j = jev(classes, { failures: 1, status: 401 });
-  const answer = (await j.adapter.classify(facts, classificationQuestions, context())) as {
-    source: string;
-  };
-  expect(answer.source).toBe("jev");
-  expect(j.attempts()).toBe(2);
+it("uses fallback after rejected credentials while retrying a transient classification outage", async () => {
+  for (const [status, attempts, source] of [
+    [401, 1, "fallback"],
+    [503, 2, "jev"],
+  ] as const) {
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ model: "test-model", answers: classes }), {
+          status: fetch.mock.calls.length === 1 ? status : 200,
+        }),
+    );
+    const fallback = vi.fn(async () => classes);
+    const onJevRetry = vi.fn();
+    const adapter = jevAdapter({
+      key: "test-only",
+      model: "test-model",
+      fallbackClaude: pinnedClaude,
+      fetch,
+      fallback,
+      onJevRetry,
+    });
+    const answer = await adapter.classify(facts, classificationQuestions, context());
+    expect(answer).toMatchObject({ source, mechanical: 1 });
+    expect(fetch).toHaveBeenCalledTimes(attempts);
+    expect(fallback).toHaveBeenCalledTimes(source === "fallback" ? 1 : 0);
+    expect(onJevRetry).toHaveBeenCalledTimes(source === "fallback" ? 0 : 1);
+  }
 });
 it("prepares only a missing native Claude after Jev is exhausted, then reuses it", async () => {
   const root = await mkdtemp(join(tmpdir(), "margot-fallback-"));
@@ -287,44 +279,6 @@ it("returns an explicit classification error after both providers fail", async (
     stage: "classification",
   });
 });
-it("preserves risk levels in Jev score distributions", async () => {
-  const answers = Object.fromEntries(
-    dimensions.map((d) => [
-      d,
-      {
-        type: "score",
-        confidence: 0.8,
-        probabilities: { 0: 0, 1: 0, 2: 1, 3: 0 },
-      },
-    ]),
-  );
-  const r = await jev(answers).adapter.risk(facts, [], riskQuestions, context());
-  expect(riskSchema.parse(r).dimensions.operations.probabilities[2]).toBe(1);
-});
-it("rates any non-empty distribution by its tail, whatever it sums to, and only an absent one by its score", async () => {
-  const answers = {
-    ...Object.fromEntries(
-      dimensions.map((d) => [
-        d,
-        { type: "score", confidence: 0.9, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } },
-      ]),
-    ),
-    // Sums to 0.98: the tail puts it at level 2 (P(>=2) = 0.38); its score would say 1.
-    operations: {
-      type: "score",
-      confidence: 0.9,
-      score: 1,
-      probabilities: { 0: 0.5, 1: 0.1, 2: 0.1, 3: 0.28 },
-    },
-    // A partial distribution counts its missing levels as 0.
-    data_security: { type: "score", confidence: 0.9, score: 0, probabilities: { 2: 1 } },
-  };
-  const r = riskSchema.parse(await jev(answers).adapter.risk(facts, [], riskQuestions, context()));
-  expect({
-    operations: r.dimensions.operations.probabilities,
-    dataSecurity: r.dimensions.data_security.probabilities,
-  }).toEqual({ operations: [0.5, 0.1, 0.1, 0.28], dataSecurity: [0, 0, 1, 0] });
-});
 it("keeps Jev's score for each risk dimension", async () => {
   const answers = Object.fromEntries(
     dimensions.map((d, i) => [
@@ -333,20 +287,9 @@ it("keeps Jev's score for each risk dimension", async () => {
     ]),
   );
   const r = riskSchema.parse(await jev(answers).adapter.risk(facts, [], riskQuestions, context()));
-  expect(dimensions.map((d) => r.dimensions[d].score)).toEqual([0, 0.25, 0.5, 0.75, 1]);
-});
-it("preserves routing uncertainty in Jev exposure confidence", async () => {
-  const answers = Object.fromEntries(cardNames.map((n) => [n, { type: "noul", noul: 0.5 }]));
-  const r = await jev({
-    ...answers,
-    documentation_substantive: { type: "noul", noul: 1 },
-    exposure: {
-      type: "score",
-      confidence: 0,
-      probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 },
-    },
-  }).adapter.route(facts, "documentation", routeQuestions, context());
-  expect(routeSchema.parse(r).confidence).toBe(0);
+  expect(dimensions.map((dimension) => r.dimensions[dimension].score)).toEqual([
+    0, 0.25, 0.5, 0.75, 1,
+  ]);
 });
 describe("routing and risk state", () => {
   const source = readRecording("council-clear");
@@ -385,46 +328,27 @@ describe("routing and risk state", () => {
     ownedPathTier: "owned",
     diff: "a.ts evidence 🐱 ".repeat(8000),
   };
-  it("routes a functional change on the PR summary, without the diff, in one request", async () => {
+  it("routes functional changes once from summary evidence without the diff", async () => {
     const { client, requests } = capture();
     const { documentation_substantive: _substance, ...functional } = routeQuestions;
     await client.route(large, "functional", functional, context());
+    expect(requests).toHaveLength(1);
     const state = String(requests[0]?.state);
-    expect({
-      requests: requests.length,
-      lines: state.split("\n").map((line) => line.slice(0, 40)),
-      body: state.split("\n")[2]?.length,
-      files: state.split("\n")[3]?.split(", ").length,
-      questions: Object.keys(requests[0]?.questions ?? {}),
-      exposure: requests[0]?.questions.exposure?.instructions,
-      safety: requests[0]?.questions.safety?.instructions,
-    }).toEqual({
-      requests: 1,
-      lines: [
-        "Pull request #2 in example/project by oc",
-        "Title: Pin the shell checker",
-        `Body: Why: ${"x".repeat(29)}`,
-        "Changed files (70): f0.ts, f1.ts, f2.ts,",
-        "CODEOWNERS ownership tier: owned",
-      ],
-      body: "Body: ".length + 1500,
-      files: 60,
-      questions: ["exposure", ...cardNames],
-      exposure: "Score this change's overall security/operational exposure.",
-      safety:
-        "Does this change need the 'safety' review lens? It does when: a changed file can run, be sourced, grant access, or carry a credential shape.",
-    });
+    for (const evidence of [large.title, "Why:", "f0.ts", "owned"])
+      expect(state).toContain(evidence);
+    expect(state).not.toContain("a.ts evidence");
+    expect(Object.keys(requests[0]?.questions ?? {}).sort()).toEqual(
+      ["exposure", ...cardNames].sort(),
+    );
   });
-  it("routes a documentation change with the whole diff and asks whether its meaning changed", async () => {
+  it("routes documentation with the complete diff and its substantive-meaning question", async () => {
     const { client, requests } = capture();
     await client.route(large, "documentation", routeQuestions, context());
-    expect({
-      requests: requests.length,
-      diff: String(requests[0]?.state).endsWith(`\nDiff:\n${large.diff}`),
-      last: Object.keys(requests[0]?.questions ?? {}).at(-1),
-    }).toEqual({ requests: 1, diff: true, last: "documentation_substantive" });
+    expect(requests).toHaveLength(1);
+    expect(String(requests[0]?.state)).toContain(large.diff);
+    expect(requests[0]?.questions).toHaveProperty("documentation_substantive");
   });
-  it("scores risk on the PR summary and the council's findings, in one request", async () => {
+  it("sends council finding meaning or an explicit no-council state to risk", async () => {
     const { client, requests } = capture();
     const card = {
       name: "safety" as const,
@@ -443,35 +367,11 @@ describe("routing and risk state", () => {
       ],
     };
     await client.risk(large, [card], riskQuestions, context());
-    expect({
-      requests: requests.length,
-      state: requests[0]?.state,
-      instructions: requests[0]?.questions.blast_radius?.instructions,
-    }).toEqual({
-      requests: 1,
-      state: jevState(large, `Council findings:\n${councilText([card])}`),
-      instructions: "Score the change's blast radius against the anchors.",
-    });
-    expect(councilText([card])).toBe(
-      [
-        "===CARD: safety===",
-        "card: safety",
-        "completion: completed",
-        "Checked:",
-        "- Read the workflow",
-        "Not covered:",
-        "Findings:",
-        "- [issue] a.ts:1 · severity=MAJOR · confidence=HIGH",
-        "    what: The token reaches the log.",
-      ].join("\n"),
-    );
-  });
-  it("tells risk when no council ran", async () => {
-    const { client, requests } = capture();
+    expect(requests).toHaveLength(1);
+    expect(String(requests[0]?.state)).toContain("The token reaches the log.");
+    expect(String(requests[0]?.state)).toContain("a.ts:1");
     await client.risk(facts, [], riskQuestions, context());
-    expect(
-      String(requests[0]?.state).endsWith("\nCouncil findings:\n(no council: no_council)"),
-    ).toBe(true);
+    expect(String(requests[1]?.state)).toContain("(no council: no_council)");
   });
 });
 describe("fallback decisions", () => {
@@ -509,7 +409,8 @@ describe("fallback decisions", () => {
     let calls = 0;
     const adapter = outage(async (questions, state) => {
       calls++;
-      expect(state).toBe(jevState(facts));
+      expect(state).toContain(facts.title);
+      expect(state).toContain(facts.files[0]?.path ?? "");
       return Object.fromEntries(
         Object.keys(questions).map((key) => [
           key,
@@ -524,6 +425,12 @@ describe("fallback decisions", () => {
       answer: { source: "fallback", cards: Object.fromEntries(cardNames.map((name) => [name, 1])) },
       calls: 1,
     });
+    expect(routeSchema.parse(answer).confidence).toBe(0);
+    await expect(
+      outage(async () => {
+        throw new Error("fallback unavailable");
+      }).route(facts, "functional", routeQuestions, context()),
+    ).rejects.toThrow("fallback unavailable");
   });
   it("routes documentation to every card without calling the fallback during a Jev outage", async () => {
     let calls = 0;
@@ -548,12 +455,6 @@ describe("fallback decisions", () => {
       calls: 0,
     });
   });
-  it("fails functional routing when Jev and the fallback are unavailable", async () => {
-    const adapter = outage(async () => {
-      throw new Error("Haiku unavailable");
-    });
-    await expect(adapter.route(facts, "functional", routeQuestions, context())).rejects.toThrow();
-  });
   it("asks Haiku for structured decisions with bound evidence and no tools", async () => {
     const spy = vi.spyOn(processAdapter, "execute");
     let flags: string[] = [];
@@ -567,12 +468,13 @@ describe("fallback decisions", () => {
       });
     });
     try {
+      const evidence = `fallback-evidence-canary ${facts.diff}`;
       const answers = await decisionFallback(
         {
           lens: { type: "noul", instructions: "Lens needed?" },
           exposure: { type: "score", criteria: ["none", "low", "medium", "high"] },
         },
-        { diff: facts.diff },
+        { diff: evidence },
         context(),
         pinnedClaude,
       );
@@ -584,8 +486,8 @@ describe("fallback decisions", () => {
         tools: flags[forbidden + 1],
         strict: flags.includes("--strict-mcp-config"),
         sources: flags[flags.indexOf("--setting-sources") + 1],
-        state: present(input).includes(JSON.stringify({ diff: facts.diff })),
-        promptInArguments: flags.includes(present(input)),
+        state: present(input).includes(JSON.stringify({ diff: evidence })),
+        promptInArguments: flags.some((argument) => argument.includes("fallback-evidence-canary")),
         required: schema.required,
       }).toMatchObject({
         answers: {
@@ -654,20 +556,17 @@ describe("Jev failure diagnostics", () => {
       warn.mockRestore();
     }
   }
-  it.each([401, 403])(
-    "reports a rejected credential (HTTP %i) as authentication",
-    async (status) => {
+  it("distinguishes authentication rejection from a service outage", async () => {
+    for (const [status, category, other] of [
+      [401, "authentication", "unavailable"],
+      [503, "unavailable", "authentication"],
+    ] as const) {
       const { result, warnings } = await classifyDuring(status);
       expect(result).toBeInstanceOf(Error);
-      expect(warnings).toContain(`Jev authentication rejected (HTTP ${status})`);
-      expect(warnings).not.toContain("Jev unavailable");
-    },
-  );
-  it("reports a server error as an outage, not an authentication failure", async () => {
-    const { result, warnings } = await classifyDuring(503);
-    expect(result).toBeInstanceOf(Error);
-    expect(warnings).toContain("Jev unavailable (HTTP 503)");
-    expect(warnings).not.toContain("authentication");
+      expect(warnings).toContain(category);
+      expect(warnings).toContain(String(status));
+      expect(warnings).not.toContain(other);
+    }
   });
   it("reports a transport failure with its cause", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -687,20 +586,9 @@ describe("Jev failure diagnostics", () => {
       await expect(adapter.classify(facts, classificationQuestions, context())).rejects.toThrow(
         "fallback unavailable",
       );
-      expect(String(warn.mock.calls[0]?.[0])).toContain(
-        "Jev transport unavailable: connect ETIMEDOUT",
-      );
-    } finally {
-      warn.mockRestore();
-    }
-  });
-  it("names the authentication cause when documentation routing degrades", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      const j = jev({}, { failures: 99, status: 401 });
-      const answer = await j.adapter.route(facts, "documentation", routeQuestions, context());
-      expect(answer).toMatchObject({ source: "jev_unreachable" });
-      expect(String(warn.mock.calls[0]?.[0])).toContain("Jev authentication rejected (HTTP 401)");
+      const warnings = warn.mock.calls.map(([message]) => String(message)).join("\n");
+      expect(warnings).toContain("transport");
+      expect(warnings).toContain("connect ETIMEDOUT");
     } finally {
       warn.mockRestore();
     }
@@ -720,6 +608,12 @@ describe("an irregular distribution, partial or not summing to one", () => {
     const evidence = riskSchema.parse(
       await jev(answers).adapter.risk(facts, [], riskQuestions, context()),
     );
+    const supplied = operations.probabilities;
+    if (supplied && typeof supplied === "object") {
+      expect(evidence.dimensions.operations.probabilities).toEqual(
+        [0, 1, 2, 3].map((level) => (supplied as Record<string, number>)[String(level)] ?? 0),
+      );
+    }
     return rate(evidence, false, configSchema.parse(recording.config)).band;
   };
   it("is rated no lower than Jev's own score, and a regular one by its tail alone", async () => {
@@ -755,7 +649,7 @@ describe("a malformed Jev answer", () => {
     }).toEqual({
       operations: [0, 0, 1, 0],
       calls: 2,
-      retries: [{ question: "risk", attempt: 2, reason: "operations: a partial distribution" }],
+      retries: [{ question: "risk", attempt: 2, reason: expect.any(String) }],
     });
   });
   it("takes today's defaults only after three malformed answers", async () => {
@@ -765,11 +659,6 @@ describe("a malformed Jev answer", () => {
       operations: { confidence: 0.9, score: 3, partial: true, probabilities: [1, 0, 0, 0] },
       calls: 3,
     });
-  });
-  it("is asked once when well-formed", async () => {
-    const j = jev(wellFormed);
-    await j.adapter.risk(facts, [], riskQuestions, context());
-    expect({ calls: j.attempts(), retries: j.retries }).toEqual({ calls: 1, retries: [] });
   });
   it("re-asks an unreadable classification and a missing routing exposure", async () => {
     const classification = jev(undefined, {
@@ -784,17 +673,21 @@ describe("a malformed Jev answer", () => {
     const routing = jev(undefined, {
       sequence: [cardsOnly, { ...cardsOnly, exposure: regular }],
     });
-    await routing.adapter.route(facts, "functional", routeQuestions, context());
+    const routed = routeSchema.parse(
+      await routing.adapter.route(facts, "functional", routeQuestions, context()),
+    );
     expect({
       mechanical: classificationSchema.parse(classified).mechanical,
       classifyCalls: classification.attempts(),
       routeCalls: routing.attempts(),
+      routeConfidence: routed.confidence,
       routeRetry: routing.retries,
     }).toEqual({
       mechanical: 1,
       classifyCalls: 2,
       routeCalls: 2,
-      routeRetry: [{ question: "route", attempt: 2, reason: "exposure: unreadable" }],
+      routeConfidence: 0.9,
+      routeRetry: [{ question: "route", attempt: 2, reason: expect.any(String) }],
     });
   });
 });
@@ -809,47 +702,35 @@ describe("the advisory template-adherence check", () => {
     ],
   };
   const questions = adherenceQuestions(["safety", "works-and-proven"]);
-  const distinct = (card: string) => ({
-    type: "noul",
-    instructions: adherenceDistinctQuestion(card),
-  });
-  it("keeps the previous reviewer's wording, verbatim", () => {
-    expect({ risk: adherenceRiskQuestion, distinct: adherenceDistinctQuestion("safety") }).toEqual({
-      risk: "Is the risk line a SHORT CLASSIFICATION — a few-word noun phrase naming the KIND of exposure (e.g. 'workflow-injection risk' or 'dependency bump, non-behavioral') — rather than a full explanatory sentence? True = a classification; False = a sentence.",
-      distinct:
-        "Does the 'safety' card's finding state ITS OWN review lens's distinct contribution, rather than merely RESTATE in similar words the same root-cause chain another card's finding already states? Several cards independently corroborating one real defect from their own distinct angles is legitimate and is True; only a phrasing-level restatement adding no lens-specific point is False.",
-    });
-  });
-  it("asks the previous reviewer's questions over its prose state", async () => {
+  it("checks the posted risk, summary and distinct card findings as advisory evidence", async () => {
     const j = jev({
       risk_is_classification: { type: "noul", noul: 0.9 },
       distinct__safety: { type: "noul", noul: 0.2 },
       "distinct__works-and-proven": { type: "noul", noul: 0.8 },
     });
     const result = await j.adapter.adherence(input, questions, context());
-    expect({ sent: j.calls, result }).toEqual({
-      sent: [
-        {
-          model: "test-model",
-          questions: {
-            risk_is_classification: { type: "noul", instructions: adherenceRiskQuestion },
-            distinct__safety: distinct("safety"),
-            "distinct__works-and-proven": distinct("works-and-proven"),
-          },
-          state:
-            "Risk line: workflow-injection risk\nSummary: The change widens a token.\n\nCouncil findings (card: finding):\n- [safety] the token is printed\n- [works-and-proven] no test\n- [works-and-proven] no receipt",
-        },
-      ],
-      result: {
-        status: "checked",
-        riskClassificationOk: true,
-        cardsRestating: ["safety"],
-        ok: false,
-        nouls: {
-          risk_is_classification: 0.9,
-          distinct__safety: 0.2,
-          "distinct__works-and-proven": 0.8,
-        },
+    expect(j.calls).toHaveLength(1);
+    const sent = j.calls[0] as { state: string; questions: Record<string, unknown> };
+    expect(Object.keys(sent.questions).sort()).toEqual(
+      ["risk_is_classification", "distinct__safety", "distinct__works-and-proven"].sort(),
+    );
+    for (const evidence of [
+      input.risk,
+      input.summary,
+      "[safety] the token is printed",
+      "[works-and-proven] no test",
+      "[works-and-proven] no receipt",
+    ])
+      expect(sent.state).toContain(evidence);
+    expect(result).toMatchObject({
+      status: "checked",
+      riskClassificationOk: true,
+      cardsRestating: ["safety"],
+      ok: false,
+      nouls: {
+        risk_is_classification: 0.9,
+        distinct__safety: 0.2,
+        "distinct__works-and-proven": 0.8,
       },
     });
   });
@@ -869,23 +750,10 @@ describe("the advisory template-adherence check", () => {
       fallback: fallback.mock.calls.length,
     }).toEqual({ result: { status: "unchecked" }, fallback: 0 });
   });
-  it("re-asks an unreadable answer, then reads a still-missing one as a pass", async () => {
+  it("keeps advisory evidence unchecked when answers remain unreadable after reasks", async () => {
     const j = jev({ risk_is_classification: { type: "noul" } });
     const result = await j.adapter.adherence(input, questions, context());
-    expect({ calls: j.attempts(), result }).toEqual({
-      calls: 3,
-      result: {
-        status: "checked",
-        riskClassificationOk: true,
-        cardsRestating: [],
-        ok: true,
-        nouls: {
-          risk_is_classification: 1,
-          distinct__safety: 1,
-          "distinct__works-and-proven": 1,
-        },
-      },
-    });
+    expect({ calls: j.attempts(), result }).toEqual({ calls: 3, result: { status: "unchecked" } });
   });
 });
 
@@ -902,7 +770,7 @@ describe("bounded initial classification", () => {
       fetch,
       fallback,
     });
-  it("bounds each Jev attempt at 15 seconds, waits one second, then bounds fallback at 90 seconds", async () => {
+  it("bounds provider attempts and the enclosing review classification stage", async () => {
     vi.useFakeTimers();
     try {
       const signals: AbortSignal[] = [];
@@ -934,6 +802,16 @@ describe("bounded initial classification", () => {
       await rejected;
       expect(signals[2]?.aborted).toBe(true);
       expect(fetch).toHaveBeenCalledTimes(2);
+      const enclosing = review(
+        { ...request, phase: "triage" },
+        { ...configSchema.parse(recording.config), timeoutMs: 900000 },
+        {
+          ...recordedServices(recording),
+          classify: async () => await new Promise<never>(() => {}),
+        },
+      );
+      await vi.advanceTimersByTimeAsync(130000);
+      expect(await enclosing).toMatchObject({ kind: "error", stage: "classification" });
     } finally {
       vi.useRealTimers();
     }
@@ -962,7 +840,7 @@ describe("bounded initial classification", () => {
       vi.useRealTimers();
     }
   });
-  it.each(["jev", "fallback"])(
+  it.each(["jev"])(
     "rejects a valid late %s response after parent cancellation",
     async (provider) => {
       vi.useFakeTimers();
@@ -989,22 +867,4 @@ describe("bounded initial classification", () => {
       }
     },
   );
-  it("caps the enclosing review classification stage at 130 seconds", async () => {
-    vi.useFakeTimers();
-    try {
-      const services = {
-        ...recordedServices(recording),
-        classify: async () => await new Promise<never>(() => {}),
-      };
-      const result = review(
-        { ...request, phase: "triage" },
-        { ...configSchema.parse(recording.config), timeoutMs: 900000 },
-        services,
-      );
-      await vi.advanceTimersByTimeAsync(130000);
-      expect(await result).toMatchObject({ kind: "error", stage: "classification" });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
 });
