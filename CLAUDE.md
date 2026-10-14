@@ -24,13 +24,13 @@ scan and Margot handoff and defines a distinct `ci / package validation` job on
 Ubuntu/Node22. This new job becomes active after this PR merges:
 `pull_request_target` reads the default branch's workflow. Its distinct
 concurrency group keeps it independent of legacy acceptance. The new package job
-runs only
-for the authenticated functional class; mechanical and documentation classes
+runs only for the authenticated functional class; mechanical and documentation classes
 still skip it. It packs once through `prepack` and validates the same archive
 with publint, ATTW and one installed smoke.
 
-After this PR merges normally, prepare one follow-up PR whose only file change
-is deletion of `.github/workflows/acceptance.yml`. First prove the new
+After this PR merges normally, prepare a small follow-up PR removing
+`.github/workflows/acceptance.yml` and replacing these transition instructions
+with the final setup. First prove the new
 `ci / package validation` job succeeds on that exact functional follow-up head.
 The old `ci / test` gate remains required; hold the follow-up until the separately
 approved gate migration.
@@ -39,7 +39,7 @@ context from `ci / test` to `ci / package validation` in both Dotty's existing
 rulesets registry, released through `@v1`, and the live GitHub checks rule.
 Preserve the GitHub Actions App ID 15368 and every other check, review, tag and
 update gate. Obtain normal
-Margot review and merge that one-file deletion PR. The new named job must pass
+Margot review and merge that follow-up PR. The new named job must pass
 before the gate migration, and the legacy workflow leaves main only after the
 migration and normal reviewed merge.
 
