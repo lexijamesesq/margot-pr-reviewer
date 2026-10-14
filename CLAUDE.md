@@ -17,31 +17,12 @@ Prose-only pushes skip these package commands.
 Native file filters can omit deletion-only changes; run the relevant commands
 manually for removals. Fix findings.
 
-During the transition, `.github/workflows/acceptance.yml` still runs hosted lint,
-typecheck, tests and build under the required `ci / test` check, plus its separate
-`ci / package` job. `.github/workflows/ci.yml` preserves the shared `@v1` universal
-scan and Margot handoff and defines a distinct `ci / package validation` job on
-Ubuntu/Node22. This new job becomes active after this PR merges:
-`pull_request_target` reads the default branch's workflow. Its distinct
-concurrency group keeps it independent of legacy acceptance. The new package job
-runs only for the authenticated functional class; mechanical and documentation classes
-still skip it. It packs once through `prepack` and validates the same archive
-with publint, ATTW and one installed smoke.
-
-After this PR merges normally, prepare a small follow-up PR removing
-`.github/workflows/acceptance.yml` and replacing these transition instructions
-with the final setup. First prove the new
-`ci / package validation` job succeeds on that exact functional follow-up head.
-The old `ci / test` gate remains required; hold the follow-up until the separately
-approved gate migration.
-With that approval, rename the existing required
-context from `ci / test` to `ci / package validation` in both Dotty's existing
-rulesets registry, released through `@v1`, and the live GitHub checks rule.
-Preserve the GitHub Actions App ID 15368 and every other check, review, tag and
-update gate. Obtain normal
-Margot review and merge that follow-up PR. The new named job must pass
-before the gate migration, and the legacy workflow leaves main only after the
-migration and normal reviewed merge.
+`.github/workflows/ci.yml` preserves the shared `@v1` universal scan and Margot
+handoff, then runs `ci / package validation` on Ubuntu/Node22 for the
+authenticated functional class. Mechanical and documentation classes skip that
+package job. It packs once through `prepack` and validates the same archive with
+publint, ATTW and one installed smoke. Behavior tests, typecheck and build run
+through the native local pre-push hooks described above.
 
 For focused diagnostics, use `npm run build`, `npm run lint`,
 `npm run typecheck` and `npm test`. The README explains package installation,
