@@ -38,7 +38,9 @@ jobs:
           HEAD_SHA: ${{ needs.checks.outputs.head_sha }}
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          [[ "$CLASSIFICATION" == functional && "$HEAD_SHA" == "$EVENT_HEAD" && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CLASSIFICATION" == functional && "$HEAD_SHA" == "$EVENT_HEAD" &&
+            "$HEAD_SHA" =~ ^[0-9a-f]{40}$ &&
+            ( ${ACTIONS_CACHE_MODE:-} == read || ${ACTIONS_CACHE_MODE:-} == none ) ]]
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.checks.outputs.head_sha }}
