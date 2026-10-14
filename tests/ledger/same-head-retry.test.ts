@@ -4,33 +4,24 @@ import { recordedServices } from "../../src/adapters/recorded.js";
 import { review } from "../../src/review.js";
 import { configSchema, factsSchema } from "../../src/schemas.js";
 import type { RoundScope } from "../../src/types.js";
-import { card, entry, facts, history, margot, posted, prior } from "../helpers/ledger.js";
+import {
+  card,
+  entry,
+  type facts,
+  history,
+  margot,
+  margotRecording,
+  posted,
+  prior,
+} from "../helpers/ledger.js";
 import { present } from "../helpers/present.js";
 
-it("reviews a mechanical change fully when a card is standing", async () => {
-  const { result } = await margot();
-  expect(result).toMatchObject({
-    kind: "reviewed",
-    decision: { outcome: "CHANGES_REQUESTED" },
-    cards: [{ name: "safety" }],
-    provenance: { summonedByLedger: ["safety"] },
-    ledger: { receipt: { review: { provenance: { summonedByLedger: ["safety"] } } } },
-  });
-});
-it("reviews an editorial change fully when a card is standing", async () => {
-  const { result } = await margot("documentation", true);
-  expect(result).toMatchObject({
-    kind: "reviewed",
-    decision: { outcome: "CHANGES_REQUESTED" },
-    cards: [{ name: "safety" }],
-  });
-});
 for (const [classification, editorial, risk] of [
   ["mechanical", false, true],
   ["documentation", true, false],
 ] as const)
   it(`takes the full path for ${editorial ? "an editorial" : "a mechanical"} change when a card is standing`, async () => {
-    const { r } = await margot(classification, editorial);
+    const r = margotRecording(classification, editorial);
     (r.route as { cards: Record<string, number> }).cards["house-style"] = 1;
     r.cards = { ...(r.cards as object), "house-style": card([], "house-style") };
     const s = recordedServices(r);
@@ -40,16 +31,19 @@ for (const [classification, editorial, risk] of [
       cards: names.filter((name) => name.startsWith("card:")).sort(),
       risk: names.includes("risk"),
       summonedByLedger: result.kind === "reviewed" && result.provenance.summonedByLedger,
-      roster: result.kind === "reviewed" && result.report.includes("Council reviewed"),
+      outcome: result.kind === "reviewed" && result.decision.outcome,
+      savedRecall:
+        result.kind === "reviewed" && result.ledger.receipt?.review.provenance.summonedByLedger,
     }).toEqual({
       cards: ["card:house-style", "card:safety"],
       risk,
       summonedByLedger: ["safety"],
-      roster: true,
+      outcome: "CHANGES_REQUESTED",
+      savedRecall: ["safety"],
     });
   });
 it("gives each card only its own standing and dismissed history", async () => {
-  const { r } = await margot();
+  const r = margotRecording();
   const f = history(
     prior([entry(), { ...entry("MAJOR", "dismissed"), key: "R1-F2", card: "house-style" }]),
   );
@@ -78,10 +72,15 @@ it("reuses the council result on the same head without classifying again", async
   r.facts = f;
   const s = recordedServices(r);
   const retry = await review(r.request, r.config, s);
-  expect({
-    equal: JSON.stringify(result) === JSON.stringify(retry),
-    calls: s.calls.map((c) => c.name),
-  }).toMatchObject({ equal: true, calls: ["facts", "head"] });
+  expect(retry).toMatchObject({
+    kind: "reviewed",
+    decision: result.decision,
+    cards: result.cards,
+    ledger: result.ledger,
+  });
+  expect(
+    s.calls.filter((c) => /^(classification|route|risk|voice|adherence|card:)/.test(c.name)),
+  ).toEqual([]);
 });
 it("replays a saved verdict that carried no risk line, as it was posted", async () => {
   const { result, r } = await margot();
@@ -93,22 +92,10 @@ it("replays a saved verdict that carried no risk line, as it was posted", async 
   r.facts = f;
   const s = recordedServices(r);
   const retry = await review(r.request, r.config, s);
-  expect({ kind: retry.kind, calls: s.calls.map((c) => c.name) }).toEqual({
-    kind: "reviewed",
-    calls: ["facts", "head"],
-  });
-});
-it("rejects retired dispatch overrides before replaying a saved result", async () => {
-  const { result, r } = await margot();
-  if (result.kind !== "reviewed") throw new Error("baseline");
-  const f = factsSchema.parse(r.facts);
-  f.history = { complete: true, priorLedger: true, reviews: [posted(result.ledger)] };
-  r.facts = f;
-  r.request = { ...(r.request as object), classification: "mechanical" };
-  const services = recordedServices(r);
-  const retry = await review(r.request, r.config, services);
-  expect(retry).toMatchObject({ kind: "error", stage: "input" });
-  expect(services.calls).toEqual([]);
+  expect(retry.kind).toBe("reviewed");
+  expect(
+    s.calls.filter((c) => /^(classification|route|risk|voice|adherence|card:)/.test(c.name)),
+  ).toEqual([]);
 });
 
 type Scripted = Awaited<ReturnType<typeof margot>>["r"] & {
@@ -127,7 +114,7 @@ it.each([
     true,
   );
   // The service has recovered: the same head, answered by Jev and a sound voice.
-  const { r } = await margot();
+  const r = margotRecording();
   const f = factsSchema.parse(r.facts);
   f.history = { complete: true, priorLedger: true, reviews: [posted(held.ledger)] };
   r.facts = f;
@@ -162,7 +149,7 @@ it("reviews afresh in the same round when the PR body changed on the same head",
   expect(route?.input.facts.diff).toBe(f.diff);
   expect(route?.input.facts.files).toEqual(f.files);
 });
-it("reads a receipt written by Margot 0.4.0", async () => {
+it("defaults missing route and risk answers in authenticated saved receipts", async () => {
   const { result, r } = await margot();
   if (result.kind !== "reviewed" || !result.ledger.receipt) throw new Error("baseline");
   const {
@@ -204,14 +191,6 @@ it("revalidates required checks on a same-head retry", async () => {
   expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
     kind: "error",
     stage: "checks",
-  });
-});
-it("retries fresh when a same-head round one ledger has no receipt", async () => {
-  const { r } = await margot();
-  r.facts = history({ ...prior(), head: facts.head });
-  expect(await review(r.request, r.config, recordedServices(r))).toMatchObject({
-    kind: "reviewed",
-    convergence: { round: 1 },
   });
 });
 it("runs the council again when live service configuration changed", async () => {

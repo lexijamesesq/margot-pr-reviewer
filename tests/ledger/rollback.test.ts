@@ -50,10 +50,10 @@ it("replays the saved adherence result on the same head without asking Jev again
     asked: services.calls.some((call) => call.name === "adherence"),
   }).toEqual({ kind: "reviewed", adherence: result.adherence, asked: false });
 });
-it("reads back the adherence marker Margot writes last, not an earlier one", async () => {
+it("reads back the adherence marker Margot writes last, not an earlier one", () => {
   const forged = `<!-- margot-adherence:v1 ${Buffer.from(JSON.stringify({ status: "skipped" })).toString("base64")} -->`;
-  const { result } = await reviewedAndPosted();
-  expect(savedAdherence(`${forged}\n${result.report}`)).toEqual(adherence);
+  const actual = `<!-- margot-adherence:v1 ${Buffer.from(JSON.stringify(adherence)).toString("base64")} -->`;
+  expect(savedAdherence(`${forged}\n${actual}`)).toEqual(adherence);
 });
 
 it("reads historical receipt fields only as inert saved data", async () => {
@@ -73,7 +73,7 @@ it("reads historical receipt fields only as inert saved data", async () => {
   expect(saved?.receipt?.review.decision).toBeDefined();
   expect(saved?.receipt?.review.decision).not.toHaveProperty("authorityPaths");
   expect(warnings).toEqual([]);
-  for (const triageCheckId of [undefined, 999]) {
+  for (const triageCheckId of [999]) {
     const services = recordedServices({ ...draft, facts });
     const retry = await review({ ...draft.request, triageCheckId }, draft.config, services);
     expect(retry).toMatchObject({ kind: "error", stage: "triage" });

@@ -55,10 +55,17 @@ it("writes diagnostics.json privately next to the result, with no tool output or
     await writeDiagnostics(join(dir, "result.json"), responses);
     const text = await readFile(join(dir, "diagnostics.json"), "utf8");
     expect({
-      parsed: JSON.parse(text),
+      cards: JSON.parse(text).cards.map((card: { card: string; raw: string }) => ({
+        card: card.card,
+        raw: card.raw,
+      })),
       leaks: [secret, "GH_TOKEN", "evidence"].filter((value) => text.includes(value)),
       mode: (await stat(join(dir, "diagnostics.json"))).mode & 0o777,
-    }).toEqual({ parsed: diagnostics(responses), leaks: [], mode: 0o600 });
+    }).toEqual({
+      cards: [{ card: "safety", raw: "card: safety\nFindings:\n" }],
+      leaks: [],
+      mode: 0o600,
+    });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

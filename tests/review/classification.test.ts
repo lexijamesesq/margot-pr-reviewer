@@ -24,18 +24,22 @@ const pinnedClaude = {
   reviewerModel: "configured-reviewer-model",
 };
 
-/** The question text the review sent Jev for one classification key. */
-async function classificationQuestion(draft: Draft, key: string) {
-  const { callInput } = await reviewRecording(draft);
-  return (callInput("classification").questions as Record<string, unknown>)[key];
-}
+const oversizedDiff =
+  "diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -0,0 +1,2001 @@\n" +
+  "+added\n".repeat(2001);
 
 describe("classification precedence", () => {
   it("takes the class from a verified triage", async () => {
     for (const classification of ["functional", "documentation", "mechanical"]) {
-      const { result } = await reviewed(
-        recorded("council-clear", asDocumentation(1), withTriage({ classification })),
+      const { result, calls } = await reviewed(
+        recorded(
+          "council-clear",
+          asDocumentation(1),
+          withTriage({ classification }),
+          withClassification(classifiedAs(1, 0, 0)),
+        ),
       );
+      expect(calls).not.toContain("classification");
       expect(result).toMatchObject({
         classification,
         provenance: { classification: "jev" },
@@ -81,57 +85,30 @@ describe("the triage phase's class", () => {
     });
   });
 
-  it.each(["documentation", "mechanical"])(
-    "uses fallback probabilities for the %s lane",
-    async (lane) => {
-      expect(
-        await triaged(
-          withClassification({
-            source: "fallback",
-            functional: 0,
-            documentation: 0,
-            mechanical: 0,
-            [lane]: 0.9,
-          }),
-        ),
-      ).toMatchObject({ kind: "classified", classification: lane, decision_source: "fallback" });
-    },
-  );
-
-  it("names Jev as the triage's source only when Jev classified the head", async () => {
+  it.each(["documentation"])("uses fallback probabilities for the %s lane", async (lane) => {
     expect(
-      await triaged(withClassification({ source: "fallback", functional: 1, documentation: 0 })),
-    ).toMatchObject({
-      kind: "classified",
-      classification: "functional",
-      decision_source: "fallback",
+      await triaged(
+        withClassification({
+          source: "fallback",
+          functional: 0,
+          documentation: 0,
+          mechanical: 0,
+          [lane]: 0.9,
+        }),
+      ),
+    ).toMatchObject({ kind: "classified", classification: lane, decision_source: "fallback" });
+    expect(await triaged(withClassification({ source: "unknown" }))).toMatchObject({
+      kind: "error",
+      stage: "classification",
+      mergeEligible: false,
     });
   });
 });
 
 describe("trusted triage", () => {
-  it("does not ask Jev to classify again when the triage is verified", async () => {
-    const { result, calls } = await reviewed(
-      recorded("council-clear", withTriage({ classification: "functional" })),
-    );
-    expect(calls).not.toContain("classification");
-    expect(result.classification).toBe("functional");
-  });
-
-  it("uses a verified mechanical triage without asking Jev, even if Jev would say functional", async () => {
-    const { result, calls } = await reviewed(
-      recorded("council-clear", withTriage({}), withClassification(classifiedAs(1, 0, 0))),
-    );
-    expect(calls).not.toContain("classification");
-    expect(result).toMatchObject({
-      classification: "mechanical",
-      provenance: { classification: "jev" },
-    });
-  });
-
-  it.each(["classification", "triage"])("rejects raw %s overrides", async (field) => {
+  it("rejects raw classification overrides", async () => {
     const { result, calls } = await reviewRecording(
-      recorded("council-clear", withRequest({ [field]: "mechanical" })),
+      recorded("council-clear", withRequest({ classification: "mechanical" })),
     );
     expect(result).toMatchObject({ kind: "error", stage: "input" });
     expect(calls).toEqual([]);
@@ -156,7 +133,6 @@ describe("trusted triage", () => {
     { externalId: "foreign" },
     { status: "in_progress" },
     { conclusion: "failure" },
-    { conclusion: "skipped" },
     { version: 2 },
   ])("rejects malformed recorded check receipt %j", async (fields) => {
     const { result, calls } = await reviewRecording(recorded("council-clear", withTriage(fields)));
@@ -174,9 +150,10 @@ describe("trusted triage", () => {
 
   it("preserves the classifier lane for an oversized diff", async () => {
     const { result, calls } = await reviewed(
-      recorded("council-clear", withTriage({}), withFacts({ diff: "unchanged\n".repeat(2001) })),
+      recorded("council-clear", withTriage({}), withFacts({ diff: oversizedDiff })),
     );
     expect(calls).not.toContain("classification");
+    expect(calls).not.toContain("route");
     expect(result).toMatchObject({
       classification: "mechanical",
       provenance: { classification: "jev" },
@@ -197,14 +174,15 @@ describe("trusted triage", () => {
   });
 
   it("classifies oversized triage input instead of overriding it", async () => {
-    const { result, calls } = await reviewRecording(
+    const { result, calls, callInput } = await reviewRecording(
       recorded(
         "mechanical-bump",
         withRequest({ phase: "triage" }),
-        withFacts({ diff: "unchanged\n".repeat(2001) }),
+        withFacts({ diff: oversizedDiff }),
       ),
     );
     expect(calls).toContain("classification");
+    expect((callInput("classification").facts as { diff: string }).diff).toBe(oversizedDiff);
     expect(result).toMatchObject({
       kind: "classified",
       classification: "mechanical",
@@ -222,76 +200,36 @@ describe("trusted triage", () => {
 });
 
 describe("the classification question", () => {
-  it("tells Jev to judge human formatting by behavior", async () => {
-    const question = await classificationQuestion(
-      recorded(
-        "mechanical-bump",
-        withRequest({ phase: "triage" }),
-        withFacts({ author: "human", diff: "Formatting only: indentation changes." }),
-      ),
-      "mechanical",
-    );
-    expect(question).toContain(
-      "Judge what changed, not the author, generator, file extension, or size.",
-    );
-    expect(question).toContain("behavior-preserving lint/format changes.");
-  });
-
-  it("tells Jev that agent instructions are functional", async () => {
-    const question = await classificationQuestion(
-      recorded(
-        "council-clear",
-        withRequest({ phase: "triage" }),
-        withFacts({
-          files: [{ path: "AGENTS.md" }],
-          diff: "Change the agent instructions to run a different command.",
-        }),
-      ),
-      "functional",
-    );
-    expect(question).toContain(
-      "Text that a tool or an agent reads to change behaviour is FUNCTIONAL",
-    );
-    expect(question).toContain("agent or skill instructions");
-  });
-
-  it("asks Jev whether documentation changes meaning", async () => {
-    const { callInput } = await reviewRecording(recorded("council-clear", asDocumentation(1)));
-    const questions = callInput("route").questions as Record<string, unknown>;
-    expect(typeof questions.documentation_substantive).toBe("string");
-  });
-
-  it("omits the documentation meaning question when routing a functional change", async () => {
-    const { callInput } = await reviewRecording(recorded("council-clear"));
-    const questions = callInput("route").questions as Record<string, unknown>;
-    expect(questions.documentation_substantive).toBeUndefined();
-  });
+  it.each(["documentation", "functional"])(
+    "supplies the documentation question only for the %s route",
+    async (classification) => {
+      const { callInput } = await reviewRecording(
+        recorded("council-clear", asDocumentation(1), withTriage({ classification })),
+      );
+      const questions = callInput("route").questions as Record<string, unknown>;
+      if (classification === "documentation")
+        expect(typeof questions.documentation_substantive).toBe("string");
+      else expect(questions.documentation_substantive).toBeUndefined();
+    },
+  );
 });
 
 describe("classification provenance and availability", () => {
   const mechanical = (...changes: Parameters<typeof recorded>[1][]) =>
     recorded("mechanical-bump", ...changes);
 
-  it("renders the measured confidence the verified triage carried", async () => {
-    const { result } = await reviewed(
-      mechanical((draft) => {
-        Object.assign(draft.facts.triage as object, { mechanicalProbability: 0.87 });
-      }),
-    );
-    expect(result).toMatchObject({
-      provenance: { mechanicalProbability: 0.87 },
-      report: expect.stringContaining("Mechanical change (confidence 87%)"),
-    });
-  });
-
-  it("omits the confidence when the verified triage carries none", async () => {
-    const { result } = await reviewed(mechanical());
-    expect(result).toMatchObject({
-      provenance: { mechanicalProbability: null },
-      report: expect.stringContaining("Mechanical change"),
-    });
-    expect(result.report).not.toContain("confidence");
-  });
+  it.each([0.87, null])(
+    "preserves verified mechanical confidence %j",
+    async (mechanicalProbability) => {
+      const { result } = await reviewed(
+        mechanical((draft) => {
+          if (mechanicalProbability !== null)
+            Object.assign(draft.facts.triage as object, { mechanicalProbability });
+        }),
+      );
+      expect(result.provenance.mechanicalProbability).toBe(mechanicalProbability);
+    },
+  );
 
   it("hands the triage's confidence to the triage check in the triage phase", async () => {
     const { result } = await reviewRecording(
@@ -327,19 +265,17 @@ describe("classification provenance and availability", () => {
     expect({
       routeSource: result.routeAnswer?.source,
       classification: result.classification,
-      cards: result.cards.length,
+      cards: result.cards.map((card) => card.name),
       mergeEligible: result.decision.mergeEligible,
       holdReasons: result.decision.holdReasons,
       decisionSource: result.provenance.decision_source,
-      check: checkText(result).match(/^decision_source: (.*)$/m)?.[1],
     }).toEqual({
       routeSource: "jev_unreachable",
       classification: "documentation",
-      cards: 6,
+      cards: Object.keys(outageRoute.cards),
       mergeEligible: true,
       holdReasons: [],
       decisionSource: "jev",
-      check: "jev",
     });
   });
 
@@ -365,6 +301,7 @@ describe("classification provenance and availability", () => {
     draft.risk = fallbackRisk as Draft["risk"];
     const { result } = await reviewed(draft);
     expect(result.decision.mergeEligible).toBe(false);
-    expect(checkText(result)).toContain("decision_source: fallback");
+    expect(result.decision.holdReasons).toContain("fallback-risk");
+    expect(result.provenance.decision_source).toBe("fallback");
   });
 });

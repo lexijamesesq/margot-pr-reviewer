@@ -29,9 +29,12 @@ for (const [name, change] of [
   ["reviews the full PR when a delta hunk is truncated", { diff: diff().replace("+new\n", "") }],
 ] as const) {
   it(name, () => {
-    expect({ full: roundScope(facts, prior(), { ...comparison(), ...change }).full }).toMatchObject(
-      { full: true },
-    );
+    expect(roundScope(facts, prior(), { ...comparison(), ...change })).toMatchObject({
+      full: true,
+      entries: prior().entries,
+      diff: facts.diff,
+      files: facts.files,
+    });
   });
 }
 it("reviews the full PR when the comparison is unreadable", () => {

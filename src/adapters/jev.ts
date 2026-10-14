@@ -235,6 +235,7 @@ export function jevAdapter(options: {
             response.status === 401 || response.status === 403
               ? `Jev authentication rejected (HTTP ${response.status})`
               : `Jev unavailable (HTTP ${response.status})`,
+            { cause: response.status },
           );
           if (response.status !== 429 && response.status < 500) throw new AbortError(error);
           throw error;
@@ -334,6 +335,7 @@ export function jevAdapter(options: {
             console.warn(
               `Margot: classification attempt ${attempt} failed (${errorMessage(error)})`,
             );
+            if (error instanceof Error && (error.cause === 401 || error.cause === 403)) break;
             if (attempt < classificationLimits.jevAttempts) {
               options.onJevRetry?.({
                 question: "classification",
@@ -441,8 +443,8 @@ export function jevAdapter(options: {
   /**
    * The previous reviewer's advisory template-adherence check: is the risk line a short
    * classification, and does each card with findings state its own lens's contribution. It
-   * never falls back and never throws: a Jev outage is `unchecked`, and an answer still
-   * missing after the re-asks reads as a pass, so it never spuriously flags.
+   * never falls back and never throws: an outage or an answer still unreadable after
+   * the re-asks is `unchecked`, without inventing either a pass or a failure.
    */
   const adherence: NonNullable<Services["adherence"]> = async (input, questions, c) => {
     const keys = Object.keys(questions);
@@ -461,6 +463,7 @@ export function jevAdapter(options: {
       console.warn(`Margot: adherence check unchecked (${errorMessage(error)})`);
       return { status: "unchecked" };
     }
+    if (unreadableNouls(answers, keys) !== null) return { status: "unchecked" };
     const value = (key: string) => noul.safeParse(answers[key]).data?.noul ?? 1;
     const riskClassificationOk = value("risk_is_classification") >= 0.5;
     const cardsRestating = keys

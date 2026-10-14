@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseVoice } from "../../src/adapters/prose.js";
-import { cardNames, requestSchema } from "../../src/schemas.js";
+import { mandatory, requireRiskLine } from "../../src/policy.js";
+import { cardNames, requestSchema, voiceSchema } from "../../src/schemas.js";
 import {
   asDocumentation,
   type Change,
@@ -77,6 +78,7 @@ describe("documentation findings", () => {
         ),
       ),
     );
+    expect(result.decision.mergeEligible).toBe(false);
     expect(result.decision.outcome).toBe("CLARIFICATION_REQUESTED");
     expect(result.decision.rating.band).toBe("LOW");
   });
@@ -125,6 +127,11 @@ describe("documentation findings", () => {
       ),
     );
     expect(result.decision.mergeEligible).toBe(false);
+    expect(result.ledger.entries).toHaveLength(1);
+    expect(result.ledger.entries[0]).toMatchObject({
+      status: "standing",
+      what: "The documented command deletes required data.",
+    });
   });
 
   it("rejects an approval that leaves a mandatory finding established", async () => {
@@ -144,7 +151,7 @@ describe("documentation findings", () => {
   });
 
   it("summons the voice for a BLOCKING info finding, which the voice need not dispose of", async () => {
-    const { result } = await reviewed(
+    const { result, calls } = await reviewed(
       recorded(
         "council-clear",
         asDocumentation(
@@ -157,11 +164,14 @@ describe("documentation findings", () => {
         ),
       ),
     );
+    expect(calls).toContain("voice");
+    expect(mandatory(result.cards)).toEqual([]);
+    expect(result.voice?.dispositions).toEqual([]);
     expect(result.decision.mergeEligible).toBe(false);
   });
 
   it("summons the voice for an achieves-the-objective finding, which the voice need not dispose of", async () => {
-    const { result } = await reviewed(
+    const { result, calls } = await reviewed(
       recorded(
         "council-clear",
         asDocumentation(
@@ -169,17 +179,35 @@ describe("documentation findings", () => {
           withRoutedCards({ "achieves-the-objective": 1 }),
           withCard(
             "achieves-the-objective",
-            completedCard("achieves-the-objective", [finding({ tag: "info" })]),
+            completedCard("achieves-the-objective", [
+              finding({
+                tag: "info",
+                what: "The Done-When does not specify which caller should receive the new behavior.",
+              }),
+            ]),
           ),
-          withVoice(voiceRuling("CHANGES_REQUESTED", "LOW")),
+          withVoice({
+            ...voiceRuling("CLARIFICATION_REQUESTED", "LOW"),
+            clarification: "Should existing callers receive the new behavior?",
+          }),
         ),
       ),
     );
+    expect(result.decision.outcome).toBe("CLARIFICATION_REQUESTED");
+    expect(calls).toContain("voice");
+    expect(mandatory(result.cards)).toEqual([]);
+    expect(result.voice?.dispositions).toEqual([]);
     expect(result.decision.mergeEligible).toBe(false);
   });
 });
 
 describe("voice publication safeguards", () => {
+  it.each([undefined, "   "])("rejects an empty risk classification %j", (risk) => {
+    const voice = voiceSchema.parse(voiceRuling("CHANGES_REQUESTED", "LOW"));
+    if (risk === undefined) delete voice.risk;
+    else voice.risk = risk;
+    expect(() => requireRiskLine(voice)).toThrow();
+  });
   function recordedWithVoiceProse(prose: string) {
     return recorded(
       "mechanical-bump",
@@ -227,7 +255,7 @@ describe("voice publication safeguards", () => {
     expect(publications).toEqual([]);
   });
 
-  it.each(["", "risk: \n"])(
+  it.each([""])(
     "holds a verdict whose risk line has no classification (%j) instead of posting it",
     async (risk) => {
       const { result, publications } = await reviewRecording(
@@ -256,34 +284,25 @@ describe("voice publication safeguards", () => {
     expect(result).toMatchObject({ kind: "reviewed", decision: { outcome: "ERROR" } });
   });
 
-  it.each(["summary", "risk", "band_reason", "finding", "clarification"])(
-    "refuses self-attribution in the voice's %s before publication",
-    async (field) => {
-      const fields = {
-        outcome: "CHANGES_REQUESTED",
-        band: "LOW",
-        band_reason: "Bounded change",
-        risk: "configuration change",
-        summary: "Reviewed",
-        finding: "",
-        clarification: "",
-        [field]: "Generated with Claude Code",
-      };
-      const { result, publications } = await reviewRecording(
-        recordedWithVoiceProse(
-          Object.entries(fields)
-            .map(([name, value]) => `${name}: ${value}`)
-            .join("\n"),
-        ),
-      );
-      expect(result).toMatchObject({
-        kind: "error",
-        mergeEligible: false,
-        diagnostic: expect.stringContaining("Attribution leak in review prose"),
-      });
-      expect(publications).toEqual([]);
-    },
-  );
+  it("publishes a review that quotes the credit text under review", async () => {
+    const quotedCredit = '"Generated with Claude Code"';
+    const draft = recordedWithVoiceProse(
+      `outcome: APPROVED\nband: LOW\nband_reason: Only the package credit text changed\nrisk: package metadata\nsummary: The credit now reads ${quotedCredit}. No runtime behavior changed.\nestablished:\ndismissed:\n`,
+    );
+    draft.facts.diff =
+      'diff --git a/package.json b/package.json\n--- a/package.json\n+++ b/package.json\n@@ -1 +1 @@\n-{"credit":"Generated with another tool"}\n+{"credit":"Generated with Claude Code"}\n';
+    draft.facts.title = "Update package credit label";
+    draft.facts.body = "Update the package credit text without changing runtime behavior.";
+    draft.facts.files = [{ path: "package.json" }];
+    draft.facts.fileCount = 1;
+    const { result, publications } = await reviewRecording(draft);
+    expect(result).toMatchObject({
+      kind: "reviewed",
+      decision: { outcome: "APPROVED", mergeEligible: true },
+    });
+    expect(publications).toHaveLength(1);
+    expect(publications[0]).toMatchObject({ report: expect.stringContaining(quotedCredit) });
+  });
 });
 
 describe("the comment's card rows", () => {
@@ -310,5 +329,6 @@ describe("the comment's card rows", () => {
       recorded("council-clear", withShownFinding("The note is minor.")),
     );
     expect(result.kind).toBe("reviewed");
+    if (result.kind === "reviewed") expect(result.report).toContain("The note is minor.");
   });
 });

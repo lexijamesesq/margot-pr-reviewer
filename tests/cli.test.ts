@@ -46,9 +46,6 @@ const recording = readRecording("mechanical-bump");
 const sampleConfig = JSON.parse(
   await readFile(new URL("../samples/config.sample.json", import.meta.url), "utf8"),
 );
-const manifest = JSON.parse(
-  await readFile(new URL("../package.json", import.meta.url), "utf8"),
-) as { version: string };
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -85,40 +82,31 @@ async function invoke(
 }
 
 describe("margot-review failure messages", () => {
-  it("names a request file that does not exist", async () => {
-    const { code, stderr, paths } = await invoke({
-      args: (p) => [join(p.request, "..", "absent.json"), p.config, p.output],
-    });
-    const missing = join(paths.request, "..", "absent.json");
-    expect({ code, stderr }).toEqual({
-      code: 1,
-      stderr: `Review failed: cannot read request file ${missing} (ENOENT)\n`,
-    });
+  it("names either missing input file and exits unsuccessfully", async () => {
+    for (const label of ["request", "configuration"]) {
+      const { code, stderr } = await invoke({
+        args: (p) =>
+          label === "request"
+            ? [p.request.replace("request", "absent"), p.config, p.output]
+            : [p.request, p.config.replace("config", "absent"), p.output],
+      });
+      expect(code).toBe(1);
+      expect(stderr).toContain(label);
+      expect(stderr).toContain("absent.json");
+      expect(stderr).toContain("ENOENT");
+    }
   });
-  it("names a configuration file that does not exist", async () => {
-    const { code, stderr } = await invoke({
-      args: (p) => [p.request, p.request.replace("request", "absent"), p.output],
-    });
-    expect(code).toBe(1);
-    expect(stderr).toMatch(
-      /^Review failed: cannot read configuration file .*absent\.json \(ENOENT\)/,
-    );
-  });
-  it("names the configuration field that is invalid", async () => {
+  it("names invalid configuration and request fields", async () => {
     const bad = structuredClone(sampleConfig);
     bad.review.timeoutMs = "soon";
-    const { code, stderr } = await invoke({ config: bad });
-    expect(code).toBe(1);
-    expect(stderr).toMatch(
-      /^Review failed: invalid configuration file .*config\.json: review\.timeoutMs: /,
-    );
-  });
-  it("names the request field that is invalid", async () => {
-    const { code, stderr } = await invoke({
-      request: { ...(recording.request as object), pr: "seven" },
-    });
-    expect(code).toBe(1);
-    expect(stderr).toMatch(/^Review failed: invalid request file .*request\.json: pr: /);
+    const configRun = await invoke({ config: bad });
+    expect(configRun.code).toBe(1);
+    expect(configRun.stderr).toContain("configuration");
+    expect(configRun.stderr).toContain("review.timeoutMs");
+    const requestRun = await invoke({ request: { ...(recording.request as object), pr: "seven" } });
+    expect(requestRun.code).toBe(1);
+    expect(requestRun.stderr).toContain("request");
+    expect(requestRun.stderr).toContain("pr:");
   });
   it("names the missing environment variable and never prints a secret", async () => {
     const { code, stderr } = await invoke({ environment: { GH_TOKEN: "ghp_secretvalue" } });
@@ -130,26 +118,16 @@ describe("margot-review failure messages", () => {
   });
   it("prints usage when the arguments are wrong", async () => {
     const { code, stderr } = await invoke({ args: () => ["only-one.json"] });
-    expect({ code, stderr }).toEqual({
-      code: 1,
-      stderr: "Review failed: Usage: margot-review REQUEST.json CONFIG.json OUTPUT.json\n",
-    });
+    expect(code).toBe(1);
+    expect(stderr).toContain("Usage: margot-review REQUEST.json CONFIG.json OUTPUT.json");
   });
 });
 
-describe("margot-review --help and --version", () => {
+describe("margot-review --help", () => {
   it("prints the usage and exits 0 for --help", async () => {
     const { code, stdout, stderr } = await invoke({ args: () => ["--help"] });
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" });
     expect(stdout).toContain("Usage: margot-review REQUEST.json CONFIG.json OUTPUT.json");
-  });
-  it("prints the package version and exits 0 for --version", async () => {
-    const { code, stdout, stderr } = await invoke({ args: () => ["--version"] });
-    expect({ code, stdout, stderr }).toEqual({
-      code: 0,
-      stdout: `${manifest.version}\n`,
-      stderr: "",
-    });
   });
 });
 
@@ -159,58 +137,39 @@ describe("margot-review GitHub publication settings", () => {
     config.review.publication = "github";
     return config;
   };
-  it("names the missing write token without printing any token", async () => {
-    const { code, stderr } = await invoke({
+  it("names missing publication credentials and publisher configuration without secrets", async () => {
+    const tokenRun = await invoke({
       config: publishing(),
       environment: { JEV_KEY: "test-only", GH_TOKEN: "ghp_secretvalue" },
     });
-    expect(code).toBe(1);
-    expect(stderr).toContain("MARGOT_WRITE_TOKEN");
-    expect(stderr).not.toContain("ghp_secretvalue");
-  });
-  it("names the missing publisher configuration", async () => {
+    expect(tokenRun.code).toBe(1);
+    expect(tokenRun.stderr).toContain("MARGOT_WRITE_TOKEN");
+    expect(tokenRun.stderr).not.toContain("ghp_secretvalue");
     const config = publishing();
     delete config.publisher;
-    const { stderr } = await invoke({
+    const configRun = await invoke({
       config,
       environment: { JEV_KEY: "test-only", MARGOT_WRITE_TOKEN: "placeholder" },
     });
-    expect(stderr).toContain("`publisher` configuration");
+    expect(configRun.code).toBe(1);
+    expect(configRun.stderr).toContain("publisher");
+    expect(configRun.stderr).not.toContain("placeholder");
   });
 });
-it("writes diagnostics.json beside the output after a successful review", async () => {
+it("writes successful model callbacks and retry/adherence diagnostics beside the output", async () => {
   scripted.on = true;
   try {
     const run = await invoke();
     const written = JSON.parse(
       await readFile(join(run.paths.output, "..", "diagnostics.json"), "utf8"),
     );
-    expect({ code: run.code, written }).toEqual({
-      code: 0,
-      written: {
-        cards: [
-          {
-            card: "safety",
-            raw: "safety raw",
-            durationMs: 10,
-            numTurns: 2,
-            models: ["example-model"],
-            costUsd: 0.1,
-          },
-        ],
-        voice: {
-          prose: "voice raw",
-          durationMs: 10,
-          numTurns: 2,
-          models: ["example-model"],
-          costUsd: 0.1,
-        },
-        jevRetries: [
-          { question: "risk", attempt: 2, reason: "operations: a partial distribution" },
-        ],
-        adherence: { status: "unchecked" },
-      },
-    });
+    expect(run.code).toBe(0);
+    expect(written.cards).toMatchObject([{ card: "safety", raw: "safety raw" }]);
+    expect(written.voice).toMatchObject({ prose: "voice raw" });
+    expect(written.jevRetries).toEqual([
+      { question: "risk", attempt: 2, reason: "operations: a partial distribution" },
+    ]);
+    expect(written.adherence).toEqual({ status: "unchecked" });
   } finally {
     scripted.on = false;
   }

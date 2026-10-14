@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   type Change,
   missingHead,
@@ -38,14 +38,7 @@ const rejections: Rejection[] = [
     change: withFacts({ repository: "example/other" }),
     stage: "facts",
   },
-  {
-    when: "the classification has an unknown source",
-    change: (draft) => {
-      withRequest({ phase: "triage" })(draft);
-      withClassification({ source: "unknown" })(draft);
-    },
-    stage: "classification",
-  },
+
   {
     when: "a classification probability is out of range",
     change: (draft) => {
@@ -151,8 +144,16 @@ const rejections: Rejection[] = [
 describe("failing closed", () => {
   for (const { when, change, stage, recording = "council-clear" } of rejections) {
     it(`errors at the ${stage} stage without merge eligibility when ${when}`, async () => {
-      const { result } = await reviewRecording(recorded(recording, change));
-      expect(result).toMatchObject({ kind: "error", stage, mergeEligible: false });
+      const timedOut = when === "a card never returns before the deadline";
+      if (timedOut) vi.useFakeTimers();
+      try {
+        const pending = reviewRecording(recorded(recording, change));
+        if (timedOut) await vi.runAllTimersAsync();
+        const { result } = await pending;
+        expect(result).toMatchObject({ kind: "error", stage, mergeEligible: false });
+      } finally {
+        if (timedOut) vi.useRealTimers();
+      }
     });
   }
 });

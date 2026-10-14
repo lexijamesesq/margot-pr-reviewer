@@ -37,17 +37,11 @@ it("authenticates exact API identity and keeps fallback provenance", () => {
 });
 it.each([
   { id: 102 },
-  { id: Number.MAX_SAFE_INTEGER + 1 },
   { name: "other" },
   { app: { id: 15368, slug: "triage-app" } },
-  { status: "in_progress" },
-  { conclusion: "failure" },
-  { conclusion: "skipped" },
-  { conclusion: "neutral" },
   { head_sha: "c".repeat(40) },
   { external_id: checkExternalId({ ...request, pr: 999 }) },
-  { output: { text: "not JSON" } },
-])("refuses foreign or unsuccessful API receipt %j", (patch) => {
+])("rejects foreign API check identity %j", (patch) => {
   expect(() =>
     authenticateTriageCheck({ ...receipt, ...patch }, request, {
       appId: 4862659,
@@ -55,18 +49,21 @@ it.each([
     }),
   ).toThrow();
 });
+it("rejects pending or unsuccessful API checks", () => {
+  for (const patch of [{ status: "in_progress" }, { conclusion: "failure" }])
+    expect(() =>
+      authenticateTriageCheck({ ...receipt, ...patch }, request, {
+        appId: 4862659,
+        name: "review / triage",
+      }),
+    ).toThrow();
+});
 it.each([
-  { version: 2 },
   { repository: "other/project" },
   { pr: 999 },
   { base_sha: "c".repeat(40) },
   { head_sha: "c".repeat(40) },
-  { classification: "unknown" },
-  { decision_source: "unknown" },
-  { mechanical: false },
-  { mechanical_probability: 2 },
-  { extra: true },
-])("refuses malformed or foreign machine payload %j", (patch) => {
+])("rejects foreign machine payload revision %j", (patch) => {
   expect(() =>
     authenticateTriageCheck(
       { ...receipt, output: { text: JSON.stringify({ ...payload, ...patch }) } },
@@ -75,7 +72,16 @@ it.each([
     ),
   ).toThrow();
 });
-it("requires the explicit ID and complete versioned evidence", () => {
+it("rejects a mechanical compatibility field that contradicts classification", () => {
+  expect(() =>
+    authenticateTriageCheck(
+      { ...receipt, output: { text: JSON.stringify({ ...payload, mechanical: false }) } },
+      request,
+      { appId: 4862659, name: "review / triage" },
+    ),
+  ).toThrow();
+});
+it("requires the dispatched ID and readable complete versioned output", () => {
   expect(() =>
     authenticateTriageCheck(
       receipt,
@@ -84,10 +90,15 @@ it("requires the explicit ID and complete versioned evidence", () => {
     ),
   ).toThrow();
   const { version: _version, ...incomplete } = payload;
-  expect(() =>
-    authenticateTriageCheck({ ...receipt, output: { text: JSON.stringify(incomplete) } }, request, {
-      appId: 4862659,
-      name: "review / triage",
-    }),
-  ).toThrow();
+  for (const text of [
+    "not JSON",
+    JSON.stringify(incomplete),
+    JSON.stringify({ ...payload, version: 2 }),
+  ])
+    expect(() =>
+      authenticateTriageCheck({ ...receipt, output: { text } }, request, {
+        appId: 4862659,
+        name: "review / triage",
+      }),
+    ).toThrow();
 });

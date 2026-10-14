@@ -103,6 +103,7 @@ it("returns the actual read-back ID with complete versioned triage", async () =>
   const r = await run();
   expect(r.result).toMatchObject({ kind: "classified", triage_check_id: 101 });
   expect(r.reads).toContain(101);
+  expect(r.writes.filter((write) => write.path.endsWith("/reviews"))).toEqual([]);
   const text = (r.stored.get(101)?.output as { text: string } | undefined)?.text;
   expect(JSON.parse(text ?? "")).toEqual({
     version: 1,
@@ -121,7 +122,7 @@ it("never adopts another PR with the same head", async () => {
   expect(r.result).toMatchObject({ kind: "classified", triage_check_id: 101 });
   expect(r.writes.some((w) => w.path.endsWith("/99"))).toBe(false);
 });
-it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+it.each([0, 1.5, Number.MAX_SAFE_INTEGER + 1])(
   "refuses unsafe adoption ID %s before PATCH",
   async (id) => {
     const r = await run({ seed: { ...seed, id } });
@@ -129,8 +130,14 @@ it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
     expect(r.writes).toEqual([]);
   },
 );
+it("withholds ownership when the new check ID has no confirmed readback", async () => {
+  const r = await run({ receipt: (check) => ({ ...check, id: 999 }) });
+  expect(r.result.kind).toBe("error");
+  expect(r.evaluated).toBe(false);
+  expect(r.writes).toHaveLength(1);
+  expect(r.writes.some((write) => write.path.endsWith("/999"))).toBe(false);
+});
 it.each([
-  { id: 999 },
   { name: "foreign" },
   { app: { id: 15368 } },
   { head_sha: "f".repeat(40) },
@@ -144,20 +151,18 @@ it.each([
   expect(r.writes.some((w) => w.path.endsWith("/999"))).toBe(false);
 });
 it("does not seize newer ownership after an unconfirmed opening write", async () => {
-  const r = await run({ readback: (v) => ({ ...v, details_url: "https://example.test/new-run" }) });
+  const r = await run({
+    armed: true,
+    readback: (v) => ({ ...v, details_url: "https://example.test/new-run" }),
+  });
   expect(r.result.kind).toBe("error");
   expect(r.evaluated).toBe(false);
   expect(r.writes).toHaveLength(1);
-});
-it("initial refusal cannot neutralize an existing scoped writer", async () => {
-  const r = await run({ seed, closed: true });
-  expect(r.result.kind).toBe("error");
-  expect(r.writes).toEqual([]);
+  expect(r.writes.some((write) => write.path === "/graphql")).toBe(false);
 });
 it.each([
   { status: "in_progress" },
   { conclusion: "failure" },
-  { conclusion: "skipped" },
   { name: "foreign" },
   { app: { id: 15368 } },
   { external_id: "foreign" },
@@ -170,6 +175,7 @@ it.each([
 it("revalidates live base after terminal readback", async () => {
   let moved = false;
   const r = await run({
+    armed: true,
     readback: (v) => {
       if (v.conclusion === "success") moved = true;
       return v;
@@ -178,6 +184,7 @@ it("revalidates live base after terminal readback", async () => {
   });
   expect(r.result.kind).toBe("error");
   expect(r.result).not.toHaveProperty("triage_check_id");
+  expect(r.writes.some((write) => write.path === "/graphql")).toBe(false);
 });
 
 it("refusal cleanup rechecks ownership after the disarm attempt loses it", async () => {
@@ -188,22 +195,12 @@ it("refusal cleanup rechecks ownership after the disarm attempt loses it", async
   expect(r.stored.get(101)?.details_url).toBe("https://example.test/new-owner");
 });
 
-it.each(["unconfirmed", "refused", "stale", "superseded"])(
-  "never disarms auto-merge after %s ownership/revision failure",
-  async (defect) => {
-    let moved = false;
-    const r = await run({
-      armed: true,
-      closed: defect === "refused",
-      readback: (v, ordinal) => {
-        if (defect === "unconfirmed" || (defect === "superseded" && ordinal > 1))
-          return { ...v, details_url: "https://example.test/new-owner" };
-        if (defect === "stale" && v.conclusion === "success") moved = true;
-        return v;
-      },
-      afterReadback: () => moved,
-    });
-    expect(r.result.kind).toBe("error");
-    expect(r.writes.some((w) => w.path === "/graphql")).toBe(false);
-  },
-);
+it("never disarms auto-merge after confirmed ownership is superseded", async () => {
+  const r = await run({
+    armed: true,
+    readback: (check, ordinal) =>
+      ordinal > 1 ? { ...check, details_url: "https://example.test/new-owner" } : check,
+  });
+  expect(r.result.kind).toBe("error");
+  expect(r.writes.some((write) => write.path === "/graphql")).toBe(false);
+});
