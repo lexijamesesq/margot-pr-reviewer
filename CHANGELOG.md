@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.3
+
+- Add bounded request identifiers, model names and request byte counts to Jev HTTP failure diagnostics. Request contents and provider response bodies are not logged; historical rejection causes remain unknown.
+- Use the existing classification fallback immediately after Jev rejects credentials with HTTP 401 or 403, without repeating the rejected request.
+- Report exhausted unreadable advisory answers as unchecked instead of implicitly passing them.
+- Allow quoted attribution or credit text in review prose without rejecting the review.
+
 ## 0.12.0
 
 - Remove protected-path self-instrument holds and the merge-alert caller. Reviewer files follow ordinary ownership, risk and review policy without a special hold or risk floor.

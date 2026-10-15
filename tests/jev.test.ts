@@ -568,6 +568,84 @@ describe("Jev failure diagnostics", () => {
       expect(warnings).not.toContain(other);
     }
   });
+  it("correlates an HTTP failure without reading or exposing provider content", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const retry = vi.fn();
+    const fallback = vi.fn(async () => classes);
+    const sent: string[] = [];
+    const responses: Response[] = [];
+    const fetch = vi.fn(async (_input, init) => {
+      sent.push(String(init?.body));
+      const response = new Response("provider-message-canary malformed-body-canary {", {
+        status: 400,
+        headers: { "x-typesafe-request-id": "req_trace-123" },
+      });
+      responses.push(response);
+      return response;
+    });
+    try {
+      const adapter = jevAdapter({
+        key: "credential-canary",
+        model: "test-model",
+        fallbackClaude: pinnedClaude,
+        fetch,
+        fallback,
+        onJevRetry: retry,
+      });
+      const diff = "private-diff-canary 🐱";
+      expect(
+        await adapter.classify({ ...facts, diff }, classificationQuestions, context()),
+      ).toMatchObject({ source: "fallback", mechanical: 1 });
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fallback).toHaveBeenCalledTimes(1);
+      expect(retry).toHaveBeenCalledTimes(1);
+      expect(responses.every((response) => !response.bodyUsed)).toBe(true);
+      const request = present(sent[0]);
+      const diagnostics = JSON.stringify({ warnings: warn.mock.calls, retries: retry.mock.calls });
+      expect(diagnostics).toContain("HTTP 400");
+      expect(diagnostics).toContain("model=test-model");
+      expect(diagnostics).toContain(`request_bytes=${Buffer.byteLength(request, "utf8")}`);
+      expect(diagnostics).toContain("request_id=req_trace-123");
+      for (const secret of [
+        "credential-canary",
+        "private-diff-canary",
+        "provider-message-canary",
+        "malformed-body-canary",
+      ])
+        expect(diagnostics).not.toContain(secret);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+  it.each(["unsafe request-id-canary", "request-id-canary".repeat(20)])(
+    "omits unsafe or oversized metadata from HTTP failure diagnostics (%#)",
+    async (requestId) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const adapter = jevAdapter({
+          key: "test-only",
+          model: "unsafe-model-canary\nforged diagnostic",
+          fallbackClaude: pinnedClaude,
+          fallback: async () => classes,
+          fetch: async () =>
+            new Response("{}", {
+              status: 401,
+              headers: { "x-typesafe-request-id": requestId },
+            }),
+        });
+        expect(await adapter.classify(facts, classificationQuestions, context())).toMatchObject({
+          source: "fallback",
+        });
+        const diagnostics = warn.mock.calls.map(([message]) => String(message)).join("\n");
+        expect(diagnostics).toContain("authentication rejected (HTTP 401)");
+        expect(diagnostics).toContain("model=(invalid)");
+        expect(diagnostics).not.toContain("unsafe-model-canary");
+        expect(diagnostics).not.toContain("request-id-canary");
+      } finally {
+        warn.mockRestore();
+      }
+    },
+  );
   it("reports a transport failure with its cause", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
