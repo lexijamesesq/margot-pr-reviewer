@@ -197,6 +197,10 @@ function classificationPause(signal: AbortSignal): Promise<void> {
     signal.addEventListener("abort", cancel, { once: true });
   });
 }
+/** A conservative logging allowlist, not the provider's identifier grammar. */
+function diagnosticIdentifier(value: string | null): string | undefined {
+  return value !== null && /^[A-Za-z0-9._/-]{1,128}$/.test(value) ? value : undefined;
+}
 export function jevAdapter(options: {
   key: string;
   model: string;
@@ -219,11 +223,13 @@ export function jevAdapter(options: {
     const raw = await pRetry(
       async () => {
         let response: Response;
+        let body: string;
         try {
+          body = JSON.stringify({ model: options.model, questions, state });
           response = await transport(options.url ?? "https://api.typesafe.ai/v1/systemone", {
             method: "POST",
             headers: { Authorization: `Bearer ${options.key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: options.model, questions, state }),
+            body,
             signal: c.signal,
           });
         } catch (error) {
@@ -231,10 +237,13 @@ export function jevAdapter(options: {
         }
         if (!response.ok) {
           // A rejected credential is distinguishable from an outage in every diagnostic.
-          const error = new Error(
+          const failure =
             response.status === 401 || response.status === 403
               ? `Jev authentication rejected (HTTP ${response.status})`
-              : `Jev unavailable (HTTP ${response.status})`,
+              : `Jev unavailable (HTTP ${response.status})`;
+          const requestId = diagnosticIdentifier(response.headers.get("x-typesafe-request-id"));
+          const error = new Error(
+            `${failure}; model=${diagnosticIdentifier(options.model) ?? "(invalid)"}; request_bytes=${Buffer.byteLength(body, "utf8")}${requestId ? `; request_id=${requestId}` : ""}`,
             { cause: response.status },
           );
           if (response.status !== 429 && response.status < 500) throw new AbortError(error);
