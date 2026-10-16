@@ -18,7 +18,7 @@ Native file filters can omit deletion-only changes; run the relevant commands
 manually for removals. Fix findings.
 
 `.github/workflows/ci.yml` preserves the shared `@v1` universal scan and Margot
-handoff, then runs `ci / package validation` on Ubuntu/Node22 for the
+handoff, then runs `CI / Package Validation` on Ubuntu/Node22 for the
 authenticated functional class. Mechanical and documentation classes skip that
 package job. It packs once through `prepack` and validates the same archive with
 publint, ATTW and one installed smoke. Behavior tests, typecheck and build run
