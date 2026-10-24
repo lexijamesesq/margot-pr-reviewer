@@ -29,7 +29,7 @@ Fix findings rather than bypassing hooks. Keep existing custom hooks and
 
 ## Maintainer tooling
 
-`ruff.toml`, `.house-code.json`, `.prettierrc`, the `ollie-*` workflows,
+`ruff.toml`, `.house-code.json`, `.prettierrc`,
 and the pull-request template are the
 maintainer's repository tooling, provisioned centrally. You do not need them to
 contribute, and they apply only to this repository's own pull requests.
