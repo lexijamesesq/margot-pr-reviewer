@@ -302,17 +302,21 @@ export async function review(
     const scope = roundScope(facts, prior, comparison, cached !== undefined);
     let result: Review;
     if (cached && prior) {
+      const effective =
+        priorEffective(facts, config, { body: priorReview?.body ?? "", round: prior.round }) ??
+        effectiveBand(null, cached.review.decision.rating.band, prior.round);
+      // A receipt saved before the effective band existed may hold an approval the PR's peak band now withholds.
+      const decision = structuredClone(cached.review.decision);
+      holdForEffective(decision, effective);
       result = {
         ...cached.review,
+        decision,
         request,
         provenance: { ...cached.review.provenance, classification: classSource },
         ledger: prior,
         convergence: cached.counts,
         ...(priorReview ? optionalAdherence(savedAdherence(priorReview.body)) : {}),
-        // A same-head replay reposts the effective band it posted, as it reposts the verdict.
-        effective:
-          priorEffective(facts, config, { body: priorReview?.body ?? "", round: prior.round }) ??
-          effectiveBand(null, cached.review.decision.rating.band, prior.round),
+        effective,
       };
     } else {
       const cards: Card[] = [];

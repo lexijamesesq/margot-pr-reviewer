@@ -106,6 +106,43 @@ describe("effective band", () => {
     expect(render(held)).toContain("unreadable band marker");
   });
 
+  it("holds a same-head replay of an approval saved before the band marker, after a HIGH round", async () => {
+    // A clean LOW approval, reviewed after an earlier round.
+    const r = margotRecording("mechanical");
+    const round1 = prior([], 2);
+    const first = posted(round1, "reviewer[bot]", `review\n${ledgerBlock(round1)}`);
+    r.facts = {
+      ...(r.facts as object),
+      history: { complete: true, priorLedger: true, reviews: [first] },
+    };
+    const result = await review(r.request as never, r.config as never, recordedServices(r));
+    if (result.kind !== "reviewed" || !result.decision.mergeEligible) throw new Error("baseline");
+    // Rerun on the same head after an earlier release posted it with no band marker, and the earlier round reads HIGH.
+    const approval = result.report.replace(/<!-- margot-band:v1 [^\n]* -->\n/, "");
+    r.facts = {
+      ...(r.facts as object),
+      history: {
+        complete: true,
+        priorLedger: true,
+        reviews: [
+          { ...first, body: `🔴 **Risk: HIGH**\n${ledgerBlock(round1)}` },
+          {
+            ...posted(result.ledger, "reviewer[bot]", approval),
+            id: 2,
+            submittedAt: "2026-09-02T00:00:00Z",
+          },
+        ],
+      },
+    };
+    const s = recordedServices(r);
+    const replay = await review(r.request as never, r.config as never, s);
+    if (replay.kind !== "reviewed") throw new Error(`not reviewed: ${replay.kind}`);
+    // The council is not run again: this is the cached decision, held.
+    expect(s.calls.some((c) => c.name.startsWith("card:"))).toBe(false);
+    expect(replay.decision.mergeEligible).toBe(false);
+    expect(replay.decision.holdReasons).toContain("peak-risk");
+  });
+
   it("holds after eve-plus#132's real chain: a HIGH round then a LOW round, both posted before the marker", async () => {
     // Both rounds were posted by 0.12.3; the latest says LOW, so reading only it would clear the PR.
     const round2 = "### ✅ APPROVED\n🔴 **Risk: HIGH** — release that's hard to take back";
