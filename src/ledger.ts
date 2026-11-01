@@ -134,7 +134,7 @@ type PostedReview = NonNullable<Facts["history"]["reviews"]>[number];
 
 /**
  * The ledger a posted review carries, when it is one Margot trusts: posted by a trusted bot actor, ending with a
- * ledger block, for that review's head, and with a receipt for this PR. Null for a review that carries no ledger or
+ * ledger block, for that review's head, and, when it carries a receipt, one for this PR. Null for a review that carries no ledger or
  * wasn't posted by a trusted actor; throws for a trusted ledger that can't be read. Every reader of earlier rounds
  * goes through it, so what counts as Margot's own record has one definition.
  */
