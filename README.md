@@ -324,8 +324,10 @@ it, never lower it, so a HIGH PR followed by a one-line fix stays the operator's
 merge. From round two the comment states both, the round's own `Risk:` line and an
 `Effective for merge:` line naming the round that set it. The effective band travels
 in its own `margot-band:v1` marker before the ledger block, outside the ledger
-encoding that earlier releases read. A review posted before the marker existed is
-read by its own `Risk:` line.
+encoding that earlier releases read. With no marker, every
+review was posted before it existed, and the effective band is the highest `Risk:` band
+across all the PR's trusted reviews; a marker that is present but unreadable holds the PR
+as HIGH.
 
 In GitHub mode it is accompanied by a check run named `review / margot`. Its text
 has these machine-readable lines: `outcome: <OUTCOME> | band: <BAND>`, where

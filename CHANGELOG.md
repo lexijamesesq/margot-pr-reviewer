@@ -2,9 +2,11 @@
 
 ## 0.13.0
 
+A minor release: this package bumps the minor version for an interface or contract change (here, the check text's `band:` line) and the patch version for a fix.
+
 - Merge authority follows the PR's effective band: the highest band any round has given it. From round two a round reviews only the changes since the last reviewed head, so its band describes that delta; before this release a HIGH PR followed by a trivial commit (a comment-only change on lexijamesesq/eve-plus#132) was rebanded LOW and became auto-mergeable. A round whose own band is below the effective band is held with the reason `peak-risk` ("round N banded it HIGH"), posts a comment rather than an approval, and concludes its check `neutral`.
 - Check contract change: `band:` in the check text is now the effective band, and a new `delta_band:` line carries the round's own band. Consumers that read `band:` as the round's band must read `delta_band:` instead. The check summary names the effective band too.
-- From round two the comment adds an `Effective for merge:` line beside the round's `Risk:` line. The effective band is posted in a new `margot-band:v1` marker before the ledger block; the ledger encoding and receipt are unchanged, so earlier releases still read the ledger. A prior review without the marker is read by its `Risk:` line.
+- From round two the comment adds an `Effective for merge:` line beside the round's `Risk:` line. The effective band is posted in a new `margot-band:v1` marker before the ledger block; the ledger encoding and receipt are unchanged, so earlier releases still read the ledger. With no marker (every review posted before this release), the effective band is the highest `Risk:` band across all the PR's trusted reviews, so a HIGH-then-LOW chain posted by earlier releases is held too. A marker that is present but unreadable holds the PR as HIGH.
 
 ## 0.12.3
 
