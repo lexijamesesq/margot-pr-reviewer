@@ -109,7 +109,7 @@ describe("effective band", () => {
     );
     expect(held.decision.mergeEligible).toBe(false);
     expect(held.effective).toEqual({ band: "HIGH", round: 2, unreadable: true });
-    expect(render(held)).toContain("unreadable band marker");
+    expect(render(held)).toContain("an earlier round's record could not be read");
   });
 
   it("holds a same-head replay of an approval saved before the band marker, after a HIGH round", async () => {
@@ -216,6 +216,7 @@ describe("effective band", () => {
       if (result.kind !== "reviewed") throw new Error(`not reviewed: ${result.kind}`);
       expect(result.decision.mergeEligible).toBe(false);
       expect(result.effective).toMatchObject({ band: "HIGH", unreadable: true });
+      expect(render(result)).toContain("an earlier round's record could not be read");
     });
 
   // A fresh review of the same head and round replaces that round's band; only earlier rounds carry one forward.

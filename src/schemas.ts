@@ -47,7 +47,10 @@ export const bandSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 export const effectiveBandSchema = z.strictObject({
   band: bandSchema,
   round: z.number().int().positive(),
-  /** Set when an earlier review's band marker could not be read, so the PR is held as HIGH. */
+  /**
+   * Set when an earlier round's record could not be read, so the PR is held as HIGH: a band marker that won't parse,
+   * or a trusted Margot review whose ledger is corrupt or posted for another head.
+   */
   unreadable: z.literal(true).optional(),
 });
 /** The posted band marker: the effective band after its round, and the one carried into that round. */
