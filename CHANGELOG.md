@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0
+
+- Merge authority follows the PR's effective band: the highest band any round has given it. From round two a round reviews only the changes since the last reviewed head, so its band describes that delta; before this release a HIGH PR followed by a trivial commit (a comment-only change on lexijamesesq/eve-plus#132) was rebanded LOW and became auto-mergeable. A round whose own band is below the effective band is held with the reason `peak-risk` ("round N banded it HIGH"), posts a comment rather than an approval, and concludes its check `neutral`.
+- Check contract change: `band:` in the check text is now the effective band, and a new `delta_band:` line carries the round's own band. Consumers that read `band:` as the round's band must read `delta_band:` instead. The check summary names the effective band too.
+- From round two the comment adds an `Effective for merge:` line beside the round's `Risk:` line. The effective band is posted in a new `margot-band:v1` marker before the ledger block; the ledger encoding and receipt are unchanged, so earlier releases still read the ledger. A prior review without the marker is read by its `Risk:` line.
+
 ## 0.12.3
 
 - Add bounded request identifiers, model names and request byte counts to Jev HTTP failure diagnostics. Request contents and provider response bodies are not logged; historical rejection causes remain unknown.

@@ -1,5 +1,5 @@
-import { adherenceBlock, ledgerBlock } from "./ledger.js";
-import { fallbackNotice, holdReason } from "./policy.js";
+import { adherenceBlock, bandBlock, ledgerBlock } from "./ledger.js";
+import { effectiveBand, fallbackNotice, holdReason } from "./policy.js";
 import { cardNames, dimensions } from "./schemas.js";
 import type { Card, Review, ReviewCore, ReviewPresentation } from "./types.js";
 
@@ -79,7 +79,7 @@ function codeVerdict(review: ReviewCore): { risk: string; summary: string } {
 
 function approvalHoldLine(review: Review): string | null {
   if (review.decision.outcome !== "APPROVED" || review.decision.mergeEligible) return null;
-  const { sentence } = holdReason(review.decision);
+  const { sentence } = holdReason(review.decision, review.effective);
   return `Above my authority: ${sentence}. Yours to merge.`;
 }
 
@@ -215,10 +215,26 @@ function adherenceLines(review: Review): string[] {
   ];
 }
 
+/** The band that decides who merges: the effective band, which is never below this round's own. */
+export function mergeBand(review: Review): string {
+  const own = review.decision.rating.band;
+  return effectiveBand(review.effective ?? null, own, review.ledger.round).band;
+}
+
+/**
+ * The second risk line, from round two on: this round's band covers only the changes since the
+ * last reviewed head, so the band that decides who merges is said beside it, never left to inference.
+ */
+function effectiveLine(review: Review): string | null {
+  const effective = review.effective;
+  if (!effective || review.ledger.round < 2) return null;
+  return `${bandIcons[effective.band]} **Effective for merge: ${effective.band}** — the highest band any round gave this PR (round ${effective.round}); this round's band covers the changes since the last reviewed head.`;
+}
+
 /** The verdict check's summary: outcome, band and the risk label's first sentence. */
 export function checkSummary(review: Review): string {
-  const { outcome, rating } = review.decision;
-  return Array.from(`${outcome}, ${rating.band}: ${labelSentence(riskLabel(review))}`)
+  const { outcome } = review.decision;
+  return Array.from(`${outcome}, ${mergeBand(review)}: ${labelSentence(riskLabel(review))}`)
     .slice(0, 900)
     .join("");
 }
@@ -248,6 +264,7 @@ export function render(review: Review): string {
   const lines = [
     `### ${outcomeIcons[decision.outcome]} ${decision.outcome}`,
     `${bandIcons[decision.rating.band]} **Risk: ${decision.rating.band}**${risk ? ` — ${risk}` : ""}`,
+    ...(effectiveLine(review) ? [effectiveLine(review) as string] : []),
     `> ${firstSentences(rationale, 2)}`,
     ...(fallbackNotice(review.decision.holdReasons)
       ? [`> ⚠️ _${fallbackNotice(review.decision.holdReasons)}, so nothing was auto-merged._`]
@@ -283,7 +300,7 @@ export function render(review: Review): string {
   ];
   const body = lines.join("\n").replaceAll("margot-ledger", "margot‑ledger");
   // The ledger block stays last: every release reads it only as the body's final line.
-  return `${body}\n${review.adherence ? `${adherenceBlock(review.adherence)}\n` : ""}${ledgerBlock(review.ledger)}`;
+  return `${body}\n${review.adherence ? `${adherenceBlock(review.adherence)}\n` : ""}${review.effective ? `${bandBlock(review.effective)}\n` : ""}${ledgerBlock(review.ledger)}`;
 }
 
 /**
@@ -304,7 +321,8 @@ export function checkText(review: Review): string {
           ? "no_council"
           : "fast_path";
   const lines = [
-    `outcome: ${review.decision.outcome} | band: ${review.decision.rating.band}`,
+    `outcome: ${review.decision.outcome} | band: ${mergeBand(review)}`,
+    `delta_band: ${review.decision.rating.band}`,
     `decision_source: ${review.provenance.decision_source ?? "jev"}`,
     `verdict_source: ${verdictSource}`,
     `class: ${review.classification}`,

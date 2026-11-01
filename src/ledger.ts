@@ -3,11 +3,12 @@ import { deflateSync, inflateSync } from "node:zlib";
 import parseDiff from "parse-diff";
 import { diffIsComplete } from "./diff.js";
 import { errorMessage } from "./errors.js";
-import { adherenceSchema, comparisonSchema, ledgerSchema } from "./schemas.js";
+import { adherenceSchema, comparisonSchema, effectiveBandSchema, ledgerSchema } from "./schemas.js";
 import type {
   Adherence,
   Card,
   Convergence,
+  EffectiveBand,
   Facts,
   Ledger,
   ReviewConfig,
@@ -37,6 +38,33 @@ export function savedAdherence(body: string): Adherence | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The PR's effective band, posted in its own marker before the ledger block, like the adherence
+ * result: the ledger encoding stays as earlier releases read it, so a rollback still reads the ledger.
+ */
+export function bandBlock(effective: EffectiveBand): string {
+  return `<!-- margot-band:v1 ${Buffer.from(JSON.stringify(effective)).toString("base64")} -->`;
+}
+/**
+ * The effective band a posted review carried. A review from before this marker existed falls back
+ * to its own risk line, which was that round's band, at the round its ledger names; one with
+ * neither is unknown.
+ */
+export function savedBand(body: string, round: number): EffectiveBand | null {
+  const match = [...body.matchAll(/(?:^|\n)<!-- margot-band:v1 ([A-Za-z0-9+/=]+) -->/g)].at(-1);
+  if (match) {
+    try {
+      return effectiveBandSchema.parse(
+        JSON.parse(Buffer.from(match[1] ?? "", "base64").toString("utf8")),
+      );
+    } catch {
+      // An unreadable marker falls back to the risk line, as a missing one does.
+    }
+  }
+  const line = /\*\*Risk: (LOW|MEDIUM|HIGH)\*\*/.exec(body);
+  return line ? { band: line[1] as EffectiveBand["band"], round } : null;
 }
 
 export const configHash = (config: ReviewConfig): string =>

@@ -309,7 +309,7 @@ export function githubPublisher(
       decision.mergeEligible
         ? "Margot: approved"
         : decision.outcome === "APPROVED"
-          ? `held for the operator: ${holdReason(decision).sentence}`
+          ? `held for the operator: ${holdReason(decision, review.effective).sentence}`
           : decision.outcome === "ERROR"
             ? "not reviewed (error)"
             : `Margot: ${decision.outcome}`,

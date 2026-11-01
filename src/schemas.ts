@@ -43,6 +43,11 @@ export const checkConclusions = [
 export const classSchema = z.enum(classNames);
 export const cardNameSchema = z.enum(cardNames);
 export const bandSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
+/** The band that decides who merges: the highest any round has given the PR, and the round that gave it. */
+export const effectiveBandSchema = z.strictObject({
+  band: bandSchema,
+  round: z.number().int().positive(),
+});
 export const checkIdSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const triagePayloadSchema = z
   .strictObject({

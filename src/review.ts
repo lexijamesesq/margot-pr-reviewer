@@ -7,6 +7,7 @@ import {
   prepareFindings,
   roundScope,
   savedAdherence,
+  savedBand,
   selectLedgerReview,
   standingCards,
 } from "./ledger.js";
@@ -14,6 +15,8 @@ import {
   assignFindingIds,
   classify,
   decide,
+  effectiveBand,
+  holdForEffective,
   needsVoice,
   rate,
   requireRiskLine,
@@ -306,6 +309,10 @@ export async function review(
         ledger: prior,
         convergence: cached.counts,
         ...(priorReview ? optionalAdherence(savedAdherence(priorReview.body)) : {}),
+        // A same-head replay reposts the effective band it posted, as it reposts the verdict.
+        effective:
+          savedBand(priorReview?.body ?? "", prior.round) ??
+          effectiveBand(null, cached.review.decision.rating.band, prior.round),
       };
     } else {
       const cards: Card[] = [];
@@ -444,6 +451,13 @@ export async function review(
           services: services.provenance,
         },
       };
+      // Merge authority follows the highest band any round gave the PR, not this round's delta.
+      const effective = effectiveBand(
+        priorReview && prior ? savedBand(priorReview.body, prior.round) : null,
+        core.decision.rating.band,
+        scope.round,
+      );
+      holdForEffective(core.decision, effective);
       if (core.provenance.decision_source !== "jev") {
         core.decision.mergeEligible = false;
         if (routeAnswer && routeAnswer.source !== "jev")
@@ -463,6 +477,7 @@ export async function review(
         ...core,
         ...nextLedger(scope, cards, voice, core, config, facts),
         adherence: advisory,
+        effective,
       };
     }
     const metadata = services.reviewMetadata?.() ?? {};
