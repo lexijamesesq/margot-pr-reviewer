@@ -326,8 +326,10 @@ merge. From round two the comment states both, the round's own `Risk:` line and 
 in its own `margot-band:v1` marker before the ledger block, outside the ledger
 encoding that earlier releases read. With no marker, every
 review was posted before it existed, and the effective band is the highest `Risk:` band
-across all the PR's trusted reviews; a marker that is present but unreadable holds the PR
-as HIGH.
+across all the PR's trusted reviews; a marker that is present but unreadable, or a trusted
+review whose ledger can't be read, holds the PR as HIGH. Only earlier rounds count: the
+marker also records the band carried into its round, so a fresh re-review of the same head
+and round replaces that round's band.
 
 In GitHub mode it is accompanied by a check run named `review / margot`. Its text
 has these machine-readable lines: `outcome: <OUTCOME> | band: <BAND>`, where
