@@ -182,6 +182,42 @@ describe("effective band", () => {
       expect(result.effective?.band).toBe("LOW");
     });
 
+  // A trusted Margot review whose ledger can't be read recorded a band nobody can know, so it fails closed.
+  for (const [failure, mangle] of [
+    ["is for another head", (r: ReturnType<typeof posted>) => ({ ...r, head: "1".repeat(40) })],
+    [
+      "carries a corrupt ledger",
+      (r: ReturnType<typeof posted>) => ({
+        ...r,
+        body: "🔴 **Risk: HIGH**\n<!-- margot-ledger:v1 bm90 -->",
+      }),
+    ],
+  ] as const)
+    it(`holds as HIGH after an earlier Margot review that ${failure}`, async () => {
+      const r = margotRecording("mechanical");
+      const high = prior([], 2);
+      const low = prior([], 3);
+      r.facts = {
+        ...(r.facts as object),
+        history: {
+          complete: true,
+          priorLedger: true,
+          reviews: [
+            mangle(posted(high, "reviewer[bot]", `🔴 **Risk: HIGH**\n${ledgerBlock(high)}`)),
+            {
+              ...posted(low, "reviewer[bot]", `🟢 **Risk: LOW**\n${ledgerBlock(low)}`),
+              id: 2,
+              submittedAt: "2026-09-02T00:00:00Z",
+            },
+          ],
+        },
+      };
+      const result = await review(r.request as never, r.config as never, recordedServices(r));
+      if (result.kind !== "reviewed") throw new Error(`not reviewed: ${result.kind}`);
+      expect(result.decision.mergeEligible).toBe(false);
+      expect(result.effective).toMatchObject({ band: "HIGH", unreadable: true });
+    });
+
   // A fresh review of the same head and round replaces that round's band; only earlier rounds carry one forward.
   for (const [what, carried, eligible] of [
     [

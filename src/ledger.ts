@@ -85,7 +85,7 @@ export function priorEffective(
     try {
       ledger = readLedger(review, facts, config);
     } catch {
-      continue;
+      return unreadable;
     }
     const band = /\*\*Risk: (LOW|MEDIUM|HIGH)\*\*/.exec(review.body)?.[1] as
       | EffectiveBand["band"]
