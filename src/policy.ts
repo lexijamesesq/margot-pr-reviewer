@@ -263,8 +263,9 @@ const holdSentences: [string, string][] = [
   ["fallback", "a model step fell back (reduced confidence)"],
   ["ownership-uncomputed", "ownership could not be established"],
   ["calibration", "calibration mode is on"],
-  ["risk", ""],
+  // Above this round's own band, the effective band is the one that holds the PR, so it names the hold.
   ["peak-risk", ""],
+  ["risk", ""],
 ];
 
 /** The one reason a held review is held, for the comment and the check title alike. */

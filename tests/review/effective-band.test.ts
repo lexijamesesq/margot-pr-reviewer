@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { recordedServices } from "../../src/adapters/recorded.js";
 import { bandBlock, ledgerBlock } from "../../src/ledger.js";
-import { effectiveBand } from "../../src/policy.js";
+import { effectiveBand, holdReason } from "../../src/policy.js";
 import { checkText, render } from "../../src/render.js";
 import { review } from "../../src/review.js";
 import type { Review } from "../../src/types.js";
@@ -41,6 +41,14 @@ describe("effective band", () => {
       round: 2,
     });
     expect(effectiveBand(null, "LOW", 1)).toEqual({ band: "LOW", round: 1 });
+  });
+
+  it("names the effective band when it holds above this round's own", () => {
+    const decision = { holdReasons: ["risk", "peak-risk"], rating: { band: "MEDIUM" } };
+    expect(holdReason(decision, { band: "HIGH", round: 2 })).toEqual({
+      reason: "peak-risk",
+      sentence: "round 2 banded it HIGH",
+    });
   });
 
   it("holds a LOW round after a HIGH one for the operator, and says both bands", async () => {
