@@ -143,6 +143,40 @@ describe("effective band", () => {
     expect(replay.decision.holdReasons).toContain("peak-risk");
   });
 
+  // The effective band trusts exactly what the ledger trusts: a review that fails any of its checks sets no band.
+  for (const [failure, mangle] of [
+    ["is for another head", (r: ReturnType<typeof posted>) => ({ ...r, head: "1".repeat(40) })],
+    [
+      "was posted by an untrusted actor",
+      (r: ReturnType<typeof posted>) => ({ ...r, actor: "someone[bot]" }),
+    ],
+    ["was posted by a person", (r: ReturnType<typeof posted>) => ({ ...r, actorType: "User" })],
+  ] as const)
+    it(`ignores an earlier HIGH review that ${failure}`, async () => {
+      const r = margotRecording("mechanical");
+      const high = prior([], 2);
+      const low = prior([], 3);
+      r.facts = {
+        ...(r.facts as object),
+        history: {
+          complete: true,
+          priorLedger: true,
+          reviews: [
+            mangle(posted(high, "reviewer[bot]", `🔴 **Risk: HIGH**\n${ledgerBlock(high)}`)),
+            {
+              ...posted(low, "reviewer[bot]", `🟢 **Risk: LOW**\n${ledgerBlock(low)}`),
+              id: 2,
+              submittedAt: "2026-09-02T00:00:00Z",
+            },
+          ],
+        },
+      };
+      const result = await review(r.request as never, r.config as never, recordedServices(r));
+      if (result.kind !== "reviewed") throw new Error(`not reviewed: ${result.kind}`);
+      expect(result.decision.mergeEligible).toBe(true);
+      expect(result.effective?.band).toBe("LOW");
+    });
+
   it("holds after eve-plus#132's real chain: a HIGH round then a LOW round, both posted before the marker", async () => {
     // Both rounds were posted by 0.12.3; the latest says LOW, so reading only it would clear the PR.
     const round2 = "### ✅ APPROVED\n🔴 **Risk: HIGH** — release that's hard to take back";

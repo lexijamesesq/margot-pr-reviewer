@@ -48,27 +48,6 @@ export function savedAdherence(body: string): Adherence | undefined {
 export function bandBlock(effective: EffectiveBand): string {
   return `<!-- margot-band:v1 ${Buffer.from(JSON.stringify(effective)).toString("base64")} -->`;
 }
-// A review posted by a trusted actor whose body ends with a ledger: Margot's own, as selectLedgerReview reads it.
-const ledgerTail = /(?:^|\n)<!-- margot-ledger:v1 ([A-Za-z0-9+/=]+) -->\s*$/;
-function trustedLedgerReviews(facts: Facts, config: ReviewConfig) {
-  return (facts.history.reviews ?? []).filter(
-    (r) =>
-      r.actorType === "Bot" &&
-      config.trustedLedgerActors.includes(r.actor) &&
-      ledgerTail.test(r.body.trimEnd()),
-  );
-}
-// The round a posted ledger names, or null when it can't be read.
-function ledgerRound(body: string): number | null {
-  try {
-    const encoded = ledgerTail.exec(body.trimEnd())?.[1] ?? "";
-    const round = JSON.parse(Buffer.from(encoded, "base64").toString("utf8")).round;
-    return Number.isInteger(round) && round > 0 ? round : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The effective band the PR carried into this round, from its latest trusted review (`latest`,
  * with the round its ledger names). That review's band marker carries it forward. A marker that is
@@ -96,12 +75,17 @@ export function priorEffective(
     }
   }
   let peak: EffectiveBand | null = null;
-  for (const review of trustedLedgerReviews(facts, config)) {
+  for (const review of facts.history.reviews ?? []) {
+    let ledger: Ledger | null;
+    try {
+      ledger = readLedger(review, facts, config);
+    } catch {
+      continue;
+    }
     const band = /\*\*Risk: (LOW|MEDIUM|HIGH)\*\*/.exec(review.body)?.[1] as
       | EffectiveBand["band"]
       | undefined;
-    if (!band) continue;
-    peak = effectiveBand(peak, band, ledgerRound(review.body) ?? latest.round);
+    if (ledger && band) peak = effectiveBand(peak, band, ledger.round);
   }
   return peak;
 }
@@ -141,6 +125,49 @@ export function selectLedger(
 ): Ledger | null {
   return selectLedgerReview(facts, config, onWarning)?.ledger ?? null;
 }
+type PostedReview = NonNullable<Facts["history"]["reviews"]>[number];
+
+/**
+ * The ledger a posted review carries, when it is one Margot trusts: posted by a trusted bot actor, ending with a
+ * ledger block, for that review's head, and with a receipt for this PR. Null for a review that carries no ledger or
+ * wasn't posted by a trusted actor; throws for a trusted ledger that can't be read. Every reader of earlier rounds
+ * goes through it, so what counts as Margot's own record has one definition.
+ */
+function readLedger(review: PostedReview, facts: Facts, config: ReviewConfig): Ledger | null {
+  if (!/(?:^|\n)<!-- margot-ledger:[^\n]*$/.test(review.body.trimEnd())) return null;
+  if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor)) return null;
+  const match = review.body.match(/(?:^|\n)<!-- margot-ledger:v1 ([A-Za-z0-9+/=]+) -->\s*$/);
+  if (!match) throw new Error("Malformed ledger encoding");
+  let decoded = JSON.parse(Buffer.from(match[1] ?? "", "base64").toString("utf8"));
+  let version = 1;
+  // A version 1 reader ignores this extension and sees the same plain entries.
+  // The saved receipt is restored from the compressed field without a second ledger.
+  if (decoded && typeof decoded.receipt_v2 === "string") {
+    const { receipt_v2, ...plain } = decoded;
+    if (plain.v !== 1 || "receipt" in plain) throw new Error("Invalid rollback ledger");
+    decoded = {
+      ...plain,
+      v: 2,
+      receipt: JSON.parse(
+        inflateSync(Buffer.from(receipt_v2, "base64"), { maxOutputLength: 1048576 }).toString(
+          "utf8",
+        ),
+      ),
+    };
+    version = 2;
+  }
+  const ledger = ledgerSchema.parse(decoded);
+  if (ledger.v !== version || ledger.head !== review.head)
+    throw new Error("Ledger revision mismatch");
+  if (
+    ledger.receipt &&
+    (ledger.receipt.review.request.repository !== facts.repository ||
+      ledger.receipt.review.request.pr !== facts.pr)
+  )
+    throw new Error("Ledger belongs to another PR");
+  return ledger;
+}
+
 /** The selected ledger with the body of the posted review that carried it. */
 export function selectLedgerReview(
   facts: Facts,
@@ -153,39 +180,9 @@ export function selectLedgerReview(
     (a, b) => b.submittedAt.localeCompare(a.submittedAt) || b.id - a.id,
   );
   for (const review of reviews) {
-    if (!/(?:^|\n)<!-- margot-ledger:[^\n]*$/.test(review.body.trimEnd())) continue;
-    const match = review.body.match(/(?:^|\n)<!-- margot-ledger:v1 ([A-Za-z0-9+/=]+) -->\s*$/);
-    if (review.actorType !== "Bot" || !config.trustedLedgerActors.includes(review.actor)) continue;
     try {
-      if (!match) throw new Error("Malformed ledger encoding");
-      let decoded = JSON.parse(Buffer.from(match[1] ?? "", "base64").toString("utf8"));
-      let version = 1;
-      // A version 1 reader ignores this extension and sees the same plain entries.
-      // The saved receipt is restored from the compressed field without a second ledger.
-      if (decoded && typeof decoded.receipt_v2 === "string") {
-        const { receipt_v2, ...plain } = decoded;
-        if (plain.v !== 1 || "receipt" in plain) throw new Error("Invalid rollback ledger");
-        decoded = {
-          ...plain,
-          v: 2,
-          receipt: JSON.parse(
-            inflateSync(Buffer.from(receipt_v2, "base64"), { maxOutputLength: 1048576 }).toString(
-              "utf8",
-            ),
-          ),
-        };
-        version = 2;
-      }
-      const ledger = ledgerSchema.parse(decoded);
-      if (ledger.v !== version || ledger.head !== review.head)
-        throw new Error("Ledger revision mismatch");
-      if (
-        ledger.receipt &&
-        (ledger.receipt.review.request.repository !== facts.repository ||
-          ledger.receipt.review.request.pr !== facts.pr)
-      )
-        throw new Error("Ledger belongs to another PR");
-      return { ledger, body: review.body };
+      const ledger = readLedger(review, facts, config);
+      if (ledger) return { ledger, body: review.body };
     } catch (error) {
       const reason = errorMessage(error);
       const warning = `Skipped ledger from review ${review.id}: ${reason.replace(/\s+/g, " ").trim()}`;
