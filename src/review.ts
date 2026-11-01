@@ -302,9 +302,13 @@ export async function review(
     const scope = roundScope(facts, prior, comparison, cached !== undefined);
     let result: Review;
     if (cached && prior) {
-      const effective =
-        priorEffective(facts, config, { body: priorReview?.body ?? "", round: prior.round }) ??
-        effectiveBand(null, cached.review.decision.rating.band, prior.round);
+      const carried = priorEffective(
+        facts,
+        config,
+        { body: priorReview?.body ?? "", round: prior.round },
+        prior.round,
+      );
+      const effective = effectiveBand(carried, cached.review.decision.rating.band, prior.round);
       // A receipt saved before the effective band existed may hold an approval the PR's peak band now withholds.
       const decision = structuredClone(cached.review.decision);
       holdForEffective(decision, effective);
@@ -317,6 +321,7 @@ export async function review(
         convergence: cached.counts,
         ...(priorReview ? optionalAdherence(savedAdherence(priorReview.body)) : {}),
         effective,
+        carried,
       };
     } else {
       const cards: Card[] = [];
@@ -456,13 +461,16 @@ export async function review(
         },
       };
       // Merge authority follows the highest band any round gave the PR, not this round's delta.
-      const effective = effectiveBand(
+      const carried =
         priorReview && prior
-          ? priorEffective(facts, config, { body: priorReview.body, round: prior.round })
-          : null,
-        core.decision.rating.band,
-        scope.round,
-      );
+          ? priorEffective(
+              facts,
+              config,
+              { body: priorReview.body, round: prior.round },
+              scope.round,
+            )
+          : null;
+      const effective = effectiveBand(carried, core.decision.rating.band, scope.round);
       holdForEffective(core.decision, effective);
       if (core.provenance.decision_source !== "jev") {
         core.decision.mergeEligible = false;
@@ -484,6 +492,7 @@ export async function review(
         ...nextLedger(scope, cards, voice, core, config, facts),
         adherence: advisory,
         effective,
+        carried,
       };
     }
     const metadata = services.reviewMetadata?.() ?? {};

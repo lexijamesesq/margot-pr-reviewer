@@ -50,6 +50,10 @@ export const effectiveBandSchema = z.strictObject({
   /** Set when an earlier review's band marker could not be read, so the PR is held as HIGH. */
   unreadable: z.literal(true).optional(),
 });
+/** The posted band marker: the effective band after its round, and the one carried into that round. */
+export const bandMarkerSchema = effectiveBandSchema.extend({
+  carried: effectiveBandSchema.nullable(),
+});
 export const checkIdSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const triagePayloadSchema = z
   .strictObject({

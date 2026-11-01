@@ -4,7 +4,7 @@ import parseDiff from "parse-diff";
 import { diffIsComplete } from "./diff.js";
 import { errorMessage } from "./errors.js";
 import { effectiveBand } from "./policy.js";
-import { adherenceSchema, comparisonSchema, effectiveBandSchema, ledgerSchema } from "./schemas.js";
+import { adherenceSchema, bandMarkerSchema, comparisonSchema, ledgerSchema } from "./schemas.js";
 import type {
   Adherence,
   Card,
@@ -45,33 +45,38 @@ export function savedAdherence(body: string): Adherence | undefined {
  * The PR's effective band, posted in its own marker before the ledger block, like the adherence
  * result: the ledger encoding stays as earlier releases read it, so a rollback still reads the ledger.
  */
-export function bandBlock(effective: EffectiveBand): string {
-  return `<!-- margot-band:v1 ${Buffer.from(JSON.stringify(effective)).toString("base64")} -->`;
+export function bandBlock(effective: EffectiveBand, carried: EffectiveBand | null): string {
+  return `<!-- margot-band:v1 ${Buffer.from(JSON.stringify({ ...effective, carried })).toString("base64")} -->`;
 }
 /**
- * The effective band the PR carried into this round, from its latest trusted review (`latest`,
- * with the round its ledger names). That review's band marker carries it forward. A marker that is
- * present but can't be read holds the PR as HIGH, since what it recorded is unknown. With no
- * marker, every review was posted before the marker existed, so each one's own `Risk:` line was
- * that round's band, and the highest of them across all the PR's trusted reviews is the effective
- * band. Reading only the latest would let a LOW round posted after a HIGH one clear the PR.
- * Null when no review records a band.
+ * The effective band carried into `round` from the rounds before it, read from the PR's latest trusted review
+ * (`latest`, with the round its ledger names). Only earlier rounds count: a review of the same round, such as a
+ * fresh same-head re-review after a degraded answer, replaces that round's band rather than adding to it.
+ *
+ * That review's band marker records the effective band after its round and the one carried into it; a review of an
+ * earlier round gives the former, one of this round the latter. With no marker, every review was posted before the
+ * marker existed, so each earlier round's own `Risk:` line was its band, and the highest of them is the carried band.
+ * Reading only the latest would let a LOW round posted after a HIGH one clear the PR. A marker that can't be read, or
+ * a trusted Margot review whose ledger can't be read, holds the PR as HIGH: what it recorded is unknown, so it fails
+ * closed. A review that isn't Margot's carries no band. Null when no earlier round records one.
  */
 export function priorEffective(
   facts: Facts,
   config: ReviewConfig,
   latest: { body: string; round: number } | null,
+  round: number,
 ): EffectiveBand | null {
   if (!latest) return null;
+  const unreadable = { band: "HIGH", round: latest.round, unreadable: true } as const;
   const marker = [...latest.body.matchAll(/(?:^|\n)<!-- margot-band:v1 ([^\n]*?) -->/g)].at(-1);
   if (marker) {
     try {
-      return effectiveBandSchema.parse(
+      const { carried, ...after } = bandMarkerSchema.parse(
         JSON.parse(Buffer.from(marker[1] ?? "", "base64").toString("utf8")),
       );
+      return latest.round < round ? after : carried;
     } catch {
-      // Present but unreadable: what it recorded is unknown, so it fails closed rather than to this round's band.
-      return { band: "HIGH", round: latest.round, unreadable: true };
+      return unreadable;
     }
   }
   let peak: EffectiveBand | null = null;
@@ -85,7 +90,7 @@ export function priorEffective(
     const band = /\*\*Risk: (LOW|MEDIUM|HIGH)\*\*/.exec(review.body)?.[1] as
       | EffectiveBand["band"]
       | undefined;
-    if (ledger && band) peak = effectiveBand(peak, band, ledger.round);
+    if (ledger && band && ledger.round < round) peak = effectiveBand(peak, band, ledger.round);
   }
   return peak;
 }

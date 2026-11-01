@@ -305,7 +305,7 @@ export function render(review: Review): string {
     .replaceAll("margot-band", "margot‑band")
     .replaceAll("margot-adherence", "margot‑adherence");
   // The ledger block stays last: every release reads it only as the body's final line.
-  return `${body}\n${review.adherence ? `${adherenceBlock(review.adherence)}\n` : ""}${review.effective ? `${bandBlock(review.effective)}\n` : ""}${ledgerBlock(review.ledger)}`;
+  return `${body}\n${review.adherence ? `${adherenceBlock(review.adherence)}\n` : ""}${review.effective ? `${bandBlock(review.effective, review.carried ?? null)}\n` : ""}${ledgerBlock(review.ledger)}`;
 }
 
 /**

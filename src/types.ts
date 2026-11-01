@@ -56,6 +56,8 @@ export type Review = ReviewCore & {
   adherence?: Adherence;
   /** The band that decides who merges; posted in its own marker, never in the ledger's receipt. */
   effective?: EffectiveBand;
+  /** The effective band carried into this round, from the rounds before it; posted with `effective`. */
+  carried?: EffectiveBand | null;
 };
 export type RoundScope = {
   round: number;

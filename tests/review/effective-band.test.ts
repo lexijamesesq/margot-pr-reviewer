@@ -56,7 +56,7 @@ describe("effective band", () => {
     expect(control.decision.mergeEligible).toBe(true);
 
     const held = await roundAfter(
-      (ledger) => `review\n${bandBlock({ band: "HIGH", round: 2 })}\n${ledger}`,
+      (ledger) => `review\n${bandBlock({ band: "HIGH", round: 2 }, null)}\n${ledger}`,
     );
     expect(held.decision).toMatchObject({
       outcome: "APPROVED",
@@ -149,9 +149,8 @@ describe("effective band", () => {
     expect(replay.decision.holdReasons).toContain("peak-risk");
   });
 
-  // The effective band trusts exactly what the ledger trusts: a review that fails any of its checks sets no band.
+  // A review that isn't Margot's carries no band.
   for (const [failure, mangle] of [
-    ["is for another head", (r: ReturnType<typeof posted>) => ({ ...r, head: "1".repeat(40) })],
     [
       "was posted by an untrusted actor",
       (r: ReturnType<typeof posted>) => ({ ...r, actor: "someone[bot]" }),
@@ -182,6 +181,58 @@ describe("effective band", () => {
       expect(result.decision.mergeEligible).toBe(true);
       expect(result.effective?.band).toBe("LOW");
     });
+
+  // A fresh review of the same head and round replaces that round's band; only earlier rounds carry one forward.
+  for (const [what, carried, eligible] of [
+    [
+      "with no earlier round above LOW, a re-review that rates LOW clears the replaced HIGH",
+      null,
+      true,
+    ],
+    [
+      "an earlier round's HIGH still holds a same-head re-review that rates LOW",
+      { band: "HIGH", round: 1 },
+      false,
+    ],
+  ] as const)
+    it(what, async () => {
+      const r = margotRecording("mechanical");
+      const head = (r.request as { head: string }).head;
+      const same = { ...prior([], 2), head };
+      const replaced = bandBlock({ band: "HIGH", round: 2 }, carried);
+      r.facts = {
+        ...(r.facts as object),
+        history: {
+          complete: true,
+          priorLedger: true,
+          reviews: [
+            posted(same, "reviewer[bot]", `🔴 **Risk: HIGH**\n${replaced}\n${ledgerBlock(same)}`),
+          ],
+        },
+      };
+      const result = await review(r.request as never, r.config as never, recordedServices(r));
+      if (result.kind !== "reviewed") throw new Error(`not reviewed: ${result.kind}`);
+      expect(result.decision.mergeEligible).toBe(eligible);
+      expect(result.effective?.band).toBe(eligible ? "LOW" : "HIGH");
+      expect(result.decision.holdReasons.includes("peak-risk")).toBe(!eligible);
+    });
+
+  it("a same-head re-review replaces a HIGH that an earlier release posted for the same round", async () => {
+    const r = margotRecording("mechanical");
+    const same = { ...prior([], 2), head: (r.request as { head: string }).head };
+    r.facts = {
+      ...(r.facts as object),
+      history: {
+        complete: true,
+        priorLedger: true,
+        reviews: [posted(same, "reviewer[bot]", `🔴 **Risk: HIGH**\n${ledgerBlock(same)}`)],
+      },
+    };
+    const result = await review(r.request as never, r.config as never, recordedServices(r));
+    if (result.kind !== "reviewed") throw new Error(`not reviewed: ${result.kind}`);
+    expect(result.decision.mergeEligible).toBe(true);
+    expect(result.effective?.band).toBe("LOW");
+  });
 
   it("holds after eve-plus#132's real chain: a HIGH round then a LOW round, both posted before the marker", async () => {
     // Both rounds were posted by 0.12.3; the latest says LOW, so reading only it would clear the PR.
