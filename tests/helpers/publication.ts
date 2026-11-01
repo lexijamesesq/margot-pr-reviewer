@@ -25,6 +25,7 @@ export type PublicationMode =
   | "hold"
   | "peak-risk"
   | "changes"
+  | "clarification"
   | "calibration"
   | "triage"
   | "phase-titles"
@@ -375,8 +376,8 @@ export async function runPublication(
       value.decision.holdReasons = holdReasons ?? [mode === "calibration" ? "calibration" : "risk"];
       value.decision.rating.band = "HIGH";
     }
-    if (mode === "changes") {
-      value.decision.outcome = "CHANGES_REQUESTED";
+    if (mode === "changes" || mode === "clarification") {
+      value.decision.outcome = mode === "changes" ? "CHANGES_REQUESTED" : "CLARIFICATION_REQUESTED";
       value.decision.mergeEligible = false;
       value.decision.holdReasons = [];
     }

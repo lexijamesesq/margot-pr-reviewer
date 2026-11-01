@@ -8,7 +8,7 @@ A minor release: this package bumps the minor version for an interface or contra
 - Check contract change: `band:` in the check text is now the effective band, and a new `delta_band:` line carries the round's own band. Consumers that read `band:` as the round's band must read `delta_band:` instead. The check summary names the effective band too.
 - From round two the comment adds an `Effective for merge:` line beside the round's `Risk:` line. The effective band is posted in a new `margot-band:v1` marker before the ledger block; the ledger encoding and receipt are unchanged, so earlier releases still read the ledger. With no marker (every review posted before this release), the effective band is the highest `Risk:` band across all the PR's trusted reviews, so a HIGH-then-LOW chain posted by earlier releases is held too. A marker that is present but unreadable holds the PR as HIGH.
 - A same-head rerun applies the effective-band hold to the decision it replays, so an approval saved by an earlier release isn't reposted over a HIGH peak band.
-- CHANGES_REQUESTED concludes the review check `failure`, not `neutral`. GitHub treats a neutral required check as passing, so a human approval already on the head let a PR merge over Margot's CHANGES_REQUESTED (lexijamesesq/eve-deploy#157). The review itself is still a comment.
+- CHANGES_REQUESTED and CLARIFICATION_REQUESTED conclude the review check `failure`, not `neutral`. GitHub treats a neutral required check as passing, so a human approval already on the head let a PR merge over Margot's CHANGES_REQUESTED (lexijamesesq/eve-deploy#157). The review itself is still a comment.
 
 ## 0.12.3
 

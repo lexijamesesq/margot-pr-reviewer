@@ -294,14 +294,15 @@ export function githubPublisher(
     if (!decision.mergeEligible && !(await disableAutoMerge(r, c)))
       throw new Error("Auto-merge disable was not confirmed");
     // Review first, then disarm held PRs, then conclude the required check.
-    // CHANGES_REQUESTED fails the required check: a neutral conclusion passes branch protection, so a human
-    // approval already on the head would let the PR merge over her verdict.
+    // A request for changes or for clarification fails the check: a neutral conclusion passes branch protection, so a
+    // human approval already on the head would let the PR merge over a verdict that it can't land, or one she couldn't reach.
     const reviewConclusion =
       decision.holdReasons.includes("calibration") || decision.outcome === "ERROR"
         ? "action_required"
         : decision.mergeEligible
           ? "success"
-          : decision.outcome === "CHANGES_REQUESTED"
+          : decision.outcome === "CHANGES_REQUESTED" ||
+              decision.outcome === "CLARIFICATION_REQUESTED"
             ? "failure"
             : "neutral";
     await check(
