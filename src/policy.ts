@@ -11,6 +11,7 @@ import type {
   Card,
   Classification,
   Decision,
+  EffectiveBand,
   Facts,
   Rating,
   ReviewConfig,
@@ -232,6 +233,28 @@ export function decide(
   };
 }
 
+const bandRank = { LOW: 0, MEDIUM: 1, HIGH: 2 } as const;
+
+/**
+ * The band that decides who merges: the highest any round of the PR has given, never the latest
+ * round's alone. From round two a round reviews only the changes since the last reviewed head, so
+ * its band describes that delta; a HIGH PR followed by a one-line fix would otherwise read LOW.
+ */
+export function effectiveBand(
+  prior: EffectiveBand | null,
+  band: EffectiveBand["band"],
+  round: number,
+): EffectiveBand {
+  return prior && bandRank[prior.band] > bandRank[band] ? prior : { band, round };
+}
+
+/** Holds a decision whose effective band is above its own: an earlier round banded the PR higher. */
+export function holdForEffective(decision: Decision, effective: EffectiveBand): void {
+  if (bandRank[effective.band] <= bandRank[decision.rating.band]) return;
+  decision.mergeEligible = false;
+  decision.holdReasons.push("peak-risk");
+}
+
 /** Every reason an approved review is held, most telling first; a missing "risk" sentence is filled with the band. */
 const holdSentences: [string, string][] = [
   ["fallback-risk", "the risk was scored by a fallback (reduced confidence)"],
@@ -240,11 +263,16 @@ const holdSentences: [string, string][] = [
   ["fallback", "a model step fell back (reduced confidence)"],
   ["ownership-uncomputed", "ownership could not be established"],
   ["calibration", "calibration mode is on"],
+  // Above this round's own band, the effective band is the one that holds the PR, so it names the hold.
+  ["peak-risk", ""],
   ["risk", ""],
 ];
 
 /** The one reason a held review is held, for the comment and the check title alike. */
-export function holdReason(decision: { holdReasons: string[]; rating: { band: string } }): {
+export function holdReason(
+  decision: { holdReasons: string[]; rating: { band: string } },
+  effective?: EffectiveBand,
+): {
   reason: string;
   sentence: string;
 } {
@@ -260,6 +288,13 @@ export function holdReason(decision: { holdReasons: string[]; rating: { band: st
     "risk",
     "",
   ];
+  if (reason === "peak-risk" && effective)
+    return {
+      reason,
+      sentence: effective.unreadable
+        ? `an earlier round's record could not be read, so it is held as ${effective.band}`
+        : `round ${effective.round} banded it ${effective.band}`,
+    };
   return { reason, sentence: sentence || `risk is ${decision.rating.band}` };
 }
 

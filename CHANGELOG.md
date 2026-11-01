@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.0
+
+A minor release: this package bumps the minor version for an interface or contract change (here, the check text's `band:` line) and the patch version for a fix.
+
+- Merge authority follows the PR's effective band: the highest band any round has given it. From round two a round reviews only the changes since the last reviewed head, so its band describes that delta; before this release a HIGH PR followed by a trivial commit (a comment-only change on lexijamesesq/eve-plus#132) was rebanded LOW and became auto-mergeable. A round whose own band is below the effective band is held with the reason `peak-risk` ("round N banded it HIGH"), posts a comment rather than an approval, and concludes its check `neutral`.
+- Check contract change: `band:` in the check text is now the effective band, and a new `delta_band:` line carries the round's own band. Consumers that read `band:` as the round's band must read `delta_band:` instead. The check summary names the effective band too.
+- From round two the comment adds an `Effective for merge:` line beside the round's `Risk:` line. The effective band is posted in a new `margot-band:v1` marker before the ledger block; the ledger encoding and receipt are unchanged, so earlier releases still read the ledger. With no marker (every review posted before this release), the effective band is the highest `Risk:` band across all the PR's trusted reviews, so a HIGH-then-LOW chain posted by earlier releases is held too. A marker that is present but unreadable, or a trusted Margot review whose ledger can't be read, holds the PR as HIGH. The marker also records the band carried into its round, so a fresh same-head re-review of a round (after a degraded answer or a PR body edit) replaces that round's band instead of keeping the score it replaced.
+- A same-head rerun applies the effective-band hold to the decision it replays, so an approval saved by an earlier release isn't reposted over a HIGH peak band.
+- CHANGES_REQUESTED and CLARIFICATION_REQUESTED conclude the review check `failure`, not `neutral`. A neutral conclusion reads the same as a hold for the operator, so a landing agent merged a PR over Margot's CHANGES_REQUESTED on a human approval alone. GitHub blocks on the conclusion only where her check is required. The review itself is still a comment.
+
 ## 0.12.3
 
 - Add bounded request identifiers, model names and request byte counts to Jev HTTP failure diagnostics. Request contents and provider response bodies are not logged; historical rejection causes remain unknown.

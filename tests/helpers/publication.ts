@@ -23,6 +23,9 @@ import { readRecording } from "./recordings.js";
 export type PublicationMode =
   | "clear"
   | "hold"
+  | "peak-risk"
+  | "changes"
+  | "clarification"
   | "calibration"
   | "triage"
   | "phase-titles"
@@ -372,6 +375,18 @@ export async function runPublication(
       value.decision.mergeEligible = false;
       value.decision.holdReasons = holdReasons ?? [mode === "calibration" ? "calibration" : "risk"];
       value.decision.rating.band = "HIGH";
+    }
+    if (mode === "changes" || mode === "clarification") {
+      value.decision.outcome = mode === "changes" ? "CHANGES_REQUESTED" : "CLARIFICATION_REQUESTED";
+      value.decision.mergeEligible = false;
+      value.decision.holdReasons = [];
+    }
+    if (mode === "peak-risk") {
+      // A clean round after one that banded the PR HIGH: held on the effective band alone.
+      value.decision.mergeEligible = false;
+      value.decision.holdReasons = ["peak-risk"];
+      value.decision.rating.band = "LOW";
+      value.effective = { band: "HIGH", round: 2 };
     }
     const report = render(value);
     if (mode === "head") moved = true;

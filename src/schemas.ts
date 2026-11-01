@@ -43,6 +43,20 @@ export const checkConclusions = [
 export const classSchema = z.enum(classNames);
 export const cardNameSchema = z.enum(cardNames);
 export const bandSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
+/** The band that decides who merges: the highest any round has given the PR, and the round that gave it. */
+export const effectiveBandSchema = z.strictObject({
+  band: bandSchema,
+  round: z.number().int().positive(),
+  /**
+   * Set when an earlier round's record could not be read, so the PR is held as HIGH: a band marker that won't parse,
+   * or a trusted Margot review whose ledger is corrupt or posted for another head.
+   */
+  unreadable: z.literal(true).optional(),
+});
+/** The posted band marker: the effective band after its round, and the one carried into that round. */
+export const bandMarkerSchema = effectiveBandSchema.extend({
+  carried: effectiveBandSchema.nullable(),
+});
 export const checkIdSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const triagePayloadSchema = z
   .strictObject({

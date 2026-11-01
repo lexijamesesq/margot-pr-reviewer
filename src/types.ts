@@ -8,6 +8,7 @@ import type {
   configSchema,
   convergenceSchema,
   decisionSchema,
+  effectiveBandSchema,
   factsSchema,
   ledgerSchema,
   publicationSchema,
@@ -28,6 +29,7 @@ export type RiskEvidence = z.infer<typeof riskSchema>;
 export type Bundle = z.infer<typeof bundleSchema>;
 export type Band = z.infer<typeof bandSchema>;
 export type Rating = z.infer<typeof ratingSchema>;
+export type EffectiveBand = z.infer<typeof effectiveBandSchema>;
 export type Decision = z.infer<typeof decisionSchema>;
 export type Ledger = z.infer<typeof ledgerSchema>;
 export type Convergence = z.infer<typeof convergenceSchema>;
@@ -52,6 +54,10 @@ export type Review = ReviewCore & {
   presentation?: ReviewPresentation;
   /** Advisory; posted in its own marker, never in the ledger's receipt. */
   adherence?: Adherence;
+  /** The band that decides who merges; posted in its own marker, never in the ledger's receipt. */
+  effective?: EffectiveBand;
+  /** The effective band carried into this round, from the rounds before it; posted with `effective`. */
+  carried?: EffectiveBand | null;
 };
 export type RoundScope = {
   round: number;
