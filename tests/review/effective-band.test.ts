@@ -83,6 +83,15 @@ describe("effective band", () => {
     expect(held.effective).toEqual({ band: "HIGH", round: 2 });
   });
 
+  it("holds a PR whose earlier band marker can't be read, as HIGH", async () => {
+    const held = await roundAfter(
+      (ledger) => `review\n<!-- margot-band:v1 bm90IGpzb24= -->\n${ledger}`,
+    );
+    expect(held.decision.mergeEligible).toBe(false);
+    expect(held.effective).toEqual({ band: "HIGH", round: 2, unreadable: true });
+    expect(render(held)).toContain("unreadable band marker");
+  });
+
   it("holds after eve-plus#132's real chain: a HIGH round then a LOW round, both posted before the marker", async () => {
     // Both rounds were posted by 0.12.3; the latest says LOW, so reading only it would clear the PR.
     const round2 = "### ✅ APPROVED\n🔴 **Risk: HIGH** — release that's hard to take back";

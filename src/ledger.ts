@@ -91,7 +91,8 @@ export function priorEffective(
         JSON.parse(Buffer.from(marker[1] ?? "", "base64").toString("utf8")),
       );
     } catch {
-      // Falls back to the risk lines below.
+      // Present but unreadable: what it recorded is unknown, so it fails closed rather than to this round's band.
+      return { band: "HIGH", round: latest.round, unreadable: true };
     }
   }
   let peak: EffectiveBand | null = null;

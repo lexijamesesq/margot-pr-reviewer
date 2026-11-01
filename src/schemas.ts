@@ -47,6 +47,8 @@ export const bandSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 export const effectiveBandSchema = z.strictObject({
   band: bandSchema,
   round: z.number().int().positive(),
+  /** Set when an earlier review's band marker could not be read, so the PR is held as HIGH. */
+  unreadable: z.literal(true).optional(),
 });
 export const checkIdSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const triagePayloadSchema = z

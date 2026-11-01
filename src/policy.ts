@@ -288,7 +288,12 @@ export function holdReason(
     "",
   ];
   if (reason === "peak-risk" && effective)
-    return { reason, sentence: `round ${effective.round} banded it ${effective.band}` };
+    return {
+      reason,
+      sentence: effective.unreadable
+        ? `an earlier round's band record could not be read (unreadable band marker), so it is held as ${effective.band}`
+        : `round ${effective.round} banded it ${effective.band}`,
+    };
   return { reason, sentence: sentence || `risk is ${decision.rating.band}` };
 }
 
