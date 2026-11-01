@@ -24,6 +24,7 @@ export type PublicationMode =
   | "clear"
   | "hold"
   | "peak-risk"
+  | "changes"
   | "calibration"
   | "triage"
   | "phase-titles"
@@ -373,6 +374,11 @@ export async function runPublication(
       value.decision.mergeEligible = false;
       value.decision.holdReasons = holdReasons ?? [mode === "calibration" ? "calibration" : "risk"];
       value.decision.rating.band = "HIGH";
+    }
+    if (mode === "changes") {
+      value.decision.outcome = "CHANGES_REQUESTED";
+      value.decision.mergeEligible = false;
+      value.decision.holdReasons = [];
     }
     if (mode === "peak-risk") {
       // A clean round after one that banded the PR HIGH: held on the effective band alone.

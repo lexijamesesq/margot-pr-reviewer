@@ -43,6 +43,14 @@ it("carries the lines merge automation parses to request the operator when the r
     title: expect.stringMatching(/held.*risk.*HIGH/i),
   });
 });
+it("fails the verdict check on CHANGES_REQUESTED, so branch protection blocks a merge over it", async () => {
+  const run = await runPublication("changes");
+  expect({
+    events: run.writes.flatMap((w) => (typeof w.body.event === "string" ? [w.body.event] : [])),
+    conclusion: run.final?.conclusion,
+    title: (run.final?.output as { title?: string } | undefined)?.title,
+  }).toEqual({ events: ["COMMENT"], conclusion: "failure", title: "Margot: CHANGES_REQUESTED" });
+});
 it("holds a clean round on the effective band: a comment, a neutral check, and the band that holds it", async () => {
   const run = await runPublication("peak-risk");
   const output = (run.final?.output ?? {}) as { text?: string; title?: string };

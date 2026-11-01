@@ -84,7 +84,7 @@ export function githubPublisher(
   async function writeCheck(
     r: ReviewRequest,
     name: string,
-    conclusion: "success" | "neutral" | "action_required" | null,
+    conclusion: "success" | "neutral" | "failure" | "action_required" | null,
     title: string,
     summary: string,
     text: string | undefined,
@@ -175,7 +175,7 @@ export function githubPublisher(
   async function check(
     r: ReviewRequest,
     name: string,
-    conclusion: "success" | "neutral" | "action_required" | null,
+    conclusion: "success" | "neutral" | "failure" | "action_required" | null,
     title: string,
     summary: string,
     text: string | undefined,
@@ -294,12 +294,16 @@ export function githubPublisher(
     if (!decision.mergeEligible && !(await disableAutoMerge(r, c)))
       throw new Error("Auto-merge disable was not confirmed");
     // Review first, then disarm held PRs, then conclude the required check.
+    // CHANGES_REQUESTED fails the required check: a neutral conclusion passes branch protection, so a human
+    // approval already on the head would let the PR merge over her verdict.
     const reviewConclusion =
       decision.holdReasons.includes("calibration") || decision.outcome === "ERROR"
         ? "action_required"
         : decision.mergeEligible
           ? "success"
-          : "neutral";
+          : decision.outcome === "CHANGES_REQUESTED"
+            ? "failure"
+            : "neutral";
     await check(
       r,
       config.checks.review,
