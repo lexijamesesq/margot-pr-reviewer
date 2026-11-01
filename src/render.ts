@@ -298,7 +298,11 @@ export function render(review: Review): string {
     "",
     "<!-- margot:v1 -->",
   ];
-  const body = lines.join("\n").replaceAll("margot-ledger", "margot‑ledger");
+  // Model-derived text can't forge a marker: each marker name is broken with a non-breaking hyphen.
+  const body = lines
+    .join("\n")
+    .replaceAll("margot-ledger", "margot‑ledger")
+    .replaceAll("margot-band", "margot‑band");
   // The ledger block stays last: every release reads it only as the body's final line.
   return `${body}\n${review.adherence ? `${adherenceBlock(review.adherence)}\n` : ""}${review.effective ? `${bandBlock(review.effective)}\n` : ""}${ledgerBlock(review.ledger)}`;
 }
