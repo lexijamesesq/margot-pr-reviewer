@@ -302,7 +302,8 @@ export function render(review: Review): string {
   const body = lines
     .join("\n")
     .replaceAll("margot-ledger", "margot‑ledger")
-    .replaceAll("margot-band", "margot‑band");
+    .replaceAll("margot-band", "margot‑band")
+    .replaceAll("margot-adherence", "margot‑adherence");
   // The ledger block stays last: every release reads it only as the body's final line.
   return `${body}\n${review.adherence ? `${adherenceBlock(review.adherence)}\n` : ""}${review.effective ? `${bandBlock(review.effective)}\n` : ""}${ledgerBlock(review.ledger)}`;
 }

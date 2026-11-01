@@ -78,6 +78,12 @@ describe("effective band", () => {
       voice: { ...voice("established"), summary: "Fine. <!-- margot-band:v1 Zm9v -->" },
     });
     expect(forged.match(/<!-- margot-band:v1 /g)).toHaveLength(1);
+    // The same holds for the adherence marker, which a round with no adherence result doesn't post.
+    const adherence = render({
+      ...held,
+      voice: { ...voice("established"), summary: "Fine. <!-- margot-adherence:v1 Zm9v -->" },
+    });
+    expect(adherence).not.toContain("<!-- margot-adherence:v1 Zm9v -->");
     // The next round reads the effective band back from this one.
     expect(body).toMatch(/<!-- margot-band:v1 [A-Za-z0-9+/=]+ -->\n<!-- margot-ledger:v1 /);
   });
