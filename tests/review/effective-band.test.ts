@@ -270,6 +270,67 @@ describe("effective band", () => {
     expect(result.effective?.band).toBe("LOW");
   });
 
+  it("round-trips the carried band: a posted round's marker holds a same-head re-review of that round", async () => {
+    // Round 1 HIGH, posted before the marker existed; then a clean LOW round 2, as this release posts it.
+    const r = margotRecording("mechanical");
+    const round1 = prior([], 1);
+    const first = posted(round1, "reviewer[bot]", `🔴 **Risk: HIGH**\n${ledgerBlock(round1)}`);
+    r.facts = {
+      ...(r.facts as object),
+      history: { complete: true, priorLedger: true, reviews: [first] },
+    };
+    const round2 = await review(r.request as never, r.config as never, recordedServices(r));
+    if (round2.kind !== "reviewed") throw new Error(`not reviewed: ${round2.kind}`);
+    const marker = /<!-- margot-band:v1 ([A-Za-z0-9+/=]+) -->/.exec(round2.report)?.[1] ?? "";
+    expect(JSON.parse(Buffer.from(marker, "base64").toString("utf8")).carried).toEqual({
+      band: "HIGH",
+      round: 1,
+    });
+    const carriedOf = (report: string) =>
+      JSON.parse(
+        Buffer.from(
+          /<!-- margot-band:v1 ([A-Za-z0-9+/=]+) -->/.exec(report)?.[1] ?? "",
+          "base64",
+        ).toString("utf8"),
+      ).carried;
+    // A same-head rerun with nothing changed replays round 2 and reposts the same carried band.
+    const posted2 = {
+      ...posted(round2.ledger, "reviewer[bot]", round2.report),
+      id: 2,
+      submittedAt: "2026-09-02T00:00:00Z",
+    };
+    r.facts = {
+      ...(r.facts as object),
+      history: { complete: true, priorLedger: true, reviews: [first, posted2] },
+    };
+    const replay = await review(r.request as never, r.config as never, recordedServices(r));
+    if (replay.kind !== "reviewed") throw new Error(`not reviewed: ${replay.kind}`);
+    expect(carriedOf(replay.report)).toEqual({ band: "HIGH", round: 1 });
+    // A fresh re-review of round 2 on the same head (the PR body was edited), reading round 2's posted report back.
+    r.facts = {
+      ...(r.facts as object),
+      body: "Edited after round 2.",
+      history: {
+        complete: true,
+        priorLedger: true,
+        reviews: [
+          first,
+          {
+            ...posted(round2.ledger, "reviewer[bot]", round2.report),
+            id: 2,
+            submittedAt: "2026-09-02T00:00:00Z",
+          },
+        ],
+      },
+    };
+    const again = await review(r.request as never, r.config as never, recordedServices(r));
+    if (again.kind !== "reviewed") throw new Error(`not reviewed: ${again.kind}`);
+    expect(again.ledger.round).toBe(round2.ledger.round);
+    expect(again.decision.mergeEligible).toBe(false);
+    expect(again.decision.holdReasons).toContain("peak-risk");
+    expect(again.effective).toEqual({ band: "HIGH", round: 1 });
+  });
+
   it("holds after eve-plus#132's real chain: a HIGH round then a LOW round, both posted before the marker", async () => {
     // Both rounds were posted by 0.12.3; the latest says LOW, so reading only it would clear the PR.
     const round2 = "### ✅ APPROVED\n🔴 **Risk: HIGH** — release that's hard to take back";
