@@ -5,9 +5,9 @@ import {
   evidenceHash,
   nextLedger,
   prepareFindings,
+  priorEffective,
   roundScope,
   savedAdherence,
-  savedBand,
   selectLedgerReview,
   standingCards,
 } from "./ledger.js";
@@ -311,7 +311,7 @@ export async function review(
         ...(priorReview ? optionalAdherence(savedAdherence(priorReview.body)) : {}),
         // A same-head replay reposts the effective band it posted, as it reposts the verdict.
         effective:
-          savedBand(priorReview?.body ?? "", prior.round) ??
+          priorEffective(facts, config, { body: priorReview?.body ?? "", round: prior.round }) ??
           effectiveBand(null, cached.review.decision.rating.band, prior.round),
       };
     } else {
@@ -453,7 +453,9 @@ export async function review(
       };
       // Merge authority follows the highest band any round gave the PR, not this round's delta.
       const effective = effectiveBand(
-        priorReview && prior ? savedBand(priorReview.body, prior.round) : null,
+        priorReview && prior
+          ? priorEffective(facts, config, { body: priorReview.body, round: prior.round })
+          : null,
         core.decision.rating.band,
         scope.round,
       );

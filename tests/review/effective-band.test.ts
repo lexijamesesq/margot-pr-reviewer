@@ -11,22 +11,27 @@ import { margotRecording, posted, prior } from "../helpers/ledger.js";
 // that delta. Found on lexijamesesq/eve-plus#132: round 2 was APPROVED and HIGH, a comment-only
 // commit made round 3 APPROVED and LOW, and the LOW made the PR auto-mergeable.
 
-/** A clean round reviewed after a prior round posted `body`, which ends with its ledger. */
-async function roundAfter(body: (ledger: string) => string): Promise<Review> {
+/** A clean round reviewed after earlier rounds posted these bodies, oldest first, each ending with its ledger. */
+async function roundAfterAll(...bodies: ((ledger: string) => string)[]): Promise<Review> {
   const r = margotRecording("mechanical");
-  const ledger = prior([], 2);
+  const reviews = bodies.map((body, i) => {
+    const ledger = prior([], i + 2);
+    return {
+      ...posted(ledger, "reviewer[bot]", body(ledgerBlock(ledger))),
+      id: i + 1,
+      submittedAt: `2026-09-0${i + 1}T00:00:00Z`,
+    };
+  });
   r.facts = {
     ...(r.facts as object),
-    history: {
-      complete: true,
-      priorLedger: true,
-      reviews: [posted(ledger, "reviewer[bot]", body(ledgerBlock(ledger)))],
-    },
+    history: { complete: true, priorLedger: true, reviews },
   };
   const result = await review(r.request as never, r.config as never, recordedServices(r));
   if (result.kind !== "reviewed") throw new Error(`not reviewed: ${result.kind}`);
   return result;
 }
+/** A clean round reviewed after one prior round posted `body`. */
+const roundAfter = (body: (ledger: string) => string) => roundAfterAll(body);
 
 describe("effective band", () => {
   it("is the highest band any round gave, never the latest round's alone", () => {
@@ -74,6 +79,18 @@ describe("effective band", () => {
       "Above my authority: risk is HIGH. Yours to merge.",
     ].join("\n");
     const held = await roundAfter((ledger) => `${round2}\n${ledger}`);
+    expect(held.decision.mergeEligible).toBe(false);
+    expect(held.effective).toEqual({ band: "HIGH", round: 2 });
+  });
+
+  it("holds after eve-plus#132's real chain: a HIGH round then a LOW round, both posted before the marker", async () => {
+    // Both rounds were posted by 0.12.3; the latest says LOW, so reading only it would clear the PR.
+    const round2 = "### ✅ APPROVED\n🔴 **Risk: HIGH** — release that's hard to take back";
+    const round3 = "### ✅ APPROVED\n🟢 **Risk: LOW** — low exposure — data security";
+    const held = await roundAfterAll(
+      (ledger) => `${round2}\n${ledger}`,
+      (ledger) => `${round3}\n${ledger}`,
+    );
     expect(held.decision.mergeEligible).toBe(false);
     expect(held.effective).toEqual({ band: "HIGH", round: 2 });
   });
