@@ -317,28 +317,12 @@ or the council's per-card results — a status icon, the card name, and its
 finding, if any — followed by a round summary (new, open, and closed findings)
 and the PR's author, ticket, commit, and run links.
 
-From round two, a round reviews only the changes since the last reviewed head, so
-its risk band describes that delta. Merge authority follows the PR's **effective
-band** instead: the highest band any round has given the PR. A delta round can raise
-it, never lower it, so a HIGH PR followed by a one-line fix stays the operator's to
-merge. From round two the comment states both, the round's own `Risk:` line and an
-`Effective for merge:` line naming the round that set it. The effective band travels
-in its own `margot-band:v1` marker before the ledger block, outside the ledger
-encoding that earlier releases read. With no marker, every
-review was posted before it existed, and the effective band is the highest `Risk:` band
-across all the PR's trusted reviews; a marker that is present but unreadable, or a trusted
-review whose ledger can't be read, holds the PR as HIGH. Only earlier rounds count: the
-marker also records the band carried into its round, so a fresh re-review of the same head
-and round replaces that round's band.
-
 In GitHub mode it is accompanied by a check run named `review / margot`. Its text
-has these machine-readable lines: `outcome: <OUTCOME> | band: <BAND>`, where
-`<BAND>` is the effective band; `delta_band: <BAND>`, this round's own band; and
-`decision_source: <source>`. Before 0.13.0, `band:` was the round's own band.
+has two machine-readable lines: `outcome: <OUTCOME> | band: <BAND>` and
+`decision_source: <source>`.
 
 A PR is held for the operator — not cleared for merge, even on an outcome of
-APPROVED — when any of the following holds: risk is above LOW, in this round or
-in any earlier round of the PR (the effective band); routing or the
+APPROVED — when any of the following holds: risk is above LOW; routing or the
 risk score of a functional or mechanical change came from the fallback model
 rather than Jev (a documentation change is reviewed and not held for its
 routing); the review history
