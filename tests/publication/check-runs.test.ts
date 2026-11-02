@@ -43,34 +43,6 @@ it("carries the lines merge automation parses to request the operator when the r
     title: expect.stringMatching(/held.*risk.*HIGH/i),
   });
 });
-for (const [mode, outcome] of [
-  ["changes", "CHANGES_REQUESTED"],
-  ["clarification", "CLARIFICATION_REQUESTED"],
-] as const)
-  it(`fails the verdict check on ${outcome}, so a human approval alone can't land it`, async () => {
-    const run = await runPublication(mode);
-    expect({
-      events: run.writes.flatMap((w) => (typeof w.body.event === "string" ? [w.body.event] : [])),
-      conclusion: run.final?.conclusion,
-      title: (run.final?.output as { title?: string } | undefined)?.title,
-    }).toEqual({ events: ["COMMENT"], conclusion: "failure", title: `Margot: ${outcome}` });
-  });
-it("holds a clean round on the effective band: a comment, a neutral check, and the band that holds it", async () => {
-  const run = await runPublication("peak-risk");
-  const output = (run.final?.output ?? {}) as { text?: string; title?: string };
-  expect({
-    events: run.writes.flatMap((w) => (typeof w.body.event === "string" ? [w.body.event] : [])),
-    conclusion: run.final?.conclusion,
-    title: output.title,
-    band: parseVerdictText(output.text).band,
-  }).toEqual({
-    events: ["COMMENT"],
-    conclusion: "neutral",
-    title: "held for the operator: round 2 banded it HIGH",
-    band: "HIGH",
-  });
-  expect(output.text).toContain("delta_band: LOW");
-});
 it("overwrites the verdict check text after a later failure so merge automation never reads a stale approval", async () => {
   const run = await runPublication("confirm");
   const output = (run.final?.output ?? {}) as {

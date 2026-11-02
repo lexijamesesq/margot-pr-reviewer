@@ -5,7 +5,6 @@ import {
   evidenceHash,
   nextLedger,
   prepareFindings,
-  priorEffective,
   roundScope,
   savedAdherence,
   selectLedgerReview,
@@ -15,8 +14,6 @@ import {
   assignFindingIds,
   classify,
   decide,
-  effectiveBand,
-  holdForEffective,
   needsVoice,
   rate,
   requireRiskLine,
@@ -302,26 +299,13 @@ export async function review(
     const scope = roundScope(facts, prior, comparison, cached !== undefined);
     let result: Review;
     if (cached && prior) {
-      const carried = priorEffective(
-        facts,
-        config,
-        { body: priorReview?.body ?? "", round: prior.round },
-        prior.round,
-      );
-      const effective = effectiveBand(carried, cached.review.decision.rating.band, prior.round);
-      // A receipt saved before the effective band existed may hold an approval the PR's peak band now withholds.
-      const decision = structuredClone(cached.review.decision);
-      holdForEffective(decision, effective);
       result = {
         ...cached.review,
-        decision,
         request,
         provenance: { ...cached.review.provenance, classification: classSource },
         ledger: prior,
         convergence: cached.counts,
         ...(priorReview ? optionalAdherence(savedAdherence(priorReview.body)) : {}),
-        effective,
-        carried,
       };
     } else {
       const cards: Card[] = [];
@@ -460,18 +444,6 @@ export async function review(
           services: services.provenance,
         },
       };
-      // Merge authority follows the highest band any round gave the PR, not this round's delta.
-      const carried =
-        priorReview && prior
-          ? priorEffective(
-              facts,
-              config,
-              { body: priorReview.body, round: prior.round },
-              scope.round,
-            )
-          : null;
-      const effective = effectiveBand(carried, core.decision.rating.band, scope.round);
-      holdForEffective(core.decision, effective);
       if (core.provenance.decision_source !== "jev") {
         core.decision.mergeEligible = false;
         if (routeAnswer && routeAnswer.source !== "jev")
@@ -491,8 +463,6 @@ export async function review(
         ...core,
         ...nextLedger(scope, cards, voice, core, config, facts),
         adherence: advisory,
-        effective,
-        carried,
       };
     }
     const metadata = services.reviewMetadata?.() ?? {};
