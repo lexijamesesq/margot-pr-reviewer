@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.4
+
+- Add the publisher option `approveRiskHold` (default `false`, so existing deployments are unchanged). When on, a review held for risk alone (hold reasons exactly `["risk"]`) posts an `APPROVED` review instead of `COMMENTED`, so the required review is met on a pull request its author cannot approve. The review check stays `neutral` and titled as held for the operator, and every other hold still posts `COMMENTED`.
+- With the option on, auto-merge is disarmed and confirmed before the approval is posted, so a pull request armed in advance cannot merge on the approval. If the disarm cannot be confirmed, no approval is posted.
+
 ## 0.12.3
 
 - Add bounded request identifiers, model names and request byte counts to Jev HTTP failure diagnostics. Request contents and provider response bodies are not logged; historical rejection causes remain unknown.

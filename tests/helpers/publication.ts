@@ -92,6 +92,12 @@ export async function runPublication(
   diagnostic = "Distinctive diagnostic detail.",
   /** The message GitHub returns for a failed write. */
   writeFailure = "Recorded write failure",
+  extra: {
+    /** Publisher options layered over the defaults, e.g. `approveRiskHold`. */
+    publisher?: Record<string, unknown>;
+    /** GitHub merges an armed PR the moment an approving review lands, as it does when the required review is the only gate left. */
+    autoMergeOnApprove?: boolean;
+  } = {},
 ) {
   const writes: {
     method: string;
@@ -207,6 +213,10 @@ export async function runPublication(
         };
         if (!defect("receipt")) reviews.push(data as Record<string, unknown>);
         if (mode === "head-after-approval") moved = true;
+        if (extra.autoMergeOnApprove && body.event === "APPROVE" && armed) {
+          merged = true;
+          armed = false;
+        }
       } else {
         const id = method === "POST" ? ++sequence : Number(path.split("/").at(-1));
         data = {
@@ -244,7 +254,7 @@ export async function runPublication(
       retry: { enabled: false },
       throttle: { enabled: false },
     }),
-    publisherOptions,
+    { ...publisherOptions, ...(extra.publisher ?? {}) },
   );
   const request = {
     ...mechanicalRequest,
@@ -396,7 +406,7 @@ export async function runPublication(
       v.name ===
       (mode === "triage" ? publisherOptions.checks.triage : publisherOptions.checks.review),
   );
-  return { result, writes, reviews, dismissedIds, evaluated, armed, final };
+  return { result, writes, reviews, dismissedIds, evaluated, armed, merged, final };
 }
 export function tallyReview() {
   const value = structuredClone(mechanicalReview);
