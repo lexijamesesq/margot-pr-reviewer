@@ -166,6 +166,9 @@ A review run takes two JSON files: a request and a configuration.
 GitHub mode: with `margot-instance bind-request --authority true` the review publishes
 its comment and check runs to the pull request. That needs the `publisher` block (the two check
 names, the review app's actor and id, and the run URL); `bind-request` fails without it.
+`publisher.approveRiskHold` (default `false`) makes a review held for risk alone post `APPROVED`
+instead of `COMMENTED`; the check stays `neutral` and held for the operator, and auto-merge is
+disarmed before the approval is posted. Every other hold still posts a comment.
 Without `--authority true` the review runs in shadow mode and publishes nothing.
 
 `claude.executable`, `claude.pluginDirectory` and `claude.container.work` may use

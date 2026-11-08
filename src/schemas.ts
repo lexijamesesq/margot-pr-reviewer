@@ -278,6 +278,9 @@ export const publisherSchema = z.strictObject({
   actor: text,
   appId: z.number().int().positive(),
   runUrl: z.url(),
+  /** Post `APPROVED` on a PR held for risk alone (its hold reasons are exactly `["risk"]`) instead
+   * of `COMMENTED`. The check stays `neutral` and the PR stays held for the operator. Off by default. */
+  approveRiskHold: z.boolean().default(false),
 });
 const environmentVariableNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
 const ticketingSchema = z

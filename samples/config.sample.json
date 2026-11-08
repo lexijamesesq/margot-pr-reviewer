@@ -39,7 +39,8 @@
     },
     "actor": "YOUR_REVIEW_APP[bot]",
     "appId": 1,
-    "runUrl": "https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/1"
+    "runUrl": "https://github.com/YOUR_ORG/YOUR_CONTROL_REPOSITORY/actions/runs/1",
+    "approveRiskHold": false
   },
   "jev": {
     "model": "YOUR_JEV_VERSION",

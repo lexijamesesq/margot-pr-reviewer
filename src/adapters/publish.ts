@@ -35,7 +35,7 @@ class PublicationRefusal extends Error {
 /** Adopt the caller check by App/name/head; its run URL fences superseded writers. */
 export function githubPublisher(
   client: Octokit,
-  input: z.infer<typeof publisherSchema>,
+  input: z.input<typeof publisherSchema>,
   readClient: Octokit = client,
 ) {
   const config = publisherSchema.parse(input);
@@ -275,10 +275,26 @@ export function githubPublisher(
     // Margot never dismisses her own earlier approvals: a new head gets a new review, and
     // branch protection handles stale approvals.
     await guard(r, c);
+    // A review that is clean and held for risk alone may be posted as a real approval, so the
+    // required review is met on a PR the author cannot approve. Only `["risk"]` qualifies: every
+    // other hold reason (changes requested, calibration, ownership, error, fallback scoring)
+    // still posts a comment. This is not `mergeEligible`, which also sets the `success` check, the
+    // "approved" title and the auto-merge line: a risk hold stays held on all of those.
+    const approvedHeld =
+      config.approveRiskHold &&
+      !decision.mergeEligible &&
+      decision.holdReasons.length === 1 &&
+      decision.holdReasons[0] === "risk";
+    const approve = decision.mergeEligible || approvedHeld;
+    // GitHub's required review is met the instant an approval lands, and `CI / Margot` is not a
+    // required check, so a PR with auto-merge already armed would merge before the disarm below.
+    // Disarm first, so a held PR is never approved while it is armed.
+    if (approvedHeld && !(await disableAutoMerge(r, c)))
+      throw new Error("Auto-merge disable was not confirmed");
     const { data } = await client.rest.pulls.createReview({
       ...params(r, c),
       commit_id: r.head,
-      event: decision.mergeEligible ? "APPROVE" : "COMMENT",
+      event: approve ? "APPROVE" : "COMMENT",
       body: report,
     });
     reviewPosted = true;
@@ -288,7 +304,7 @@ export function githubPublisher(
       data.commit_id !== r.head ||
       data.user?.login !== config.actor ||
       data.user.type !== "Bot" ||
-      data.state !== (decision.mergeEligible ? "APPROVED" : "COMMENTED")
+      data.state !== (approve ? "APPROVED" : "COMMENTED")
     )
       throw new Error("Invalid native review receipt");
     if (!decision.mergeEligible && !(await disableAutoMerge(r, c)))
