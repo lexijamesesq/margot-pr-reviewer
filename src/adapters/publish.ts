@@ -309,7 +309,9 @@ export function githubPublisher(
       throw new Error("Invalid native review receipt");
     if (!decision.mergeEligible && !(await disableAutoMerge(r, c)))
       throw new Error("Auto-merge disable was not confirmed");
-    // Review first, then disarm held PRs, then conclude the required check.
+    // Held PRs are disarmed here too (idempotent), then the required check concludes. The review
+    // normally comes first; the one exception is an approved risk hold, which was already disarmed
+    // above, before the approval, so the approval can never meet GitHub's gate on an armed PR.
     const reviewConclusion =
       decision.holdReasons.includes("calibration") || decision.outcome === "ERROR"
         ? "action_required"
