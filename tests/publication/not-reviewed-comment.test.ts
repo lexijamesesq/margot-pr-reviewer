@@ -71,6 +71,26 @@ it("posts no not-reviewed comment under a review that was already posted", async
   const run = await runPublication("published-then-error");
   expect(comments(run).map((w) => w.body.event)).toEqual(["APPROVE"]);
 });
+it("carries GitHub's HTTP status into the diagnostic when a publication write fails inside the review", async () => {
+  const run = await runPublication("published-then-error");
+  expect(run.result).toMatchObject({
+    kind: "error",
+    diagnostic: expect.stringContaining("github_status=422"),
+  });
+});
+it("carries GitHub's request id into the diagnostic when a publication write fails", async () => {
+  const run = await runPublication("final-fail");
+  expect(run.result).toMatchObject({
+    kind: "error",
+    diagnostic: expect.stringContaining("github_request_id=A1B2:3C4D:5E6F:7A8B:9C0D"),
+  });
+});
+it("drops a request id that is unsafe to log", async () => {
+  const run = await runPublication("unsafe-request-id");
+  expect(run.result).toMatchObject({ kind: "error" });
+  expect((run.result as { diagnostic: string }).diagnostic).not.toContain("github_request_id=");
+  expect((run.result as { diagnostic: string }).diagnostic).not.toContain("github_status=200");
+});
 it("returns the error result, naming the failed comment write, when the comment is rejected", async () => {
   const run = await runPublication("comment-fail");
   expect(run.result).toMatchObject({

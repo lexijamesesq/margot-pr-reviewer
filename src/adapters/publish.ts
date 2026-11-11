@@ -24,6 +24,24 @@ export function notReviewedReason(stage: string): string | undefined {
   return stage.startsWith("card:") ? councilReason : notReviewedReasons[stage as Stage];
 }
 
+/** A conservative logging allowlist, not GitHub's identifier grammar. */
+function diagnosticIdentifier(value: unknown): string | undefined {
+  return typeof value === "string" && /^[A-Za-z0-9._/:-]{1,128}$/.test(value) ? value : undefined;
+}
+/**
+ * The failure's message, with GitHub's HTTP status and request id when GitHub answered. Only
+ * those two bounded values are added: never a token, a header set or a response body.
+ */
+function failureMessage(error: unknown): string {
+  const { status, response } = (error ?? {}) as {
+    status?: unknown;
+    response?: { headers?: Record<string, unknown> };
+  };
+  const requestId = diagnosticIdentifier(response?.headers?.["x-github-request-id"]);
+  const http = typeof status === "number" && Number.isInteger(status) ? status : undefined;
+  return `${errorMessage(error)}${http === undefined ? "" : `; github_status=${http}`}${requestId ? `; github_request_id=${requestId}` : ""}`;
+}
+
 type RefusalReason = "draft" | "fork" | "closed" | "stale";
 
 class PublicationRefusal extends Error {
@@ -125,7 +143,7 @@ export function githubPublisher(
         .sort((a, b) => b.id - a.id)[0];
       // A same-head retry finds the previous run's check already completed. GitHub does
       // not reopen a completed check-run, so a retry opens a new one rather than
-      // failing on the readback of a PATCH that could not take.
+      // failing on an update that could not take.
       if (existing && !(payload.status === "in_progress" && existing.status === "completed")) {
         if (isTriage && (!Number.isSafeInteger(existing.id) || existing.id <= 0))
           throw new Error("Invalid check adoption ID");
@@ -148,29 +166,11 @@ export function githubPublisher(
     ].filter(Boolean);
     if (mismatches.length)
       throw new Error(`Invalid check write receipt for ${name}: ${mismatches.join(", ")}`);
-    if (!isTriage) {
-      ids.set(name, data.id);
-      return data;
-    }
-    const persisted = (await client.rest.checks.get({ ...params(r, c), check_run_id: data.id }))
-      .data;
-    if (
-      persisted.id !== data.id ||
-      persisted.name !== name ||
-      persisted.head_sha !== r.head ||
-      persisted.app?.id !== config.appId ||
-      persisted.external_id !== payload.external_id ||
-      persisted.details_url !== config.runUrl ||
-      persisted.status !== payload.status ||
-      (conclusion && persisted.conclusion !== conclusion) ||
-      persisted.output.title !== payload.output.title ||
-      persisted.output.summary !== summary ||
-      (persisted.output.text ?? undefined) !== payload.output.text
-    )
-      throw new Error(`Check write not confirmed for ${name}`);
-    // Only authenticated persisted triage ownership may be reused by later triage writes/cleanup.
+    // The id is recorded from the validated write response, so later writes and cleanup can find
+    // the check this run opened. Each of them still reads the check through the ownership guard
+    // first, and the consumer authenticates the terminal triage check again in its own job.
     ids.set(name, data.id);
-    return persisted;
+    return data;
   }
   async function check(
     r: ReviewRequest,
@@ -183,18 +183,6 @@ export function githubPublisher(
   ) {
     await guard(r, c);
     return writeCheck(r, name, conclusion, title, summary, text, c);
-  }
-  async function confirmReviewCheck(r: ReviewRequest, conclusion: string, c: CallContext) {
-    const id = ids.get(config.checks.review);
-    if (!id) throw new Error("Review check was not completed after publication");
-    const { data } = await client.rest.checks.get({ ...params(r, c), check_run_id: id });
-    if (
-      data.status !== "completed" ||
-      data.conclusion !== conclusion ||
-      data.head_sha !== r.head ||
-      data.app?.id !== config.appId
-    )
-      throw new Error("Review check was not confirmed after publication");
   }
   const disableAutoMerge: Services["disableAutoMerge"] = async (r, c) => {
     const { data: pr } = await readClient.rest.pulls.get(params(r, c));
@@ -220,7 +208,7 @@ export function githubPublisher(
     source = "jev",
     mechanicalProbability: number | null = null,
   ) {
-    const persisted = await check(
+    const written = await check(
       r,
       config.checks.triage,
       "success",
@@ -244,12 +232,12 @@ export function githubPublisher(
       c,
     );
     authenticateTriageCheck(
-      persisted,
-      { ...r, triageCheckId: persisted.id },
+      written,
+      { ...r, triageCheckId: written.id },
       { appId: config.appId, name: config.checks.triage },
     );
     await guard(r, c);
-    return persisted.id;
+    return written.id;
   }
   const progress: NonNullable<Services["progress"]> = async (title, c) => {
     if (active?.phase !== "review")
@@ -335,7 +323,6 @@ export function githubPublisher(
       checkText(review),
       c,
     );
-    await confirmReviewCheck(r, reviewConclusion, c);
     await guard(r, c, decision.mergeEligible);
     return { recorded: false, head: r.head, id: String(data.id) };
   };
@@ -412,7 +399,7 @@ export function githubPublisher(
             refusalFailures.push("disable auto-merge cleanup unconfirmed: disable unconfirmed");
         } catch (disableError) {
           refusalFailures.push(
-            `disable auto-merge cleanup unconfirmed: ${errorMessage(disableError)}`,
+            `disable auto-merge cleanup unconfirmed: ${failureMessage(disableError)}`,
           );
         }
         try {
@@ -428,7 +415,7 @@ export function githubPublisher(
             context(),
           );
         } catch (refusalError) {
-          refusalFailures.push(`refusal check unconfirmed: ${errorMessage(refusalError)}`);
+          refusalFailures.push(`refusal check unconfirmed: ${failureMessage(refusalError)}`);
         }
         return {
           kind: "error",
@@ -477,7 +464,7 @@ export function githubPublisher(
         try {
           await cleanup();
         } catch (cleanupError) {
-          failures.push(`${label} cleanup unconfirmed: ${errorMessage(cleanupError)}`);
+          failures.push(`${label} cleanup unconfirmed: ${failureMessage(cleanupError)}`);
         }
       }
       // The check is closed first; the author then gets the reason in the conversation too.
@@ -490,7 +477,7 @@ export function githubPublisher(
           () => true,
           (guardError: unknown) => {
             if (!(guardError instanceof PublicationRefusal))
-              failures.push(`not-reviewed comment skipped: ${errorMessage(guardError)}`);
+              failures.push(`not-reviewed comment skipped: ${failureMessage(guardError)}`);
             return false;
           },
         );
@@ -503,18 +490,37 @@ export function githubPublisher(
               body: `Not reviewed: ${notReviewed}. The review run has the details. Held for the operator.`,
             });
           } catch (commentError) {
-            failures.push(`not-reviewed comment unconfirmed: ${errorMessage(commentError)}`);
+            failures.push(`not-reviewed comment unconfirmed: ${failureMessage(commentError)}`);
           }
       }
       return {
         kind: "error",
         stage: "publication",
         mergeEligible: false,
-        diagnostic: `${errorMessage(error)}${failures.length ? `; ${failures.join("; ")}` : ""}`,
+        diagnostic: `${failureMessage(error)}${failures.length ? `; ${failures.join("; ")}` : ""}`,
       };
     }
   }
-  return { run, publish, disableAutoMerge, progress };
+  // The review stage turns whatever these throw into plain text, so a GitHub failure carries its
+  // status and request id across that boundary. An error GitHub did not answer, such as a
+  // refusal, passes through unchanged.
+  const withGithubDetail =
+    <A extends unknown[], T>(fn: (...args: A) => Promise<T>) =>
+    async (...args: A): Promise<T> => {
+      try {
+        return await fn(...args);
+      } catch (error) {
+        const message = failureMessage(error);
+        if (message === errorMessage(error)) throw error;
+        throw new Error(message, { cause: error });
+      }
+    };
+  return {
+    run,
+    publish: withGithubDetail(publish),
+    disableAutoMerge: withGithubDetail(disableAutoMerge),
+    progress: withGithubDetail(progress),
+  };
 }
 
 export function capCheckText(text: string): string {

@@ -20,24 +20,23 @@ for (const [name, mode] of [
       expect(run.final?.conclusion).toBe("action_required");
     }
   });
-for (const [name, mode] of [
-  ["fails closed before approving when the head moves", "head"],
-  ["fails publication when the final check reads back as in progress", "confirm"],
-] as const)
-  it(name, async () => {
-    const run = await runPublication(mode);
-    expect({
-      kind: run.result.kind,
-      completedWrite: run.writes.some(
-        (w) => w.body.name === publisherOptions.checks.review && w.body.conclusion === "success",
-      ),
-      approvalAttempted: run.writes.some((w) => w.body.event === "APPROVE"),
-    }).toMatchObject(
-      mode === "head"
-        ? { kind: "error", completedWrite: false, approvalAttempted: false }
-        : { kind: "error", completedWrite: true, approvalAttempted: true },
-    );
-  });
+it("fails closed before approving when the head moves", async () => {
+  const run = await runPublication("head");
+  expect({
+    kind: run.result.kind,
+    completedWrite: run.writes.some(
+      (w) => w.body.name === publisherOptions.checks.review && w.body.conclusion === "success",
+    ),
+    approvalAttempted: run.writes.some((w) => w.body.event === "APPROVE"),
+  }).toMatchObject({ kind: "error", completedWrite: false, approvalAttempted: false });
+});
+it("still posts the review and ends reviewed when the concluded check reads back stale", async () => {
+  const run = await runPublication("stale-readback");
+  expect({
+    kind: run.result.kind,
+    approvals: run.writes.filter((w) => w.body.event === "APPROVE").length,
+  }).toEqual({ kind: "reviewed", approvals: 1 });
+});
 it("closes the gate without touching earlier reviews when evaluation errors", async () => {
   const run = await runPublication("error");
   expect({

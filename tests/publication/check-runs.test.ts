@@ -44,7 +44,7 @@ it("carries the lines merge automation parses to request the operator when the r
   });
 });
 it("overwrites the verdict check text after a later failure so merge automation never reads a stale approval", async () => {
-  const run = await runPublication("confirm");
+  const run = await runPublication("final-guard-fail");
   const output = (run.final?.output ?? {}) as {
     text?: string;
   };

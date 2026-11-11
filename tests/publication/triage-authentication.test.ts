@@ -16,6 +16,7 @@ async function run(
     receipt?: (check: Check) => Check;
     readback?: (check: Check, ordinal: number) => Check;
     afterReadback?: () => boolean;
+    notFoundBeforeEvaluation?: boolean;
   } = {},
 ) {
   const stored = new Map<number, Check>();
@@ -51,6 +52,8 @@ async function run(
         else if (/\/check-runs\/\d+$/.test(path)) {
           const id = Number(path.split("/").at(-1));
           reads.push(id);
+          if (!stored.has(id) || (options.notFoundBeforeEvaluation && !evaluated))
+            return new Response(JSON.stringify({ message: "Not Found" }), { status: 404 });
           data =
             options.readback?.(structuredClone(stored.get(id) as Check), ++checkReads) ??
             stored.get(id);
@@ -99,7 +102,7 @@ const seed = {
   details_url: "https://example.test/old",
   external_id: checkExternalId(request),
 };
-it("returns the actual read-back ID with complete versioned triage", async () => {
+it("returns the written check's ID with complete versioned triage", async () => {
   const r = await run();
   expect(r.result).toMatchObject({ kind: "classified", triage_check_id: 101 });
   expect(r.reads).toContain(101);
@@ -117,6 +120,18 @@ it("returns the actual read-back ID with complete versioned triage", async () =>
     mechanical_probability: 0.9,
   });
 });
+it("does not read the new check back before evaluation, when GitHub may not serve it yet", async () => {
+  const r = await run({ notFoundBeforeEvaluation: true });
+  expect(r.result).toMatchObject({ kind: "classified", triage_check_id: 101 });
+});
+it("authenticates the terminal write response, so an unreadable machine payload fails triage", async () => {
+  const r = await run({
+    receipt: (v) =>
+      v.conclusion === "success" ? { ...v, output: { ...(v.output as object), text: "{}" } } : v,
+  });
+  expect(r.result.kind).toBe("error");
+  expect(r.result).not.toHaveProperty("triage_check_id");
+});
 it("never adopts another PR with the same head", async () => {
   const r = await run({ seed: { ...seed, external_id: checkExternalId({ ...request, pr: 999 }) } });
   expect(r.result).toMatchObject({ kind: "classified", triage_check_id: 101 });
@@ -130,10 +145,9 @@ it.each([0, 1.5, Number.MAX_SAFE_INTEGER + 1])(
     expect(r.writes).toEqual([]);
   },
 );
-it("withholds ownership when the new check ID has no confirmed readback", async () => {
+it("never writes to a check it cannot read back as its own", async () => {
   const r = await run({ receipt: (check) => ({ ...check, id: 999 }) });
   expect(r.result.kind).toBe("error");
-  expect(r.evaluated).toBe(false);
   expect(r.writes).toHaveLength(1);
   expect(r.writes.some((write) => write.path.endsWith("/999"))).toBe(false);
 });
@@ -150,33 +164,28 @@ it.each([
   expect(r.writes).toHaveLength(1);
   expect(r.writes.some((w) => w.path.endsWith("/999"))).toBe(false);
 });
-it("does not seize newer ownership after an unconfirmed opening write", async () => {
+it("does not seize newer ownership after the opening write", async () => {
   const r = await run({
     armed: true,
     readback: (v) => ({ ...v, details_url: "https://example.test/new-run" }),
   });
   expect(r.result.kind).toBe("error");
-  expect(r.evaluated).toBe(false);
   expect(r.writes).toHaveLength(1);
   expect(r.writes.some((write) => write.path === "/graphql")).toBe(false);
 });
-it.each([
-  { status: "in_progress" },
-  { conclusion: "failure" },
-  { name: "foreign" },
-  { app: { id: 15368 } },
-  { external_id: "foreign" },
-  { output: { text: "{}" } },
-])("rejects corrupted persisted terminal triage %j", async (patch) => {
-  const r = await run({ readback: (v) => (v.conclusion === "success" ? { ...v, ...patch } : v) });
-  expect(r.result.kind).toBe("error");
-  expect(r.result).not.toHaveProperty("triage_check_id");
-});
-it("revalidates live base after terminal readback", async () => {
+it.each([{ name: "foreign" }, { app: { id: 15368 } }, { external_id: "foreign" }])(
+  "rejects corrupted persisted terminal triage %j",
+  async (patch) => {
+    const r = await run({ readback: (v) => (v.conclusion === "success" ? { ...v, ...patch } : v) });
+    expect(r.result.kind).toBe("error");
+    expect(r.result).not.toHaveProperty("triage_check_id");
+  },
+);
+it("revalidates live base after the terminal write", async () => {
   let moved = false;
   const r = await run({
     armed: true,
-    readback: (v) => {
+    receipt: (v) => {
       if (v.conclusion === "success") moved = true;
       return v;
     },
