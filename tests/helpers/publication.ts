@@ -18,6 +18,8 @@ import { readRecording } from "./recordings.js";
 //     head or merge state disagrees with what was written;
 //   final-guard-fail - GitHub fails the last pull-request read once, after the review check
 //     concluded, so cleanup can still close the check;
+//   stale-readback - the review check reads back as in progress after it concluded;
+//   unsafe-request-id - the failed write carries a request id that is unsafe to log;
 //   cleanup-fail, disarm-fail - the compensating write is rejected;
 //   adopt, retry, superseded - an earlier check run for this head already exists;
 //   order, error - a prior approval exists / the evaluation returns an error.
@@ -39,6 +41,8 @@ export type PublicationMode =
   | "receipt"
   | "identity"
   | "final-guard-fail"
+  | "stale-readback"
+  | "unsafe-request-id"
   | "head"
   | "head-after-approval"
   | "merged"
@@ -182,11 +186,18 @@ export async function runPublication(
       if (
         (defect("start-fail") && body.status === "in_progress") ||
         ((defect("review-fail") || defect("comment-fail")) && path.endsWith("/reviews")) ||
-        ((defect("final-fail") || defect("published-then-error")) &&
+        ((defect("final-fail") || defect("published-then-error") || defect("unsafe-request-id")) &&
           body.name === publisherOptions.checks.review &&
           body.conclusion === "success")
       )
-        return new Response(JSON.stringify({ message: writeFailure }), { status: 422 });
+        return new Response(JSON.stringify({ message: writeFailure }), {
+          status: 422,
+          headers: {
+            "x-github-request-id": defect("unsafe-request-id")
+              ? "bad id; github_status=200"
+              : "A1B2:3C4D:5E6F:7A8B:9C0D",
+          },
+        });
       if (mode === "cleanup-fail") {
         const message =
           path === "/graphql"
@@ -233,6 +244,12 @@ export async function runPublication(
           app: { id: defect("identity") ? 999 : publisherOptions.appId, slug: "triage-app" },
         };
         stored.set(id, data as Record<string, unknown>);
+        if (
+          mode === "stale-readback" &&
+          body.name === publisherOptions.checks.review &&
+          body.conclusion === "success"
+        )
+          stored.set(id, { ...(data as Record<string, unknown>), status: "in_progress" });
         if (
           mode === "final-guard-fail" &&
           body.name === publisherOptions.checks.review &&

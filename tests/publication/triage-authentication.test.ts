@@ -102,7 +102,7 @@ const seed = {
   details_url: "https://example.test/old",
   external_id: checkExternalId(request),
 };
-it("returns the actual read-back ID with complete versioned triage", async () => {
+it("returns the written check's ID with complete versioned triage", async () => {
   const r = await run();
   expect(r.result).toMatchObject({ kind: "classified", triage_check_id: 101 });
   expect(r.reads).toContain(101);
@@ -123,6 +123,14 @@ it("returns the actual read-back ID with complete versioned triage", async () =>
 it("does not read the new check back before evaluation, when GitHub may not serve it yet", async () => {
   const r = await run({ notFoundBeforeEvaluation: true });
   expect(r.result).toMatchObject({ kind: "classified", triage_check_id: 101 });
+});
+it("authenticates the terminal write response, so an unreadable machine payload fails triage", async () => {
+  const r = await run({
+    receipt: (v) =>
+      v.conclusion === "success" ? { ...v, output: { ...(v.output as object), text: "{}" } } : v,
+  });
+  expect(r.result.kind).toBe("error");
+  expect(r.result).not.toHaveProperty("triage_check_id");
 });
 it("never adopts another PR with the same head", async () => {
   const r = await run({ seed: { ...seed, external_id: checkExternalId({ ...request, pr: 999 }) } });

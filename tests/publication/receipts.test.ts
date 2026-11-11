@@ -30,6 +30,13 @@ it("fails closed before approving when the head moves", async () => {
     approvalAttempted: run.writes.some((w) => w.body.event === "APPROVE"),
   }).toMatchObject({ kind: "error", completedWrite: false, approvalAttempted: false });
 });
+it("still posts the review and ends reviewed when the concluded check reads back stale", async () => {
+  const run = await runPublication("stale-readback");
+  expect({
+    kind: run.result.kind,
+    approvals: run.writes.filter((w) => w.body.event === "APPROVE").length,
+  }).toEqual({ kind: "reviewed", approvals: 1 });
+});
 it("closes the gate without touching earlier reviews when evaluation errors", async () => {
   const run = await runPublication("error");
   expect({

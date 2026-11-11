@@ -2,7 +2,7 @@
 
 ## 0.13.1
 
-- Stop reading a check run back from GitHub straight after writing it. The triage check and the review check were each read once, within about a second, with no retry, and a "not found" or stale answer failed the whole publication even though the write had succeeded. The id of each check is now recorded from the validated write response, so a check the run opened can always be closed. The triage check is still authenticated by the review job that consumes it, and the ownership guard still runs before each later write.
+- Stop reading a check run back from GitHub straight after writing it. The triage check and the review check were each read once, within about a second, with no retry, and a "not found" or stale answer failed the whole publication even though the write had succeeded. The id of each check is now recorded from the validated write response, so later writes and cleanup can find the check the run opened; each still reads it through the ownership guard first. The triage check is still authenticated by the review job that consumes it, and the ownership guard still runs before each later write.
 - A triage run whose check cannot be served (a bad or missing id) is now stopped at the next ownership guard, after the classification call and before any further write, where it was stopped before classification.
 - Publication failures now carry GitHub's HTTP status and request id (`github_status`, `github_request_id`) in the diagnostic. No token, header set or response body is added.
 

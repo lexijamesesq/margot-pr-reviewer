@@ -166,9 +166,9 @@ export function githubPublisher(
     ].filter(Boolean);
     if (mismatches.length)
       throw new Error(`Invalid check write receipt for ${name}: ${mismatches.join(", ")}`);
-    // The id is recorded from the validated write response, so a check this run opened can
-    // always be closed. Later guards authenticate ownership; the consumer authenticates the
-    // terminal triage check again in its own job.
+    // The id is recorded from the validated write response, so later writes and cleanup can find
+    // the check this run opened. Each of them still reads the check through the ownership guard
+    // first, and the consumer authenticates the terminal triage check again in its own job.
     ids.set(name, data.id);
     return data;
   }
@@ -208,7 +208,7 @@ export function githubPublisher(
     source = "jev",
     mechanicalProbability: number | null = null,
   ) {
-    const persisted = await check(
+    const written = await check(
       r,
       config.checks.triage,
       "success",
@@ -232,12 +232,12 @@ export function githubPublisher(
       c,
     );
     authenticateTriageCheck(
-      persisted,
-      { ...r, triageCheckId: persisted.id },
+      written,
+      { ...r, triageCheckId: written.id },
       { appId: config.appId, name: config.checks.triage },
     );
     await guard(r, c);
-    return persisted.id;
+    return written.id;
   }
   const progress: NonNullable<Services["progress"]> = async (title, c) => {
     if (active?.phase !== "review")
