@@ -71,6 +71,13 @@ it("posts no not-reviewed comment under a review that was already posted", async
   const run = await runPublication("published-then-error");
   expect(comments(run).map((w) => w.body.event)).toEqual(["APPROVE"]);
 });
+it("carries GitHub's HTTP status into the diagnostic when a publication write fails inside the review", async () => {
+  const run = await runPublication("published-then-error");
+  expect(run.result).toMatchObject({
+    kind: "error",
+    diagnostic: expect.stringContaining("github_status=422"),
+  });
+});
 it("returns the error result, naming the failed comment write, when the comment is rejected", async () => {
   const run = await runPublication("comment-fail");
   expect(run.result).toMatchObject({

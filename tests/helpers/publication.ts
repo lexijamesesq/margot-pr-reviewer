@@ -14,8 +14,10 @@ import { readRecording } from "./recordings.js";
 //     - the review the publisher is given (default `clear`: a clean approval);
 //   closed, fork, draft, base - the pull request is not reviewable;
 //   start-fail, review-fail, final-fail - the write named by the mode is rejected by GitHub;
-//   receipt, identity, confirm, head, head-after-approval, merged - a GitHub receipt or the
+//   receipt, identity, head, head-after-approval, merged - a GitHub receipt or the
 //     head or merge state disagrees with what was written;
+//   final-guard-fail - GitHub fails the last pull-request read once, after the review check
+//     concluded, so cleanup can still close the check;
 //   cleanup-fail, disarm-fail - the compensating write is rejected;
 //   adopt, retry, superseded - an earlier check run for this head already exists;
 //   order, error - a prior approval exists / the evaluation returns an error.
@@ -36,7 +38,7 @@ export type PublicationMode =
   | "final-fail"
   | "receipt"
   | "identity"
-  | "confirm"
+  | "final-guard-fail"
   | "head"
   | "head-after-approval"
   | "merged"
@@ -135,6 +137,7 @@ export async function runPublication(
   let evaluated = false;
   let moved = false;
   let unconfirmed = false;
+  let failNextPullRead = false;
   let draftNow = false;
   let sequence = 0;
   const defect = (name: string) => mode === name;
@@ -153,6 +156,10 @@ export async function runPublication(
     if (method === "GET") {
       if (unconfirmed && /\/pulls\/\d+$/.test(path))
         return new Response(JSON.stringify({ message: "Recorded outage" }), { status: 502 });
+      if (failNextPullRead && /\/pulls\/\d+$/.test(path)) {
+        failNextPullRead = false;
+        return new Response(JSON.stringify({ message: "Recorded outage" }), { status: 502 });
+      }
       if (path.endsWith("/reviews")) data = reviews;
       else if (path.endsWith("/check-runs"))
         data = { check_runs: [...stored.values()], total_count: stored.size };
@@ -227,11 +234,11 @@ export async function runPublication(
         };
         stored.set(id, data as Record<string, unknown>);
         if (
-          mode === "confirm" &&
+          mode === "final-guard-fail" &&
           body.name === publisherOptions.checks.review &&
           body.conclusion === "success"
         )
-          stored.set(id, { ...(data as Record<string, unknown>), status: "in_progress" });
+          failNextPullRead = true;
         if (
           mode === "merged" &&
           body.name === publisherOptions.checks.review &&
