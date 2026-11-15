@@ -1,3 +1,13 @@
+---
+tags:
+  - type/claude-repo
+description: "Margot's reviewer: the package that reads a pull request, runs the review council and rules on it."
+linear_project_id: "1f5a661d-2d4e-4dcf-b67e-f707b8dc5164"
+linear_url: "https://linear.app/lexijamesesq/project/margot-04c3ecfb365b"
+notion_project: "https://app.notion.com/p/4195f53f7dbc81928f31ed5598ce4f7c"
+notion_knowledge: "collection://4195f53f-7dbc-8149-86c9-000bf8b74e54"
+---
+
 # Margot PR reviewer
 
 This package owns review and convergence decisions. It provides live read-only
